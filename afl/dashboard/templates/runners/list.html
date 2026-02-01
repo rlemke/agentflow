@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Runners — AgentFlow{% endblock %}
+{% block content %}
+<h1>Runners</h1>
+
+<nav>
+    <a href="/runners">All</a> |
+    <a href="/runners?state=running">Running</a> |
+    <a href="/runners?state=completed">Completed</a> |
+    <a href="/runners?state=failed">Failed</a> |
+    <a href="/runners?state=paused">Paused</a> |
+    <a href="/runners?state=cancelled">Cancelled</a>
+</nav>
+
+{% if filter_state %}
+<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+{% endif %}
+
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Workflow</th>
+            <th>State</th>
+            <th>Started</th>
+            <th>Duration</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody hx-get="/api/runners?partial=true{% if filter_state %}&state={{ filter_state }}{% endif %}"
+           hx-trigger="every 5s"
+           hx-swap="innerHTML">
+        {% for runner in runners %}
+        {% include "partials/runner_row.html" %}
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}New Workflow — AgentFlow Dashboard{% endblock %}
+{% block content %}
+<h1>New Workflow</h1>
+
+<form method="POST" action="/workflows/compile" enctype="application/x-www-form-urlencoded">
+    <label for="source">AFL Source</label>
+    <textarea id="source" name="source" rows="20">facet MyFacet(input: Long)
+
+workflow MyWorkflow(x: Long) => (result: Long) andThen {
+    s1 = MyFacet(input = $.x)
+    yield MyWorkflow(result = s1.input)
+}</textarea>
+    <button type="submit">Compile</button>
+</form>
+{% endblock %}

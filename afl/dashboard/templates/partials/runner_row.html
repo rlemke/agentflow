@@ -1,0 +1,10 @@
+<tr>
+    <td><a href="/runners/{{ runner.uuid }}" class="mono">{{ runner.uuid|truncate_uuid }}</a></td>
+    <td>{{ runner.workflow.name }}</td>
+    <td>{% include "partials/status_badge.html" with context %}</td>
+    <td>{{ runner.start_time|timestamp }}</td>
+    <td>{{ runner.duration|duration }}</td>
+    <td class="actions">
+        <a href="/runners/{{ runner.uuid }}" role="button" class="outline" style="font-size:0.8em;padding:0.2em 0.5em;">View</a>
+    </td>
+</tr>

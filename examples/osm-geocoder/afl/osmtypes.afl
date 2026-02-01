@@ -1,0 +1,8 @@
+
+schema OSMCache {
+   url: String
+   path: String
+   date: String
+   size: Long
+   wasInCache: Boolean
+}

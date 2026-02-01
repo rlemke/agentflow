@@ -1,0 +1,297 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""AFL AST node definitions using dataclasses."""
+
+import uuid
+from dataclasses import dataclass, field
+
+
+def _generate_uuid() -> str:
+    """Generate a unique UUID for an AST node."""
+    return str(uuid.uuid4())
+
+
+@dataclass
+class SourceLocation:
+    """Source code location for error reporting with provenance tracking."""
+
+    line: int
+    column: int
+    end_line: int | None = None
+    end_column: int | None = None
+    source_id: str | None = None  # Reference to SourceRegistry for provenance
+
+
+@dataclass
+class ASTNode:
+    """Base class for all AST nodes."""
+
+    node_id: str = field(default_factory=_generate_uuid, compare=False, repr=False, kw_only=True)
+    location: SourceLocation | None = field(default=None, compare=False, repr=False, kw_only=True)
+
+
+# Types
+@dataclass
+class TypeRef(ASTNode):
+    """Type reference (builtin or qualified name)."""
+
+    name: str
+
+
+@dataclass
+class ArrayType(ASTNode):
+    """Array type: [ElementType]."""
+
+    element_type: "TypeRef | ArrayType"
+
+
+# Parameters
+@dataclass
+class Parameter(ASTNode):
+    """Parameter declaration: name: Type = default"""
+
+    name: str
+    type: "TypeRef | ArrayType"
+    default: "Literal | Reference | ConcatExpr | None" = None
+
+
+# Expressions
+@dataclass
+class Literal(ASTNode):
+    """Literal value (string, int, bool, null)."""
+
+    value: object
+    kind: str  # "string", "integer", "boolean", "null"
+
+
+@dataclass
+class Reference(ASTNode):
+    """Reference to input ($.field) or step output (step.field)."""
+
+    path: list[str]
+    is_input: bool  # True for $.field, False for step.field
+
+
+@dataclass
+class ConcatExpr(ASTNode):
+    """Concatenation expression: expr ++ expr ++ ..."""
+
+    operands: list["Literal | Reference | ConcatExpr"]
+
+
+@dataclass
+class NamedArg(ASTNode):
+    """Named argument: name = expr"""
+
+    name: str
+    value: "Literal | Reference | ConcatExpr"
+
+
+# Mixins
+@dataclass
+class MixinSig(ASTNode):
+    """Mixin signature in facet declaration: with Name(args)"""
+
+    name: str
+    args: list[NamedArg] = field(default_factory=list)
+
+
+@dataclass
+class MixinCall(ASTNode):
+    """Mixin call in expression: with Name(args) as alias"""
+
+    name: str
+    args: list[NamedArg] = field(default_factory=list)
+    alias: str | None = None
+
+
+# Call expressions
+@dataclass
+class CallExpr(ASTNode):
+    """Call expression: Name(args) with mixins"""
+
+    name: str
+    args: list[NamedArg] = field(default_factory=list)
+    mixins: list[MixinCall] = field(default_factory=list)
+
+
+# Statements
+@dataclass
+class StepStmt(ASTNode):
+    """Step statement: name = CallExpr"""
+
+    name: str
+    call: CallExpr
+
+
+@dataclass
+class YieldStmt(ASTNode):
+    """Yield statement: yield CallExpr"""
+
+    call: CallExpr
+
+
+# Blocks
+@dataclass
+class ForeachClause(ASTNode):
+    """Foreach clause: foreach var in reference"""
+
+    variable: str
+    iterable: Reference
+
+
+@dataclass
+class Block(ASTNode):
+    """Block: { steps... yields* }"""
+
+    steps: list[StepStmt] = field(default_factory=list)
+    yield_stmts: list[YieldStmt] = field(default_factory=list)
+
+    # Backwards compatibility property
+    @property
+    def yield_stmt(self) -> YieldStmt | None:
+        """Return first yield statement for backwards compatibility."""
+        return self.yield_stmts[0] if self.yield_stmts else None
+
+
+@dataclass
+class AndThenBlock(ASTNode):
+    """andThen block with optional foreach."""
+
+    block: Block
+    foreach: ForeachClause | None = None
+
+
+# Return clause
+@dataclass
+class ReturnClause(ASTNode):
+    """Return clause: => (params)"""
+
+    params: list[Parameter] = field(default_factory=list)
+
+
+# Facet signature
+@dataclass
+class FacetSig(ASTNode):
+    """Facet signature: Name(params) => (returns) with mixins"""
+
+    name: str
+    params: list[Parameter] = field(default_factory=list)
+    returns: ReturnClause | None = None
+    mixins: list[MixinSig] = field(default_factory=list)
+
+
+# Declarations
+@dataclass
+class FacetDecl(ASTNode):
+    """Facet declaration."""
+
+    sig: FacetSig
+    body: AndThenBlock | None = None
+
+
+@dataclass
+class EventFacetDecl(ASTNode):
+    """Event facet declaration."""
+
+    sig: FacetSig
+    body: AndThenBlock | None = None
+
+
+@dataclass
+class WorkflowDecl(ASTNode):
+    """Workflow declaration."""
+
+    sig: FacetSig
+    body: AndThenBlock | None = None
+
+
+@dataclass
+class ImplicitDecl(ASTNode):
+    """Implicit declaration: implicit name = CallExpr"""
+
+    name: str
+    call: CallExpr
+
+
+@dataclass
+class UsesDecl(ASTNode):
+    """Uses declaration: uses qualified.name"""
+
+    name: str
+
+
+# Schema declarations
+@dataclass
+class SchemaField(ASTNode):
+    """Schema field: name: Type"""
+
+    name: str
+    type: "TypeRef | ArrayType"
+
+
+@dataclass
+class SchemaDecl(ASTNode):
+    """Schema declaration: schema Name { fields }"""
+
+    name: str
+    fields: list[SchemaField] = field(default_factory=list)
+
+
+# Namespace
+@dataclass
+class Namespace(ASTNode):
+    """Namespace block."""
+
+    name: str
+    uses: list[UsesDecl] = field(default_factory=list)
+    facets: list[FacetDecl] = field(default_factory=list)
+    event_facets: list[EventFacetDecl] = field(default_factory=list)
+    workflows: list[WorkflowDecl] = field(default_factory=list)
+    implicits: list[ImplicitDecl] = field(default_factory=list)
+    schemas: list[SchemaDecl] = field(default_factory=list)
+
+
+# Program (root)
+@dataclass
+class Program(ASTNode):
+    """Root AST node representing an AFL program."""
+
+    namespaces: list[Namespace] = field(default_factory=list)
+    facets: list[FacetDecl] = field(default_factory=list)
+    event_facets: list[EventFacetDecl] = field(default_factory=list)
+    workflows: list[WorkflowDecl] = field(default_factory=list)
+    implicits: list[ImplicitDecl] = field(default_factory=list)
+    schemas: list[SchemaDecl] = field(default_factory=list)
+
+    @classmethod
+    def merge(cls, programs: list["Program"]) -> "Program":
+        """Merge multiple Program ASTs into one.
+
+        Args:
+            programs: List of Program ASTs to merge
+
+        Returns:
+            Single merged Program AST
+        """
+        merged = cls()
+        for prog in programs:
+            merged.namespaces.extend(prog.namespaces)
+            merged.facets.extend(prog.facets)
+            merged.event_facets.extend(prog.event_facets)
+            merged.workflows.extend(prog.workflows)
+            merged.implicits.extend(prog.implicits)
+            merged.schemas.extend(prog.schemas)
+        return merged

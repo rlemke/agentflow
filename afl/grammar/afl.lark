@@ -1,0 +1,109 @@
+// Copyright 2025 Ralph Lemke
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// AFL v1 Grammar (Lark LALR)
+
+start: _NL* (namespace_block | top_level_decl | schema_decl)*
+
+// Namespace
+namespace_block: "namespace" QNAME "{" _NL* namespace_body "}" _NL*
+namespace_body: (uses_decl | facet_decl | event_facet_decl | workflow_decl | implicit_decl | schema_decl)*
+
+uses_decl: ("uses" | "use") QNAME _stmt_end
+
+// Top-level declarations
+top_level_decl: facet_decl | event_facet_decl | workflow_decl | implicit_decl
+
+facet_decl: "facet" facet_sig facet_def_tail? _stmt_end
+event_facet_decl: "event" "facet" facet_sig facet_def_tail? _stmt_end
+workflow_decl: "workflow" facet_sig facet_def_tail? _stmt_end
+
+// Facet signature
+facet_sig: IDENT "(" [params] ")" [return_clause] mixin_sig*
+return_clause: "=>" "(" [params] ")"
+
+// Parameters (allow newlines)
+params: _NL* param (_NL* "," _NL* param)* _NL*
+param: IDENT ":" type ("=" expr)?
+
+type: array_type | TYPE_BUILTIN | QNAME
+array_type: "[" type "]"
+
+mixin_sig: "with" QNAME "(" [named_args] ")"
+
+// andThen blocks
+facet_def_tail: "andThen" foreach_clause? block
+foreach_clause: "foreach" IDENT "in" reference
+
+block: "{" _NL* block_body "}"
+block_body: (step_stmt _NL*)* (yield_stmt _NL*)*
+step_stmt: IDENT "=" call_expr
+
+yield_stmt: "yield" call_expr
+
+// Call expressions
+call_expr: QNAME "(" [named_args] ")" mixin_call*
+mixin_call: "with" QNAME "(" [named_args] ")" ["as" IDENT]
+
+// Arguments (allow newlines)
+named_args: _NL* named_arg (_NL* "," _NL* named_arg)* _NL*
+named_arg: IDENT "=" _NL* expr
+
+// Expressions
+expr: concat_expr
+concat_expr: atom_expr ("++" _NL* atom_expr)*
+atom_expr: literal | reference
+
+reference: INPUT_REF | step_ref
+step_ref: IDENT ("." IDENT)+
+INPUT_REF: "$." IDENT ("." IDENT)*
+
+literal: STRING | INTEGER | BOOLEAN | NULL
+
+// Schema declarations
+schema_decl: "schema" IDENT "{" _NL* schema_fields "}" _stmt_end
+schema_fields: (schema_field _NL*)*
+schema_field: IDENT ":" type
+
+// Implicit declarations
+implicit_decl: "implicit" IDENT "=" call_expr _stmt_end
+
+// Statement terminator (newline or semicolon, both optional in many contexts)
+_stmt_end: (_NL+ | ";" _NL* | )
+
+// Terminals - order matters for priority
+// Keywords and literals must come before IDENT
+BOOLEAN.2: "true" | "false"
+NULL.2: "null"
+TYPE_BUILTIN.2: "String" | "Long" | "Int" | "Boolean" | "Json"
+
+STRING: "\"" _STRING_INNER* "\""
+_STRING_INNER: /[^"\\]/ | _ESCAPE
+_ESCAPE: "\\" /./
+
+INTEGER: /[0-9]+/
+
+IDENT: /[A-Za-z_][A-Za-z0-9_]*/
+QNAME: IDENT ("." IDENT)*
+
+// Comments
+COMMENT: "//" /[^\n]/*
+BLOCK_COMMENT: "/*" /(.|\n)*?/ "*/"
+
+// Whitespace and newlines
+_NL: /(\r?\n)+/
+%import common.WS_INLINE
+%ignore WS_INLINE
+%ignore COMMENT
+%ignore BLOCK_COMMENT

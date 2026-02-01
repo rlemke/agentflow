@@ -1,0 +1,172 @@
+namespace osm.geo.Africa.cache {
+
+  use osm.geo.Operations
+  use osm.geo.cache.Africa
+
+  facet AfricaIndividually() => (cache: [OSMCache]) andThen {
+    algeria = Algeria()
+    angola = Angola()
+    benin = Benin()
+    botswana = Botswana()
+    burkinaFaso = BurkinaFaso()
+    burundi = Burundi()
+    capeVerde = CapeVerde()
+    cameroon = Cameroon()
+    centralAfricanRepublic = CentralAfricanRepublic()
+    chad = Chad()
+    comores = Comores()
+    congo_Brazzaville = Congo_Brazzaville()
+    congo_Kinshasa = Congo_Kinshasa()
+    djibouti = Djibouti()
+    egypt = Egypt()
+    equatorialGuinea = EquatorialGuinea()
+    eritrea = Eritrea()
+    eswatini = Eswatini()
+    ethiopia = Ethiopia()
+    gabon = Gabon()
+    gambia = Gambia()
+    ghana = Ghana()
+    guinea = Guinea()
+    guineaBissau = GuineaBissau()
+    kenya = Kenya()
+    lesotho = Lesotho()
+    liberia = Liberia()
+    libya = Libya()
+    madagascar = Madagascar()
+    malawi = Malawi()
+    mali = Mali()
+    mauritania = Mauritania()
+    mauritius = Mauritius()
+    morocco = Morocco()
+    mozambique = Mozambique()
+    namibia = Namibia()
+    niger = Niger()
+    nigeria = Nigeria()
+    rwanda = Rwanda()
+    saoTomeAndPrincipe = SaoTomeAndPrincipe()
+    senegal = Senegal()
+    seychelles = Seychelles()
+    sierraLeone = SierraLeone()
+    somalia = Somalia()
+    southAfrica = SouthAfrica()
+    southSudan = SouthSudan()
+    sudan = Sudan()
+    tanzania = Tanzania()
+    togo = Togo()
+    tunisia = Tunisia()
+    uganda = Uganda()
+    zambia = Zambia()
+    zimbabwe = Zimbabwe()
+
+
+    dl_algeria = Download(cache = algeria.cache)
+    dl_angola = Download(cache = angola.cache)
+    dl_benin = Download(cache = benin.cache)
+    dl_botswana = Download(cache = botswana.cache)
+    dl_burkinaFaso = Download(cache = burkinaFaso.cache)
+    dl_burundi = Download(cache = burundi.cache)
+    dl_capeVerde = Download(cache = capeVerde.cache)
+    dl_cameroon = Download(cache = cameroon.cache)
+    dl_centralAfricanRepublic = Download(cache = centralAfricanRepublic.cache)
+    dl_chad = Download(cache = chad.cache)
+    dl_comores = Download(cache = comores.cache)
+    dl_congo_Brazzaville = Download(cache = congo_Brazzaville.cache)
+    dl_congo_Kinshasa = Download(cache = congo_Kinshasa.cache)
+    dl_djibouti = Download(cache = djibouti.cache)
+    dl_egypt = Download(cache = egypt.cache)
+    dl_equatorialGuinea = Download(cache = equatorialGuinea.cache)
+    dl_eritrea = Download(cache = eritrea.cache)
+    dl_eswatini = Download(cache = eswatini.cache)
+    dl_ethiopia = Download(cache = ethiopia.cache)
+    dl_gabon = Download(cache = gabon.cache)
+    dl_gambia = Download(cache = gambia.cache)
+    dl_ghana = Download(cache = ghana.cache)
+    dl_guinea = Download(cache = guinea.cache)
+    dl_guineaBissau = Download(cache = guineaBissau.cache)
+    dl_kenya = Download(cache = kenya.cache)
+    dl_lesotho = Download(cache = lesotho.cache)
+    dl_liberia = Download(cache = liberia.cache)
+    dl_libya = Download(cache = libya.cache)
+    dl_madagascar = Download(cache = madagascar.cache)
+    dl_malawi = Download(cache = malawi.cache)
+    dl_mali = Download(cache = mali.cache)
+    dl_mauritania = Download(cache = mauritania.cache)
+    dl_mauritius = Download(cache = mauritius.cache)
+    dl_morocco = Download(cache = morocco.cache)
+    dl_mozambique = Download(cache = mozambique.cache)
+    dl_namibia = Download(cache = namibia.cache)
+    dl_niger = Download(cache = niger.cache)
+    dl_nigeria = Download(cache = nigeria.cache)
+    dl_rwanda = Download(cache = rwanda.cache)
+    dl_saoTomeAndPrincipe = Download(cache = saoTomeAndPrincipe.cache)
+    dl_senegal = Download(cache = senegal.cache)
+    dl_seychelles = Download(cache = seychelles.cache)
+    dl_sierraLeone = Download(cache = sierraLeone.cache)
+    dl_somalia = Download(cache = somalia.cache)
+    dl_southAfrica = Download(cache = southAfrica.cache)
+    dl_southSudan = Download(cache = southSudan.cache)
+    dl_sudan = Download(cache = sudan.cache)
+    dl_tanzania = Download(cache = tanzania.cache)
+    dl_togo = Download(cache = togo.cache)
+    dl_tunisia = Download(cache = tunisia.cache)
+    dl_uganda = Download(cache = uganda.cache)
+    dl_zambia = Download(cache = zambia.cache)
+    dl_zimbabwe = Download(cache = zimbabwe.cache)
+
+    yield AfricaIndividually(cache =
+      dl_algeria.cache ++
+      dl_angola.cache ++
+      dl_benin.cache ++
+      dl_botswana.cache ++
+      dl_burkinaFaso.cache ++
+      dl_burundi.cache ++
+      dl_capeVerde.cache ++
+      dl_cameroon.cache ++
+      dl_centralAfricanRepublic.cache ++
+      dl_chad.cache ++
+      dl_comores.cache ++
+      dl_congo_Brazzaville.cache ++
+      dl_congo_Kinshasa.cache ++
+      dl_djibouti.cache ++
+      dl_egypt.cache ++
+      dl_equatorialGuinea.cache ++
+      dl_eritrea.cache ++
+      dl_eswatini.cache ++
+      dl_ethiopia.cache ++
+      dl_gabon.cache ++
+      dl_gambia.cache ++
+      dl_ghana.cache ++
+      dl_guinea.cache ++
+      dl_guineaBissau.cache ++
+      dl_kenya.cache ++
+      dl_lesotho.cache ++
+      dl_liberia.cache ++
+      dl_libya.cache ++
+      dl_madagascar.cache ++
+      dl_malawi.cache ++
+      dl_mali.cache ++
+      dl_mauritania.cache ++
+      dl_mauritius.cache ++
+      dl_morocco.cache ++
+      dl_mozambique.cache ++
+      dl_namibia.cache ++
+      dl_niger.cache ++
+      dl_nigeria.cache ++
+      dl_rwanda.cache ++
+      dl_saoTomeAndPrincipe.cache ++
+      dl_senegal.cache ++
+      dl_seychelles.cache ++
+      dl_sierraLeone.cache ++
+      dl_somalia.cache ++
+      dl_southAfrica.cache ++
+      dl_southSudan.cache ++
+      dl_sudan.cache ++
+      dl_tanzania.cache ++
+      dl_togo.cache ++
+      dl_tunisia.cache ++
+      dl_uganda.cache ++
+      dl_zambia.cache ++
+      dl_zimbabwe.cache)
+  }
+}
+

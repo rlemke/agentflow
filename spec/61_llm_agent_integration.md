@@ -1,0 +1,244 @@
+# 61 — LLM Agent Integration
+
+This document analyzes what changes are required to make AgentFlow a platform
+for building AI agents backed by large language models, what kinds of prompts
+and tasks the resulting system could handle, and how the platform accelerates
+agent development compared to building from scratch.
+
+---
+
+## 1. Current Foundation
+
+AgentFlow already provides the core primitives for AI agent orchestration:
+
+| Primitive | Purpose |
+|-----------|---------|
+| **Event facets** | Declare an external capability with typed inputs and outputs |
+| **Task queue** | Atomic claiming ensures exactly one agent handles each event |
+| **Pause/resume** | Workflows block at event steps and resume when an agent responds |
+| **MCP server** | Exposes 6 tools so an LLM can compile, execute, continue, and manage workflows |
+| **AgentPoller** | Lightweight library to build agent services that poll for work |
+
+The AddOne agent test (`tests/runtime/test_addone_agent.py`) demonstrates the
+full loop: workflow executes, pauses at event facet, agent claims task, agent
+returns result, workflow resumes.
+
+---
+
+## 2. Required Changes
+
+### 2.1 LLM Dispatch in Event Handlers
+
+Currently event handlers are plain Python functions. An AI agent needs an LLM
+call in the handler:
+
+```python
+# Today: deterministic handler
+poller.register("SummarizeDoc", lambda p: {"summary": p["text"][:100]})
+
+# Needed: LLM-backed handler
+async def summarize(payload):
+    response = await claude.messages.create(
+        model="claude-sonnet-4-20250514",
+        messages=[{"role": "user", "content": f"Summarize: {payload['text']}"}]
+    )
+    return {"summary": response.content[0].text}
+
+poller.register("SummarizeDoc", summarize)
+```
+
+**Changes required:**
+
+- `AgentPoller` needs async callback support (currently synchronous
+  `ThreadPoolExecutor`).
+- A built-in `LLMHandler` base class that wraps prompt construction, API
+  calls, and response parsing.
+- Configurable model/provider (Claude, OpenAI, local models).
+- Token budget and retry logic.
+
+### 2.2 Prompt Templates Bound to Event Facets
+
+Event facets define typed parameters but have no way to specify *how* those
+parameters become a prompt:
+
+```afl
+// Current: just types
+event facet SummarizeDoc(text: String, max_length: Int) => (summary: String)
+
+// Needed: prompt template as part of the facet definition
+event facet SummarizeDoc(text: String, max_length: Int) => (summary: String)
+    prompt """
+        Summarize the following document in at most {max_length} words:
+        {text}
+    """
+```
+
+**Changes required:**
+
+- Grammar extension: `prompt` block on event facets (`afl/grammar/afl.lark`).
+- New AST node: `PromptTemplate` with interpolation slots.
+- Transformer and emitter support for the new node.
+- Runtime evaluation of template expressions against step params.
+
+### 2.3 Tool Use and Multi-Turn Agent Loops
+
+A single LLM call is often not enough. Agents need to call tools, inspect
+results, and iterate:
+
+```afl
+event facet ResearchTopic(query: String) => (report: String)
+    tools [WebSearch, ReadFile, Calculator]
+    max_turns 5
+```
+
+**Changes required:**
+
+- Tool registry concept at the AFL language level (not just runtime).
+- An agent executor loop: LLM call → tool use → LLM call → ... → final answer.
+- Integration with MCP tool calling (the MCP server already exists, so an agent
+  could use AFL's own tools recursively).
+
+### 2.4 Context and Memory Across Steps
+
+Multi-step workflows need to pass conversation history or accumulated context
+between steps:
+
+```afl
+workflow ResearchAndWrite(topic: String) => (article: String) andThen {
+    research = ResearchTopic(query = $.topic)
+    outline = CreateOutline(topic = $.topic, sources = research.report)
+    article = WriteArticle(outline = outline.text, sources = research.report)
+    yield ResearchAndWrite(article = article.text)
+}
+```
+
+The data flow (`$.x`, `step.field`) already works for structured data. What is
+missing:
+
+- A `Context` or `Memory` type that accumulates across steps.
+- Support for list and map types in expressions (currently only scalars).
+- Possibly a vector store integration for retrieval.
+
+### 2.5 Streaming and Partial Results
+
+LLM responses are often streamed. The current model is fire-and-forget with a
+single `continue_step()` call.
+
+**Changes required:**
+
+- `update_step()` for partial/streaming results alongside `continue_step()`
+  for final results.
+- Dashboard support for showing in-progress agent output.
+- Event state extension: `Processing` could have sub-states.
+
+### 2.6 Error Recovery and Retries with LLM Awareness
+
+The runtime has `fail_step()` but no intelligent retry. An AI agent platform
+needs:
+
+- Retry with modified prompts (e.g., "Your previous answer was invalid JSON,
+  try again").
+- Fallback to a different model.
+- Human escalation when confidence is low.
+
+---
+
+## 3. Prompt and Task Categories
+
+Given the workflow DSL, AgentFlow is best suited for **structured multi-step AI
+tasks** rather than single-shot chat.
+
+### 3.1 Document Processing Pipelines
+
+```afl
+workflow ProcessInvoice(pdf: Binary) => (structured: Json) andThen {
+    extracted = OCR(image = $.pdf)
+    parsed = ExtractFields(text = extracted.text)
+    validated = ValidateInvoice(fields = parsed.data)
+    yield ProcessInvoice(structured = validated.result)
+}
+```
+
+### 3.2 Research and Analysis
+
+```afl
+workflow CompetitorAnalysis(company: String) => (report: String) andThen {
+    search = WebResearch(query = $.company)
+    financials = AnalyzeFinancials(data = search.results)
+    summary = WriteBrief(analysis = financials.insights)
+    yield CompetitorAnalysis(report = summary.text)
+}
+```
+
+### 3.3 Code Generation with Validation
+
+```afl
+workflow GenerateFeature(spec: String) => (code: String) andThen {
+    design = ArchitectSolution(requirements = $.spec)
+    impl = WriteCode(design = design.plan)
+    reviewed = ReviewCode(code = impl.source)
+    yield GenerateFeature(code = reviewed.final_code)
+}
+```
+
+### 3.4 Multi-Agent Collaboration
+
+```afl
+workflow PeerReview(paper: String) => (verdict: String)
+    andThen foreach reviewer in ["Expert1", "Expert2", "Expert3"] {
+    review = ReviewPaper(text = $.paper, persona = reviewer)
+    yield PeerReview(verdict = review.assessment)
+}
+```
+
+### 3.5 Tasks Not Well Suited
+
+- **Real-time conversational chat** — no streaming, no session state.
+- **Single-shot Q&A** — overhead of compilation and evaluation is not
+  justified.
+- **Unstructured exploration** — the DSL requires known steps upfront.
+
+---
+
+## 4. How AgentFlow Accelerates Agent Development
+
+Without AgentFlow, building a multi-step AI agent means writing custom
+orchestration logic, state persistence, concurrency control, and monitoring.
+With AgentFlow, these concerns are handled by the platform.
+
+| Concern | Without AFL | With AFL |
+|---------|------------|----------|
+| Step sequencing | Custom code per workflow | Declare in `.afl`, compiler handles it |
+| Data flow | Manual plumbing between steps | `step.field` references, type-checked |
+| Persistence | Build your own | MongoDB store with atomic commits |
+| Concurrency | Locks, queues, dedup | Task queue with atomic claiming |
+| Monitoring | Build dashboard | Dashboard and MCP resources included |
+| Error handling | Per-agent custom logic | State machine with `fail_step()` |
+| Parallel execution | Threading/async code | `andThen foreach` in the DSL |
+
+The key value proposition is the **separation of workflow logic (AFL) from
+agent logic (Python handlers)**. A new agent is a handler function registered
+against an event facet name. The platform handles everything else.
+
+Once prompt templates (§2.2) and an async LLM handler (§2.1) are added,
+defining an AI agent becomes: write the AFL workflow, write the prompt
+templates, deploy. No orchestration code required.
+
+---
+
+## 5. Implementation Priority
+
+Suggested ordering based on impact and dependency:
+
+1. **Async callback support in AgentPoller** (§2.1) — unblocks all LLM
+   integration work.
+2. **LLMHandler base class** (§2.1) — provides the standard pattern for
+   connecting models.
+3. **Prompt templates in grammar** (§2.2) — makes workflows self-contained
+   and declarative.
+4. **List/map expression types** (§2.4) — needed for real-world data flow
+   between steps.
+5. **Tool use loops** (§2.3) — enables agentic behavior beyond single-call
+   handlers.
+6. **Streaming** (§2.5) — improves user experience for long-running agents.
+7. **Intelligent retry** (§2.6) — improves reliability in production.

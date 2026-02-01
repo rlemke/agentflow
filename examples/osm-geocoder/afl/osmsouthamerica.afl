@@ -1,0 +1,50 @@
+namespace osm.geo.SouthAmerica.cache {
+// SouthAmerica
+
+  use osm.geo.Operations
+  use osm.geo.cache.SouthAmerica
+
+
+  facet SouthAmericaIndividually () => (cache: [OSMCache]) andThen {
+
+    argentina = Argentina()
+    bolivia = Bolivia()
+    brazil = Brazil()
+    chile = Chile()
+    colombia = Colombia()
+    ecuador = Ecuador()
+    guyana = Guyana()
+    paraguay = Paraguay()
+    peru = Peru()
+    suriname = Suriname()
+    uruguay = Uruguay()
+    venezuela = Venezuela()
+
+    dl_argentina = Download(cache = argentina.cache)
+    dl_bolivia = Download(cache = bolivia.cache)
+    dl_brazil = Download(cache = brazil.cache)
+    dl_chile = Download(cache = chile.cache)
+    dl_colombia = Download(cache = colombia.cache)
+    dl_ecuador = Download(cache = ecuador.cache)
+    dl_guyana = Download(cache = guyana.cache)
+    dl_paraguay = Download(cache = paraguay.cache)
+    dl_peru = Download(cache = peru.cache)
+    dl_suriname = Download(cache = suriname.cache)
+    dl_uruguay = Download(cache = uruguay.cache)
+    dl_venezuela = Download(cache = venezuela.cache)
+
+
+    yield SouthAmericaIndividually(cache = dl_argentina.cache ++
+                                   dl_bolivia.cache ++
+                                   dl_brazil.cache ++
+                                   dl_chile.cache ++
+                                   dl_colombia.cache ++
+                                   dl_ecuador.cache ++
+                                   dl_guyana.cache ++
+                                   dl_paraguay.cache ++
+                                   dl_peru.cache ++
+                                   dl_suriname.cache ++
+                                   dl_uruguay.cache ++
+                                   dl_venezuela.cache)
+  }
+}

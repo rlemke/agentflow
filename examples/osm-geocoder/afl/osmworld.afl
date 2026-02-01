@@ -1,0 +1,41 @@
+namespace osm.geo.World.cache {
+
+    use osm.geo.Africa.cache
+    use osm.geo.Australia.cache
+    use osm.geo.Canada.cache
+    use osm.geo.CentralAmerica.cache
+    use osm.geo.Europe.cache
+    use osm.geo.NorthAmerica.cache
+    use osm.geo.SouthAmerica.cache
+    use osm.geo.UnitedStates.cache
+
+
+    facet World() => (cache: [OSMCache]) andThen {
+
+        // These broadcast the requests to the download services
+        // If they are already cache, then just the locations are returned.
+        // If not, then they are downloaded and cached.
+        // As many OSM services as you got will get the requests and
+        // participate in the downloads.
+
+        africa = AfricaIndividually()
+        australia = AustraliaIndividually()
+        canada = CanadaIndividually()
+        centralAmerica = CentralAmericaIndividually()
+        europe = EuropeIndividually()
+        northAmerica = NorthAmericaIndividually()
+        southAmerica = SouthAmericaIndividually()
+        unitedStatesAmerica = UnitedStatesIndividually()
+
+        yield World(cache = africa.cache ++
+                australia.cache ++
+                canada.cache ++
+                centralAmerica.cache ++
+                europe.cache ++
+                northAmerica.cache ++
+                southAmerica.cache ++
+                unitedStatesAmerica.cache)
+    }
+}
+
+

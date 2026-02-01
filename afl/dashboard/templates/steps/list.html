@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Steps — AgentFlow{% endblock %}
+{% block content %}
+<h1>Steps{% if runner %} for Runner <span class="mono">{{ runner.uuid|truncate_uuid }}</span>{% endif %}</h1>
+
+<figure>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Type</th><th>State</th><th>Statement</th></tr>
+    </thead>
+    <tbody>
+        {% for step in steps %}
+        {% include "partials/step_row.html" %}
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+
+{% if runner %}
+<p><a href="/runners/{{ runner.uuid }}">Back to runner</a></p>
+{% endif %}
+{% endblock %}

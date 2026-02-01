@@ -1,0 +1,568 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""AFL AST to JSON emitter."""
+
+import json
+from typing import Any
+
+from .ast import (
+    AndThenBlock,
+    ArrayType,
+    ASTNode,
+    Block,
+    CallExpr,
+    ConcatExpr,
+    EventFacetDecl,
+    FacetDecl,
+    FacetSig,
+    ForeachClause,
+    ImplicitDecl,
+    Literal,
+    MixinCall,
+    MixinSig,
+    NamedArg,
+    Namespace,
+    Parameter,
+    Program,
+    Reference,
+    ReturnClause,
+    SchemaDecl,
+    SchemaField,
+    SourceLocation,
+    StepStmt,
+    TypeRef,
+    UsesDecl,
+    WorkflowDecl,
+    YieldStmt,
+)
+from .source import (
+    FileOrigin,
+    MavenOrigin,
+    MongoDBOrigin,
+    SourceOrigin,
+    SourceRegistry,
+)
+
+
+class JSONEmitter:
+    """Converts AFL AST to JSON representation."""
+
+    def __init__(
+        self,
+        include_locations: bool = True,
+        include_provenance: bool = False,
+        source_registry: SourceRegistry | None = None,
+        indent: int | None = 2,
+    ):
+        """Initialize emitter.
+
+        Args:
+            include_locations: Include source locations in output
+            include_provenance: Include source provenance in locations
+            source_registry: Registry for looking up provenance data
+            indent: JSON indentation (None for compact)
+        """
+        self.include_locations = include_locations
+        self.include_provenance = include_provenance
+        self.source_registry = source_registry
+        self.indent = indent
+
+    def emit(self, node: ASTNode) -> str:
+        """Convert AST node to JSON string.
+
+        Args:
+            node: AST node to convert
+
+        Returns:
+            JSON string representation
+        """
+        data = self._convert(node)
+        return json.dumps(data, indent=self.indent)
+
+    def emit_dict(self, node: ASTNode) -> dict[str, Any]:
+        """Convert AST node to dictionary.
+
+        Args:
+            node: AST node to convert
+
+        Returns:
+            Dictionary representation
+        """
+        return self._convert(node)
+
+    def _convert(self, node: Any) -> Any:
+        """Convert a node to its JSON-serializable form."""
+        if node is None:
+            return None
+
+        if isinstance(node, (str, int, bool)):
+            return node
+
+        if isinstance(node, list):
+            return [self._convert(item) for item in node]
+
+        if isinstance(node, Program):
+            return self._program(node)
+        if isinstance(node, Namespace):
+            return self._namespace(node)
+        if isinstance(node, UsesDecl):
+            return self._uses_decl(node)
+        if isinstance(node, FacetDecl):
+            return self._facet_decl(node)
+        if isinstance(node, EventFacetDecl):
+            return self._event_facet_decl(node)
+        if isinstance(node, WorkflowDecl):
+            return self._workflow_decl(node)
+        if isinstance(node, ImplicitDecl):
+            return self._implicit_decl(node)
+        if isinstance(node, FacetSig):
+            return self._facet_sig(node)
+        if isinstance(node, ReturnClause):
+            return self._return_clause(node)
+        if isinstance(node, Parameter):
+            return self._parameter(node)
+        if isinstance(node, TypeRef):
+            return self._type_ref(node)
+        if isinstance(node, MixinSig):
+            return self._mixin_sig(node)
+        if isinstance(node, MixinCall):
+            return self._mixin_call(node)
+        if isinstance(node, CallExpr):
+            return self._call_expr(node)
+        if isinstance(node, NamedArg):
+            return self._named_arg(node)
+        if isinstance(node, StepStmt):
+            return self._step_stmt(node)
+        if isinstance(node, YieldStmt):
+            return self._yield_stmt(node)
+        if isinstance(node, Block):
+            return self._block(node)
+        if isinstance(node, AndThenBlock):
+            return self._and_then_block(node)
+        if isinstance(node, ForeachClause):
+            return self._foreach_clause(node)
+        if isinstance(node, Literal):
+            return self._literal(node)
+        if isinstance(node, Reference):
+            return self._reference(node)
+        if isinstance(node, ConcatExpr):
+            return self._concat_expr(node)
+        if isinstance(node, SourceLocation):
+            return self._location(node)
+        if isinstance(node, SchemaDecl):
+            return self._schema_decl(node)
+        if isinstance(node, SchemaField):
+            return self._schema_field(node)
+        if isinstance(node, ArrayType):
+            return self._array_type(node)
+
+        raise ValueError(f"Unknown node type: {type(node)}")
+
+    def _add_metadata(self, data: dict, node: ASTNode) -> dict:
+        """Add node ID and location info to data dict."""
+        data["id"] = node.node_id
+        if self.include_locations and node.location:
+            data["location"] = self._location(node.location)
+        return data
+
+    def _location(self, loc: SourceLocation) -> dict:
+        """Convert source location with optional provenance."""
+        result = {"line": loc.line, "column": loc.column}
+        if loc.end_line is not None:
+            result["endLine"] = loc.end_line
+        if loc.end_column is not None:
+            result["endColumn"] = loc.end_column
+
+        # Add provenance if enabled and available
+        if self.include_provenance and loc.source_id:
+            result["sourceId"] = loc.source_id
+            if self.source_registry:
+                origin = self.source_registry.get(loc.source_id)
+                if origin:
+                    result["provenance"] = self._provenance_to_dict(origin)
+
+        return result
+
+    def _provenance_to_dict(self, origin: SourceOrigin) -> dict:
+        """Convert source provenance to JSON."""
+        if isinstance(origin, FileOrigin):
+            return {"type": "file", "path": origin.path}
+        elif isinstance(origin, MongoDBOrigin):
+            return {
+                "type": "mongodb",
+                "collectionId": origin.collection_id,
+                "displayName": origin.display_name,
+            }
+        elif isinstance(origin, MavenOrigin):
+            result = {
+                "type": "maven",
+                "groupId": origin.group_id,
+                "artifactId": origin.artifact_id,
+                "version": origin.version,
+            }
+            if origin.classifier:
+                result["classifier"] = origin.classifier
+            return result
+        else:
+            return {"type": "unknown"}
+
+    def _program(self, node: Program) -> dict:
+        """Convert Program node."""
+        data = {"type": "Program"}
+
+        if node.namespaces:
+            data["namespaces"] = self._convert(node.namespaces)
+        if node.facets:
+            data["facets"] = self._convert(node.facets)
+        if node.event_facets:
+            data["eventFacets"] = self._convert(node.event_facets)
+        if node.workflows:
+            data["workflows"] = self._convert(node.workflows)
+        if node.implicits:
+            data["implicits"] = self._convert(node.implicits)
+        if node.schemas:
+            data["schemas"] = self._convert(node.schemas)
+
+        # Also emit unified declarations list for runtime compatibility
+        declarations: list = []
+        if node.namespaces:
+            declarations.extend(self._convert(node.namespaces))
+        if node.facets:
+            declarations.extend(self._convert(node.facets))
+        if node.event_facets:
+            declarations.extend(self._convert(node.event_facets))
+        if node.schemas:
+            declarations.extend(self._convert(node.schemas))
+        if declarations:
+            data["declarations"] = declarations
+
+        return self._add_metadata(data, node)
+
+    def _namespace(self, node: Namespace) -> dict:
+        """Convert Namespace node."""
+        data = {
+            "type": "Namespace",
+            "name": node.name,
+        }
+
+        if node.uses:
+            data["uses"] = [u.name for u in node.uses]
+        if node.facets:
+            data["facets"] = self._convert(node.facets)
+        if node.event_facets:
+            data["eventFacets"] = self._convert(node.event_facets)
+        if node.workflows:
+            data["workflows"] = self._convert(node.workflows)
+        if node.implicits:
+            data["implicits"] = self._convert(node.implicits)
+        if node.schemas:
+            data["schemas"] = self._convert(node.schemas)
+
+        # Also emit unified declarations list for runtime compatibility
+        declarations: list = []
+        if node.facets:
+            declarations.extend(self._convert(node.facets))
+        if node.event_facets:
+            declarations.extend(self._convert(node.event_facets))
+        if node.schemas:
+            declarations.extend(self._convert(node.schemas))
+        if declarations:
+            data["declarations"] = declarations
+
+        return self._add_metadata(data, node)
+
+    def _uses_decl(self, node: UsesDecl) -> dict:
+        """Convert UsesDecl node."""
+        data = {
+            "type": "UsesDecl",
+            "name": node.name,
+        }
+        return self._add_metadata(data, node)
+
+    def _facet_decl(self, node: FacetDecl) -> dict:
+        """Convert FacetDecl node."""
+        data = {
+            "type": "FacetDecl",
+            "name": node.sig.name,
+        }
+
+        if node.sig.params:
+            data["params"] = self._convert(node.sig.params)
+        if node.sig.returns:
+            data["returns"] = self._convert(node.sig.returns.params)
+        if node.sig.mixins:
+            data["mixins"] = self._convert(node.sig.mixins)
+        if node.body:
+            data["body"] = self._convert(node.body)
+
+        return self._add_metadata(data, node)
+
+    def _event_facet_decl(self, node: EventFacetDecl) -> dict:
+        """Convert EventFacetDecl node."""
+        data = {
+            "type": "EventFacetDecl",
+            "name": node.sig.name,
+        }
+
+        if node.sig.params:
+            data["params"] = self._convert(node.sig.params)
+        if node.sig.returns:
+            data["returns"] = self._convert(node.sig.returns.params)
+        if node.sig.mixins:
+            data["mixins"] = self._convert(node.sig.mixins)
+        if node.body:
+            data["body"] = self._convert(node.body)
+
+        return self._add_metadata(data, node)
+
+    def _workflow_decl(self, node: WorkflowDecl) -> dict:
+        """Convert WorkflowDecl node."""
+        data = {
+            "type": "WorkflowDecl",
+            "name": node.sig.name,
+        }
+
+        if node.sig.params:
+            data["params"] = self._convert(node.sig.params)
+        if node.sig.returns:
+            data["returns"] = self._convert(node.sig.returns.params)
+        if node.sig.mixins:
+            data["mixins"] = self._convert(node.sig.mixins)
+        if node.body:
+            data["body"] = self._convert(node.body)
+
+        return self._add_metadata(data, node)
+
+    def _implicit_decl(self, node: ImplicitDecl) -> dict:
+        """Convert ImplicitDecl node."""
+        data = {
+            "type": "ImplicitDecl",
+            "name": node.name,
+            "call": self._convert(node.call),
+        }
+        return self._add_metadata(data, node)
+
+    def _facet_sig(self, node: FacetSig) -> dict:
+        """Convert FacetSig node."""
+        data = {
+            "type": "FacetSig",
+            "name": node.name,
+        }
+
+        if node.params:
+            data["params"] = self._convert(node.params)
+        if node.returns:
+            data["returns"] = self._convert(node.returns.params)
+        if node.mixins:
+            data["mixins"] = self._convert(node.mixins)
+
+        return self._add_metadata(data, node)
+
+    def _return_clause(self, node: ReturnClause) -> dict:
+        """Convert ReturnClause node."""
+        return self._convert(node.params)
+
+    def _parameter(self, node: Parameter) -> dict:
+        """Convert Parameter node."""
+        data = {
+            "name": node.name,
+            "type": self._convert(node.type),
+        }
+        if node.default is not None:
+            data["default"] = self._convert(node.default)
+        return data
+
+    def _type_ref(self, node: TypeRef) -> str:
+        """Convert TypeRef node."""
+        return node.name
+
+    def _mixin_sig(self, node: MixinSig) -> dict:
+        """Convert MixinSig node."""
+        data = {
+            "type": "MixinSig",
+            "target": node.name,
+        }
+
+        if node.args:
+            data["args"] = self._convert(node.args)
+
+        return data
+
+    def _mixin_call(self, node: MixinCall) -> dict:
+        """Convert MixinCall node."""
+        data = {
+            "type": "MixinCall",
+            "target": node.name,
+        }
+
+        if node.args:
+            data["args"] = self._convert(node.args)
+        if node.alias:
+            data["alias"] = node.alias
+
+        return data
+
+    def _call_expr(self, node: CallExpr) -> dict:
+        """Convert CallExpr node."""
+        data = {
+            "type": "CallExpr",
+            "target": node.name,
+        }
+
+        if node.args:
+            data["args"] = self._convert(node.args)
+        if node.mixins:
+            data["mixins"] = self._convert(node.mixins)
+
+        return self._add_metadata(data, node)
+
+    def _named_arg(self, node: NamedArg) -> dict:
+        """Convert NamedArg node."""
+        return {
+            "name": node.name,
+            "value": self._convert(node.value),
+        }
+
+    def _step_stmt(self, node: StepStmt) -> dict:
+        """Convert StepStmt node."""
+        data = {
+            "type": "StepStmt",
+            "name": node.name,
+            "call": self._convert(node.call),
+        }
+        return self._add_metadata(data, node)
+
+    def _yield_stmt(self, node: YieldStmt) -> dict:
+        """Convert YieldStmt node."""
+        data = {
+            "type": "YieldStmt",
+            "call": self._convert(node.call),
+        }
+        return self._add_metadata(data, node)
+
+    def _block(self, node: Block) -> dict:
+        """Convert Block node."""
+        data = {"type": "Block"}
+
+        if node.steps:
+            data["steps"] = self._convert(node.steps)
+        if node.yield_stmt:
+            data["yield"] = self._convert(node.yield_stmt)
+
+        return self._add_metadata(data, node)
+
+    def _and_then_block(self, node: AndThenBlock) -> dict:
+        """Convert AndThenBlock node."""
+        data = {"type": "AndThenBlock"}
+
+        if node.foreach:
+            data["foreach"] = self._convert(node.foreach)
+        if node.block:
+            if node.block.steps:
+                data["steps"] = self._convert(node.block.steps)
+            if node.block.yield_stmts:
+                if len(node.block.yield_stmts) == 1:
+                    data["yield"] = self._convert(node.block.yield_stmts[0])
+                else:
+                    data["yields"] = self._convert(node.block.yield_stmts)
+
+        return self._add_metadata(data, node)
+
+    def _foreach_clause(self, node: ForeachClause) -> dict:
+        """Convert ForeachClause node."""
+        return {
+            "type": "ForeachClause",
+            "variable": node.variable,
+            "iterable": self._convert(node.iterable),
+        }
+
+    def _literal(self, node: Literal) -> dict:
+        """Convert Literal node."""
+        if node.kind == "null":
+            return {"type": "Null"}
+        elif node.kind == "string":
+            return {"type": "String", "value": node.value}
+        elif node.kind == "integer":
+            return {"type": "Int", "value": node.value}
+        elif node.kind == "boolean":
+            return {"type": "Boolean", "value": node.value}
+        else:
+            return {"type": "Unknown", "value": node.value}
+
+    def _reference(self, node: Reference) -> dict:
+        """Convert Reference node."""
+        if node.is_input:
+            return {"type": "InputRef", "path": node.path}
+        else:
+            return {"type": "StepRef", "path": node.path}
+
+    def _schema_decl(self, node: SchemaDecl) -> dict:
+        """Convert SchemaDecl node."""
+        data = {
+            "type": "SchemaDecl",
+            "name": node.name,
+            "fields": self._convert(node.fields),
+        }
+        return self._add_metadata(data, node)
+
+    def _schema_field(self, node: SchemaField) -> dict:
+        """Convert SchemaField node."""
+        return {
+            "name": node.name,
+            "type": self._convert(node.type),
+        }
+
+    def _array_type(self, node: ArrayType) -> dict:
+        """Convert ArrayType node."""
+        return {
+            "type": "ArrayType",
+            "elementType": self._convert(node.element_type),
+        }
+
+    def _concat_expr(self, node: ConcatExpr) -> dict:
+        """Convert ConcatExpr node."""
+        return {
+            "type": "ConcatExpr",
+            "operands": self._convert(node.operands),
+        }
+
+
+def emit_json(ast: Program, include_locations: bool = True, indent: int | None = 2) -> str:
+    """Convert AST to JSON string.
+
+    Args:
+        ast: Program AST node
+        include_locations: Include source locations
+        indent: JSON indentation (None for compact)
+
+    Returns:
+        JSON string
+    """
+    emitter = JSONEmitter(include_locations=include_locations, indent=indent)
+    return emitter.emit(ast)
+
+
+def emit_dict(ast: Program, include_locations: bool = True) -> dict[str, Any]:
+    """Convert AST to dictionary.
+
+    Args:
+        ast: Program AST node
+        include_locations: Include source locations
+
+    Returns:
+        Dictionary representation
+    """
+    emitter = JSONEmitter(include_locations=include_locations)
+    return emitter.emit_dict(ast)

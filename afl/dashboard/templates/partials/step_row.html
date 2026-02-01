@@ -1,0 +1,6 @@
+<tr>
+    <td><a href="/steps/{{ step.id }}" class="mono">{{ step.id|truncate_uuid }}</a></td>
+    <td>{{ step.object_type }}</td>
+    <td><span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span></td>
+    <td class="mono">{{ step.statement_id or "—" }}</td>
+</tr>

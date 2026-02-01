@@ -1,0 +1,50 @@
+namespace osm.geo.CentralAmerica.cache {
+// CentralAmerica
+
+  use osm.geo.Operations
+  use osm.geo.cache.CentralAmerica
+
+
+  facet CentralAmericaIndividually () => (cache: [OSMCache]) andThen {
+
+    bahamas = Bahamas()
+    belize = Belize()
+    costaRica = CostaRica()
+    cuba = Cuba()
+    elSalvador = ElSalvador()
+    dominicanRepublic = DominicanRepublic()
+    guatemala = Guatemala()
+    haiti = Haiti()
+    honduras = Honduras()
+    jamaica = Jamaica()
+    nicaragua = Nicaragua()
+    panama = Panama()
+
+    dl_bahamas = Download(cache = bahamas.cache)
+    dl_belize = Download(cache = belize.cache)
+    dl_costaRica = Download(cache = costaRica.cache)
+    dl_cuba = Download(cache = cuba.cache)
+    dl_elSalvador = Download(cache = elSalvador.cache)
+    dl_dominicanRepublic = Download(cache = dominicanRepublic.cache)
+    dl_guatemala = Download(cache = guatemala.cache)
+    dl_haiti = Download(cache = haiti.cache)
+    dl_honduras = Download(cache = honduras.cache)
+    dl_jamaica = Download(cache = jamaica.cache)
+    dl_nicaragua = Download(cache = nicaragua.cache)
+    dl_panama = Download(cache = panama.cache)
+
+    yield CentralAmericaIndividually( cache =
+      dl_bahamas.cache ++
+      dl_belize.cache ++
+      dl_costaRica.cache ++
+      dl_cuba.cache ++
+      dl_elSalvador.cache ++
+      dl_dominicanRepublic.cache ++
+      dl_guatemala.cache ++
+      dl_haiti.cache ++
+      dl_honduras.cache ++
+      dl_jamaica.cache ++
+      dl_nicaragua.cache ++
+      dl_panama.cache)
+   }
+}

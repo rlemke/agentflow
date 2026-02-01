@@ -1,0 +1,388 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""In-memory implementation of PersistenceAPI for testing."""
+
+import threading
+import time
+from collections import defaultdict
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Optional
+
+from .entities import (
+    LockDefinition,
+    LogDefinition,
+    RunnerDefinition,
+    ServerDefinition,
+    TaskDefinition,
+)
+from .persistence import EventDefinition, IterationChanges, PersistenceAPI
+from .step import StepDefinition
+from .types import BlockId, EventId, StepId, WorkflowId
+
+if TYPE_CHECKING:
+    from .persistence import LockMetaData
+
+
+def _current_time_ms() -> int:
+    """Get current time in milliseconds."""
+    return int(time.time() * 1000)
+
+
+class MemoryStore(PersistenceAPI):
+    """In-memory implementation of the persistence API.
+
+    Used for testing without external database dependencies.
+    All data is stored in dictionaries and cleared on restart.
+    """
+
+    def __init__(self):
+        """Initialize empty stores."""
+        self._steps: dict[StepId, StepDefinition] = {}
+        self._events: dict[EventId, EventDefinition] = {}
+
+        # Indexes for efficient queries
+        self._steps_by_block: dict[BlockId, list[StepId]] = defaultdict(list)
+        self._steps_by_workflow: dict[WorkflowId, list[StepId]] = defaultdict(list)
+        self._steps_by_container: dict[StepId, list[StepId]] = defaultdict(list)
+        self._blocks_by_step: dict[StepId, list[StepId]] = defaultdict(list)
+        self._steps_by_statement: dict[str, StepId] = {}  # statement_id+block_id -> step_id
+
+        # New stores for extended entities
+        self._runners: dict[str, RunnerDefinition] = {}
+        self._tasks: dict[str, TaskDefinition] = {}
+        self._logs: list[LogDefinition] = []
+        self._locks: dict[str, LockDefinition] = {}
+        self._servers: dict[str, ServerDefinition] = {}
+
+        # Lock for atomic task claiming
+        self._claim_lock = threading.Lock()
+
+    def get_step(self, step_id: StepId) -> StepDefinition | None:
+        """Fetch a step by ID."""
+        step = self._steps.get(step_id)
+        if step:
+            return step.clone()  # Return a copy for isolation
+        return None
+
+    def get_steps_by_block(self, block_id: BlockId) -> Sequence[StepDefinition]:
+        """Fetch all steps in a block."""
+        step_ids = self._steps_by_block.get(block_id, [])
+        return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
+
+    def get_steps_by_workflow(self, workflow_id: WorkflowId) -> Sequence[StepDefinition]:
+        """Fetch all steps in a workflow."""
+        step_ids = self._steps_by_workflow.get(workflow_id, [])
+        return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
+
+    def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
+        """Fetch all steps in a given state."""
+        return [s.clone() for s in self._steps.values() if s.state == state]
+
+    def get_steps_by_container(self, container_id: StepId) -> Sequence[StepDefinition]:
+        """Fetch all steps with a given container."""
+        step_ids = self._steps_by_container.get(container_id, [])
+        return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
+
+    def save_step(self, step: StepDefinition) -> None:
+        """Save a step to the store."""
+        # Remove from old indexes if updating
+        if step.id in self._steps:
+            old_step = self._steps[step.id]
+            self._remove_from_indexes(old_step)
+
+        # Store the step
+        self._steps[step.id] = step.clone()
+
+        # Update indexes
+        self._add_to_indexes(step)
+
+    def _add_to_indexes(self, step: StepDefinition) -> None:
+        """Add step to all indexes."""
+        self._steps_by_workflow[step.workflow_id].append(step.id)
+
+        if step.block_id:
+            self._steps_by_block[step.block_id].append(step.id)
+
+        if step.container_id:
+            self._steps_by_container[step.container_id].append(step.id)
+            # If this is a block step, also index it
+            if step.is_block:
+                self._blocks_by_step[step.container_id].append(step.id)
+
+        # Statement index for idempotency
+        if step.statement_id:
+            key = self._statement_key(str(step.statement_id), step.block_id)
+            self._steps_by_statement[key] = step.id
+
+    def _remove_from_indexes(self, step: StepDefinition) -> None:
+        """Remove step from all indexes."""
+        if step.id in self._steps_by_workflow.get(step.workflow_id, []):
+            self._steps_by_workflow[step.workflow_id].remove(step.id)
+
+        if step.block_id and step.id in self._steps_by_block.get(step.block_id, []):
+            self._steps_by_block[step.block_id].remove(step.id)
+
+        if step.container_id and step.id in self._steps_by_container.get(step.container_id, []):
+            self._steps_by_container[step.container_id].remove(step.id)
+
+        if (
+            step.container_id
+            and step.is_block
+            and step.id in self._blocks_by_step.get(step.container_id, [])
+        ):
+            self._blocks_by_step[step.container_id].remove(step.id)
+
+        if step.statement_id:
+            key = self._statement_key(str(step.statement_id), step.block_id)
+            if key in self._steps_by_statement:
+                del self._steps_by_statement[key]
+
+    def _statement_key(self, statement_id: str, block_id: BlockId | None) -> str:
+        """Create a unique key for statement+block combination."""
+        block_str = str(block_id) if block_id else "root"
+        return f"{statement_id}:{block_str}"
+
+    def get_event(self, event_id: EventId) -> EventDefinition | None:
+        """Fetch an event by ID."""
+        return self._events.get(event_id)
+
+    def save_event(self, event: EventDefinition) -> None:
+        """Save an event to the store."""
+        self._events[event.id] = event
+
+    def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
+        """Fetch all block steps for a containing step."""
+        block_ids = self._blocks_by_step.get(step_id, [])
+        return [self._steps[bid].clone() for bid in block_ids if bid in self._steps]
+
+    def commit(self, changes: IterationChanges) -> None:
+        """Atomically commit all iteration changes.
+
+        For the in-memory store, this just saves all changes.
+        A real implementation would use transactions.
+        """
+        # Save created steps
+        for step in changes.created_steps:
+            self.save_step(step)
+
+        # Save updated steps
+        for step in changes.updated_steps:
+            self.save_step(step)
+
+        # Save created events
+        for event in changes.created_events:
+            self.save_event(event)
+
+        # Save updated events
+        for event in changes.updated_events:
+            self.save_event(event)
+
+        # Save created tasks
+        for task in changes.created_tasks:
+            self.save_task(task)
+
+    def get_workflow_root(self, workflow_id: WorkflowId) -> StepDefinition | None:
+        """Get the root step of a workflow."""
+        step_ids = self._steps_by_workflow.get(workflow_id, [])
+        for sid in step_ids:
+            step = self._steps.get(sid)
+            if step and step.root_id is None and step.container_id is None:
+                return step.clone()
+        return None
+
+    def step_exists(self, statement_id: str, block_id: BlockId | None) -> bool:
+        """Check if a step already exists for a statement in a block."""
+        key = self._statement_key(statement_id, block_id)
+        return key in self._steps_by_statement
+
+    # Utility methods for testing
+
+    def clear(self) -> None:
+        """Clear all stored data."""
+        self._steps.clear()
+        self._events.clear()
+        self._steps_by_block.clear()
+        self._steps_by_workflow.clear()
+        self._steps_by_container.clear()
+        self._blocks_by_step.clear()
+        self._steps_by_statement.clear()
+        self._runners.clear()
+        self._tasks.clear()
+        self._logs.clear()
+        self._locks.clear()
+        self._servers.clear()
+
+    def step_count(self) -> int:
+        """Get total number of steps."""
+        return len(self._steps)
+
+    def event_count(self) -> int:
+        """Get total number of events."""
+        return len(self._events)
+
+    def get_all_steps(self) -> list[StepDefinition]:
+        """Get all steps (for testing)."""
+        return [s.clone() for s in self._steps.values()]
+
+    # =========================================================================
+    # Runner Operations
+    # =========================================================================
+
+    def get_runner(self, runner_id: str) -> Optional["RunnerDefinition"]:
+        """Get a runner by ID."""
+        return self._runners.get(runner_id)
+
+    def save_runner(self, runner: "RunnerDefinition") -> None:
+        """Save a runner."""
+        self._runners[runner.uuid] = runner
+
+    def get_runners_by_state(self, state: str) -> Sequence["RunnerDefinition"]:
+        """Get runners by state."""
+        return [r for r in self._runners.values() if r.state == state]
+
+    # =========================================================================
+    # Task Operations
+    # =========================================================================
+
+    def get_pending_tasks(self, task_list: str) -> Sequence["TaskDefinition"]:
+        """Get pending tasks for a task list."""
+        return [
+            t
+            for t in self._tasks.values()
+            if t.task_list_name == task_list and t.state == "pending"
+        ]
+
+    def save_task(self, task: "TaskDefinition") -> None:
+        """Save a task."""
+        self._tasks[task.uuid] = task
+
+    def claim_task(
+        self,
+        task_names: list[str],
+        task_list: str = "default",
+    ) -> Optional["TaskDefinition"]:
+        """Atomically claim a pending task matching one of the given names."""
+        with self._claim_lock:
+            names_set = set(task_names)
+            for task in self._tasks.values():
+                if (
+                    task.state == "pending"
+                    and task.name in names_set
+                    and task.task_list_name == task_list
+                ):
+                    task.state = "running"
+                    task.updated = _current_time_ms()
+                    return task
+            return None
+
+    # =========================================================================
+    # Log Operations
+    # =========================================================================
+
+    def save_log(self, log: "LogDefinition") -> None:
+        """Save a log entry."""
+        self._logs.append(log)
+
+    def get_logs_by_runner(self, runner_id: str) -> Sequence["LogDefinition"]:
+        """Get logs for a runner."""
+        return [log for log in self._logs if log.runner_id == runner_id]
+
+    # =========================================================================
+    # Server Operations
+    # =========================================================================
+
+    def get_server(self, server_id: str) -> Optional["ServerDefinition"]:
+        """Get a server by ID."""
+        return self._servers.get(server_id)
+
+    def save_server(self, server: "ServerDefinition") -> None:
+        """Save a server."""
+        self._servers[server.uuid] = server
+
+    def update_server_ping(self, server_id: str, ping_time: int) -> None:
+        """Update server ping time."""
+        if server_id in self._servers:
+            self._servers[server_id].ping_time = ping_time
+
+    def get_all_servers(self) -> list["ServerDefinition"]:
+        """Get all servers."""
+        return list(self._servers.values())
+
+    # =========================================================================
+    # Lock Operations
+    # =========================================================================
+
+    def acquire_lock(
+        self, key: str, duration_ms: int, meta: Optional["LockMetaData"] = None
+    ) -> bool:
+        """Acquire a distributed lock."""
+        from .entities import LockDefinition
+
+        now = _current_time_ms()
+
+        # Check if lock exists and is still valid
+        if key in self._locks:
+            existing = self._locks[key]
+            if existing.expires_at > now:
+                return False  # Lock still held
+            # Lock expired, can be replaced
+
+        # Acquire the lock
+        self._locks[key] = LockDefinition(
+            key=key,
+            acquired_at=now,
+            expires_at=now + duration_ms,
+            meta=meta,
+        )
+        return True
+
+    def release_lock(self, key: str) -> bool:
+        """Release a distributed lock."""
+        if key in self._locks:
+            del self._locks[key]
+            return True
+        return False
+
+    def check_lock(self, key: str) -> Optional["LockDefinition"]:
+        """Check if a lock exists and is valid."""
+        if key not in self._locks:
+            return None
+
+        lock = self._locks[key]
+        now = _current_time_ms()
+
+        if lock.expires_at <= now:
+            # Lock expired, clean it up
+            del self._locks[key]
+            return None
+
+        return lock
+
+    def extend_lock(self, key: str, duration_ms: int) -> bool:
+        """Extend a lock's expiration."""
+        if key not in self._locks:
+            return False
+
+        lock = self._locks[key]
+        now = _current_time_ms()
+
+        if lock.expires_at <= now:
+            # Lock expired
+            del self._locks[key]
+            return False
+
+        # Extend the lock
+        lock.expires_at = now + duration_ms
+        return True

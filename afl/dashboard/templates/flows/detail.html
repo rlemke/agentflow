@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Flow {{ flow.name.name if flow else "Not Found" }} — AgentFlow{% endblock %}
+{% block content %}
+{% if not flow %}
+<h1>Flow not found</h1>
+<p><a href="/flows">Back to flows</a></p>
+{% else %}
+<h1>{{ flow.name.name }}</h1>
+
+<article>
+    <table>
+        <tr><th>UUID</th><td class="mono">{{ flow.uuid }}</td></tr>
+        <tr><th>Path</th><td class="mono">{{ flow.name.path }}</td></tr>
+        <tr><th>Namespaces</th><td>{{ flow.namespaces|length }}</td></tr>
+        <tr><th>Facets</th><td>{{ flow.facets|length }}</td></tr>
+        <tr><th>Blocks</th><td>{{ flow.blocks|length }}</td></tr>
+        <tr><th>Statements</th><td>{{ flow.statements|length }}</td></tr>
+    </table>
+</article>
+
+{% if flow.compiled_sources %}
+<p>
+    <a href="/flows/{{ flow.uuid }}/source" role="button" class="outline">View AFL Source</a>
+    <a href="/flows/{{ flow.uuid }}/json" role="button" class="outline">View JSON</a>
+</p>
+{% endif %}
+
+<h2>Workflows</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Version</th><th>Documentation</th></tr>
+    </thead>
+    <tbody>
+        {% for wf in workflows %}
+        <tr>
+            <td>{{ wf.name }}</td>
+            <td>{{ wf.version }}</td>
+            <td>{{ wf.documentation or "—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+{% endblock %}

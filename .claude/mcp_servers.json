@@ -1,0 +1,10 @@
+{
+  "afl": {
+    "command": "python",
+    "args": ["-m", "afl.mcp"],
+    "cwd": "/Users/ralph_lemke/agentflow",
+    "env": {
+      "PYTHONPATH": "/Users/ralph_lemke/agentflow"
+    }
+  }
+}

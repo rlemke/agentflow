@@ -1,0 +1,27 @@
+namespace osm.geo.NorthAmerica.cache {
+// NorthAmerica
+
+  use osm.geo.Operations
+  use osm.geo.cache.NorthAmerica
+
+
+  facet NorthAmericaIndividually () => (cache: [OSMCache]) andThen {
+
+    canada = Canada()
+    mexico = Mexico()
+    unitedStates = UnitedStates()
+    greenland = Greenland()
+
+    dl_canada = Download(cache = canada.cache)
+    dl_mexico = Download(cache = mexico.cache)
+    dl_unitedStates = Download(cache = unitedStates.cache)
+    dl_greenland = Download(cache = greenland.cache)
+
+    yield NorthAmericaIndividually(cache = dl_canada.cache ++
+                                   dl_mexico.cache ++
+                                   dl_unitedStates.cache ++
+                                   dl_greenland.cache)
+
+  }
+
+}

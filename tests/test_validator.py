@@ -1,0 +1,812 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for AFL semantic validator."""
+
+import pytest
+
+from afl import parse
+from afl.validator import AFLValidator, ValidationError, ValidationResult, validate
+
+
+@pytest.fixture
+def validator():
+    """Create a validator instance."""
+    return AFLValidator()
+
+
+class TestNameUniqueness:
+    """Test name uniqueness validation."""
+
+    def test_duplicate_facet_names(self, validator):
+        """Duplicate facet names should error."""
+        ast = parse("""
+        facet User(name: String)
+        facet User(email: String)
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate facet name 'User'" in str(e) for e in result.errors)
+
+    def test_duplicate_workflow_names(self, validator):
+        """Duplicate workflow names should error."""
+        ast = parse("""
+        workflow Process(input: String)
+        workflow Process(data: String)
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate workflow name 'Process'" in str(e) for e in result.errors)
+
+    def test_duplicate_event_facet_names(self, validator):
+        """Duplicate event facet names should error."""
+        ast = parse("""
+        event facet Handler(input: String)
+        event facet Handler(data: String)
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate event facet name 'Handler'" in str(e) for e in result.errors)
+
+    def test_facet_workflow_same_name(self, validator):
+        """Facet and workflow with same name should error."""
+        ast = parse("""
+        facet Process(input: String)
+        workflow Process(input: String)
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate" in str(e) and "Process" in str(e) for e in result.errors)
+
+    def test_unique_names_valid(self, validator):
+        """Unique names should pass."""
+        ast = parse("""
+        facet User(name: String)
+        facet Account(id: String)
+        workflow Process(input: String)
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_duplicate_names_in_namespace(self, validator):
+        """Duplicate names within a namespace should error."""
+        ast = parse("""
+        namespace team.data {
+            facet User(name: String)
+            facet User(email: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate facet name 'User'" in str(e) for e in result.errors)
+
+    def test_same_name_different_namespaces(self, validator):
+        """Same name in different namespaces should be valid."""
+        ast = parse("""
+        namespace team.a {
+            facet User(name: String)
+        }
+        namespace team.b {
+            facet User(email: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_duplicate_step_names(self, validator):
+        """Duplicate step names within a block should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            step1 = Data(value = $.input)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate step name 'step1'" in str(e) for e in result.errors)
+
+    def test_unique_step_names_valid(self, validator):
+        """Unique step names should pass."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            step2 = Data(value = $.input)
+            yield Test(output = step2.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+
+class TestStepReferences:
+    """Test step reference validation."""
+
+    def test_valid_input_reference(self, validator):
+        """Valid $.param reference should pass."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_invalid_input_reference(self, validator):
+        """Invalid $.param reference should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.nonexistent)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
+
+    def test_valid_step_reference(self, validator):
+        """Valid step.attr reference should pass."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            step2 = Data(value = step1.result)
+            yield Test(output = step2.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_invalid_step_attribute(self, validator):
+        """Invalid step attribute should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            step2 = Data(value = step1.nonexistent)
+            yield Test(output = step2.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any(
+            "Invalid attribute 'nonexistent' for step 'step1'" in str(e) for e in result.errors
+        )
+
+    def test_reference_undefined_step(self, validator):
+        """Reference to undefined step should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = undefined.result)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Reference to undefined step 'undefined'" in str(e) for e in result.errors)
+
+    def test_reference_step_defined_after(self, validator):
+        """Reference to step defined after should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = step2.result)
+            step2 = Data(value = $.input)
+            yield Test(output = step2.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        # Step2 is not defined when step1 tries to reference it
+        assert any("undefined step 'step2'" in str(e) for e in result.errors)
+
+    def test_foreach_variable_valid(self, validator):
+        """Foreach variable reference should be valid."""
+        ast = parse("""
+        facet Process(item: String) => (result: String)
+        workflow Test(items: Json) => (results: Json) andThen foreach item in $.items {
+            step1 = Process(item = item.value)
+            yield Test(results = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+
+class TestYieldValidation:
+    """Test yield statement validation."""
+
+    def test_valid_yield_containing_facet(self, validator):
+        """Yield to containing facet should pass."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_invalid_yield_target(self, validator):
+        """Yield to wrong facet should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            yield WrongFacet(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Invalid yield target 'WrongFacet'" in str(e) for e in result.errors)
+
+    def test_yield_to_mixin_valid(self, validator):
+        """Yield to mixin should pass."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        facet Extra(data: String) => (extra: String)
+        workflow Test(input: String) => (output: String) with Extra(data = "x") andThen {
+            step1 = Data(value = $.input)
+            yield Test(output = step1.result)
+            yield Extra(extra = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        # This should pass - yields to both containing facet and mixin
+        assert result.is_valid
+
+    def test_yield_references_validated(self, validator):
+        """References in yield should be validated."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            yield Test(output = undefined.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Reference to undefined step 'undefined'" in str(e) for e in result.errors)
+
+    def test_duplicate_yield_targets(self, validator):
+        """Duplicate yield targets should error."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            yield Test(output = step1.result)
+            yield Test(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate yield target 'Test'" in str(e) for e in result.errors)
+
+
+class TestConvenienceFunction:
+    """Test module-level validate function."""
+
+    def test_validate_function(self):
+        """Test validate() convenience function."""
+        ast = parse("facet Test()")
+        result = validate(ast)
+        assert isinstance(result, ValidationResult)
+        assert result.is_valid
+
+    def test_validate_with_errors(self):
+        """Test validate() returns errors."""
+        ast = parse("""
+        facet Test()
+        facet Test()
+        """)
+        result = validate(ast)
+        assert not result.is_valid
+        assert len(result.errors) > 0
+
+
+class TestValidationResult:
+    """Test ValidationResult class."""
+
+    def test_empty_result_is_valid(self):
+        """Empty result should be valid."""
+        result = ValidationResult()
+        assert result.is_valid
+        assert len(result.errors) == 0
+
+    def test_result_with_errors_invalid(self):
+        """Result with errors should be invalid."""
+        result = ValidationResult()
+        result.add_error("Test error")
+        assert not result.is_valid
+        assert len(result.errors) == 1
+
+    def test_error_string_format(self):
+        """Error should format with location."""
+        error = ValidationError("Test error", line=10, column=5)
+        assert "Test error at line 10, column 5" == str(error)
+
+    def test_error_string_no_location(self):
+        """Error without location should format correctly."""
+        error = ValidationError("Test error")
+        assert "Test error" == str(error)
+
+
+class TestComplexScenarios:
+    """Test complex validation scenarios."""
+
+    def test_nested_block_references(self, validator):
+        """References in nested contexts should work."""
+        ast = parse("""
+        facet Transform(input: String) => (output: String)
+        facet Process(data: String) => (result: String)
+
+        workflow Pipeline(input: String) => (final: String) andThen {
+            t1 = Transform(input = $.input)
+            p1 = Process(data = t1.output)
+            yield Pipeline(final = p1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_multiple_errors_reported(self, validator):
+        """Multiple errors should all be reported."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        facet Data(other: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.nonexistent)
+            step1 = Data(value = $.input)
+            yield WrongTarget(output = step1.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        # Should have multiple errors: duplicate name, invalid input ref, duplicate step, invalid yield
+        assert len(result.errors) >= 3
+
+    def test_full_namespace_example(self, validator):
+        """Full namespace example should validate correctly."""
+        ast = parse("""
+        namespace team.email {
+            facet EmailConfig(host: String, port: Int)
+            facet SendResult(messageId: String) => (status: String)
+
+            event facet SendEmail(to: String, subject: String) => (messageId: String)
+
+            workflow BulkSend(recipients: Json, template: String) => (results: Json) andThen foreach r in $.recipients {
+                email = SendEmail(to = r.email, subject = $.template)
+                yield BulkSend(results = email.messageId)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+
+class TestUseStatementValidation:
+    """Test use statement validation."""
+
+    def test_valid_use_statement(self, validator):
+        """Use statement referencing existing namespace should pass."""
+        ast = parse("""
+        namespace common.utils {
+            facet Helper(value: String)
+        }
+        namespace app.main {
+            use common.utils
+            facet App(input: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_invalid_use_statement(self, validator):
+        """Use statement referencing non-existent namespace should error."""
+        ast = parse("""
+        namespace app.main {
+            use nonexistent.namespace
+            facet App(input: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any(
+            "namespace 'nonexistent.namespace' does not exist" in str(e) for e in result.errors
+        )
+
+    def test_multiple_valid_use_statements(self, validator):
+        """Multiple use statements referencing existing namespaces should pass."""
+        ast = parse("""
+        namespace lib.a {
+            facet FacetA(value: String)
+        }
+        namespace lib.b {
+            facet FacetB(value: String)
+        }
+        namespace app {
+            use lib.a
+            use lib.b
+            facet App(input: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_mixed_valid_invalid_use_statements(self, validator):
+        """Mix of valid and invalid use statements should report errors."""
+        ast = parse("""
+        namespace lib.a {
+            facet FacetA(value: String)
+        }
+        namespace app {
+            use lib.a
+            use lib.nonexistent
+            facet App(input: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("namespace 'lib.nonexistent' does not exist" in str(e) for e in result.errors)
+
+
+class TestFacetNameResolution:
+    """Test facet name resolution and ambiguity detection."""
+
+    def test_unambiguous_facet_reference(self, validator):
+        """Unambiguous facet reference should pass."""
+        ast = parse("""
+        namespace lib {
+            facet Helper(value: String) => (result: String)
+        }
+        namespace app {
+            use lib
+            facet App(input: String) => (output: String) andThen {
+                h = Helper(value = $.input)
+                yield App(output = h.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_ambiguous_facet_reference(self, validator):
+        """Ambiguous facet reference should error."""
+        ast = parse("""
+        namespace a.b {
+            facet SomeFacet(input: String) => (result: String)
+        }
+        namespace c.d {
+            facet SomeFacet(input: String) => (result: String)
+        }
+        namespace app {
+            use a.b
+            use c.d
+            facet App(input: String) => (output: String) andThen {
+                s = SomeFacet(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Ambiguous facet reference 'SomeFacet'" in str(e) for e in result.errors)
+
+    def test_qualified_name_resolves_ambiguity(self, validator):
+        """Using fully qualified name should resolve ambiguity."""
+        ast = parse("""
+        namespace a.b {
+            facet SomeFacet(input: String) => (result: String)
+        }
+        namespace c.d {
+            facet SomeFacet(input: String) => (result: String)
+        }
+        namespace app {
+            use a.b
+            use c.d
+            facet App(input: String) => (output: String) andThen {
+                s = a.b.SomeFacet(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_local_facet_takes_precedence(self, validator):
+        """Facet in current namespace takes precedence over imports."""
+        ast = parse("""
+        namespace lib {
+            facet Helper(value: String) => (result: String)
+        }
+        namespace app {
+            use lib
+            facet Helper(value: String) => (result: String)
+            facet App(input: String) => (output: String) andThen {
+                h = Helper(value = $.input)
+                yield App(output = h.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        # Local Helper should be used without ambiguity
+        assert result.is_valid
+
+    def test_mixin_with_qualified_name(self, validator):
+        """Mixin with qualified name should work."""
+        ast = parse("""
+        namespace a.b {
+            facet SomeFacet(input: String) => (data: String)
+        }
+        namespace c.d {
+            facet SomeFacet(input: String) => (data: String)
+            facet OtherFacet(value: String) with a.b.SomeFacet(input = "test")
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_unknown_qualified_facet(self, validator):
+        """Unknown fully qualified facet should error."""
+        ast = parse("""
+        namespace app {
+            facet App(input: String) => (output: String) andThen {
+                s = nonexistent.namespace.Facet(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Unknown facet 'nonexistent.namespace.Facet'" in str(e) for e in result.errors)
+
+
+class TestSchemaValidation:
+    """Test schema declaration validation."""
+
+    def test_duplicate_schema_names(self, validator):
+        """Duplicate schema names should error."""
+        ast = parse("""
+        schema User {
+            name: String
+        }
+        schema User {
+            email: String
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate schema name 'User'" in str(e) for e in result.errors)
+
+    def test_schema_facet_same_name(self, validator):
+        """Schema and facet with same name should error."""
+        ast = parse("""
+        schema User {
+            name: String
+        }
+        facet User(name: String)
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate" in str(e) and "User" in str(e) for e in result.errors)
+
+    def test_duplicate_field_names(self, validator):
+        """Duplicate field names within a schema should error."""
+        ast = parse("""
+        schema User {
+            name: String
+            name: Int
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate schema field name 'name'" in str(e) for e in result.errors)
+
+    def test_valid_schema(self, validator):
+        """Valid schema should pass validation."""
+        ast = parse("""
+        schema User {
+            name: String
+            age: Int
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_duplicate_schema_in_namespace(self, validator):
+        """Duplicate schema names in namespace should error."""
+        ast = parse("""
+        namespace app {
+            schema Config {
+                key: String
+            }
+            schema Config {
+                value: String
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate schema name 'Config'" in str(e) for e in result.errors)
+
+    def test_schema_and_facet_same_name_in_namespace(self, validator):
+        """Schema and facet with same name in namespace should error."""
+        ast = parse("""
+        namespace app {
+            schema Data {
+                value: String
+            }
+            facet Data(value: String)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Duplicate" in str(e) and "Data" in str(e) for e in result.errors)
+
+
+class TestAmbiguousReferences:
+    """Test ambiguous facet references across namespaces and imports."""
+
+    def test_ambiguous_across_imports_and_toplevel(self, validator):
+        """Facet defined both at top-level and in imported namespace is ambiguous."""
+        ast = parse("""
+        facet Helper(value: String) => (result: String)
+
+        namespace lib {
+            facet Helper(value: String) => (result: String)
+        }
+
+        namespace app {
+            use lib
+            workflow Run(input: String) => (output: String) andThen {
+                h = Helper(value = $.input)
+                yield Run(output = h.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Ambiguous" in str(e) for e in result.errors)
+
+    def test_ambiguous_multiple_global_namespaces(self, validator):
+        """Facet defined in two non-imported namespaces should be ambiguous when referenced from third."""
+        ast = parse("""
+        namespace x {
+            facet Shared(a: String) => (r: String)
+        }
+        namespace y {
+            facet Shared(a: String) => (r: String)
+        }
+        namespace app {
+            use x
+            use y
+            workflow Run(input: String) => (output: String) andThen {
+                s = Shared(a = $.input)
+                yield Run(output = s.r)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Ambiguous facet reference 'Shared'" in str(e) for e in result.errors)
+
+
+class TestForwardStepReferences:
+    """Test that forward references to later steps are rejected."""
+
+    def test_step2_references_step3_forward(self, validator):
+        """A step cannot reference a step defined after it."""
+        ast = parse("""
+        facet Data(value: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            step1 = Data(value = $.input)
+            step2 = Data(value = step3.result)
+            step3 = Data(value = $.input)
+            yield Test(output = step3.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("undefined step 'step3'" in str(e) for e in result.errors)
+
+
+class TestEventFacetValidation:
+    """Test event facet with body and mixin references."""
+
+    def test_event_facet_with_body(self, validator):
+        """Event facet with andThen body should validate correctly."""
+        ast = parse("""
+        facet Compute(x: Int) => (result: Int)
+        event facet Process(input: Int) => (output: Int) andThen {
+            c = Compute(x = $.input)
+            yield Process(output = c.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_event_facet_mixin_references(self, validator):
+        """Event facet with mixin references should validate."""
+        ast = parse("""
+        facet Retry(maxAttempts: Int)
+        event facet Process(input: String) => (result: String) with Retry(maxAttempts = 3)
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_event_facet_invalid_mixin(self, validator):
+        """Event facet with unknown mixin should produce an error."""
+        ast = parse("""
+        event facet Process(input: String) with nonexistent.ns.Mixin(x = "y")
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Unknown facet" in str(e) for e in result.errors)
+
+
+class TestErrorLocation:
+    """Test that validation errors include location information."""
+
+    def test_error_line_only(self):
+        """Error with line but no column."""
+        from afl.validator import ValidationError
+
+        error = ValidationError("test error", line=5)
+        assert "at line 5" in str(error)
+        assert "column" not in str(error)
+
+    def test_add_error_with_location(self, validator):
+        """add_error with SourceLocation should capture line/column."""
+        from afl.ast import SourceLocation
+        from afl.validator import ValidationResult
+
+        result = ValidationResult()
+        loc = SourceLocation(line=10, column=3)
+        result.add_error("test", loc)
+        assert result.errors[0].line == 10
+        assert result.errors[0].column == 3
+
+    def test_add_error_without_location(self, validator):
+        """add_error without location should have None line/column."""
+        from afl.validator import ValidationResult
+
+        result = ValidationResult()
+        result.add_error("test")
+        assert result.errors[0].line is None
+        assert result.errors[0].column is None
+
+
+class TestMixinCallValidation:
+    """Test that mixin call references in step calls are validated."""
+
+    def test_mixin_args_reference_validated(self, validator):
+        """References in mixin call arguments should be validated."""
+        ast = parse("""
+        facet Config(setting: String)
+        facet Process(input: String) => (result: String)
+        workflow Test(x: String) => (output: String) andThen {
+            p = Process(input = $.x) with Config(setting = $.nonexistent)
+            yield Test(output = p.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)

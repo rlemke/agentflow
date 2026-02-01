@@ -1,0 +1,43 @@
+namespace osm.geo.Continents.cache {
+// Continents
+
+  use osm.geo.Operations
+  use osm.geo.cache.Continents
+
+
+  facet ContinentsIndividually() => (cache: [OSMCache]) andThen {
+    /*
+    planet = Planet()
+    africa = Africa()
+    antarctica = Antarctica()
+    asia = Asisa()
+    australia = Australia()
+    centralAmerica = CentralAmerica()
+    europe = Europe()
+    southAmerica = SouthAmerica()
+    russia = Russia()
+
+    dl_planet = Download(cache = planet.cache)
+    dl_africa = Download(cache = africa.cache)
+    dl_antarctica = Download(cache = antarctica.cache)
+    dl_asia = Download(cache = asia.cache)
+    dl_australia = Download(cache = australia.cache)
+    dl_centralAmerica = Download(cache = centralAmerica.cache)
+    dl_europe = Download(cache = europe.cache)
+    dl_southAmerica = Download(cache = southAmerica.cache)
+    dl_russia = Download(cache = russia.cache)
+
+    yield ContinentsIndividually(cache =
+      dl_planet.cache ++
+      dl_africa.cache ++
+      dl_antarctica.cache ++
+      //dl_asia.cache ++
+      dl_australia.cache ++
+      dl_centralAmerica.cache ++
+      dl_europe.cache ++
+      dl_southAmerica.cache ++
+      dl_russia.cache)
+      */
+  }
+}
+

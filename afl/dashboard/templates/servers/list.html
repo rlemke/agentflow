@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Servers — AgentFlow{% endblock %}
+{% block content %}
+<h1>Servers</h1>
+
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Group</th>
+            <th>Service</th>
+            <th>State</th>
+            <th>IPs</th>
+            <th>Last Ping</th>
+            <th>Handlers</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for server in servers %}
+        <tr>
+            <td>{{ server.server_name }}</td>
+            <td>{{ server.server_group }}</td>
+            <td>{{ server.service_name }}</td>
+            <td><span class="badge badge-{{ server.state|state_color }}">{{ server.state }}</span></td>
+            <td class="mono">{{ server.server_ips|join(", ") }}</td>
+            <td>{{ server.ping_time|timestamp }}</td>
+            <td>{{ server.handlers|join(", ") }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endblock %}

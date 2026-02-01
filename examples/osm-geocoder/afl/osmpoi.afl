@@ -1,0 +1,25 @@
+
+namespace osm.geo.POIs {
+
+    event facet POI(cache: OSMCache) => (pois: OSMCache )
+
+    facet Volcanos(cache: OSMCache, elevation:Long, active:Boolean) => (pois: OSMCache )
+    facet Prisons(operator:String, capacity:Long, securityLevel:String, gender:String ) => (pois: OSMCache )
+    facet NationalParks() => (pois: OSMCache )
+    facet StateParks() => (pois: OSMCache )
+    facet Hospitals() => (pois: OSMCache )
+    facet Airports() => (pois: OSMCache )
+    facet Military(kind:String) => (pois: OSMCache )
+
+    event facet Cities(cache: OSMCache) => (cities: OSMCache )
+    event facet Towns(cache: OSMCache) => (towns: OSMCache )
+    event facet Suburbs(cache: OSMCache) => (towns: OSMCache )
+    event facet Villages(cache: OSMCache) => (villages: OSMCache )
+    event facet Hamlets(cache: OSMCache) => (villages: OSMCache )
+    event facet Countries(cache: OSMCache) => (villages: OSMCache )
+    event facet GeoOSMCache(cache: OSMCache) => (geojson: OSMCache )
+
+}
+
+
+

@@ -1,0 +1,55 @@
+/* State badge colours */
+.badge {
+    display: inline-block;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #fff;
+}
+.badge-primary   { background-color: #1095c1; }
+.badge-success   { background-color: #2a9d2a; }
+.badge-danger    { background-color: #c62828; }
+.badge-warning   { background-color: #e67e22; color: #000; }
+.badge-secondary { background-color: #6c757d; }
+
+/* Summary cards grid */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.summary-card {
+    text-align: center;
+    padding: 1.5rem;
+}
+.summary-card h2 {
+    margin-bottom: 0.25rem;
+    font-size: 2.5rem;
+}
+.summary-card p {
+    margin: 0;
+    color: var(--muted-color);
+}
+
+/* Monospace for UUIDs and code */
+.mono {
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+/* Action buttons */
+.actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.actions button, .actions a {
+    font-size: 0.85em;
+    padding: 0.3em 0.8em;
+}
+
+/* Pre blocks */
+pre code {
+    font-size: 0.85em;
+}

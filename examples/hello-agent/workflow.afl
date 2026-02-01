@@ -1,0 +1,17 @@
+// Hello Agent Example
+//
+// A minimal workflow demonstrating the agent/runtime boundary:
+// 1. Workflow calls an event facet (Greet)
+// 2. Agent processes the event and returns a greeting
+// 3. Workflow completes with the result
+
+namespace hello {
+    // Event facet: processed by an external agent
+    event facet Greet(name: String) => (message: String)
+}
+
+// Workflow: entry point for execution
+workflow SayHello(name: String) => (greeting: String) andThen {
+    result = hello.Greet(name = $.name)
+    yield SayHello(greeting = result.message)
+}

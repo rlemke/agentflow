@@ -1,0 +1,71 @@
+namespace osm.geo.Australia.cache {
+
+  use osm.geo.Operations
+  use osm.geo.cache.Australia
+
+  facet AustraliaIndividually() => (cache: [OSMCache]) andThen {
+
+    americanOceania = AmericanOceania()
+    cookIslands = CookIslands()
+    fiji = Fiji()
+    kiribati = Kiribati()
+    ileDeClipperton = IleDeClipperton()
+    marshallIslands = MarshallIslands()
+    micronesia = Micronesia()
+    nauru = Nauru()
+    newCaledonia = NewCaledonia()
+    newZealand = NewZealand()
+    palau = Palau()
+    papuaNewGuinea = PapuaNewGuinea()
+    samoa = Samoa()
+    solomonIslands = SolomonIslands()
+    tokelau = Tokelau()
+    tonga = Tonga()
+    tuvalu = Tuvalu()
+    vanuatu = Vanuatu()
+    wallisAndFutuna = WallisAndFutuna()
+
+
+    dl_americanOceania = Download(cache = americanOceania.cache)
+    dl_cookIslands = Download(cache = cookIslands.cache)
+    dl_fiji = Download(cache = fiji.cache)
+    dl_kiribati = Download(cache = kiribati.cache)
+    dl_ileDeClipperton = Download(cache = ileDeClipperton.cache)
+    dl_marshallIslands = Download(cache = marshallIslands.cache)
+    dl_micronesia = Download(cache = micronesia.cache)
+    dl_nauru = Download(cache = nauru.cache)
+    dl_newCaledonia = Download(cache = newCaledonia.cache)
+    dl_newZealand = Download(cache = newZealand.cache)
+    dl_palau = Download(cache = palau.cache)
+    dl_papuaNewGuinea = Download(cache = papuaNewGuinea.cache)
+    dl_samoa = Download(cache = samoa.cache)
+    dl_solomonIslands = Download(cache = solomonIslands.cache)
+    dl_tokelau = Download(cache = tokelau.cache)
+    dl_tonga = Download(cache = tonga.cache)
+    dl_tuvalu = Download(cache = tuvalu.cache)
+    dl_vanuatu = Download(cache = vanuatu.cache)
+    dl_wallisAndFutuna = Download(cache = wallisAndFutuna.cache)
+
+
+    yield AustraliaIndividually(cache = dl_americanOceania.cache ++
+            dl_cookIslands.cache ++
+            dl_fiji.cache ++
+            dl_kiribati.cache ++
+            dl_ileDeClipperton.cache ++
+            dl_marshallIslands.cache ++
+            dl_micronesia.cache ++
+            dl_nauru.cache ++
+            dl_newCaledonia.cache ++
+            dl_newZealand.cache ++
+            dl_palau.cache ++
+            dl_papuaNewGuinea.cache ++
+            dl_samoa.cache ++
+            dl_solomonIslands.cache ++
+            dl_tokelau.cache ++
+            dl_tonga.cache ++
+            dl_tuvalu.cache ++
+            dl_vanuatu.cache ++
+            dl_wallisAndFutuna.cache)
+  }
+
+}

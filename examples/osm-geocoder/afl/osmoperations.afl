@@ -1,0 +1,28 @@
+
+namespace osm.geo.Operations.Data {
+
+    facet OsmDate(date: String = "latest")
+    facet OsmDownloadUrl(url: String = null)
+    facet OsmCachedLocation(location: String = null)
+    facet OsmForce(force:Boolean = false)
+
+}
+
+namespace osm.geo.Operations {
+    event facet Download(cache:OSMCache) => ()
+    event facet Tile(cache:OSMCache) => (tiles:OSMCache)
+    event facet RoutingGraph(cache:OSMCache) => (graph:OSMCache)
+    event facet Status(cache:OSMCache) => (stats:OSMCache)
+    event facet GeoOSMCache(cache:OSMCache) => (graph:OSMCache)
+    event facet PostGisImport(cache:OSMCache) => (stats:OSMCache)
+    event facet DownloadAll(cache:OSMCache) => ()
+    event facet TileAll(cache:OSMCache) => (tiles:OSMCache)
+    event facet RoutingGraphAll(cache:OSMCache) => (graph:OSMCache)
+    event facet StatusAll(cache:OSMCache) => (stats:OSMCache)
+    event facet GeoOSMCacheAll(cache:OSMCache) => (graph:OSMCache)
+    event facet DownloadShapefile(cache:OSMCache) => ()
+    event facet DownloadShapefileAll(cache:OSMCache) => ()
+
+}
+
+

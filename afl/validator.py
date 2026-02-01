@@ -1,0 +1,577 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""AFL semantic validator.
+
+Validates AST for semantic correctness:
+- Name uniqueness within scopes
+- Valid step references
+- Valid yield targets
+- Valid use statements (must reference existing namespaces)
+- Unambiguous facet references (qualified names when needed)
+"""
+
+from dataclasses import dataclass, field
+
+from .ast import (
+    AndThenBlock,
+    CallExpr,
+    EventFacetDecl,
+    FacetDecl,
+    FacetSig,
+    Namespace,
+    Program,
+    Reference,
+    SchemaDecl,
+    SourceLocation,
+    WorkflowDecl,
+    YieldStmt,
+)
+
+
+@dataclass
+class ValidationError:
+    """A semantic validation error."""
+
+    message: str
+    line: int | None = None
+    column: int | None = None
+
+    def __str__(self) -> str:
+        location = ""
+        if self.line is not None:
+            location = f" at line {self.line}"
+            if self.column is not None:
+                location += f", column {self.column}"
+        return f"{self.message}{location}"
+
+
+@dataclass
+class ValidationResult:
+    """Result of validation containing any errors found."""
+
+    errors: list[ValidationError] = field(default_factory=list)
+
+    @property
+    def is_valid(self) -> bool:
+        return len(self.errors) == 0
+
+    def add_error(self, message: str, location: SourceLocation | None = None) -> None:
+        """Add a validation error."""
+        line = location.line if location else None
+        column = location.column if location else None
+        self.errors.append(ValidationError(message, line, column))
+
+
+@dataclass
+class FacetInfo:
+    """Information about a declared facet for reference validation."""
+
+    name: str
+    params: set[str]  # Input parameter names
+    returns: set[str]  # Return parameter names
+    location: SourceLocation | None = None
+
+
+@dataclass
+class StepInfo:
+    """Information about a step within a block."""
+
+    name: str
+    facet_name: str
+    location: SourceLocation | None = None
+
+
+class AFLValidator:
+    """Validates AFL AST for semantic correctness."""
+
+    def __init__(self):
+        self._result: ValidationResult = ValidationResult()
+        self._facets: dict[str, FacetInfo] = {}  # All known facets by full name
+        self._facets_by_short_name: dict[str, list[str]] = {}  # Short name -> list of full names
+        self._namespaces: set[str] = set()  # All namespace names
+        self._schemas: dict[str, SourceLocation] = {}  # Schema names by full name
+        self._current_namespace: str = ""
+        self._current_imports: set[str] = set()  # Namespaces imported via 'use'
+
+    def validate(self, program: Program) -> ValidationResult:
+        """Validate a program AST.
+
+        Args:
+            program: The Program AST to validate
+
+        Returns:
+            ValidationResult containing any errors found
+        """
+        self._result = ValidationResult()
+        self._facets = {}
+        self._facets_by_short_name = {}
+        self._namespaces = set()
+        self._schemas = {}
+        self._current_namespace = ""
+        self._current_imports = set()
+
+        # First pass: collect all namespace names and facet definitions
+        self._collect_namespaces(program)
+        self._collect_facets(program)
+
+        # Second pass: validate references and yields
+        self._validate_program(program)
+
+        return self._result
+
+    def _collect_namespaces(self, program: Program) -> None:
+        """Collect all namespace names for use statement validation."""
+        for namespace in program.namespaces:
+            self._namespaces.add(namespace.name)
+
+    def _collect_facets(self, program: Program) -> None:
+        """Collect all facet definitions for reference validation."""
+        # Top-level declarations
+        for facet in program.facets:
+            self._register_facet(facet.sig)
+        for event_facet in program.event_facets:
+            self._register_facet(event_facet.sig)
+        for workflow in program.workflows:
+            self._register_facet(workflow.sig)
+
+        # Namespace declarations
+        for namespace in program.namespaces:
+            for facet in namespace.facets:
+                self._register_facet(facet.sig, namespace.name)
+            for event_facet in namespace.event_facets:
+                self._register_facet(event_facet.sig, namespace.name)
+            for workflow in namespace.workflows:
+                self._register_facet(workflow.sig, namespace.name)
+
+    def _register_facet(self, sig: FacetSig, namespace: str = "") -> None:
+        """Register a facet definition."""
+        full_name = f"{namespace}.{sig.name}" if namespace else sig.name
+        params = {p.name for p in sig.params}
+        returns = {p.name for p in sig.returns.params} if sig.returns else set()
+        self._facets[full_name] = FacetInfo(
+            name=sig.name,
+            params=params,
+            returns=returns,
+            location=sig.location,
+        )
+        # Track by short name for ambiguity detection
+        short_name = sig.name
+        if short_name not in self._facets_by_short_name:
+            self._facets_by_short_name[short_name] = []
+        self._facets_by_short_name[short_name].append(full_name)
+
+    def _resolve_facet_name(
+        self, name: str, location: SourceLocation | None = None
+    ) -> FacetInfo | None:
+        """Resolve a facet name to its FacetInfo, checking for ambiguity.
+
+        Resolution order:
+        1. Fully qualified name (exact match)
+        2. Current namespace (takes precedence, no ambiguity check)
+        3. Imported namespaces (via 'use') - check for ambiguity among imports
+        4. Top-level (no namespace)
+
+        Args:
+            name: The facet name (may be qualified or unqualified)
+            location: Source location for error reporting
+
+        Returns:
+            FacetInfo if found unambiguously, None if not found or ambiguous
+        """
+        # If it's a fully qualified name, look it up directly
+        if "." in name:
+            if name in self._facets:
+                return self._facets[name]
+            # Not found as exact match
+            self._result.add_error(f"Unknown facet '{name}'", location)
+            return None
+
+        # Unqualified name
+        short_name = name
+
+        # Check current namespace first - local facets take precedence
+        if self._current_namespace:
+            full_in_current = f"{self._current_namespace}.{short_name}"
+            if full_in_current in self._facets:
+                return self._facets[full_in_current]
+
+        # Check imported namespaces - collect candidates for ambiguity check
+        import_candidates: list[str] = []
+        for imported_ns in self._current_imports:
+            full_in_import = f"{imported_ns}.{short_name}"
+            if full_in_import in self._facets:
+                import_candidates.append(full_in_import)
+
+        # Check top-level (no namespace)
+        top_level_match = None
+        if short_name in self._facets:
+            # Check if it's actually a top-level facet (not namespaced)
+            all_matches = self._facets_by_short_name.get(short_name, [])
+            if short_name in all_matches:
+                top_level_match = short_name
+
+        # Combine import candidates with top-level
+        candidates = import_candidates[:]
+        if top_level_match:
+            candidates.append(top_level_match)
+
+        # Check if ambiguous among imports/top-level
+        if len(candidates) > 1:
+            self._result.add_error(
+                f"Ambiguous facet reference '{short_name}': could be {', '.join(sorted(candidates))}. "
+                f"Use fully qualified name to disambiguate.",
+                location,
+            )
+            return None
+
+        if len(candidates) == 1:
+            return self._facets[candidates[0]]
+
+        # Not found in current scope or imports - try global lookup
+        all_matches = self._facets_by_short_name.get(short_name, [])
+        if len(all_matches) == 1:
+            return self._facets[all_matches[0]]
+        elif len(all_matches) > 1:
+            self._result.add_error(
+                f"Ambiguous facet reference '{short_name}': could be {', '.join(sorted(all_matches))}. "
+                f"Use fully qualified name to disambiguate.",
+                location,
+            )
+            return None
+
+        # Not found anywhere - this is OK, might be an external facet
+        return None
+
+    def _validate_program(self, program: Program) -> None:
+        """Validate the entire program."""
+        # Validate top-level name uniqueness
+        self._validate_top_level_uniqueness(program)
+
+        # Validate each namespace
+        for namespace in program.namespaces:
+            self._validate_namespace(namespace)
+
+        # Validate top-level declarations
+        for facet in program.facets:
+            self._validate_facet_decl(facet)
+        for event_facet in program.event_facets:
+            self._validate_event_facet_decl(event_facet)
+        for workflow in program.workflows:
+            self._validate_workflow_decl(workflow)
+
+    def _validate_top_level_uniqueness(self, program: Program) -> None:
+        """Validate that top-level names are unique."""
+        names: dict[str, SourceLocation] = {}
+
+        for facet in program.facets:
+            self._check_name_unique(facet.sig.name, facet.location, names, "facet")
+        for event_facet in program.event_facets:
+            self._check_name_unique(
+                event_facet.sig.name, event_facet.location, names, "event facet"
+            )
+        for workflow in program.workflows:
+            self._check_name_unique(workflow.sig.name, workflow.location, names, "workflow")
+        for schema in program.schemas:
+            self._check_name_unique(schema.name, schema.location, names, "schema")
+            self._validate_schema_decl(schema)
+
+    def _validate_namespace(self, namespace: Namespace) -> None:
+        """Validate a namespace."""
+        self._current_namespace = namespace.name
+        self._current_imports = set()
+        names: dict[str, SourceLocation] = {}
+
+        # Validate use statements
+        for uses_decl in namespace.uses:
+            if uses_decl.name not in self._namespaces:
+                self._result.add_error(
+                    f"Invalid use statement: namespace '{uses_decl.name}' does not exist",
+                    uses_decl.location,
+                )
+            else:
+                self._current_imports.add(uses_decl.name)
+
+        # Check name uniqueness within namespace
+        for facet in namespace.facets:
+            self._check_name_unique(facet.sig.name, facet.location, names, "facet")
+        for event_facet in namespace.event_facets:
+            self._check_name_unique(
+                event_facet.sig.name, event_facet.location, names, "event facet"
+            )
+        for workflow in namespace.workflows:
+            self._check_name_unique(workflow.sig.name, workflow.location, names, "workflow")
+        for schema in namespace.schemas:
+            self._check_name_unique(schema.name, schema.location, names, "schema")
+            self._validate_schema_decl(schema)
+
+        # Validate declarations
+        for facet in namespace.facets:
+            self._validate_facet_decl(facet)
+        for event_facet in namespace.event_facets:
+            self._validate_event_facet_decl(event_facet)
+        for workflow in namespace.workflows:
+            self._validate_workflow_decl(workflow)
+
+        self._current_namespace = ""
+        self._current_imports = set()
+
+    def _check_name_unique(
+        self,
+        name: str,
+        location: SourceLocation | None,
+        names: dict[str, SourceLocation],
+        kind: str,
+    ) -> None:
+        """Check if a name is unique within a scope."""
+        if name in names:
+            prev_loc = names[name]
+            prev_line = (
+                f" (previously defined at line {prev_loc.line})"
+                if prev_loc and prev_loc.line
+                else ""
+            )
+            self._result.add_error(f"Duplicate {kind} name '{name}'{prev_line}", location)
+        else:
+            names[name] = location
+
+    def _validate_facet_decl(self, decl: FacetDecl) -> None:
+        """Validate a facet declaration."""
+        # Validate mixin references in signature
+        for mixin in decl.sig.mixins:
+            self._resolve_facet_name(mixin.name, mixin.location)
+        if decl.body:
+            self._validate_and_then_block(decl.body, decl.sig)
+
+    def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
+        """Validate an event facet declaration."""
+        # Validate mixin references in signature
+        for mixin in decl.sig.mixins:
+            self._resolve_facet_name(mixin.name, mixin.location)
+        if decl.body:
+            self._validate_and_then_block(decl.body, decl.sig)
+
+    def _validate_workflow_decl(self, decl: WorkflowDecl) -> None:
+        """Validate a workflow declaration."""
+        # Validate mixin references in signature
+        for mixin in decl.sig.mixins:
+            self._resolve_facet_name(mixin.name, mixin.location)
+        if decl.body:
+            self._validate_and_then_block(decl.body, decl.sig)
+
+    def _validate_and_then_block(self, body: AndThenBlock, containing_sig: FacetSig) -> None:
+        """Validate an andThen block."""
+        if not body.block:
+            return
+
+        # Get valid input references (parameters of containing facet)
+        input_attrs = {p.name for p in containing_sig.params}
+
+        # Get valid yield targets (containing facet name + mixin names)
+        valid_yield_targets = {containing_sig.name}
+        for mixin in containing_sig.mixins:
+            valid_yield_targets.add(mixin.name.split(".")[-1])  # Use short name
+
+        # Track steps and their return attributes
+        steps: dict[str, StepInfo] = {}
+        step_returns: dict[str, set[str]] = {}
+
+        # If foreach, add the iteration variable
+        foreach_var: str | None = None
+        if body.foreach:
+            foreach_var = body.foreach.variable
+
+        # Validate each step
+        for step in body.block.steps:
+            # Check step name uniqueness
+            if step.name in steps:
+                prev = steps[step.name]
+                prev_line = (
+                    f" (previously defined at line {prev.location.line})"
+                    if prev.location and prev.location.line
+                    else ""
+                )
+                self._result.add_error(
+                    f"Duplicate step name '{step.name}'{prev_line}", step.location
+                )
+            else:
+                steps[step.name] = StepInfo(
+                    name=step.name, facet_name=step.call.name, location=step.location
+                )
+                # Get return attributes for this step's facet (with ambiguity check)
+                facet_info = self._resolve_facet_name(step.call.name, step.call.location)
+                if facet_info:
+                    step_returns[step.name] = facet_info.returns
+                else:
+                    step_returns[step.name] = set()  # Unknown or ambiguous facet
+
+            # Validate mixin references in step call
+            for mixin in step.call.mixins:
+                self._resolve_facet_name(mixin.name, step.call.location)
+
+            # Validate references in step's call arguments
+            self._validate_call_references(
+                step.call,
+                input_attrs,
+                steps,
+                step_returns,
+                foreach_var,
+                step.name,  # Current step being defined
+            )
+
+        # Validate yield statements and check for duplicate targets
+        yield_targets_used: set[str] = set()
+        for yield_stmt in body.block.yield_stmts:
+            self._validate_yield(
+                yield_stmt, valid_yield_targets, steps, step_returns, input_attrs, foreach_var
+            )
+            target = yield_stmt.call.name.split(".")[-1]
+            if target in yield_targets_used:
+                self._result.add_error(
+                    f"Duplicate yield target '{target}': each yield must reference a different facet or mixin",
+                    yield_stmt.location,
+                )
+            else:
+                yield_targets_used.add(target)
+
+    def _validate_call_references(
+        self,
+        call: CallExpr,
+        input_attrs: set[str],
+        steps: dict[str, StepInfo],
+        step_returns: dict[str, set[str]],
+        foreach_var: str | None,
+        current_step: str | None = None,
+    ) -> None:
+        """Validate references in a call expression."""
+        for arg in call.args:
+            if isinstance(arg.value, Reference):
+                self._validate_reference(
+                    arg.value, input_attrs, steps, step_returns, foreach_var, current_step
+                )
+
+        # Also validate mixin call arguments
+        for mixin in call.mixins:
+            for arg in mixin.args:
+                if isinstance(arg.value, Reference):
+                    self._validate_reference(
+                        arg.value, input_attrs, steps, step_returns, foreach_var, current_step
+                    )
+
+    def _validate_reference(
+        self,
+        ref: Reference,
+        input_attrs: set[str],
+        steps: dict[str, StepInfo],
+        step_returns: dict[str, set[str]],
+        foreach_var: str | None,
+        current_step: str | None = None,
+    ) -> None:
+        """Validate a single reference."""
+        if ref.is_input:
+            # $.attr - must reference a valid input parameter
+            if ref.path:
+                attr = ref.path[0]
+                # Allow foreach variable
+                if foreach_var and attr == foreach_var:
+                    return
+                if attr not in input_attrs:
+                    self._result.add_error(
+                        f"Invalid input reference '$.{attr}': no parameter named '{attr}'",
+                        ref.location,
+                    )
+        else:
+            # step.attr - must reference a valid step and attribute
+            if not ref.path or len(ref.path) < 2:
+                self._result.add_error(
+                    "Invalid step reference: must be 'step.attribute'", ref.location
+                )
+                return
+
+            step_name = ref.path[0]
+            attr = ref.path[1]
+
+            # Check if referencing a step that exists
+            if step_name not in steps:
+                # Could be the foreach variable
+                if foreach_var and step_name == foreach_var:
+                    return  # Foreach variable references are allowed
+                self._result.add_error(f"Reference to undefined step '{step_name}'", ref.location)
+                return
+
+            # Check that we're not referencing a step defined after current step
+            if current_step:
+                step_names = list(steps.keys())
+                if step_name in step_names and current_step in step_names:
+                    if step_names.index(step_name) >= step_names.index(current_step):
+                        if step_name != current_step or step_names.index(
+                            step_name
+                        ) > step_names.index(current_step):
+                            self._result.add_error(
+                                f"Step '{current_step}' cannot reference step '{step_name}' which is not defined before it",
+                                ref.location,
+                            )
+                            return
+
+            # Check if attribute is valid for that step's facet
+            returns = step_returns.get(step_name, set())
+            if returns and attr not in returns:
+                self._result.add_error(
+                    f"Invalid attribute '{attr}' for step '{step_name}': "
+                    f"valid attributes are {sorted(returns)}",
+                    ref.location,
+                )
+
+    def _validate_yield(
+        self,
+        yield_stmt: YieldStmt,
+        valid_targets: set[str],
+        steps: dict[str, StepInfo],
+        step_returns: dict[str, set[str]],
+        input_attrs: set[str],
+        foreach_var: str | None,
+    ) -> None:
+        """Validate a yield statement."""
+        target = yield_stmt.call.name.split(".")[-1]  # Use short name
+
+        if target not in valid_targets:
+            self._result.add_error(
+                f"Invalid yield target '{target}': must be the containing facet or one of its mixins. "
+                f"Valid targets are: {sorted(valid_targets)}",
+                yield_stmt.location,
+            )
+
+        # Validate references in yield arguments
+        self._validate_call_references(
+            yield_stmt.call, input_attrs, steps, step_returns, foreach_var
+        )
+
+    def _validate_schema_decl(self, schema: SchemaDecl) -> None:
+        """Validate a schema declaration for field name uniqueness."""
+        field_names: dict[str, SourceLocation] = {}
+        for f in schema.fields:
+            self._check_name_unique(f.name, f.location, field_names, "schema field")
+
+
+def validate(program: Program) -> ValidationResult:
+    """Validate a program AST.
+
+    Args:
+        program: The Program AST to validate
+
+    Returns:
+        ValidationResult containing any errors found
+    """
+    validator = AFLValidator()
+    return validator.validate(program)

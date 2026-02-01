@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Flows — AgentFlow{% endblock %}
+{% block content %}
+<h1>Flows</h1>
+
+<figure>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Path</th><th>Workflows</th><th>Sources</th></tr>
+    </thead>
+    <tbody>
+        {% for flow in flows %}
+        <tr>
+            <td><a href="/flows/{{ flow.uuid }}">{{ flow.name.name }}</a></td>
+            <td class="mono">{{ flow.name.path }}</td>
+            <td>{{ flow.workflows|length }}</td>
+            <td>
+                {% if flow.compiled_sources %}
+                <a href="/flows/{{ flow.uuid }}/source">AFL</a> |
+                <a href="/flows/{{ flow.uuid }}/json">JSON</a>
+                {% else %}
+                —
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endblock %}

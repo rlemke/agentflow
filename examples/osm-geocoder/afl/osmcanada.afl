@@ -1,0 +1,52 @@
+namespace osm.geo.Canada.cache {
+// Canada
+
+  use osm.geo.Operations
+  use osm.geo.cache.Canada
+
+  facet CanadaIndividually () => (cache: [OSMCache]) andThen {
+
+    alberta = Alberta()
+    britishColumbia = BritishColumbia()
+    manitoba = Manitoba()
+    newBrunswick = NewBrunswick()
+    newfoundlandAndLabrador = NewfoundlandAndLabrador()
+    novaScotia = NovaScotia()
+    ontario = Ontario()
+    princeEdwardIsland = PrinceEdwardIsland()
+    quebec = Quebec()
+    saskatchewan = Saskatchewan()
+    yukon = Yukon()
+
+
+    dl_alberta = Download(cache = alberta.cache)
+    dl_britishColumbia = Download(cache = britishColumbia.cache)
+    dl_manitoba = Download(cache = manitoba.cache)
+    dl_newBrunswick = Download(cache = newBrunswick.cache)
+    dl_newfoundlandAndLabrador = Download(cache = newfoundlandAndLabrador.cache)
+    dl_novaScotia = Download(cache = novaScotia.cache)
+    dl_ontario = Download(cache = ontario.cache)
+    dl_princeEdwardIsland = Download(cache = princeEdwardIsland.cache)
+    dl_quebec = Download(cache = quebec.cache)
+    dl_saskatchewan = Download(cache = saskatchewan.cache)
+    dl_yukon = Download(cache = yukon.cache)
+
+    yield CanadaIndividually(cache = dl_alberta.cache ++
+                             dl_britishColumbia.cache ++
+                             dl_manitoba.cache ++
+                             dl_newBrunswick.cache ++
+                             dl_newfoundlandAndLabrador.cache ++
+                             dl_novaScotia.cache ++
+                             dl_ontario.cache ++
+                             dl_princeEdwardIsland.cache ++
+                             dl_quebec.cache ++
+                             dl_saskatchewan.cache ++
+                             dl_yukon.cache)
+
+
+
+  }
+
+
+}
+

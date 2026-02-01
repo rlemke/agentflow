@@ -1,0 +1,433 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""AFL runtime persistence abstraction.
+
+The Evaluator MUST NOT directly access the database.
+All persistence operations are performed through this API.
+"""
+
+from abc import abstractmethod
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+
+from .step import StepDefinition
+from .types import BlockId, EventId, StepId, WorkflowId
+
+if TYPE_CHECKING:
+    from .entities import (
+        LockDefinition,
+        LockMetaData,
+        LogDefinition,
+        RunnerDefinition,
+        TaskDefinition,
+    )
+
+
+@dataclass
+class IterationChanges:
+    """Accumulated changes from a single iteration.
+
+    Changes are collected in memory during iteration and
+    atomically committed at iteration boundary.
+    """
+
+    created_steps: list[StepDefinition] = field(default_factory=list)
+    updated_steps: list[StepDefinition] = field(default_factory=list)
+    created_events: list["EventDefinition"] = field(default_factory=list)
+    updated_events: list["EventDefinition"] = field(default_factory=list)
+    created_tasks: list["TaskDefinition"] = field(default_factory=list)
+
+    # Track step IDs to avoid duplicates
+    _created_ids: set[StepId] = field(default_factory=set)
+    _updated_ids: dict[StepId, int] = field(default_factory=dict)
+
+    def add_created_step(self, step: StepDefinition) -> None:
+        """Record a newly created step (idempotent)."""
+        if step.id not in self._created_ids:
+            self._created_ids.add(step.id)
+            self.created_steps.append(step)
+
+    def add_updated_step(self, step: StepDefinition) -> None:
+        """Record an updated step (replaces previous update for same ID)."""
+        if step.id in self._updated_ids:
+            # Replace the previous version
+            idx = self._updated_ids[step.id]
+            self.updated_steps[idx] = step
+        else:
+            self._updated_ids[step.id] = len(self.updated_steps)
+            self.updated_steps.append(step)
+
+    def add_created_event(self, event: "EventDefinition") -> None:
+        """Record a newly created event."""
+        self.created_events.append(event)
+
+    def add_updated_event(self, event: "EventDefinition") -> None:
+        """Record an updated event."""
+        self.updated_events.append(event)
+
+    def add_created_task(self, task: "TaskDefinition") -> None:
+        """Record a newly created task."""
+        self.created_tasks.append(task)
+
+    @property
+    def has_changes(self) -> bool:
+        """Check if there are any changes to commit."""
+        return (
+            len(self.created_steps) > 0
+            or len(self.updated_steps) > 0
+            or len(self.created_events) > 0
+            or len(self.updated_events) > 0
+            or len(self.created_tasks) > 0
+        )
+
+    def clear(self) -> None:
+        """Clear all accumulated changes."""
+        self.created_steps.clear()
+        self.updated_steps.clear()
+        self.created_events.clear()
+        self.updated_events.clear()
+        self.created_tasks.clear()
+        self._created_ids.clear()
+        self._updated_ids.clear()
+
+
+@dataclass
+class EventDefinition:
+    """Event definition for external dispatch.
+
+    Events represent work to be dispatched to agents.
+    """
+
+    id: EventId
+    step_id: StepId
+    workflow_id: WorkflowId
+    state: str  # EventState constant
+    event_type: str
+    payload: dict = field(default_factory=dict)
+
+
+@runtime_checkable
+class PersistenceAPI(Protocol):
+    """Protocol defining the persistence abstraction boundary.
+
+    All database operations MUST go through this interface.
+    Implementations handle:
+    - Concurrency and locking semantics
+    - Atomicity guarantees
+    - Database-specific details
+    """
+
+    # Step operations
+    @abstractmethod
+    def get_step(self, step_id: StepId) -> StepDefinition | None:
+        """Fetch a step by its persistent ID.
+
+        Args:
+            step_id: The step's unique identifier
+
+        Returns:
+            The step if found, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    def get_steps_by_block(self, block_id: BlockId) -> Sequence[StepDefinition]:
+        """Fetch all steps belonging to a block.
+
+        Args:
+            block_id: The block's unique identifier
+
+        Returns:
+            All steps in the block
+        """
+        ...
+
+    @abstractmethod
+    def get_steps_by_workflow(self, workflow_id: WorkflowId) -> Sequence[StepDefinition]:
+        """Fetch all steps belonging to a workflow.
+
+        Args:
+            workflow_id: The workflow's unique identifier
+
+        Returns:
+            All steps in the workflow
+        """
+        ...
+
+    @abstractmethod
+    def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
+        """Fetch all steps in a given state.
+
+        Args:
+            state: The step state to filter by
+
+        Returns:
+            All steps in the given state
+        """
+        ...
+
+    @abstractmethod
+    def get_steps_by_container(self, container_id: StepId) -> Sequence[StepDefinition]:
+        """Fetch all steps with a given container.
+
+        Args:
+            container_id: The container step's ID
+
+        Returns:
+            All steps in the container
+        """
+        ...
+
+    @abstractmethod
+    def save_step(self, step: StepDefinition) -> None:
+        """Persist a new or updated step.
+
+        Args:
+            step: The step to save
+        """
+        ...
+
+    # Event operations
+    @abstractmethod
+    def get_event(self, event_id: EventId) -> EventDefinition | None:
+        """Fetch an event by its ID.
+
+        Args:
+            event_id: The event's unique identifier
+
+        Returns:
+            The event if found, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    def save_event(self, event: EventDefinition) -> None:
+        """Persist a new or updated event.
+
+        Args:
+            event: The event to save
+        """
+        ...
+
+    # Block operations
+    @abstractmethod
+    def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
+        """Fetch all block steps for a containing step.
+
+        Args:
+            step_id: The containing step's ID
+
+        Returns:
+            All block steps for this step
+        """
+        ...
+
+    # Atomic operations
+    @abstractmethod
+    def commit(self, changes: IterationChanges) -> None:
+        """Atomically commit all iteration changes.
+
+        This is called at iteration boundary to persist
+        all in-memory changes atomically.
+
+        Args:
+            changes: The accumulated changes to commit
+        """
+        ...
+
+    # Query operations
+    @abstractmethod
+    def get_workflow_root(self, workflow_id: WorkflowId) -> StepDefinition | None:
+        """Get the root step of a workflow.
+
+        Args:
+            workflow_id: The workflow's unique identifier
+
+        Returns:
+            The root step if found
+        """
+        ...
+
+    @abstractmethod
+    def step_exists(self, statement_id: str, block_id: BlockId | None) -> bool:
+        """Check if a step already exists for a statement in a block.
+
+        Used to prevent duplicate step creation (idempotency).
+
+        Args:
+            statement_id: The statement definition ID
+            block_id: The containing block ID
+
+        Returns:
+            True if step already exists
+        """
+        ...
+
+    # Runner operations
+
+    @abstractmethod
+    def get_runner(self, runner_id: str) -> Optional["RunnerDefinition"]:
+        """Get a runner by ID.
+
+        Args:
+            runner_id: The runner's unique identifier
+
+        Returns:
+            The runner if found, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    def save_runner(self, runner: "RunnerDefinition") -> None:
+        """Save a runner.
+
+        Args:
+            runner: The runner to save
+        """
+        ...
+
+    @abstractmethod
+    def get_runners_by_state(self, state: str) -> Sequence["RunnerDefinition"]:
+        """Get runners by state.
+
+        Args:
+            state: The runner state to filter by
+
+        Returns:
+            All runners in the given state
+        """
+        ...
+
+    # Task operations
+
+    @abstractmethod
+    def get_pending_tasks(self, task_list: str) -> Sequence["TaskDefinition"]:
+        """Get pending tasks for a task list.
+
+        Args:
+            task_list: The task list name
+
+        Returns:
+            All pending tasks in the task list
+        """
+        ...
+
+    @abstractmethod
+    def save_task(self, task: "TaskDefinition") -> None:
+        """Save a task.
+
+        Args:
+            task: The task to save
+        """
+        ...
+
+    @abstractmethod
+    def claim_task(
+        self,
+        task_names: list[str],
+        task_list: str = "default",
+    ) -> Optional["TaskDefinition"]:
+        """Atomically claim a pending task matching one of the given names.
+
+        Transitions a single task from PENDING to RUNNING atomically.
+        Returns the claimed task, or None if no matching task is available.
+
+        Args:
+            task_names: List of task names to match
+            task_list: The task list to search (default: "default")
+
+        Returns:
+            The claimed task, or None
+        """
+        ...
+
+    # Log operations
+
+    @abstractmethod
+    def save_log(self, log: "LogDefinition") -> None:
+        """Save a log entry.
+
+        Args:
+            log: The log entry to save
+        """
+        ...
+
+    @abstractmethod
+    def get_logs_by_runner(self, runner_id: str) -> Sequence["LogDefinition"]:
+        """Get logs for a runner.
+
+        Args:
+            runner_id: The runner's unique identifier
+
+        Returns:
+            All logs for the runner
+        """
+        ...
+
+    # Lock operations
+
+    @abstractmethod
+    def acquire_lock(
+        self, key: str, duration_ms: int, meta: Optional["LockMetaData"] = None
+    ) -> bool:
+        """Acquire a distributed lock.
+
+        Args:
+            key: The lock key
+            duration_ms: Lock duration in milliseconds
+            meta: Optional metadata for the lock
+
+        Returns:
+            True if lock was acquired, False if already held
+        """
+        ...
+
+    @abstractmethod
+    def release_lock(self, key: str) -> bool:
+        """Release a distributed lock.
+
+        Args:
+            key: The lock key
+
+        Returns:
+            True if lock was released, False if not held
+        """
+        ...
+
+    @abstractmethod
+    def check_lock(self, key: str) -> Optional["LockDefinition"]:
+        """Check if a lock exists and is valid.
+
+        Args:
+            key: The lock key
+
+        Returns:
+            The lock definition if valid, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    def extend_lock(self, key: str, duration_ms: int) -> bool:
+        """Extend a lock's expiration.
+
+        Args:
+            key: The lock key
+            duration_ms: Additional duration in milliseconds
+
+        Returns:
+            True if lock was extended, False if not held
+        """
+        ...

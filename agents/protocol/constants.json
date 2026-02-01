@@ -1,0 +1,207 @@
+{
+  "version": "1.0",
+  "description": "AFL protocol constants for multi-language agent interoperability",
+
+  "collections": {
+    "steps": "steps",
+    "events": "events",
+    "tasks": "tasks",
+    "servers": "servers",
+    "locks": "locks",
+    "logs": "logs",
+    "flows": "flows",
+    "workflows": "workflows",
+    "runners": "runners"
+  },
+
+  "task_states": {
+    "pending": "pending",
+    "running": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "ignored": "ignored",
+    "canceled": "canceled"
+  },
+
+  "step_states": {
+    "EVENT_TRANSMIT": "state.facet.execution.EventTransmit",
+    "CREATED": "state.facet.initialization.Created",
+    "STATEMENT_ERROR": "state.facet.execution.StatementError",
+    "COMPLETED": "state.facet.completion.Completed"
+  },
+
+  "server_states": {
+    "startup": "startup",
+    "running": "running",
+    "shutdown": "shutdown",
+    "error": "error"
+  },
+
+  "protocol_tasks": {
+    "resume": {
+      "name": "afl:resume",
+      "description": "Signals the Python RunnerService to resume a workflow after an external agent has written return attributes to a step and completed the event task.",
+      "data_schema": {
+        "step_id": {
+          "type": "string",
+          "required": true,
+          "description": "The UUID of the step whose returns have been written"
+        },
+        "workflow_id": {
+          "type": "string",
+          "required": true,
+          "description": "The UUID of the workflow to resume"
+        }
+      }
+    },
+    "execute": {
+      "name": "afl:execute",
+      "description": "Executes a compiled workflow from a flow stored in MongoDB.",
+      "data_schema": {
+        "flow_id": {
+          "type": "string",
+          "required": true,
+          "description": "The UUID of the flow containing the workflow"
+        },
+        "workflow_name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the workflow to execute"
+        },
+        "inputs": {
+          "type": "object",
+          "required": false,
+          "description": "Input parameters for the workflow"
+        },
+        "runner_id": {
+          "type": "string",
+          "required": false,
+          "description": "Runner UUID for tracking"
+        }
+      }
+    }
+  },
+
+  "task_document": {
+    "uuid": "string — unique task ID",
+    "name": "string — task name (e.g. event facet name or 'afl:resume')",
+    "runner_id": "string — runner UUID that created the task",
+    "workflow_id": "string — workflow UUID",
+    "flow_id": "string — flow UUID",
+    "step_id": "string — step UUID",
+    "state": "string — one of task_states",
+    "created": "int — milliseconds since Unix epoch",
+    "updated": "int — milliseconds since Unix epoch",
+    "error": "object|null — { message: string } on failure",
+    "task_list_name": "string — task list for routing (default: 'default')",
+    "data_type": "string — optional type discriminator",
+    "data": "object|null — task-specific payload"
+  },
+
+  "step_document": {
+    "uuid": "string — unique step ID",
+    "workflow_id": "string — parent workflow UUID",
+    "object_type": "string — e.g. 'VariableAssignment', 'YieldAssignment'",
+    "state": "string — current step state",
+    "statement_id": "string — AST statement reference",
+    "container_id": "string — parent container step ID",
+    "block_id": "string — parent block step ID",
+    "facet_name": "string — resolved facet name (may be qualified: 'ns.Facet')",
+    "attributes": {
+      "params": "object — { name: { name, value, type_hint } }",
+      "returns": "object — { name: { name, value, type_hint } }"
+    }
+  },
+
+  "server_document": {
+    "uuid": "string — unique server ID",
+    "server_group": "string — logical group name",
+    "service_name": "string — service identifier",
+    "server_name": "string — hostname",
+    "server_ips": "array[string] — IP addresses",
+    "start_time": "int — milliseconds since Unix epoch",
+    "ping_time": "int — last heartbeat timestamp (ms)",
+    "topics": "array[string] — event facet names this server handles",
+    "handlers": "array[string] — registered handler names",
+    "handled": "array[{ handler, handled, not_handled }] — stats",
+    "state": "string — one of server_states"
+  },
+
+  "timestamp_format": "int — milliseconds since Unix epoch (e.g. 1706745600000)",
+
+  "config": {
+    "file_name": "afl.config.json",
+    "search_order": [
+      "explicit --config argument",
+      "AFL_CONFIG environment variable",
+      "afl.config.json in current directory",
+      "~/.afl/afl.config.json",
+      "/etc/afl/afl.config.json"
+    ],
+    "environment_variables": {
+      "AFL_MONGODB_URL": "mongodb://localhost:27017",
+      "AFL_MONGODB_USERNAME": "",
+      "AFL_MONGODB_PASSWORD": "",
+      "AFL_MONGODB_AUTH_SOURCE": "admin",
+      "AFL_MONGODB_DATABASE": "afl"
+    }
+  },
+
+  "mongodb_operations": {
+    "claim_task": {
+      "description": "Atomically transition a pending task to running",
+      "collection": "tasks",
+      "operation": "findOneAndUpdate",
+      "filter": {
+        "state": "pending",
+        "name": { "$in": ["<task_names>"] },
+        "task_list_name": "<task_list>"
+      },
+      "update": {
+        "$set": { "state": "running", "updated": "<now_ms>" }
+      },
+      "options": { "returnDocument": "after" }
+    },
+    "update_step_returns": {
+      "description": "Write return attributes to a step at EVENT_TRANSMIT",
+      "collection": "steps",
+      "operation": "updateOne",
+      "filter": {
+        "uuid": "<step_id>",
+        "state": "state.facet.execution.EventTransmit"
+      },
+      "update": {
+        "$set": {
+          "attributes.returns.<name>": {
+            "name": "<name>",
+            "value": "<value>",
+            "type_hint": "<type>"
+          }
+        }
+      }
+    },
+    "create_resume_task": {
+      "description": "Insert an afl:resume task so the Python RunnerService resumes the workflow",
+      "collection": "tasks",
+      "operation": "insertOne",
+      "document": {
+        "uuid": "<generate UUID>",
+        "name": "afl:resume",
+        "runner_id": "",
+        "workflow_id": "<workflow_id>",
+        "flow_id": "",
+        "step_id": "<step_id>",
+        "state": "pending",
+        "created": "<now_ms>",
+        "updated": "<now_ms>",
+        "error": null,
+        "task_list_name": "default",
+        "data_type": "resume",
+        "data": {
+          "step_id": "<step_id>",
+          "workflow_id": "<workflow_id>"
+        }
+      }
+    }
+  }
+}

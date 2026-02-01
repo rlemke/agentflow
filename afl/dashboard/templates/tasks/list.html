@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Tasks — AgentFlow{% endblock %}
+{% block content %}
+<h1>Task Queue</h1>
+
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>State</th>
+            <th>Task List</th>
+            <th>Runner</th>
+            <th>Created</th>
+            <th>Updated</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for task in tasks %}
+        <tr>
+            <td class="mono">{{ task.uuid|truncate_uuid }}</td>
+            <td>{{ task.name }}</td>
+            <td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td>
+            <td>{{ task.task_list_name }}</td>
+            <td><a href="/runners/{{ task.runner_id }}" class="mono">{{ task.runner_id|truncate_uuid }}</a></td>
+            <td>{{ task.created|timestamp }}</td>
+            <td>{{ task.updated|timestamp }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Runner {{ runner.uuid[:8] if runner else "Not Found" }} — AgentFlow{% endblock %}
+{% block content %}
+{% if not runner %}
+<h1>Runner not found</h1>
+<p><a href="/runners">Back to runners</a></p>
+{% else %}
+<h1>Runner <span class="mono">{{ runner.uuid|truncate_uuid }}</span></h1>
+
+<div class="grid">
+    <div>
+        <article>
+            <header>Details</header>
+            <table>
+                <tr><th>UUID</th><td class="mono">{{ runner.uuid }}</td></tr>
+                <tr><th>Workflow</th><td>{{ runner.workflow.name }}</td></tr>
+                <tr><th>State</th><td><span class="badge badge-{{ runner.state|state_color }}">{{ runner.state }}</span></td></tr>
+                <tr><th>Started</th><td>{{ runner.start_time|timestamp }}</td></tr>
+                <tr><th>Ended</th><td>{{ runner.end_time|timestamp }}</td></tr>
+                <tr><th>Duration</th><td>{{ runner.duration|duration }}</td></tr>
+            </table>
+        </article>
+    </div>
+    <div>
+        <article>
+            <header>Actions</header>
+            <div class="actions">
+                {% if runner.state == "running" %}
+                <button hx-post="/runners/{{ runner.uuid }}/pause"
+                        hx-confirm="Pause this runner?"
+                        class="outline">Pause</button>
+                <button hx-post="/runners/{{ runner.uuid }}/cancel"
+                        hx-confirm="Cancel this runner?"
+                        class="outline secondary">Cancel</button>
+                {% elif runner.state == "paused" %}
+                <button hx-post="/runners/{{ runner.uuid }}/resume"
+                        hx-confirm="Resume this runner?"
+                        class="outline">Resume</button>
+                <button hx-post="/runners/{{ runner.uuid }}/cancel"
+                        hx-confirm="Cancel this runner?"
+                        class="outline secondary">Cancel</button>
+                {% else %}
+                <small>No actions available for state: {{ runner.state }}</small>
+                {% endif %}
+            </div>
+        </article>
+
+        {% if runner.parameters %}
+        <article>
+            <header>Parameters</header>
+            <table>
+                <thead><tr><th>Name</th><th>Value</th></tr></thead>
+                <tbody>
+                {% for p in runner.parameters %}
+                <tr><td>{{ p.name }}</td><td>{{ p.value }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </article>
+        {% endif %}
+    </div>
+</div>
+
+<h2>Steps</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>ID</th><th>Type</th><th>State</th><th>Statement</th></tr>
+    </thead>
+    <tbody hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true"
+           hx-trigger="every 5s"
+           hx-swap="innerHTML">
+        {% for step in steps %}
+        {% include "partials/step_row.html" %}
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+
+{% if logs %}
+<h2>Logs</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Order</th><th>Time</th><th>Message</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td>{{ log.order }}</td>
+            <td>{{ log.time|timestamp }}</td>
+            <td>{{ log.message }}</td>
+            <td>{{ log.note_type }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+
+{% endif %}
+{% endblock %}
