@@ -1,0 +1,29 @@
+// Boundary extraction schemas and event facets
+
+schema BoundaryResult {
+    output_path: String
+    feature_count: Long
+    boundary_type: String
+    admin_levels: String
+    format: String
+    extraction_date: String
+}
+
+namespace osm.geo.Boundaries {
+    // Administrative boundaries by level (2=country, 4=state, 6=county, 8=city)
+    event facet CountryBoundaries(cache: OSMCache) => (result: BoundaryResult)
+    event facet StateBoundaries(cache: OSMCache) => (result: BoundaryResult)
+    event facet CountyBoundaries(cache: OSMCache) => (result: BoundaryResult)
+    event facet CityBoundaries(cache: OSMCache) => (result: BoundaryResult)
+
+    // Configurable admin level
+    event facet AdminBoundary(cache: OSMCache, admin_level: Long = 2) => (result: BoundaryResult)
+
+    // Natural boundaries
+    event facet LakeBoundaries(cache: OSMCache) => (result: BoundaryResult)
+    event facet ForestBoundaries(cache: OSMCache) => (result: BoundaryResult)
+    event facet ParkBoundaries(cache: OSMCache) => (result: BoundaryResult)
+
+    // Configurable natural type
+    event facet NaturalBoundary(cache: OSMCache, natural_type: String = "water") => (result: BoundaryResult)
+}
