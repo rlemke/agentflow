@@ -1,0 +1,91 @@
+// US Census TIGER/Line voting district data
+//
+// Downloads and processes electoral boundary data from the US Census Bureau.
+// Supports Congressional Districts, State Legislative Districts, and Voting Precincts.
+
+schema TIGERCache {
+    url: String
+    path: String
+    date: String
+    size: Long
+    wasInCache: Boolean
+    year: Long
+    district_type: String
+    state_fips: String
+}
+
+schema VotingDistrictResult {
+    output_path: String
+    feature_count: Long
+    district_type: String
+    state: String
+    year: Long
+    format: String
+    extraction_date: String
+}
+
+namespace census.tiger.Districts {
+    // Download Congressional District boundaries (nationwide)
+    // congress_number: e.g., 118 for 118th Congress (2023-2025)
+    event facet CongressionalDistricts(year: Long = 2023,
+        congress_number: Long = 118) => (cache: TIGERCache)
+
+    // Download State Legislative Districts - Upper Chamber (Senate)
+    // state_fips: 2-digit FIPS code (e.g., "06" for California, "48" for Texas)
+    event facet StateSenateDistricts(state_fips: String,
+        year: Long = 2023) => (cache: TIGERCache)
+
+    // Download State Legislative Districts - Lower Chamber (House/Assembly)
+    event facet StateHouseDistricts(state_fips: String,
+        year: Long = 2023) => (cache: TIGERCache)
+
+    // Download Voting Districts/Precincts
+    // Note: VTD data is from decennial census (2020, 2010)
+    event facet VotingPrecincts(state_fips: String,
+        year: Long = 2020) => (cache: TIGERCache)
+
+    // Download all district types for a state
+    event facet AllStateDistricts(state_fips: String,
+        year: Long = 2023) => (senate: TIGERCache, house: TIGERCache, precincts: TIGERCache)
+}
+
+namespace census.tiger.Processing {
+    // Convert TIGER shapefile to GeoJSON
+    event facet ShapefileToGeoJSON(cache: TIGERCache) => (result: VotingDistrictResult)
+
+    // Join voting districts with OSM administrative boundaries
+    // Performs spatial intersection to find which OSM boundaries contain each district
+    event facet JoinWithOSMBoundaries(districts: VotingDistrictResult,
+        osm_boundaries_path: String) => (result: VotingDistrictResult)
+
+    // Filter districts by attribute (e.g., by district number or name)
+    event facet FilterDistricts(input_path: String,
+        attribute: String, value: String) => (result: VotingDistrictResult)
+}
+
+// Convenience workflows for common use cases
+
+namespace census.tiger.Workflows {
+    // State FIPS code reference facet
+    facet StateFIPS(state: String) => (fips: String)
+
+    // Complete workflow: Download and convert Congressional Districts to GeoJSON
+    workflow GetCongressionalDistricts(year: Long = 2023, congress_number: Long = 118) => (result: VotingDistrictResult) andThen {
+        download = census.tiger.Districts.CongressionalDistricts(year = $.year, congress_number = $.congress_number)
+        convert = census.tiger.Processing.ShapefileToGeoJSON(cache = download.cache)
+        yield GetCongressionalDistricts(result = convert.result)
+    }
+
+    // Complete workflow: Get all voting boundaries for a state
+    workflow GetStateVotingBoundaries(state_fips: String, year: Long = 2023) => (senate: VotingDistrictResult, house: VotingDistrictResult, precincts: VotingDistrictResult) andThen {
+        senate_dl = census.tiger.Districts.StateSenateDistricts(state_fips = $.state_fips, year = $.year)
+        house_dl = census.tiger.Districts.StateHouseDistricts(state_fips = $.state_fips, year = $.year)
+        precincts_dl = census.tiger.Districts.VotingPrecincts(state_fips = $.state_fips, year = 2020)
+
+        senate_json = census.tiger.Processing.ShapefileToGeoJSON(cache = senate_dl.cache)
+        house_json = census.tiger.Processing.ShapefileToGeoJSON(cache = house_dl.cache)
+        precincts_json = census.tiger.Processing.ShapefileToGeoJSON(cache = precincts_dl.cache)
+
+        yield GetStateVotingBoundaries(senate = senate_json.result, house = house_json.result, precincts = precincts_json.result)
+    }
+}
