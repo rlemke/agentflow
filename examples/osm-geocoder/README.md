@@ -1,6 +1,6 @@
 # OSM Geocoder Agent
 
-A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~270 OSM data processing event facets.
+A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~330 OSM data processing event facets covering caching, boundaries, routes, parks, population, visualization, and more.
 
 ## What it does
 
@@ -74,7 +74,7 @@ All assertions passed.
 PYTHONPATH=. python examples/osm-geocoder/agent.py
 ```
 
-This starts a long-running agent that polls for `osm.geo.Geocode` tasks and ~270 OSM data events. In production, you would pair it with a runner service that executes workflows.
+This starts a long-running agent that polls for `osm.geo.Geocode` tasks and ~330 OSM data events (caching, boundaries, routes, parks, population, visualization, etc.). In production, you would pair it with a runner service that executes workflows.
 
 ### Compile check
 
@@ -92,6 +92,13 @@ The `handlers/` package organizes event facet handlers by category:
 | `cache_handlers.py` | ~250 | Geographic region cache lookups across 11 namespaces — see [CACHE.md](CACHE.md) |
 | `operations_handlers.py` | 13 | Downloads and data processing operations — see [DOWNLOADS.md](DOWNLOADS.md) |
 | `poi_handlers.py` | 8 | Point-of-interest extraction — see [POI.md](POI.md) |
+| `boundary_handlers.py` | 7 | Administrative and natural boundary extraction — see [BOUNDARIES.md](BOUNDARIES.md) |
+| `filter_handlers.py` | 7 | Radius-based and OSM type filtering — see [FILTERS.md](FILTERS.md) |
+| `tiger_handlers.py` | 9 | US Census TIGER voting district data — see [VOTING.md](VOTING.md) |
+| `visualization_handlers.py` | 5 | GeoJSON map rendering with Leaflet — see [VISUALIZATION.md](VISUALIZATION.md) |
+| `route_handlers.py` | 8 | Bicycle, hiking, train, bus route extraction — see [ROUTES.md](ROUTES.md) |
+| `population_handlers.py` | 11 | Population-based filtering for cities, states, etc. — see [POPULATION.md](POPULATION.md) |
+| `park_handlers.py` | 8 | National parks, state parks, protected areas — see [PARKS.md](PARKS.md) |
 | `__init__.py` | — | `register_all_handlers(poller)` convenience function |
 
 ## AFL source files
@@ -103,6 +110,13 @@ The `handlers/` package organizes event facet handlers by category:
 | `afl/osmcache.afl` | ~250 cache event facets across 11 geographic namespaces |
 | `afl/osmoperations.afl` | Data processing operations (download, tile, routing, shapefile download) |
 | `afl/osmpoi.afl` | Point-of-interest extraction facets |
+| `afl/osmboundaries.afl` | Administrative and natural boundary extraction facets |
+| `afl/osmfilters.afl` | Radius-based and OSM type filtering facets |
+| `afl/osmfilters_population.afl` | Population-based filtering facets |
+| `afl/osmvoting.afl` | US Census TIGER voting district facets |
+| `afl/osmvisualization.afl` | GeoJSON visualization and map rendering facets |
+| `afl/osmroutes.afl` | Bicycle, hiking, train, bus route extraction facets |
+| `afl/osmparks.afl` | National parks, state parks, protected areas facets |
 | `afl/osmafrica.afl` | Africa workflow composing cache + download steps |
 | `afl/osmasia.afl` | Asia workflow |
 | `afl/osmaustralia.afl` | Australia/Oceania workflow |
@@ -115,6 +129,7 @@ The `handlers/` package organizes event facet handlers by category:
 | `afl/osmcontinents.afl` | Continents workflow |
 | `afl/osmworld.afl` | World workflow composing all regional workflows |
 | `afl/osmshapefiles.afl` | Europe shapefile download workflow (reuses cache facets with `DownloadShapefile`) |
+| `afl/example_routes_visualization.afl` | Example workflows combining routes and visualization |
 
 ## Other files
 
@@ -123,8 +138,26 @@ The `handlers/` package organizes event facet handlers by category:
 | `agent.py` | Live agent using AgentPoller + Nominatim API + all OSM handlers |
 | `test_geocoder.py` | Offline end-to-end test with mock handler |
 | `test_downloader.py` | Downloader unit tests (PBF and shapefile formats) |
-| `requirements.txt` | Python dependencies (`requests`) |
+| `test_filters.py` | Radius and OSM type filter tests |
+| `test_tiger.py` | Census TIGER voting district tests |
+| `test_visualization.py` | Map visualization tests |
+| `test_routes.py` | Route extraction tests |
+| `test_population.py` | Population filter tests |
+| `test_parks.py` | Park extraction tests |
+| `requirements.txt` | Python dependencies (`requests`, `pyosmium`, `shapely`, `pyproj`, `folium`) |
+
+## Documentation
+
+| File | Description |
+|------|-------------|
 | `CACHE.md` | Cache system documentation (OSMCache schema, namespaces, region registry) |
 | `DOWNLOADS.md` | Downloads and operations documentation (downloader API, operation facets, formats) |
 | `POI.md` | POI extraction documentation (event facets, handler dispatch, return grouping) |
 | `SHAPEFILES.md` | Shapefile download documentation (format details, handler flow, availability notes) |
+| `BOUNDARIES.md` | Administrative and natural boundary extraction |
+| `FILTERS.md` | Radius-based filtering and OSM type filtering |
+| `VOTING.md` | US Census TIGER voting district data |
+| `VISUALIZATION.md` | GeoJSON map rendering with Leaflet/Folium |
+| `ROUTES.md` | Bicycle, hiking, train, bus route extraction |
+| `POPULATION.md` | Population-based filtering for places |
+| `PARKS.md` | National parks, state parks, protected areas |
