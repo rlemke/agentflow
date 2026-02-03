@@ -1,9 +1,10 @@
-// OSM radius-based boundary filtering facets
+// OSM filtering facets
 //
-// Converts polygon boundaries to equivalent circular radius using:
+// Radius-based filtering converts polygon boundaries to equivalent circular radius:
 //   radius = sqrt(area / π)
 //
-// Supports configurable units, comparison operators, and type filtering.
+// Type/tag filtering supports OSM element types (node, way, relation) and tags.
+// Optional dependency inclusion provides complete geometries for ways/relations.
 
 schema FilterResult {
     output_path: String
@@ -11,6 +12,18 @@ schema FilterResult {
     original_count: Long
     boundary_type: String
     filter_applied: String
+    format: String
+    extraction_date: String
+}
+
+schema OSMFilterResult {
+    output_path: String
+    feature_count: Long
+    original_count: Long
+    osm_type: String
+    filter_applied: String
+    dependencies_included: Boolean
+    dependency_count: Long
     format: String
     extraction_date: String
 }
@@ -33,4 +46,22 @@ namespace osm.geo.Filters {
     event facet ExtractAndFilterByRadius(cache: OSMCache, admin_levels: [Long],
         natural_types: [String], radius: Double, unit: String = "kilometers",
         operator: String = "gte") => (result: FilterResult)
+
+    // --- OSM Type and Tag Filtering ---
+
+    // Filter PBF by OSM element type (node, way, relation, or * for all)
+    // include_dependencies: if true, includes referenced nodes for ways
+    event facet FilterByOSMType(input_path: String, osm_type: String,
+        include_dependencies: Boolean = false) => (result: OSMFilterResult)
+
+    // Filter PBF by OSM tag key/value
+    // tag_value: use "*" to match any value for the key
+    // osm_type: filter by element type, or "*" for all types
+    event facet FilterByOSMTag(input_path: String, tag_key: String,
+        tag_value: String = "*", osm_type: String = "*",
+        include_dependencies: Boolean = false) => (result: OSMFilterResult)
+
+    // Filter GeoJSON (already extracted) by OSM type stored in properties
+    event facet FilterGeoJSONByOSMType(input_path: String, osm_type: String,
+        tag_key: String = "", tag_value: String = "*") => (result: OSMFilterResult)
 }

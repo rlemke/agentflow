@@ -26,10 +26,21 @@ from handlers.radius_filter import (
     matches_criteria,
     parse_criteria,
 )
+from handlers.osm_type_filter import (
+    HAS_OSMIUM,
+    OSMElement,
+    OSMFilterResult,
+    OSMType,
+    _describe_osm_filter,
+    filter_geojson_by_osm_type,
+)
 
-# Skip marker for tests requiring shapely
+# Skip markers for optional dependencies
 requires_shapely = pytest.mark.skipif(
     not HAS_SHAPELY, reason="shapely not installed"
+)
+requires_osmium = pytest.mark.skipif(
+    not HAS_OSMIUM, reason="pyosmium not installed"
 )
 
 
@@ -427,10 +438,320 @@ class TestHandlerRegistration:
 
         # Verify all handlers were registered
         registered_names = [call[0][0] for call in mock_poller.register.call_args_list]
+        # Radius filters
         assert f"{NAMESPACE}.FilterByRadius" in registered_names
         assert f"{NAMESPACE}.FilterByRadiusRange" in registered_names
         assert f"{NAMESPACE}.FilterByTypeAndRadius" in registered_names
         assert f"{NAMESPACE}.ExtractAndFilterByRadius" in registered_names
+        # OSM type/tag filters
+        assert f"{NAMESPACE}.FilterByOSMType" in registered_names
+        assert f"{NAMESPACE}.FilterByOSMTag" in registered_names
+        assert f"{NAMESPACE}.FilterGeoJSONByOSMType" in registered_names
+
+
+# --- OSM Type Filter Tests ---
+
+
+class TestOSMTypeParsing:
+    """Tests for OSMType.from_string()."""
+
+    def test_parse_node(self):
+        assert OSMType.from_string("node") == OSMType.NODE
+        assert OSMType.from_string("NODE") == OSMType.NODE
+        assert OSMType.from_string("n") == OSMType.NODE
+
+    def test_parse_way(self):
+        assert OSMType.from_string("way") == OSMType.WAY
+        assert OSMType.from_string("WAY") == OSMType.WAY
+        assert OSMType.from_string("w") == OSMType.WAY
+
+    def test_parse_relation(self):
+        assert OSMType.from_string("relation") == OSMType.RELATION
+        assert OSMType.from_string("rel") == OSMType.RELATION
+        assert OSMType.from_string("r") == OSMType.RELATION
+
+    def test_parse_all(self):
+        assert OSMType.from_string("*") == OSMType.ALL
+        assert OSMType.from_string("all") == OSMType.ALL
+        assert OSMType.from_string("any") == OSMType.ALL
+
+    def test_parse_invalid(self):
+        with pytest.raises(ValueError, match="Unknown OSM type"):
+            OSMType.from_string("polygon")
+
+
+class TestDescribeOSMFilter:
+    """Tests for the _describe_osm_filter() function."""
+
+    def test_type_only(self):
+        desc = _describe_osm_filter(OSMType.WAY, None, None, False)
+        assert desc == "type=way"
+
+    def test_tag_key_only(self):
+        desc = _describe_osm_filter(OSMType.ALL, "amenity", None, False)
+        assert desc == "amenity=*"
+
+    def test_tag_key_and_value(self):
+        desc = _describe_osm_filter(OSMType.ALL, "amenity", "restaurant", False)
+        assert desc == "amenity=restaurant"
+
+    def test_type_and_tag(self):
+        desc = _describe_osm_filter(OSMType.NODE, "amenity", "cafe", False)
+        assert desc == "type=node, amenity=cafe"
+
+    def test_with_dependencies(self):
+        desc = _describe_osm_filter(OSMType.WAY, "highway", None, True)
+        assert desc == "type=way, highway=*, +deps"
+
+    def test_all_elements(self):
+        desc = _describe_osm_filter(OSMType.ALL, None, None, False)
+        assert desc == "all elements"
+
+
+class TestOSMElement:
+    """Tests for OSMElement.to_geojson_feature()."""
+
+    def test_node_to_geojson(self):
+        element = OSMElement(
+            id=123,
+            osm_type=OSMType.NODE,
+            tags={"name": "Test", "amenity": "cafe"},
+            lat=48.8566,
+            lon=2.3522,
+        )
+        feature = element.to_geojson_feature()
+
+        assert feature["type"] == "Feature"
+        assert feature["geometry"]["type"] == "Point"
+        assert feature["geometry"]["coordinates"] == [2.3522, 48.8566]
+        assert feature["properties"]["osm_id"] == 123
+        assert feature["properties"]["osm_type"] == "node"
+        assert feature["properties"]["name"] == "Test"
+        assert feature["properties"]["amenity"] == "cafe"
+
+    def test_node_missing_coords(self):
+        element = OSMElement(
+            id=123,
+            osm_type=OSMType.NODE,
+            tags={},
+        )
+        assert element.to_geojson_feature() is None
+
+    def test_way_with_coords(self):
+        element = OSMElement(
+            id=456,
+            osm_type=OSMType.WAY,
+            tags={"highway": "residential"},
+            node_refs=[1, 2, 3],
+        )
+        node_coords = {
+            1: (0.0, 0.0),
+            2: (1.0, 0.0),
+            3: (1.0, 1.0),
+        }
+        feature = element.to_geojson_feature(node_coords)
+
+        assert feature["type"] == "Feature"
+        assert feature["geometry"]["type"] == "LineString"
+        assert feature["geometry"]["coordinates"] == [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]
+        assert feature["properties"]["osm_type"] == "way"
+
+    def test_way_without_coords(self):
+        element = OSMElement(
+            id=456,
+            osm_type=OSMType.WAY,
+            tags={"highway": "residential"},
+            node_refs=[1, 2, 3],
+        )
+        feature = element.to_geojson_feature()
+
+        assert feature["geometry"] is None
+
+    def test_closed_way_as_polygon(self):
+        element = OSMElement(
+            id=789,
+            osm_type=OSMType.WAY,
+            tags={"building": "yes"},
+            node_refs=[1, 2, 3, 4, 1],
+        )
+        node_coords = {
+            1: (0.0, 0.0),
+            2: (1.0, 0.0),
+            3: (1.0, 1.0),
+            4: (0.0, 1.0),
+        }
+        feature = element.to_geojson_feature(node_coords)
+
+        assert feature["geometry"]["type"] == "Polygon"
+
+    def test_relation_to_geojson(self):
+        element = OSMElement(
+            id=999,
+            osm_type=OSMType.RELATION,
+            tags={"type": "multipolygon"},
+            members=[{"type": "way", "ref": 123, "role": "outer"}],
+        )
+        feature = element.to_geojson_feature()
+
+        assert feature["properties"]["osm_type"] == "relation"
+        assert feature["properties"]["members"] == [{"type": "way", "ref": 123, "role": "outer"}]
+        assert feature["geometry"] is None
+
+
+class TestFilterGeoJSONByOSMType:
+    """Tests for filter_geojson_by_osm_type()."""
+
+    @pytest.fixture
+    def sample_osm_geojson(self, tmp_path):
+        """Create a sample GeoJSON file with OSM-like properties."""
+        features = [
+            {
+                "type": "Feature",
+                "properties": {"osm_id": 1, "osm_type": "node", "amenity": "cafe"},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            },
+            {
+                "type": "Feature",
+                "properties": {"osm_id": 2, "osm_type": "node", "amenity": "restaurant"},
+                "geometry": {"type": "Point", "coordinates": [1, 1]},
+            },
+            {
+                "type": "Feature",
+                "properties": {"osm_id": 3, "osm_type": "way", "highway": "residential"},
+                "geometry": {"type": "LineString", "coordinates": [[0, 0], [1, 0]]},
+            },
+            {
+                "type": "Feature",
+                "properties": {"osm_id": 4, "osm_type": "way", "building": "yes"},
+                "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]},
+            },
+        ]
+        geojson = {"type": "FeatureCollection", "features": features}
+
+        path = tmp_path / "osm_test.geojson"
+        with open(path, "w") as f:
+            json.dump(geojson, f)
+        return path
+
+    def test_filter_by_type_node(self, sample_osm_geojson, tmp_path):
+        output_path = tmp_path / "filtered.geojson"
+        result = filter_geojson_by_osm_type(
+            sample_osm_geojson, osm_type="node", output_path=output_path
+        )
+
+        assert result.feature_count == 2
+        assert result.original_count == 4
+        assert result.osm_type == "node"
+
+        with open(output_path) as f:
+            output = json.load(f)
+        assert len(output["features"]) == 2
+        assert all(f["properties"]["osm_type"] == "node" for f in output["features"])
+
+    def test_filter_by_type_way(self, sample_osm_geojson, tmp_path):
+        output_path = tmp_path / "filtered.geojson"
+        result = filter_geojson_by_osm_type(
+            sample_osm_geojson, osm_type="way", output_path=output_path
+        )
+
+        assert result.feature_count == 2
+        assert result.osm_type == "way"
+
+    def test_filter_by_tag(self, sample_osm_geojson, tmp_path):
+        output_path = tmp_path / "filtered.geojson"
+        result = filter_geojson_by_osm_type(
+            sample_osm_geojson,
+            osm_type="*",
+            tag_key="amenity",
+            tag_value="cafe",
+            output_path=output_path,
+        )
+
+        assert result.feature_count == 1
+
+        with open(output_path) as f:
+            output = json.load(f)
+        assert output["features"][0]["properties"]["amenity"] == "cafe"
+
+    def test_filter_by_tag_any_value(self, sample_osm_geojson, tmp_path):
+        output_path = tmp_path / "filtered.geojson"
+        result = filter_geojson_by_osm_type(
+            sample_osm_geojson,
+            osm_type="*",
+            tag_key="amenity",
+            tag_value="*",
+            output_path=output_path,
+        )
+
+        assert result.feature_count == 2  # cafe and restaurant
+
+    def test_filter_by_type_and_tag(self, sample_osm_geojson, tmp_path):
+        output_path = tmp_path / "filtered.geojson"
+        result = filter_geojson_by_osm_type(
+            sample_osm_geojson,
+            osm_type="way",
+            tag_key="highway",
+            output_path=output_path,
+        )
+
+        assert result.feature_count == 1
+
+        with open(output_path) as f:
+            output = json.load(f)
+        assert output["features"][0]["properties"]["highway"] == "residential"
+
+
+class TestOSMTypeFilterHandlers:
+    """Tests for the OSM type/tag filter handlers."""
+
+    def test_osm_type_handler_no_osmium(self):
+        """Test handler gracefully handles missing pyosmium."""
+        from handlers.filter_handlers import _make_osm_type_filter_handler
+
+        handler = _make_osm_type_filter_handler("FilterByOSMType")
+
+        with patch("handlers.filter_handlers.HAS_OSMIUM_TYPE", False):
+            result = handler({
+                "input_path": "/some/file.pbf",
+                "osm_type": "way",
+                "include_dependencies": True,
+            })
+
+        assert result["result"]["feature_count"] == 0
+        assert result["result"]["osm_type"] == "way"
+        assert result["result"]["dependencies_included"] is True
+
+    def test_osm_tag_handler_no_osmium(self):
+        """Test tag handler gracefully handles missing pyosmium."""
+        from handlers.filter_handlers import _make_osm_tag_filter_handler
+
+        handler = _make_osm_tag_filter_handler("FilterByOSMTag")
+
+        with patch("handlers.filter_handlers.HAS_OSMIUM_TYPE", False):
+            result = handler({
+                "input_path": "/some/file.pbf",
+                "tag_key": "amenity",
+                "tag_value": "restaurant",
+                "osm_type": "node",
+                "include_dependencies": False,
+            })
+
+        assert result["result"]["feature_count"] == 0
+        assert "amenity=restaurant" in result["result"]["filter_applied"]
+
+    def test_geojson_osm_type_handler_empty_path(self):
+        """Test GeoJSON handler with empty input path."""
+        from handlers.filter_handlers import _make_geojson_osm_type_filter_handler
+
+        handler = _make_geojson_osm_type_filter_handler("FilterGeoJSONByOSMType")
+
+        result = handler({
+            "input_path": "",
+            "osm_type": "node",
+        })
+
+        assert result["result"]["feature_count"] == 0
+        assert result["result"]["osm_type"] == "node"
 
 
 if __name__ == "__main__":

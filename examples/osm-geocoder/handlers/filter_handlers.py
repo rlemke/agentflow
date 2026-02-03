@@ -1,6 +1,9 @@
-"""Filter event facet handlers for OSM radius-based filtering.
+"""Filter event facet handlers for OSM filtering.
 
-Handles radius filtering events defined in osmfilters.afl under osm.geo.Filters.
+Handles filtering events defined in osmfilters.afl under osm.geo.Filters:
+- Radius-based filtering (by equivalent circular radius)
+- OSM type filtering (node, way, relation)
+- OSM tag filtering (by key/value)
 """
 
 import logging
@@ -11,6 +14,12 @@ from .radius_filter import (
     HAS_SHAPELY,
     filter_geojson,
     parse_criteria,
+)
+from .osm_type_filter import (
+    HAS_OSMIUM as HAS_OSMIUM_TYPE,
+    OSMFilterResult,
+    filter_geojson_by_osm_type,
+    filter_pbf_by_type,
 )
 
 log = logging.getLogger(__name__)
@@ -276,12 +285,179 @@ def _describe_boundary_type(
     return "; ".join(parts) if parts else "none"
 
 
+# --- OSM Type/Tag Filter Handlers ---
+
+
+def _make_osm_type_filter_handler(facet_name: str):
+    """Create a handler for the FilterByOSMType event facet.
+
+    Filters PBF files by OSM element type (node, way, relation).
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        osm_type = payload.get("osm_type", "*")
+        include_dependencies = payload.get("include_dependencies", False)
+
+        log.info(
+            "%s filtering %s by OSM type=%s (deps=%s)",
+            facet_name,
+            input_path,
+            osm_type,
+            include_dependencies,
+        )
+
+        if not HAS_OSMIUM_TYPE or not input_path:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "osm_type": osm_type,
+                    "filter_applied": f"type={osm_type}",
+                    "dependencies_included": include_dependencies,
+                    "dependency_count": 0,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        result = filter_pbf_by_type(
+            input_path,
+            osm_type=osm_type,
+            include_dependencies=include_dependencies,
+        )
+
+        return {"result": _osm_result_to_dict(result)}
+
+    return handler
+
+
+def _make_osm_tag_filter_handler(facet_name: str):
+    """Create a handler for the FilterByOSMTag event facet.
+
+    Filters PBF files by OSM tag key/value.
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        tag_key = payload.get("tag_key", "")
+        tag_value = payload.get("tag_value", "*")
+        osm_type = payload.get("osm_type", "*")
+        include_dependencies = payload.get("include_dependencies", False)
+
+        log.info(
+            "%s filtering %s by tag %s=%s, type=%s (deps=%s)",
+            facet_name,
+            input_path,
+            tag_key,
+            tag_value,
+            osm_type,
+            include_dependencies,
+        )
+
+        if not HAS_OSMIUM_TYPE or not input_path or not tag_key:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "osm_type": osm_type,
+                    "filter_applied": f"{tag_key}={tag_value}, type={osm_type}",
+                    "dependencies_included": include_dependencies,
+                    "dependency_count": 0,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        result = filter_pbf_by_type(
+            input_path,
+            osm_type=osm_type,
+            tag_key=tag_key,
+            tag_value=tag_value if tag_value != "*" else None,
+            include_dependencies=include_dependencies,
+        )
+
+        return {"result": _osm_result_to_dict(result)}
+
+    return handler
+
+
+def _make_geojson_osm_type_filter_handler(facet_name: str):
+    """Create a handler for the FilterGeoJSONByOSMType event facet.
+
+    Filters GeoJSON files by OSM type stored in feature properties.
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        osm_type = payload.get("osm_type", "*")
+        tag_key = payload.get("tag_key", "") or None
+        tag_value = payload.get("tag_value", "*")
+
+        log.info(
+            "%s filtering GeoJSON %s by OSM type=%s, tag=%s=%s",
+            facet_name,
+            input_path,
+            osm_type,
+            tag_key,
+            tag_value,
+        )
+
+        if not input_path:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "osm_type": osm_type,
+                    "filter_applied": f"type={osm_type}",
+                    "dependencies_included": False,
+                    "dependency_count": 0,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        result = filter_geojson_by_osm_type(
+            input_path,
+            osm_type=osm_type,
+            tag_key=tag_key,
+            tag_value=tag_value if tag_value != "*" else None,
+        )
+
+        return {"result": _osm_result_to_dict(result)}
+
+    return handler
+
+
+def _osm_result_to_dict(result: OSMFilterResult) -> dict:
+    """Convert an OSMFilterResult to a dictionary."""
+    return {
+        "output_path": result.output_path,
+        "feature_count": result.feature_count,
+        "original_count": result.original_count,
+        "osm_type": result.osm_type,
+        "filter_applied": result.filter_applied,
+        "dependencies_included": result.dependencies_included,
+        "dependency_count": result.dependency_count,
+        "format": result.format,
+        "extraction_date": result.extraction_date,
+    }
+
+
 # Event facet definitions for handler registration
 FILTER_FACETS = [
+    # Radius-based filters
     ("FilterByRadius", _make_radius_filter_handler),
     ("FilterByRadiusRange", _make_radius_range_handler),
     ("FilterByTypeAndRadius", _make_type_and_radius_handler),
     ("ExtractAndFilterByRadius", _make_extract_and_filter_handler),
+    # OSM type/tag filters
+    ("FilterByOSMType", _make_osm_type_filter_handler),
+    ("FilterByOSMTag", _make_osm_tag_filter_handler),
+    ("FilterGeoJSONByOSMType", _make_geojson_osm_type_filter_handler),
 ]
 
 
