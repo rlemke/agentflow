@@ -1,0 +1,45 @@
+// GeoJSON visualization with OSM map backgrounds
+//
+// Generates interactive HTML maps using Leaflet.js with OpenStreetMap tiles,
+// or static PNG images for embedding in documents.
+
+schema MapResult {
+    output_path: String
+    format: String
+    feature_count: Long
+    bounds: String
+    title: String
+    extraction_date: String
+}
+
+schema LayerStyle {
+    color: String
+    fill_color: String
+    weight: Long
+    opacity: Double
+    fill_opacity: Double
+}
+
+namespace osm.geo.Visualization {
+    // Generate interactive HTML map with Leaflet + OSM tiles
+    // format: "html" (interactive) or "png" (static image)
+    // fill_opacity: 0.0 to 1.0, default 0.4 in handler
+    event facet RenderMap(geojson_path: String, title: String = "Map",
+        format: String = "html", width: Long = 800, height: Long = 600,
+        color: String = "#3388ff") => (result: MapResult)
+
+    // Render map centered on specific coordinates
+    event facet RenderMapAt(geojson_path: String, lat: Double, lon: Double,
+        zoom: Long = 10, title: String = "Map") => (result: MapResult)
+
+    // Render multiple GeoJSON files as layers with different colors
+    event facet RenderLayers(layers: [String], colors: [String],
+        title: String = "Map", format: String = "html") => (result: MapResult)
+
+    // Render with custom style
+    event facet RenderStyledMap(geojson_path: String, style: LayerStyle,
+        title: String = "Map") => (result: MapResult)
+
+    // Quick preview - auto-opens in browser
+    event facet PreviewMap(geojson_path: String) => (result: MapResult)
+}
