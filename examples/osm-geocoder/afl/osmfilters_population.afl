@@ -1,0 +1,69 @@
+// Population-based filtering for OSM data
+//
+// Filters places and administrative boundaries by population.
+// Supports cities, towns, villages, states, countries, counties, etc.
+
+schema PopulationFilterResult {
+    output_path: String
+    feature_count: Long
+    original_count: Long
+    place_type: String
+    min_population: Long
+    max_population: Long
+    filter_applied: String
+    format: String
+    extraction_date: String
+}
+
+schema PopulationStats {
+    total_places: Long
+    total_population: Long
+    min_population: Long
+    max_population: Long
+    avg_population: Long
+    place_type: String
+}
+
+namespace osm.geo.Population {
+    // Filter GeoJSON by population threshold
+    // place_type: "city", "town", "village", "state", "country", "county", "all"
+    // operator: "gt", "gte", "lt", "lte", "eq", "between"
+    event facet FilterByPopulation(input_path: String, min_population: Long,
+        place_type: String = "all", operator: String = "gte") => (result: PopulationFilterResult)
+
+    // Filter by population range (inclusive)
+    event facet FilterByPopulationRange(input_path: String, min_population: Long,
+        max_population: Long, place_type: String = "all") => (result: PopulationFilterResult)
+
+    // Extract places with population from PBF file
+    // place_type: "city", "town", "village", "hamlet", "suburb", "state", "country", "county", "all"
+    event facet ExtractPlacesWithPopulation(cache: OSMCache, place_type: String = "all",
+        min_population: Long = 0) => (result: PopulationFilterResult)
+
+    // Get population statistics for a GeoJSON file
+    event facet PopulationStatistics(input_path: String,
+        place_type: String = "all") => (stats: PopulationStats)
+
+    // --- Convenience facets for common place types ---
+
+    // Extract cities (place=city) with population
+    event facet Cities(cache: OSMCache, min_population: Long = 0) => (result: PopulationFilterResult)
+
+    // Extract towns (place=town) with population
+    event facet Towns(cache: OSMCache, min_population: Long = 0) => (result: PopulationFilterResult)
+
+    // Extract villages (place=village) with population
+    event facet Villages(cache: OSMCache, min_population: Long = 0) => (result: PopulationFilterResult)
+
+    // Extract countries (admin_level=2) with population
+    event facet Countries(cache: OSMCache) => (result: PopulationFilterResult)
+
+    // Extract states/provinces (admin_level=4) with population
+    event facet States(cache: OSMCache) => (result: PopulationFilterResult)
+
+    // Extract counties (admin_level=6) with population
+    event facet Counties(cache: OSMCache) => (result: PopulationFilterResult)
+
+    // Extract all populated places (any place with population tag)
+    event facet AllPopulatedPlaces(cache: OSMCache, min_population: Long = 0) => (result: PopulationFilterResult)
+}
