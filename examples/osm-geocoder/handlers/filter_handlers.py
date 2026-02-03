@@ -1,0 +1,293 @@
+"""Filter event facet handlers for OSM radius-based filtering.
+
+Handles radius filtering events defined in osmfilters.afl under osm.geo.Filters.
+"""
+
+import logging
+from datetime import datetime, timezone
+
+from .radius_filter import (
+    FilterResult,
+    HAS_SHAPELY,
+    filter_geojson,
+    parse_criteria,
+)
+
+log = logging.getLogger(__name__)
+
+NAMESPACE = "osm.geo.Filters"
+
+# Check for boundary extractor availability (for ExtractAndFilterByRadius)
+try:
+    from .boundary_extractor import HAS_OSMIUM, extract_boundaries
+except ImportError:
+    HAS_OSMIUM = False
+
+    def extract_boundaries(*args, **kwargs):
+        raise RuntimeError("boundary_extractor not available")
+
+
+def _make_radius_filter_handler(facet_name: str):
+    """Create a handler for the FilterByRadius event facet.
+
+    Filters GeoJSON features by equivalent radius using the specified
+    threshold, unit, and comparison operator.
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        radius = payload.get("radius", 0.0)
+        unit = payload.get("unit", "kilometers")
+        operator = payload.get("operator", "gte")
+
+        log.info(
+            "%s filtering %s with radius %s %s %s",
+            facet_name,
+            input_path,
+            operator,
+            radius,
+            unit,
+        )
+
+        if not HAS_SHAPELY or not input_path:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "boundary_type": "all",
+                    "filter_applied": f"radius {operator} {radius} {unit}",
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
+        result = filter_geojson(input_path, criteria)
+
+        return {"result": _result_to_dict(result)}
+
+    return handler
+
+
+def _make_radius_range_handler(facet_name: str):
+    """Create a handler for the FilterByRadiusRange event facet.
+
+    Filters GeoJSON features by equivalent radius within an inclusive range.
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        min_radius = payload.get("min_radius", 0.0)
+        max_radius = payload.get("max_radius", 0.0)
+        unit = payload.get("unit", "kilometers")
+
+        log.info(
+            "%s filtering %s with radius %s-%s %s",
+            facet_name,
+            input_path,
+            min_radius,
+            max_radius,
+            unit,
+        )
+
+        if not HAS_SHAPELY or not input_path:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "boundary_type": "all",
+                    "filter_applied": f"radius {min_radius}-{max_radius} {unit}",
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        criteria = parse_criteria(
+            radius=min_radius,
+            unit=unit,
+            operator="between",
+            max_radius=max_radius,
+        )
+        result = filter_geojson(input_path, criteria)
+
+        return {"result": _result_to_dict(result)}
+
+    return handler
+
+
+def _make_type_and_radius_handler(facet_name: str):
+    """Create a handler for the FilterByTypeAndRadius event facet.
+
+    Filters GeoJSON features by boundary type and equivalent radius.
+    """
+
+    def handler(payload: dict) -> dict:
+        input_path = payload.get("input_path", "")
+        boundary_type = payload.get("boundary_type", "")
+        radius = payload.get("radius", 0.0)
+        unit = payload.get("unit", "kilometers")
+        operator = payload.get("operator", "gte")
+
+        log.info(
+            "%s filtering %s type=%s with radius %s %s %s",
+            facet_name,
+            input_path,
+            boundary_type,
+            operator,
+            radius,
+            unit,
+        )
+
+        if not HAS_SHAPELY or not input_path:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "boundary_type": boundary_type,
+                    "filter_applied": f"type={boundary_type}, radius {operator} {radius} {unit}",
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
+        result = filter_geojson(input_path, criteria, boundary_type=boundary_type)
+
+        return {"result": _result_to_dict(result)}
+
+    return handler
+
+
+def _make_extract_and_filter_handler(facet_name: str):
+    """Create a handler for the ExtractAndFilterByRadius event facet.
+
+    Extracts boundaries from a PBF file and filters by radius in one step.
+    """
+
+    def handler(payload: dict) -> dict:
+        cache = payload.get("cache", {})
+        pbf_path = cache.get("path", "")
+        admin_levels = payload.get("admin_levels", [])
+        natural_types = payload.get("natural_types", [])
+        radius = payload.get("radius", 0.0)
+        unit = payload.get("unit", "kilometers")
+        operator = payload.get("operator", "gte")
+
+        # Normalize admin_levels to list of ints
+        if isinstance(admin_levels, str):
+            admin_levels = [int(x.strip()) for x in admin_levels.split(",") if x.strip()]
+        admin_levels = [int(x) for x in admin_levels] if admin_levels else None
+
+        # Normalize natural_types to list of strings
+        if isinstance(natural_types, str):
+            natural_types = [x.strip() for x in natural_types.split(",") if x.strip()]
+        natural_types = natural_types if natural_types else None
+
+        log.info(
+            "%s extracting from %s (admin=%s, natural=%s) then filtering radius %s %s %s",
+            facet_name,
+            pbf_path,
+            admin_levels,
+            natural_types,
+            operator,
+            radius,
+            unit,
+        )
+
+        if not HAS_OSMIUM or not HAS_SHAPELY or not pbf_path:
+            boundary_type = _describe_boundary_type(admin_levels, natural_types)
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "boundary_type": boundary_type,
+                    "filter_applied": f"radius {operator} {radius} {unit}",
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                }
+            }
+
+        # Step 1: Extract boundaries to GeoJSON
+        extraction_result = extract_boundaries(
+            pbf_path,
+            admin_levels=admin_levels,
+            natural_types=natural_types,
+        )
+
+        if not extraction_result.output_path or extraction_result.feature_count == 0:
+            return {
+                "result": {
+                    "output_path": "",
+                    "feature_count": 0,
+                    "original_count": 0,
+                    "boundary_type": extraction_result.boundary_type,
+                    "filter_applied": f"radius {operator} {radius} {unit}",
+                    "format": "GeoJSON",
+                    "extraction_date": extraction_result.extraction_date,
+                }
+            }
+
+        # Step 2: Filter by radius
+        criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
+        filter_result = filter_geojson(extraction_result.output_path, criteria)
+
+        return {
+            "result": {
+                "output_path": filter_result.output_path,
+                "feature_count": filter_result.feature_count,
+                "original_count": extraction_result.feature_count,
+                "boundary_type": extraction_result.boundary_type,
+                "filter_applied": filter_result.filter_applied,
+                "format": "GeoJSON",
+                "extraction_date": filter_result.extraction_date,
+            }
+        }
+
+    return handler
+
+
+def _result_to_dict(result: FilterResult) -> dict:
+    """Convert a FilterResult to a dictionary."""
+    return {
+        "output_path": result.output_path,
+        "feature_count": result.feature_count,
+        "original_count": result.original_count,
+        "boundary_type": result.boundary_type,
+        "filter_applied": result.filter_applied,
+        "format": result.format,
+        "extraction_date": result.extraction_date,
+    }
+
+
+def _describe_boundary_type(
+    admin_levels: list[int] | None,
+    natural_types: list[str] | None,
+) -> str:
+    """Build a description of the boundary types being extracted."""
+    parts = []
+    if admin_levels:
+        parts.append(f"admin:{','.join(str(x) for x in admin_levels)}")
+    if natural_types:
+        parts.append(f"natural:{','.join(natural_types)}")
+    return "; ".join(parts) if parts else "none"
+
+
+# Event facet definitions for handler registration
+FILTER_FACETS = [
+    ("FilterByRadius", _make_radius_filter_handler),
+    ("FilterByRadiusRange", _make_radius_range_handler),
+    ("FilterByTypeAndRadius", _make_type_and_radius_handler),
+    ("ExtractAndFilterByRadius", _make_extract_and_filter_handler),
+]
+
+
+def register_filter_handlers(poller) -> None:
+    """Register all filter event facet handlers with the poller."""
+    for facet_name, handler_factory in FILTER_FACETS:
+        qualified_name = f"{NAMESPACE}.{facet_name}"
+        poller.register(qualified_name, handler_factory(facet_name))
+        log.debug("Registered filter handler: %s", qualified_name)

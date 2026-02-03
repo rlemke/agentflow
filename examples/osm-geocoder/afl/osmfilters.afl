@@ -1,0 +1,36 @@
+// OSM radius-based boundary filtering facets
+//
+// Converts polygon boundaries to equivalent circular radius using:
+//   radius = sqrt(area / π)
+//
+// Supports configurable units, comparison operators, and type filtering.
+
+schema FilterResult {
+    output_path: String
+    feature_count: Long
+    original_count: Long
+    boundary_type: String
+    filter_applied: String
+    format: String
+    extraction_date: String
+}
+
+namespace osm.geo.Filters {
+    // Filter GeoJSON features by equivalent radius
+    // Operator: gt, gte, lt, lte, eq, ne
+    event facet FilterByRadius(input_path: String, radius: Double,
+        unit: String = "kilometers", operator: String = "gte") => (result: FilterResult)
+
+    // Filter GeoJSON features by radius range (inclusive)
+    event facet FilterByRadiusRange(input_path: String, min_radius: Double,
+        max_radius: Double, unit: String = "kilometers") => (result: FilterResult)
+
+    // Filter GeoJSON features by boundary type and radius
+    event facet FilterByTypeAndRadius(input_path: String, boundary_type: String,
+        radius: Double, unit: String = "kilometers", operator: String = "gte") => (result: FilterResult)
+
+    // Extract boundaries from PBF and filter by radius in one step
+    event facet ExtractAndFilterByRadius(cache: OSMCache, admin_levels: [Long],
+        natural_types: [String], radius: Double, unit: String = "kilometers",
+        operator: String = "gte") => (result: FilterResult)
+}

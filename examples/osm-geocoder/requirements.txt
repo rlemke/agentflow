@@ -1,3 +1,4 @@
 requests>=2.28
 pyosmium>=3.6
 shapely>=2.0
+pyproj>=3.0
