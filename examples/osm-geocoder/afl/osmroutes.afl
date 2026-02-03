@@ -1,0 +1,61 @@
+// OSM route extraction for various transport modes
+//
+// Extracts routes and related infrastructure from OSM data for:
+// - bicycle: Cycle routes, cycleways, bike infrastructure
+// - hiking: Hiking/walking trails, footpaths
+// - train: Railway lines, stations
+// - bus: Bus routes, stops
+
+schema RouteResult {
+    output_path: String
+    feature_count: Long
+    route_type: String
+    network_level: String
+    include_infrastructure: Boolean
+    format: String
+    extraction_date: String
+}
+
+schema RouteStats {
+    route_count: Long
+    total_length_km: Double
+    infrastructure_count: Long
+    route_type: String
+}
+
+namespace osm.geo.Routes {
+    // Extract routes by transport type
+    // route_type: "bicycle", "hiking", "train", "bus"
+    // network: filter by network level (e.g., "ncn", "rcn", "lcn" for bicycle)
+    // include_infrastructure: also extract related POIs (stations, parking, etc.)
+    event facet ExtractRoutes(cache: OSMCache, route_type: String,
+        network: String = "*", include_infrastructure: Boolean = true) => (result: RouteResult)
+
+    // Extract routes from GeoJSON (already extracted OSM data)
+    event facet FilterRoutesByType(input_path: String, route_type: String,
+        network: String = "*") => (result: RouteResult)
+
+    // Get route statistics
+    event facet RouteStatistics(input_path: String) => (stats: RouteStats)
+
+    // --- Convenience facets for specific route types ---
+
+    // Bicycle routes and infrastructure
+    event facet BicycleRoutes(cache: OSMCache, network: String = "*",
+        include_infrastructure: Boolean = true) => (result: RouteResult)
+
+    // Hiking and walking trails
+    event facet HikingTrails(cache: OSMCache, network: String = "*",
+        include_infrastructure: Boolean = true) => (result: RouteResult)
+
+    // Train/railway lines and stations
+    event facet TrainRoutes(cache: OSMCache,
+        include_infrastructure: Boolean = true) => (result: RouteResult)
+
+    // Bus routes and stops
+    event facet BusRoutes(cache: OSMCache,
+        include_infrastructure: Boolean = true) => (result: RouteResult)
+
+    // Multi-modal: extract all public transport
+    event facet PublicTransport(cache: OSMCache) => (result: RouteResult)
+}
