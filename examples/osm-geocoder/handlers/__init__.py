@@ -8,6 +8,7 @@ from .cache_handlers import register_cache_handlers
 from .downloader import download as download_region  # noqa: F401
 from .filter_handlers import register_filter_handlers
 from .operations_handlers import register_operations_handlers
+from .park_handlers import register_park_handlers
 from .poi_handlers import register_poi_handlers
 from .population_handlers import register_population_handlers
 from .route_handlers import register_route_handlers
@@ -20,6 +21,7 @@ __all__ = [
     "register_cache_handlers",
     "register_filter_handlers",
     "register_operations_handlers",
+    "register_park_handlers",
     "register_poi_handlers",
     "register_population_handlers",
     "register_route_handlers",
@@ -35,6 +37,7 @@ def register_all_handlers(poller) -> None:
     register_cache_handlers(poller)
     register_filter_handlers(poller)
     register_operations_handlers(poller)
+    register_park_handlers(poller)
     register_poi_handlers(poller)
     register_population_handlers(poller)
     register_route_handlers(poller)
