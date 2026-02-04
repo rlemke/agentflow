@@ -6,3 +6,15 @@ schema OSMCache {
    size: Long
    wasInCache: Boolean
 }
+
+schema GraphHopperCache {
+   osmSource: String
+   graphDir: String
+   profile: String
+   date: String
+   size: Long
+   wasInCache: Boolean
+   version: String
+   nodeCount: Long
+   edgeCount: Long
+}

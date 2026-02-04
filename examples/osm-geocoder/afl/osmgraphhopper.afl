@@ -1,0 +1,24 @@
+// GraphHopper routing graph operations
+// Takes OSM cache as input and builds routing graphs
+
+namespace osm.geo.Operations.GraphHopper {
+
+    // Build a routing graph from an OSM cache
+    // If graph exists and recreate=false, returns cached graph
+    event facet BuildGraph(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+
+    // Build routing graphs for multiple profiles
+    event facet BuildMultiProfile(cache: OSMCache, profiles: [String], recreate: Boolean = false) => (graphs: [GraphHopperCache])
+
+    // Bulk variant for batch processing
+    event facet BuildGraphAll(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+
+    // Import/load an existing graph (builds if not found)
+    event facet ImportGraph(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+
+    // Validate a routing graph and return statistics
+    event facet ValidateGraph(graph: GraphHopperCache) => (valid: Boolean, nodeCount: Long, edgeCount: Long)
+
+    // Clean up a routing graph directory
+    event facet CleanGraph(graph: GraphHopperCache) => (deleted: Boolean)
+}
