@@ -1,6 +1,6 @@
 # OSM Geocoder Agent
 
-A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~330 OSM data processing event facets covering caching, boundaries, routes, parks, population, visualization, and more.
+A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~380 OSM data processing event facets covering caching, boundaries, routes, parks, population, buildings, amenities, roads, visualization, and more.
 
 ## What it does
 
@@ -99,6 +99,9 @@ The `handlers/` package organizes event facet handlers by category:
 | `route_handlers.py` | 8 | Bicycle, hiking, train, bus route extraction — see [ROUTES.md](ROUTES.md) |
 | `population_handlers.py` | 11 | Population-based filtering for cities, states, etc. — see [POPULATION.md](POPULATION.md) |
 | `park_handlers.py` | 8 | National parks, state parks, protected areas — see [PARKS.md](PARKS.md) |
+| `building_handlers.py` | 9 | Building footprint extraction with classification — see [BUILDINGS.md](BUILDINGS.md) |
+| `amenity_handlers.py` | 29 | Amenity extraction (food, shopping, healthcare, etc.) — see [AMENITIES.md](AMENITIES.md) |
+| `road_handlers.py` | 15 | Road network extraction by classification — see [ROADS.md](ROADS.md) |
 | `__init__.py` | — | `register_all_handlers(poller)` convenience function |
 
 ## AFL source files
@@ -117,6 +120,10 @@ The `handlers/` package organizes event facet handlers by category:
 | `afl/osmvisualization.afl` | GeoJSON visualization and map rendering facets |
 | `afl/osmroutes.afl` | Bicycle, hiking, train, bus route extraction facets |
 | `afl/osmparks.afl` | National parks, state parks, protected areas facets |
+| `afl/osmbuildings.afl` | Building footprint extraction facets |
+| `afl/osmamenities.afl` | Amenity extraction facets (food, shopping, healthcare, etc.) |
+| `afl/osmroads.afl` | Road network extraction facets |
+| `afl/osmworkflows_composed.afl` | Example composed workflows demonstrating facet composition |
 | `afl/osmafrica.afl` | Africa workflow composing cache + download steps |
 | `afl/osmasia.afl` | Asia workflow |
 | `afl/osmaustralia.afl` | Australia/Oceania workflow |
@@ -161,3 +168,7 @@ The `handlers/` package organizes event facet handlers by category:
 | `ROUTES.md` | Bicycle, hiking, train, bus route extraction |
 | `POPULATION.md` | Population-based filtering for places |
 | `PARKS.md` | National parks, state parks, protected areas |
+| `BUILDINGS.md` | Building footprint extraction with classification |
+| `AMENITIES.md` | Amenity extraction (restaurants, shops, healthcare, etc.) |
+| `ROADS.md` | Road network extraction by classification |
+| `COMPOSED_WORKFLOWS.md` | Examples demonstrating facet-based workflow composition |

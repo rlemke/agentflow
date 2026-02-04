@@ -1,0 +1,327 @@
+// Composed Workflows - Demonstrating Facet-Based Composition
+//
+// These workflows show how to combine multiple facets together:
+// - Cache facets for region data
+// - Extraction facets for specific features
+// - Filter facets for refining results
+// - Statistics facets for analysis
+// - Visualization facets for output
+//
+// This demonstrates the power of facet-based workflow composition.
+
+namespace examples.composed {
+
+    // ==========================================================================
+    // PATTERN 1: Cache → Extract → Visualize
+    // Basic three-stage pipeline for quick visualization
+    // ==========================================================================
+
+    workflow VisualizeBicycleRoutes(region: String = "Liechtenstein") => (map_path: String, route_count: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract bicycle routes
+        routes = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = true)
+
+        // Stage 3: Visualize on map
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = routes.result.output_path,
+            title = "Bicycle Routes",
+            color = "#27ae60"
+        )
+
+        yield VisualizeBicycleRoutes(map_path = map.result.output_path, route_count = routes.result.feature_count)
+    }
+
+    // ==========================================================================
+    // PATTERN 2: Cache → Extract → Statistics
+    // Analysis pipeline without visualization
+    // ==========================================================================
+
+    workflow AnalyzeParks(region: String = "Liechtenstein") => (total_parks: Long, total_area: Double, national: Long, state: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract all parks
+        parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
+
+        // Stage 3: Calculate statistics
+        stats = osm.geo.Parks.ParkStatistics(input_path = parks.result.output_path)
+
+        yield AnalyzeParks(
+            total_parks = stats.stats.total_parks,
+            total_area = stats.stats.total_area_km2,
+            national = stats.stats.national_parks,
+            state = stats.stats.state_parks
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 3: Cache → Extract → Filter → Visualize
+    // Four-stage pipeline with filtering
+    // ==========================================================================
+
+    workflow LargeCitiesMap(region: String = "Liechtenstein", min_pop: Long = 10000) => (map_path: String, city_count: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract all cities
+        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 0)
+
+        // Stage 3: Filter by population
+        large = osm.geo.Population.FilterByPopulation(
+            input_path = cities.result.output_path,
+            min_population = $.min_pop,
+            place_type = "city",
+            operator = "gte"
+        )
+
+        // Stage 4: Visualize filtered results
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = large.result.output_path,
+            title = "Large Cities",
+            color = "#e74c3c"
+        )
+
+        yield LargeCitiesMap(map_path = map.result.output_path, city_count = large.result.feature_count)
+    }
+
+    // ==========================================================================
+    // PATTERN 4: Cache → Multiple Extractions → Combine Statistics
+    // Parallel extraction with aggregated analysis
+    // ==========================================================================
+
+    workflow TransportOverview(region: String = "Liechtenstein") => (bicycle_km: Double, hiking_km: Double, train_km: Double, bus_routes: Long) andThen {
+        // Stage 1: Get cached region data (shared)
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract multiple route types (could run in parallel)
+        bicycle = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
+        hiking = osm.geo.Routes.HikingTrails(cache = cache.cache, include_infrastructure = false)
+        train = osm.geo.Routes.TrainRoutes(cache = cache.cache, include_infrastructure = false)
+        bus = osm.geo.Routes.BusRoutes(cache = cache.cache, include_infrastructure = false)
+
+        // Stage 3: Get statistics for each
+        bicycle_stats = osm.geo.Routes.RouteStatistics(input_path = bicycle.result.output_path)
+        hiking_stats = osm.geo.Routes.RouteStatistics(input_path = hiking.result.output_path)
+        train_stats = osm.geo.Routes.RouteStatistics(input_path = train.result.output_path)
+        bus_stats = osm.geo.Routes.RouteStatistics(input_path = bus.result.output_path)
+
+        yield TransportOverview(
+            bicycle_km = bicycle_stats.stats.total_length_km,
+            hiking_km = hiking_stats.stats.total_length_km,
+            train_km = train_stats.stats.total_length_km,
+            bus_routes = bus_stats.stats.route_count
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 5: Cache → Extract → Filter → Statistics → Visualize
+    // Full five-stage pipeline
+    // ==========================================================================
+
+    workflow NationalParksAnalysis(region: String = "Liechtenstein") => (map_path: String, park_count: Long, total_area: Double, avg_area: Double) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract all parks
+        all_parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
+
+        // Stage 3: Filter to national parks only
+        national = osm.geo.Parks.FilterParksByType(
+            input_path = all_parks.result.output_path,
+            park_type = "national"
+        )
+
+        // Stage 4: Calculate statistics
+        stats = osm.geo.Parks.ParkStatistics(input_path = national.result.output_path)
+
+        // Stage 5: Visualize
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = national.result.output_path,
+            title = "National Parks",
+            color = "#2ecc71"
+        )
+
+        yield NationalParksAnalysis(
+            map_path = map.result.output_path,
+            park_count = stats.stats.total_parks,
+            total_area = stats.stats.total_area_km2,
+            avg_area = stats.stats.total_area_km2
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 6: Workflow Composition with Different Regions
+    // Demonstrating parameterized workflows
+    // ==========================================================================
+
+    workflow GermanyCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
+        // Use Germany cache
+        cache = osm.geo.cache.Europe.Germany()
+
+        // Extract cities with population
+        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
+
+        // Get statistics
+        stats = osm.geo.Population.PopulationStatistics(
+            input_path = cities.result.output_path,
+            place_type = "city"
+        )
+
+        // Visualize
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = cities.result.output_path,
+            title = "German Cities > 100k",
+            color = "#3498db"
+        )
+
+        yield GermanyCityAnalysis(
+            map_path = map.result.output_path,
+            large_cities = stats.stats.total_places,
+            total_pop = stats.stats.total_population
+        )
+    }
+
+    workflow FranceCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
+        // Use France cache
+        cache = osm.geo.cache.Europe.France()
+
+        // Extract cities with population
+        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
+
+        // Get statistics
+        stats = osm.geo.Population.PopulationStatistics(
+            input_path = cities.result.output_path,
+            place_type = "city"
+        )
+
+        // Visualize
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = cities.result.output_path,
+            title = "French Cities > 100k",
+            color = "#e74c3c"
+        )
+
+        yield FranceCityAnalysis(
+            map_path = map.result.output_path,
+            large_cities = stats.stats.total_places,
+            total_pop = stats.stats.total_population
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 7: Multi-Layer Visualization
+    // Combining multiple extractions into one visual output
+    // ==========================================================================
+
+    workflow TransportMap(region: String = "Liechtenstein") => (map_path: String) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract different transport types
+        bicycle = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
+        hiking = osm.geo.Routes.HikingTrails(cache = cache.cache, include_infrastructure = false)
+
+        // Stage 3: Create individual maps (could be combined with RenderLayers if arrays were supported)
+        bicycle_map = osm.geo.Visualization.RenderMap(
+            geojson_path = bicycle.result.output_path,
+            title = "Bicycle Routes",
+            color = "#27ae60"
+        )
+
+        yield TransportMap(map_path = bicycle_map.result.output_path)
+    }
+
+    // ==========================================================================
+    // PATTERN 8: Boundary Analysis Pipeline
+    // Administrative boundary extraction with filtering
+    // ==========================================================================
+
+    workflow StateBoundariesWithStats(region: String = "Liechtenstein") => (map_path: String, state_count: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract state-level boundaries
+        boundaries = osm.geo.Boundaries.StateBoundaries(cache = cache.cache)
+
+        // Stage 3: Visualize
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = boundaries.result.output_path,
+            title = "State Boundaries",
+            color = "#9b59b6"
+        )
+
+        yield StateBoundariesWithStats(
+            map_path = map.result.output_path,
+            state_count = boundaries.result.feature_count
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 9: POI Discovery Pipeline
+    // Find and visualize points of interest
+    // ==========================================================================
+
+    workflow DiscoverCitiesAndTowns(region: String = "Liechtenstein") => (map_path: String, cities: Long, towns: Long, villages: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract settlements at different levels
+        city_data = osm.geo.POI.Cities(cache = cache.cache)
+        town_data = osm.geo.POI.Towns(cache = cache.cache)
+        village_data = osm.geo.POI.Villages(cache = cache.cache)
+
+        // Stage 3: Visualize cities (largest settlements)
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = city_data.pois.path,
+            title = "Cities",
+            color = "#e74c3c"
+        )
+
+        yield DiscoverCitiesAndTowns(
+            map_path = map.result.output_path,
+            cities = city_data.pois.count,
+            towns = town_data.pois.count,
+            villages = village_data.pois.count
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 10: Complete Regional Analysis
+    // Comprehensive analysis combining multiple feature types
+    // ==========================================================================
+
+    workflow RegionalAnalysis(region: String = "Liechtenstein") => (parks_count: Long, parks_area: Double, routes_km: Double, cities_count: Long, map_path: String) andThen {
+        // Stage 1: Get cached region data (shared across all extractions)
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Extract multiple feature types
+        parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
+        routes = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
+        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 0)
+
+        // Stage 3: Calculate statistics for each
+        park_stats = osm.geo.Parks.ParkStatistics(input_path = parks.result.output_path)
+        route_stats = osm.geo.Routes.RouteStatistics(input_path = routes.result.output_path)
+        city_stats = osm.geo.Population.PopulationStatistics(
+            input_path = cities.result.output_path,
+            place_type = "city"
+        )
+
+        // Stage 4: Visualize primary layer (parks)
+        map = osm.geo.Visualization.RenderMap(
+            geojson_path = parks.result.output_path,
+            title = "Regional Overview - Parks",
+            color = "#2ecc71"
+        )
+
+        yield RegionalAnalysis(
+            parks_count = park_stats.stats.total_parks,
+            parks_area = park_stats.stats.total_area_km2,
+            routes_km = route_stats.stats.total_length_km,
+            cities_count = city_stats.stats.total_places,
+            map_path = map.result.output_path
+        )
+    }
+}

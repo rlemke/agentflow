@@ -1,0 +1,86 @@
+// Amenity extraction from OSM data
+//
+// Extracts amenities by category:
+// - Food: restaurants, cafes, bars, fast_food
+// - Shopping: supermarket, mall, convenience
+// - Services: bank, post_office, fuel
+// - Healthcare: hospital, pharmacy, doctors
+// - Education: school, university, library
+
+schema AmenityResult {
+    output_path: String
+    feature_count: Long
+    amenity_category: String
+    amenity_types: String
+    format: String
+    extraction_date: String
+}
+
+schema AmenityStats {
+    total_amenities: Long
+    food: Long
+    shopping: Long
+    services: Long
+    healthcare: Long
+    education: Long
+    entertainment: Long
+    transport: Long
+    other: Long
+    with_name: Long
+    with_opening_hours: Long
+}
+
+namespace osm.geo.Amenities {
+    // Extract all amenities from a region
+    event facet ExtractAmenities(cache: OSMCache,
+        category: String = "all") => (result: AmenityResult)
+
+    // --- Food & Drink ---
+    event facet Restaurants(cache: OSMCache) => (result: AmenityResult)
+    event facet Cafes(cache: OSMCache) => (result: AmenityResult)
+    event facet Bars(cache: OSMCache) => (result: AmenityResult)
+    event facet FastFood(cache: OSMCache) => (result: AmenityResult)
+    event facet FoodAndDrink(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Shopping ---
+    event facet Supermarkets(cache: OSMCache) => (result: AmenityResult)
+    event facet ShoppingMalls(cache: OSMCache) => (result: AmenityResult)
+    event facet ConvenienceStores(cache: OSMCache) => (result: AmenityResult)
+    event facet AllShopping(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Services ---
+    event facet Banks(cache: OSMCache) => (result: AmenityResult)
+    event facet ATMs(cache: OSMCache) => (result: AmenityResult)
+    event facet PostOffices(cache: OSMCache) => (result: AmenityResult)
+    event facet FuelStations(cache: OSMCache) => (result: AmenityResult)
+    event facet EVCharging(cache: OSMCache) => (result: AmenityResult)
+    event facet Parking(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Healthcare ---
+    event facet Hospitals(cache: OSMCache) => (result: AmenityResult)
+    event facet Pharmacies(cache: OSMCache) => (result: AmenityResult)
+    event facet Doctors(cache: OSMCache) => (result: AmenityResult)
+    event facet AllHealthcare(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Education ---
+    event facet Schools(cache: OSMCache) => (result: AmenityResult)
+    event facet Universities(cache: OSMCache) => (result: AmenityResult)
+    event facet Libraries(cache: OSMCache) => (result: AmenityResult)
+    event facet AllEducation(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Entertainment ---
+    event facet Cinemas(cache: OSMCache) => (result: AmenityResult)
+    event facet Theatres(cache: OSMCache) => (result: AmenityResult)
+    event facet Nightclubs(cache: OSMCache) => (result: AmenityResult)
+    event facet AllEntertainment(cache: OSMCache) => (result: AmenityResult)
+
+    // --- Statistics and Filtering ---
+    event facet AmenityStatistics(input_path: String) => (stats: AmenityStats)
+
+    event facet FilterAmenitiesByCategory(input_path: String,
+        category: String) => (result: AmenityResult)
+
+    // Search amenities by name pattern
+    event facet SearchAmenities(input_path: String,
+        name_pattern: String) => (result: AmenityResult)
+}

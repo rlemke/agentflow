@@ -1,0 +1,60 @@
+// Building extraction from OSM data
+//
+// Extracts building footprints with classification:
+// - Residential, commercial, industrial, retail
+// - Building height/levels for 3D visualization
+// - Building attributes (name, address, etc.)
+
+schema BuildingResult {
+    output_path: String
+    feature_count: Long
+    building_type: String
+    total_area_km2: Double
+    with_height_data: Long
+    format: String
+    extraction_date: String
+}
+
+schema BuildingStats {
+    total_buildings: Long
+    total_area_km2: Double
+    residential: Long
+    commercial: Long
+    industrial: Long
+    retail: Long
+    other: Long
+    avg_levels: Double
+    with_height: Long
+}
+
+namespace osm.geo.Buildings {
+    // Extract all buildings from a region
+    event facet ExtractBuildings(cache: OSMCache,
+        building_type: String = "all") => (result: BuildingResult)
+
+    // Extract residential buildings
+    event facet ResidentialBuildings(cache: OSMCache) => (result: BuildingResult)
+
+    // Extract commercial buildings
+    event facet CommercialBuildings(cache: OSMCache) => (result: BuildingResult)
+
+    // Extract industrial buildings
+    event facet IndustrialBuildings(cache: OSMCache) => (result: BuildingResult)
+
+    // Extract retail buildings (shops, malls)
+    event facet RetailBuildings(cache: OSMCache) => (result: BuildingResult)
+
+    // Extract buildings with height data (for 3D)
+    event facet Buildings3D(cache: OSMCache) => (result: BuildingResult)
+
+    // Filter buildings by area
+    event facet LargeBuildings(cache: OSMCache,
+        min_area_m2: Double = 1000) => (result: BuildingResult)
+
+    // Get building statistics
+    event facet BuildingStatistics(input_path: String) => (stats: BuildingStats)
+
+    // Filter existing GeoJSON by building type
+    event facet FilterBuildingsByType(input_path: String,
+        building_type: String) => (result: BuildingResult)
+}

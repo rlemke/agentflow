@@ -1,0 +1,69 @@
+// Road network extraction from OSM data
+//
+// Extracts road network with attributes:
+// - Classification (motorway, primary, secondary, residential)
+// - Speed limits, surface type, lane count
+// - One-way status, access restrictions
+
+schema RoadResult {
+    output_path: String
+    feature_count: Long
+    road_class: String
+    total_length_km: Double
+    with_speed_limit: Long
+    format: String
+    extraction_date: String
+}
+
+schema RoadStats {
+    total_roads: Long
+    total_length_km: Double
+    motorway_km: Double
+    primary_km: Double
+    secondary_km: Double
+    tertiary_km: Double
+    residential_km: Double
+    other_km: Double
+    with_speed_limit: Long
+    with_surface: Long
+    with_lanes: Long
+    one_way_count: Long
+}
+
+namespace osm.geo.Roads {
+    // Extract all roads from a region
+    event facet ExtractRoads(cache: OSMCache,
+        road_class: String = "all") => (result: RoadResult)
+
+    // --- By Classification ---
+    event facet Motorways(cache: OSMCache) => (result: RoadResult)
+    event facet PrimaryRoads(cache: OSMCache) => (result: RoadResult)
+    event facet SecondaryRoads(cache: OSMCache) => (result: RoadResult)
+    event facet TertiaryRoads(cache: OSMCache) => (result: RoadResult)
+    event facet ResidentialRoads(cache: OSMCache) => (result: RoadResult)
+
+    // Major roads only (motorway + primary + secondary)
+    event facet MajorRoads(cache: OSMCache) => (result: RoadResult)
+
+    // --- Special Types ---
+    event facet Bridges(cache: OSMCache) => (result: RoadResult)
+    event facet Tunnels(cache: OSMCache) => (result: RoadResult)
+    event facet Roundabouts(cache: OSMCache) => (result: RoadResult)
+
+    // --- By Surface ---
+    event facet PavedRoads(cache: OSMCache) => (result: RoadResult)
+    event facet UnpavedRoads(cache: OSMCache) => (result: RoadResult)
+
+    // --- With Attributes ---
+    event facet RoadsWithSpeedLimit(cache: OSMCache) => (result: RoadResult)
+
+    // --- Statistics and Filtering ---
+    event facet RoadStatistics(input_path: String) => (stats: RoadStats)
+
+    event facet FilterRoadsByClass(input_path: String,
+        road_class: String) => (result: RoadResult)
+
+    // Filter roads by speed limit range
+    event facet FilterBySpeedLimit(input_path: String,
+        min_speed: Long, max_speed: Long) => (result: RoadResult)
+}
