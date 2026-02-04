@@ -1,6 +1,6 @@
 # OSM Geocoder Agent
 
-A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~380 OSM data processing event facets covering caching, boundaries, routes, parks, population, buildings, amenities, roads, visualization, and more.
+A geocoding agent that resolves street addresses to geographic coordinates using the [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/), plus handlers for ~580 OSM data processing event facets covering caching, boundaries, routes, parks, population, buildings, amenities, roads, visualization, GraphHopper routing graphs, and more.
 
 ## What it does
 
@@ -102,6 +102,7 @@ The `handlers/` package organizes event facet handlers by category:
 | `building_handlers.py` | 9 | Building footprint extraction with classification — see [BUILDINGS.md](BUILDINGS.md) |
 | `amenity_handlers.py` | 29 | Amenity extraction (food, shopping, healthcare, etc.) — see [AMENITIES.md](AMENITIES.md) |
 | `road_handlers.py` | 15 | Road network extraction by classification — see [ROADS.md](ROADS.md) |
+| `graphhopper_handlers.py` | ~200 | GraphHopper routing graph operations — see [GRAPHHOPPER.md](GRAPHHOPPER.md) |
 | `__init__.py` | — | `register_all_handlers(poller)` convenience function |
 
 ## AFL source files
@@ -123,6 +124,9 @@ The `handlers/` package organizes event facet handlers by category:
 | `afl/osmbuildings.afl` | Building footprint extraction facets |
 | `afl/osmamenities.afl` | Amenity extraction facets (food, shopping, healthcare, etc.) |
 | `afl/osmroads.afl` | Road network extraction facets |
+| `afl/osmgraphhopper.afl` | GraphHopper routing graph operation facets |
+| `afl/osmgraphhoppercache.afl` | Per-region GraphHopper cache facets (~200 facets) |
+| `afl/osmgraphhopper_workflows.afl` | Regional routing graph workflow compositions |
 | `afl/osmworkflows_composed.afl` | Example composed workflows demonstrating facet composition |
 | `afl/osmafrica.afl` | Africa workflow composing cache + download steps |
 | `afl/osmasia.afl` | Asia workflow |
@@ -171,4 +175,5 @@ The `handlers/` package organizes event facet handlers by category:
 | `BUILDINGS.md` | Building footprint extraction with classification |
 | `AMENITIES.md` | Amenity extraction (restaurants, shops, healthcare, etc.) |
 | `ROADS.md` | Road network extraction by classification |
+| `GRAPHHOPPER.md` | GraphHopper routing graph building and caching |
 | `COMPOSED_WORKFLOWS.md` | Examples demonstrating facet-based workflow composition |
