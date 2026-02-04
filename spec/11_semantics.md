@@ -34,6 +34,8 @@ All AST nodes MUST have a unique UUID (v4) stored in the `node_id` field. This I
 | `EventFacetDecl` | `event facet Name(params) => (returns) body?` |
 | `WorkflowDecl` | `workflow Name(params) => (returns) body?` |
 | `ImplicitDecl` | `implicit name = CallExpr` |
+| `SchemaDecl` | `schema Name { fields }` |
+| `SchemaField` | `name: Type` field within a schema |
 
 ### Signature Nodes
 | Node | Description |
@@ -94,7 +96,12 @@ Program
 │           └── yield_stmt: YieldStmt?
 ├── event_facets: list[EventFacetDecl]
 ├── workflows: list[WorkflowDecl]
-└── implicits: list[ImplicitDecl]
+├── implicits: list[ImplicitDecl]
+└── schemas: list[SchemaDecl]
+    ├── name: str
+    └── fields: list[SchemaField]
+        ├── name: str
+        └── type: TypeRef | ArrayType
 ```
 
 ---
@@ -121,6 +128,13 @@ Program
 - Steps within a block can reference earlier steps
 - Yield statements merge outputs back to containing facet
 - Implicit declarations provide default values
+
+### Schema Instantiation
+- Schemas can be instantiated in step statements: `cfg = Config(timeout = 30)`
+- Schema fields become the step's returns (accessible via `step.field`)
+- Schema instantiation uses the same `CallExpr` AST node as facet calls
+- Schemas cannot have mixins; `Config() with Mixin()` is a validation error
+- Schema fields are validated at compile time (unknown fields produce errors)
 
 ---
 

@@ -75,11 +75,15 @@ program            := (namespace_block | top_level_decl)* ;
 
 namespace_block    := "namespace" qname "{" namespace_body "}" ;
 
-namespace_body     := (uses_decl | facet_decl | event_facet_decl | workflow_decl | implicit_decl)* ;
+namespace_body     := (uses_decl | facet_decl | event_facet_decl | workflow_decl | implicit_decl | schema_decl)* ;
 
 uses_decl          := "uses" qname (stmt_sep)? ;
 
-top_level_decl     := facet_decl | event_facet_decl | workflow_decl | implicit_decl ;
+top_level_decl     := facet_decl | event_facet_decl | workflow_decl | implicit_decl | schema_decl ;
+
+schema_decl        := "schema" ident "{" schema_field* "}" (stmt_sep)? ;
+
+schema_field       := ident ":" type (stmt_sep)? ;
 
 stmt_sep           := ";" | NEWLINE+ ;
 
@@ -175,6 +179,20 @@ facet ProcessRegion(region: String) => (result: String)
 workflow ProcessAllRegions(regions: Json) => (results: Json) andThen foreach r in $.regions {
     processed = ProcessRegion(region = r.name)
     yield ProcessAllRegions(results = processed.result)
+}
+
+### Schema declaration and instantiation
+schema Config {
+    timeout: Long
+    retries: Long
+}
+
+event facet DoSomething(config: Config) => (result: String)
+
+workflow Example() => (output: String) andThen {
+    cfg = Config(timeout = 30, retries = 3)
+    result = DoSomething(config = cfg.timeout)
+    yield Example(output = result.result)
 }
 
 ### Invalid: 4.1 Missing parentheses on mixin . mixins must be written as with Name(...)

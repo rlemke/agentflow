@@ -182,6 +182,73 @@ namespace app {
 
 ---
 
+### 6. Schema Instantiation Validation
+
+Schemas can be instantiated in step statements, creating data objects.
+
+#### Valid Schema Instantiation
+```afl
+schema Config {
+    timeout: Long
+    retries: Long
+}
+
+workflow Test() => (output: Long) andThen {
+    cfg = Config(timeout = 30, retries = 3)  // OK
+    yield Test(output = cfg.timeout)          // OK - cfg.timeout is accessible
+}
+```
+
+#### Field Validation
+All arguments must be valid schema fields:
+```afl
+schema Config {
+    timeout: Long
+}
+
+workflow Test() andThen {
+    cfg = Config(timeout = 30, unknown = "bad")  // ERROR: unknown field 'unknown'
+}
+```
+
+#### No Mixins Allowed
+Schema instantiation cannot have mixins:
+```afl
+schema Config {
+    timeout: Long
+}
+facet SomeMixin()
+
+workflow Test() andThen {
+    cfg = Config(timeout = 30) with SomeMixin()  // ERROR: cannot have mixins
+}
+```
+
+#### Schema Fields as Returns
+Schema fields are stored as **returns** (not params), making them accessible via `step.field`:
+```afl
+schema Request {
+    url: String
+    method: String
+}
+facet Fetch(url: String, method: String) => (data: String)
+
+workflow Test(input: String) => (result: String) andThen {
+    req = Request(url = $.input, method = "GET")
+    resp = Fetch(url = req.url, method = req.method)  // OK - req.url, req.method accessible
+    yield Test(result = resp.data)
+}
+```
+
+#### Schema Name Resolution
+Schema names follow the same resolution order as facets:
+1. Fully qualified name
+2. Current namespace
+3. Imported namespaces
+4. Top-level
+
+---
+
 ## Implementation
 
 ### File: `afl/validator.py`
@@ -232,3 +299,6 @@ afl input.afl --no-validate
 | Invalid use | `Invalid use statement: namespace 'nonexistent' does not exist` |
 | Ambiguous facet | `Ambiguous facet reference 'Facet': could be a.b.Facet, c.d.Facet. Use fully qualified name to disambiguate.` |
 | Unknown facet | `Unknown facet 'nonexistent.Facet'` |
+| Unknown schema field | `Unknown field 'foo' for schema 'Config'. Valid fields are: ['timeout', 'retries']` |
+| Schema with mixins | `Schema instantiation 'Config' cannot have mixins. Schemas are simple data structures without mixin support.` |
+| Ambiguous schema | `Ambiguous schema reference 'Config': could be a.Config, b.Config. Use fully qualified name to disambiguate.` |

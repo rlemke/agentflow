@@ -695,6 +695,25 @@ YIELD_TRANSITIONS: dict[str, str] = {
 }
 ```
 
+### 22.2.1 Schema Instantiation State Execution
+
+Schema instantiation steps use a simplified state machine that evaluates arguments and stores them as **returns** (not params):
+
+```python
+SCHEMA_TRANSITIONS: dict[str, str] = {
+    StepState.CREATED:          StepState.FACET_INIT_BEGIN,
+    StepState.FACET_INIT_BEGIN: StepState.FACET_INIT_END,
+    StepState.FACET_INIT_END:   StepState.STATEMENT_END,
+    StepState.STATEMENT_END:    StepState.STATEMENT_COMPLETE,
+}
+```
+
+Schema instantiation:
+- Evaluates arguments in `FACET_INIT_BEGIN`
+- Stores evaluated values as **returns** (accessible via `step.fieldName`)
+- Skips all script, mixin, event, and block phases
+- Completes immediately after initialization
+
 ### 22.3 Block State Execution
 
 **Location:** `afl/runtime/changers/block_changer.py`
@@ -860,6 +879,7 @@ Three StateChanger implementations handle different step types:
 | `StepStateChanger` | `VariableAssignment` | Full state machine (all states) |
 | `BlockStateChanger` | `AndThen`, `AndMap`, `AndMatch` | Simplified: `BlockExecutionBegin → Continue → End` |
 | `YieldStateChanger` | `YieldAssignment` | Skips to end after facet initialization |
+| Schema steps | `SchemaInstantiation` | Minimal: `Created → FacetInit → End → Complete` (uses `SCHEMA_TRANSITIONS`) |
 
 **Factory function** (in `afl/runtime/evaluator.py`):
 
@@ -1171,6 +1191,7 @@ class ObjectType:
     """Object type constants for step classification."""
     VARIABLE_ASSIGNMENT = "VariableAssignment"  # Regular statement
     YIELD_ASSIGNMENT = "YieldAssignment"        # Capture/output statement
+    SCHEMA_INSTANTIATION = "SchemaInstantiation"  # Schema data object creation
     WORKFLOW = "Workflow"
 
     # Block types:
@@ -1296,7 +1317,7 @@ All source files are located in `afl/runtime/`.
 - `afl/runtime/handlers/completion.py` — `StatementCompleteHandler`, `EventTransmitHandler`
 
 ### Models
-- `afl/runtime/states.py` — `StepState` constants, transition tables (`STEP_TRANSITIONS`, `BLOCK_TRANSITIONS`, `YIELD_TRANSITIONS`)
+- `afl/runtime/states.py` — `StepState` constants, transition tables (`STEP_TRANSITIONS`, `BLOCK_TRANSITIONS`, `YIELD_TRANSITIONS`, `SCHEMA_TRANSITIONS`)
 - `afl/runtime/step.py` — `StepDefinition`, `StepTransition`
 - `afl/runtime/types.py` — `ObjectType`, `FacetAttributes`, `AttributeValue`, ID types
 
