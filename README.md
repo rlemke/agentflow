@@ -799,6 +799,35 @@ namespace app.models {
 }
 ```
 
+### Schema Instantiation in Steps
+
+Schemas can be instantiated like function calls within workflow steps. Schema fields are stored as step returns, making them accessible via `step.fieldName`:
+
+```
+schema Config {
+    timeout: Long
+    retries: Long
+}
+
+event facet DoSomething(timeout: Long, retries: Long) => (result: String)
+
+workflow Example() => (output: String) andThen {
+    cfg = Config(timeout = 30, retries = 3)
+    result = DoSomething(timeout = cfg.timeout, retries = cfg.retries)
+    yield Example(output = result.result)
+}
+```
+
+Schema instantiation follows simplified state transitions (no event dispatch or block execution) and completes synchronously. This is useful for:
+- Grouping related configuration values
+- Creating structured data to pass to event facets
+- Improving workflow readability
+
+**Validation rules for schema instantiation:**
+- All arguments must be valid schema fields
+- Unknown fields produce validation errors
+- Schemas cannot have mixins (`Config() with Mixin()` is invalid)
+
 ### Event Facets
 
 Facets that trigger agent execution:
@@ -981,6 +1010,7 @@ agentflow/
 | **Event Facet** | A facet that triggers agent execution |
 | **Workflow** | A facet designated as an entry point for execution |
 | **Schema** | A named typed structure for defining JSON shapes; usable as a type |
+| **Schema Instantiation** | Creating a schema instance in a step; fields become step returns accessible via `step.field` |
 | **AFL Agent** | A service that processes event facets by polling MongoDB for tasks, performing work, and signaling the runtime to continue |
 | **Agent Integration Library** | Language-specific library for building AFL agents (Python, Scala) |
 | **afl:resume** | Protocol task that signals the RunnerService to resume a workflow |
