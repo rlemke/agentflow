@@ -1934,3 +1934,315 @@ class TestEvaluatorIteration:
         assert progress is False
         # Step should be in pending_created (restored for commit)
         assert len(context.changes.created_steps) >= 1
+
+
+# =========================================================================
+# Schema Instantiation Runtime Tests
+# =========================================================================
+
+
+class TestSchemaInstantiationRuntime:
+    """Tests for schema instantiation execution in the runtime."""
+
+    @pytest.fixture
+    def evaluator(self):
+        """Create evaluator with in-memory store."""
+        store = MemoryStore()
+        telemetry = Telemetry(enabled=True)
+        return Evaluator(persistence=store, telemetry=telemetry)
+
+    def test_schema_instantiation_execution(self, evaluator):
+        """Schema instantiation step should create returns, not params.
+
+        ```afl
+        schema Config {
+            timeout: Long
+            retries: Long
+        }
+        facet Value(input: Long) => (output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            cfg = Config(timeout = 30, retries = 3)
+            v = Value(input = cfg.timeout)
+            yield Test(output = v.input)
+        }
+        ```
+        """
+        program_ast = {
+            "declarations": [
+                {
+                    "type": "SchemaDecl",
+                    "name": "Config",
+                    "fields": [
+                        {"name": "timeout", "type": "Long"},
+                        {"name": "retries", "type": "Long"},
+                    ],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "Test",
+            "params": [{"name": "input", "type": "Long"}],
+            "returns": [{"name": "output", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-cfg",
+                        "name": "cfg",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Config",
+                            "args": [
+                                {"name": "timeout", "value": {"type": "Int", "value": 30}},
+                                {"name": "retries", "value": {"type": "Int", "value": 3}},
+                            ],
+                        },
+                    },
+                    {
+                        "type": "StepStmt",
+                        "id": "step-v",
+                        "name": "v",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "StepRef", "path": ["cfg", "timeout"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Test",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["v", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, inputs={"input": 1}, program_ast=program_ast)
+        assert result.success is True
+        # cfg.timeout = 30 (stored as return)
+        # v.input = 30 (from cfg.timeout)
+        # output = 30
+        assert result.outputs.get("output") == 30
+
+    def test_schema_field_passed_to_facet(self, evaluator):
+        """Schema fields should be accessible via step references.
+
+        ```afl
+        schema Data {
+            value: Long
+            multiplier: Long
+        }
+        facet Multiply(a: Long, b: Long) => (result: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            d = Data(value = $.input, multiplier = 2)
+            m = Multiply(a = d.value, b = d.multiplier)
+            yield Test(output = m.result)
+        }
+        ```
+        """
+        program_ast = {
+            "declarations": [
+                {
+                    "type": "SchemaDecl",
+                    "name": "Data",
+                    "fields": [
+                        {"name": "value", "type": "Long"},
+                        {"name": "multiplier", "type": "Long"},
+                    ],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Multiply",
+                    "params": [
+                        {"name": "a", "type": "Long"},
+                        {"name": "b", "type": "Long"},
+                    ],
+                    "returns": [{"name": "result", "type": "Long"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "Test",
+            "params": [{"name": "input", "type": "Long"}],
+            "returns": [{"name": "output", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-d",
+                        "name": "d",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Data",
+                            "args": [
+                                {
+                                    "name": "value",
+                                    "value": {"type": "InputRef", "path": ["input"]},
+                                },
+                                {"name": "multiplier", "value": {"type": "Int", "value": 2}},
+                            ],
+                        },
+                    },
+                    {
+                        "type": "StepStmt",
+                        "id": "step-m",
+                        "name": "m",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Multiply",
+                            "args": [
+                                {
+                                    "name": "a",
+                                    "value": {"type": "StepRef", "path": ["d", "value"]},
+                                },
+                                {
+                                    "name": "b",
+                                    "value": {"type": "StepRef", "path": ["d", "multiplier"]},
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Test",
+                        "args": [
+                            {
+                                "name": "output",
+                                # Use a.value to verify facet processed the schema values
+                                "value": {"type": "StepRef", "path": ["m", "a"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, inputs={"input": 5}, program_ast=program_ast)
+        assert result.success is True
+        # d.value = 5, d.multiplier = 2
+        # m.a = 5, m.b = 2
+        # output = m.a = 5
+        assert result.outputs.get("output") == 5
+
+    def test_schema_with_concat_expression(self, evaluator):
+        """Schema instantiation with concatenation expression.
+
+        ```afl
+        schema StringData {
+            combined: String
+        }
+        facet Echo(value: String) => (result: String)
+        workflow Test(a: String, b: String) => (output: String) andThen {
+            d = StringData(combined = $.a ++ $.b)
+            e = Echo(value = d.combined)
+            yield Test(output = e.value)
+        }
+        ```
+        """
+        program_ast = {
+            "declarations": [
+                {
+                    "type": "SchemaDecl",
+                    "name": "StringData",
+                    "fields": [{"name": "combined", "type": "String"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "Test",
+            "params": [
+                {"name": "a", "type": "String"},
+                {"name": "b", "type": "String"},
+            ],
+            "returns": [{"name": "output", "type": "String"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-d",
+                        "name": "d",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "StringData",
+                            "args": [
+                                {
+                                    "name": "combined",
+                                    "value": {
+                                        "type": "ConcatExpr",
+                                        "operands": [
+                                            {"type": "InputRef", "path": ["a"]},
+                                            {"type": "InputRef", "path": ["b"]},
+                                        ],
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "type": "StepStmt",
+                        "id": "step-e",
+                        "name": "e",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Echo",
+                            "args": [
+                                {
+                                    "name": "value",
+                                    "value": {"type": "StepRef", "path": ["d", "combined"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Test",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["e", "value"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(
+            workflow_ast, inputs={"a": "Hello", "b": "World"}, program_ast=program_ast
+        )
+        assert result.success is True
+        # d.combined = "HelloWorld"
+        # e.value = "HelloWorld"
+        # output = "HelloWorld"
+        assert result.outputs.get("output") == "HelloWorld"

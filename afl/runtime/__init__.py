@@ -101,6 +101,7 @@ from .runner import RunnerConfig, RunnerService
 from .states import (
     BLOCK_TRANSITIONS,
     EVENT_TRANSITIONS,
+    SCHEMA_TRANSITIONS,
     STEP_TRANSITIONS,
     YIELD_TRANSITIONS,
     EventState,
@@ -149,6 +150,7 @@ __all__ = [
     "STEP_TRANSITIONS",
     "BLOCK_TRANSITIONS",
     "YIELD_TRANSITIONS",
+    "SCHEMA_TRANSITIONS",
     "EVENT_TRANSITIONS",
     "get_next_state",
     "select_transitions",

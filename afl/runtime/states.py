@@ -131,6 +131,16 @@ YIELD_TRANSITIONS: dict[str, str] = {
 }
 
 
+# Simplified state machine for SchemaInstantiation steps
+# Evaluates arguments and stores them as returns, skips all other phases
+SCHEMA_TRANSITIONS: dict[str, str] = {
+    StepState.CREATED: StepState.FACET_INIT_BEGIN,
+    StepState.FACET_INIT_BEGIN: StepState.FACET_INIT_END,
+    StepState.FACET_INIT_END: StepState.STATEMENT_END,
+    StepState.STATEMENT_END: StepState.STATEMENT_COMPLETE,
+}
+
+
 def get_next_state(current_state: str, transitions: dict[str, str]) -> str | None:
     """Get the next state given current state and transition table.
 
@@ -157,6 +167,8 @@ def select_transitions(object_type: str) -> dict[str, str]:
 
     if object_type == ObjectType.YIELD_ASSIGNMENT:
         return YIELD_TRANSITIONS
+    elif object_type == ObjectType.SCHEMA_INSTANTIATION:
+        return SCHEMA_TRANSITIONS
     elif ObjectType.is_block(object_type):
         return BLOCK_TRANSITIONS
     else:

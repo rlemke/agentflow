@@ -103,10 +103,14 @@ class DependencyGraph:
         call = step_ast.get("call", {})
         facet_name = call.get("target", "")
         args = call.get("args", [])
-        object_type = ObjectType.VARIABLE_ASSIGNMENT
 
-        # Resolve to qualified name if program AST is available
-        facet_name = self._resolve_facet_name(facet_name)
+        # Determine object type: check if target is a schema
+        if self._is_schema_instantiation(facet_name):
+            object_type = ObjectType.SCHEMA_INSTANTIATION
+        else:
+            object_type = ObjectType.VARIABLE_ASSIGNMENT
+            # Only resolve facet names (not schema names)
+            facet_name = self._resolve_facet_name(facet_name)
 
         return StatementDefinition(
             id=stmt_id,
@@ -168,6 +172,63 @@ class DependencyGraph:
                 nested = decl.get("declarations", [])
                 new_prefix = f"{prefix}.{ns_name}" if prefix else ns_name
                 result = self._resolve_in_declarations(nested, short_name, new_prefix)
+                if result:
+                    return result
+        return None
+
+    def _is_schema_instantiation(self, name: str) -> bool:
+        """Check if the given name refers to a schema.
+
+        Args:
+            name: The target name from a step call
+
+        Returns:
+            True if the name is a schema, False otherwise
+        """
+        if not self._program_ast or not name:
+            return False
+
+        declarations = self._program_ast.get("declarations", [])
+        return self._find_schema_in_declarations(declarations, name, prefix="") is not None
+
+    def _find_schema_in_declarations(
+        self, declarations: list, name: str, prefix: str
+    ) -> str | None:
+        """Recursively search declarations to find a schema.
+
+        Args:
+            declarations: List of declaration dicts
+            name: The schema name to find (may be qualified)
+            prefix: Current namespace prefix
+
+        Returns:
+            Qualified schema name if found, None otherwise
+        """
+        # Handle qualified names
+        if "." in name:
+            parts = name.split(".", 1)
+            ns_prefix = parts[0]
+            rest = parts[1]
+            for decl in declarations:
+                if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
+                    nested = decl.get("declarations", [])
+                    new_prefix = f"{prefix}.{ns_prefix}" if prefix else ns_prefix
+                    return self._find_schema_in_declarations(nested, rest, new_prefix)
+            return None
+
+        # Unqualified name - search at current level and in namespaces
+        for decl in declarations:
+            decl_type = decl.get("type", "")
+            if decl_type == "SchemaDecl":
+                if decl.get("name") == name:
+                    if prefix:
+                        return f"{prefix}.{name}"
+                    return name
+            elif decl_type == "Namespace":
+                ns_name = decl.get("name", "")
+                nested = decl.get("declarations", [])
+                new_prefix = f"{prefix}.{ns_name}" if prefix else ns_name
+                result = self._find_schema_in_declarations(nested, name, new_prefix)
                 if result:
                     return result
         return None

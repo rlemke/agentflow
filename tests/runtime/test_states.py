@@ -16,6 +16,7 @@
 
 from afl.runtime import (
     BLOCK_TRANSITIONS,
+    SCHEMA_TRANSITIONS,
     STEP_TRANSITIONS,
     YIELD_TRANSITIONS,
     ObjectType,
@@ -103,6 +104,30 @@ class TestStepTransitions:
         assert StepState.STATEMENT_BLOCKS_BEGIN not in visited
         assert StepState.BLOCK_EXECUTION_BEGIN not in visited
 
+    def test_schema_step_path(self):
+        """Test path through schema instantiation state machine."""
+        state = StepState.CREATED
+        visited = [state]
+
+        while state in SCHEMA_TRANSITIONS:
+            state = SCHEMA_TRANSITIONS[state]
+            visited.append(state)
+
+        # Should end at STATEMENT_COMPLETE
+        assert visited[-1] == StepState.STATEMENT_COMPLETE
+
+        # Should only have: CREATED -> FACET_INIT_BEGIN -> FACET_INIT_END -> STATEMENT_END -> COMPLETE
+        assert len(visited) == 5
+        assert StepState.FACET_INIT_BEGIN in visited
+        assert StepState.FACET_INIT_END in visited
+        assert StepState.STATEMENT_END in visited
+
+        # Should skip all other phases
+        assert StepState.FACET_SCRIPTS_BEGIN not in visited
+        assert StepState.MIXIN_BLOCKS_BEGIN not in visited
+        assert StepState.EVENT_TRANSMIT not in visited
+        assert StepState.STATEMENT_BLOCKS_BEGIN not in visited
+
 
 class TestSelectTransitions:
     """Tests for transition table selection."""
@@ -126,6 +151,11 @@ class TestSelectTransitions:
         """Test Workflow uses full state machine."""
         transitions = select_transitions(ObjectType.WORKFLOW)
         assert transitions == STEP_TRANSITIONS
+
+    def test_schema_instantiation_uses_schema(self):
+        """Test SchemaInstantiation uses schema state machine."""
+        transitions = select_transitions(ObjectType.SCHEMA_INSTANTIATION)
+        assert transitions == SCHEMA_TRANSITIONS
 
 
 class TestGetNextState:

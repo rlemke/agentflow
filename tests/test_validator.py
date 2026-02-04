@@ -810,3 +810,156 @@ class TestMixinCallValidation:
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
+
+
+class TestSchemaInstantiation:
+    """Test schema instantiation validation in step statements."""
+
+    def test_valid_schema_instantiation(self, validator):
+        """Valid schema instantiation should pass."""
+        ast = parse("""
+        schema Config {
+            timeout: Long
+            retries: Long
+        }
+        event facet DoSomething(config: Config) => (result: String)
+        workflow Example() => (output: String) andThen {
+            cfg = Config(timeout = 30, retries = 3)
+            result = DoSomething(config = cfg.timeout)
+            yield Example(output = result.result)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_schema_field_reference(self, validator):
+        """Step referencing schema fields should pass."""
+        ast = parse("""
+        schema Data {
+            value: String
+            count: Long
+        }
+        facet Process(input: String) => (output: String)
+        workflow Test(x: String) => (result: String) andThen {
+            d = Data(value = $.x, count = 5)
+            p = Process(input = d.value)
+            yield Test(result = p.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_schema_field_reference(self, validator):
+        """Reference to nonexistent schema field should error."""
+        ast = parse("""
+        schema Data {
+            value: String
+        }
+        facet Process(input: String) => (output: String)
+        workflow Test(x: String) => (result: String) andThen {
+            d = Data(value = $.x)
+            p = Process(input = d.nonexistent)
+            yield Test(result = p.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Invalid attribute 'nonexistent' for step 'd'" in str(e) for e in result.errors)
+
+    def test_unknown_schema_field(self, validator):
+        """Unknown field in schema instantiation should error."""
+        ast = parse("""
+        schema Config {
+            timeout: Long
+        }
+        workflow Test() andThen {
+            cfg = Config(timeout = 30, unknown = "bad")
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Unknown field 'unknown' for schema 'Config'" in str(e) for e in result.errors)
+
+    def test_schema_with_mixins_error(self, validator):
+        """Schema instantiation with mixins should error."""
+        ast = parse("""
+        schema Config {
+            timeout: Long
+        }
+        facet SomeMixin()
+        workflow Test() andThen {
+            cfg = Config(timeout = 30) with SomeMixin()
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("cannot have mixins" in str(e) for e in result.errors)
+
+    def test_namespaced_schema_instantiation(self, validator):
+        """Namespaced schema instantiation should work."""
+        ast = parse("""
+        namespace app {
+            schema Settings {
+                name: String
+                value: Long
+            }
+            facet Process(s: Settings) => (result: String)
+            workflow Test(input: String) => (output: String) andThen {
+                s = Settings(name = $.input, value = 42)
+                r = Process(s = s.name)
+                yield Test(output = r.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_qualified_namespaced_schema_instantiation(self, validator):
+        """Qualified schema reference should work across namespaces."""
+        ast = parse("""
+        namespace lib {
+            schema Config {
+                key: String
+            }
+        }
+        namespace app {
+            use lib
+            workflow Run(input: String) => (output: String) andThen {
+                c = Config(key = $.input)
+                yield Run(output = c.key)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_schema_with_concat_expression(self, validator):
+        """Schema instantiation with concatenation expression should validate."""
+        ast = parse("""
+        schema Data {
+            combined: String
+        }
+        workflow Test(a: String, b: String) => (result: String) andThen {
+            d = Data(combined = $.a ++ $.b)
+            yield Test(result = d.combined)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_schema_fields_accessible_after_step(self, validator):
+        """Schema fields should be accessible in subsequent steps."""
+        ast = parse("""
+        schema Request {
+            url: String
+            method: String
+        }
+        facet Fetch(url: String, method: String) => (data: String)
+        workflow Test(input: String) => (result: String) andThen {
+            req = Request(url = $.input, method = "GET")
+            resp = Fetch(url = req.url, method = req.method)
+            yield Test(result = resp.data)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

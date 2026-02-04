@@ -85,6 +85,15 @@ class FacetInfo:
 
 
 @dataclass
+class SchemaInfo:
+    """Information about a declared schema for validation."""
+
+    name: str
+    fields: set[str]  # Field names
+    location: SourceLocation | None = None
+
+
+@dataclass
 class StepInfo:
     """Information about a step within a block."""
 
@@ -101,7 +110,9 @@ class AFLValidator:
         self._facets: dict[str, FacetInfo] = {}  # All known facets by full name
         self._facets_by_short_name: dict[str, list[str]] = {}  # Short name -> list of full names
         self._namespaces: set[str] = set()  # All namespace names
-        self._schemas: dict[str, SourceLocation] = {}  # Schema names by full name
+        self._schemas: dict[str, SourceLocation] = {}  # Schema names by full name (for uniqueness)
+        self._schema_info: dict[str, SchemaInfo] = {}  # Full name -> SchemaInfo
+        self._schemas_by_short_name: dict[str, list[str]] = {}  # Short name -> [full names]
         self._current_namespace: str = ""
         self._current_imports: set[str] = set()  # Namespaces imported via 'use'
 
@@ -119,6 +130,8 @@ class AFLValidator:
         self._facets_by_short_name = {}
         self._namespaces = set()
         self._schemas = {}
+        self._schema_info = {}
+        self._schemas_by_short_name = {}
         self._current_namespace = ""
         self._current_imports = set()
 
@@ -137,7 +150,7 @@ class AFLValidator:
             self._namespaces.add(namespace.name)
 
     def _collect_facets(self, program: Program) -> None:
-        """Collect all facet definitions for reference validation."""
+        """Collect all facet and schema definitions for reference validation."""
         # Top-level declarations
         for facet in program.facets:
             self._register_facet(facet.sig)
@@ -145,6 +158,8 @@ class AFLValidator:
             self._register_facet(event_facet.sig)
         for workflow in program.workflows:
             self._register_facet(workflow.sig)
+        for schema in program.schemas:
+            self._register_schema(schema)
 
         # Namespace declarations
         for namespace in program.namespaces:
@@ -154,6 +169,8 @@ class AFLValidator:
                 self._register_facet(event_facet.sig, namespace.name)
             for workflow in namespace.workflows:
                 self._register_facet(workflow.sig, namespace.name)
+            for schema in namespace.schemas:
+                self._register_schema(schema, namespace.name)
 
     def _register_facet(self, sig: FacetSig, namespace: str = "") -> None:
         """Register a facet definition."""
@@ -171,6 +188,100 @@ class AFLValidator:
         if short_name not in self._facets_by_short_name:
             self._facets_by_short_name[short_name] = []
         self._facets_by_short_name[short_name].append(full_name)
+
+    def _register_schema(self, schema: SchemaDecl, namespace: str = "") -> None:
+        """Register a schema definition for instantiation validation."""
+        full_name = f"{namespace}.{schema.name}" if namespace else schema.name
+        fields = {f.name for f in schema.fields}
+        self._schema_info[full_name] = SchemaInfo(
+            name=schema.name,
+            fields=fields,
+            location=schema.location,
+        )
+        # Track by short name for ambiguity detection
+        short_name = schema.name
+        if short_name not in self._schemas_by_short_name:
+            self._schemas_by_short_name[short_name] = []
+        self._schemas_by_short_name[short_name].append(full_name)
+
+    def _resolve_schema_name(
+        self, name: str, location: SourceLocation | None = None
+    ) -> SchemaInfo | None:
+        """Resolve a schema name to its SchemaInfo, checking for ambiguity.
+
+        Resolution follows the same order as facets:
+        1. Fully qualified name (exact match)
+        2. Current namespace (takes precedence)
+        3. Imported namespaces (via 'use')
+        4. Top-level (no namespace)
+
+        Args:
+            name: The schema name (may be qualified or unqualified)
+            location: Source location for error reporting
+
+        Returns:
+            SchemaInfo if found unambiguously, None if not found
+        """
+        # If it's a fully qualified name, look it up directly
+        if "." in name:
+            if name in self._schema_info:
+                return self._schema_info[name]
+            return None
+
+        # Unqualified name
+        short_name = name
+
+        # Check current namespace first - local schemas take precedence
+        if self._current_namespace:
+            full_in_current = f"{self._current_namespace}.{short_name}"
+            if full_in_current in self._schema_info:
+                return self._schema_info[full_in_current]
+
+        # Check imported namespaces - collect candidates for ambiguity check
+        import_candidates: list[str] = []
+        for imported_ns in self._current_imports:
+            full_in_import = f"{imported_ns}.{short_name}"
+            if full_in_import in self._schema_info:
+                import_candidates.append(full_in_import)
+
+        # Check top-level (no namespace)
+        top_level_match = None
+        if short_name in self._schema_info:
+            all_matches = self._schemas_by_short_name.get(short_name, [])
+            if short_name in all_matches:
+                top_level_match = short_name
+
+        # Combine import candidates with top-level
+        candidates = import_candidates[:]
+        if top_level_match:
+            candidates.append(top_level_match)
+
+        # Check if ambiguous among imports/top-level
+        if len(candidates) > 1:
+            self._result.add_error(
+                f"Ambiguous schema reference '{short_name}': could be {', '.join(sorted(candidates))}. "
+                f"Use fully qualified name to disambiguate.",
+                location,
+            )
+            return None
+
+        if len(candidates) == 1:
+            return self._schema_info[candidates[0]]
+
+        # Not found in current scope or imports - try global lookup
+        all_matches = self._schemas_by_short_name.get(short_name, [])
+        if len(all_matches) == 1:
+            return self._schema_info[all_matches[0]]
+        elif len(all_matches) > 1:
+            self._result.add_error(
+                f"Ambiguous schema reference '{short_name}': could be {', '.join(sorted(all_matches))}. "
+                f"Use fully qualified name to disambiguate.",
+                location,
+            )
+            return None
+
+        # Not found anywhere
+        return None
 
     def _resolve_facet_name(
         self, name: str, location: SourceLocation | None = None
@@ -409,14 +520,25 @@ class AFLValidator:
                 steps[step.name] = StepInfo(
                     name=step.name, facet_name=step.call.name, location=step.location
                 )
-                # Get return attributes for this step's facet (with ambiguity check)
+                # Try to resolve as facet first, then as schema
                 facet_info = self._resolve_facet_name(step.call.name, step.call.location)
+                schema_info = None
                 if facet_info:
                     step_returns[step.name] = facet_info.returns
                 else:
-                    step_returns[step.name] = set()  # Unknown or ambiguous facet
+                    # Try to resolve as schema instantiation
+                    schema_info = self._resolve_schema_name(
+                        step.call.name, step.call.location
+                    )
+                    if schema_info:
+                        # Schema fields become the step's "returns" (accessible via step.field)
+                        step_returns[step.name] = schema_info.fields
+                        # Validate schema instantiation
+                        self._validate_schema_instantiation(step.call, schema_info)
+                    else:
+                        step_returns[step.name] = set()  # Unknown facet or schema
 
-            # Validate mixin references in step call
+            # Validate mixin references in step call (only for non-schema instantiations)
             for mixin in step.call.mixins:
                 self._resolve_facet_name(mixin.name, step.call.location)
 
@@ -556,6 +678,34 @@ class AFLValidator:
         self._validate_call_references(
             yield_stmt.call, input_attrs, steps, step_returns, foreach_var
         )
+
+    def _validate_schema_instantiation(self, call: CallExpr, schema_info: SchemaInfo) -> None:
+        """Validate a schema instantiation call.
+
+        Checks that:
+        1. All provided arguments are valid schema fields
+        2. No mixins are used (schemas don't support mixins)
+
+        Args:
+            call: The call expression instantiating the schema
+            schema_info: Information about the schema being instantiated
+        """
+        # Check that no mixins are used
+        if call.mixins:
+            self._result.add_error(
+                f"Schema instantiation '{call.name}' cannot have mixins. "
+                f"Schemas are simple data structures without mixin support.",
+                call.location,
+            )
+
+        # Check that all provided arguments are valid schema fields
+        for arg in call.args:
+            if arg.name not in schema_info.fields:
+                self._result.add_error(
+                    f"Unknown field '{arg.name}' for schema '{call.name}'. "
+                    f"Valid fields are: {sorted(schema_info.fields)}",
+                    arg.location,
+                )
 
     def _validate_schema_decl(self, schema: SchemaDecl) -> None:
         """Validate a schema declaration for field name uniqueness."""

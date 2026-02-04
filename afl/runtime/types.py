@@ -59,12 +59,14 @@ class ObjectType:
     - YieldAssignment: Minimal state machine (YieldStateChanger)
     - AndThen/Block: Block state machine (BlockStateChanger)
     - Workflow: Entry point, uses full state machine
+    - SchemaInstantiation: Simplified state machine for schema instantiation
     """
 
     VARIABLE_ASSIGNMENT = "VariableAssignment"
     YIELD_ASSIGNMENT = "YieldAssignment"
     WORKFLOW = "Workflow"
     FACET = "Facet"
+    SCHEMA_INSTANTIATION = "SchemaInstantiation"
 
     # Block types
     AND_THEN = "AndThen"

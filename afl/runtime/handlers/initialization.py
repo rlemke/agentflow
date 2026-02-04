@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
 from ..expression import EvaluationContext, evaluate_args
+from ..types import ObjectType
 from .base import StateHandler
 
 if TYPE_CHECKING:
@@ -78,9 +79,11 @@ class FacetInitializationBeginHandler(StateHandler):
             args = stmt_def.args
             evaluated = evaluate_args(args, ctx)
 
-            # Store evaluated attributes
+            # For schema instantiation, store values as returns (accessible via step.field)
+            # For facet calls, store values as params
+            is_schema = self.step.object_type == ObjectType.SCHEMA_INSTANTIATION
             for name, value in evaluated.items():
-                self.step.set_attribute(name, value)
+                self.step.set_attribute(name, value, is_return=is_schema)
 
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
