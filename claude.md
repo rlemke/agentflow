@@ -214,12 +214,15 @@ agentflow/
 │                   └── AgentPollerTest.java # JUnit 5 tests
 ├── examples/                   # Example agents and workflows
 │   └── osm-geocoder/           # OSM geocoding and data processing agent
-│       ├── afl/                # AFL source files (17 files)
+│       ├── afl/                # AFL source files (20 files)
 │       │   ├── geocoder.afl    # Schema, event facet, geocoding workflows
-│       │   ├── osmtypes.afl    # OSMCache schema
+│       │   ├── osmtypes.afl    # OSMCache, GraphHopperCache schemas
 │       │   ├── osmcache.afl    # ~250 cache event facets (11 namespaces)
 │       │   ├── osmoperations.afl # Download, Tile, RoutingGraph operations
 │       │   ├── osmpoi.afl      # POI extraction facets
+│       │   ├── osmgraphhopper.afl # GraphHopper routing graph operations
+│       │   ├── osmgraphhoppercache.afl # ~200 GraphHopper cache facets
+│       │   ├── osmgraphhopper_workflows.afl # Regional routing graph workflows
 │       │   ├── osmafrica.afl   # Africa workflow (cache + download steps)
 │       │   ├── osmasia.afl     # Asia workflow
 │       │   ├── osmaustralia.afl # Australia/Oceania workflow
@@ -232,11 +235,12 @@ agentflow/
 │       │   ├── osmcontinents.afl # Continents workflow
 │       │   ├── osmworld.afl    # World workflow (composes all regions)
 │       │   └── osmshapefiles.afl # Europe shapefile download workflow
-│       ├── handlers/           # Python event handlers (~272 facets)
+│       ├── handlers/           # Python event handlers (~480 facets)
 │       │   ├── __init__.py     # register_all_handlers(poller)
 │       │   ├── cache_handlers.py # ~250 region cache handlers (Geofabrik)
 │       │   ├── operations_handlers.py # 13 data processing handlers
-│       │   └── poi_handlers.py # 8 POI extraction handlers
+│       │   ├── poi_handlers.py # 8 POI extraction handlers
+│       │   └── graphhopper_handlers.py # ~200 GraphHopper routing handlers
 │       ├── agent.py            # Live agent (AgentPoller + Nominatim API)
 │       ├── test_geocoder.py    # Offline end-to-end test
 │       ├── requirements.txt    # Python dependencies (requests)
@@ -553,19 +557,25 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ 42 tests passing (protocol constants verification, serialization round-trips, poller unit tests)
 
 ### Completed (v0.5.3) - OSM Geocoder Example
-- ✅ 17 AFL source files defining geographic data processing workflows
-- ✅ `OSMCache` schema declaration (`osmtypes.afl`)
+- ✅ 20 AFL source files defining geographic data processing workflows
+- ✅ `OSMCache` and `GraphHopperCache` schema declarations (`osmtypes.afl`)
 - ✅ ~250 cache event facets across 11 geographic namespaces (`osmcache.afl`)
 - ✅ 13 operations event facets: Download, Tile, RoutingGraph, Status, PostGisImport, DownloadShapefile (plus *All variants) (`osmoperations.afl`)
 - ✅ 8 POI event facets: POI, Cities, Towns, Suburbs, Villages, Hamlets, Countries (`osmpoi.afl`)
+- ✅ **GraphHopper routing graph integration**:
+  - 6 operation facets: BuildGraph, BuildMultiProfile, BuildGraphAll, ImportGraph, ValidateGraph, CleanGraph (`osmgraphhopper.afl`)
+  - ~200 per-region cache facets across 9 namespaces (`osmgraphhoppercache.afl`)
+  - Regional workflow compositions: BuildMajorEuropeGraphs, BuildNorthAmericaGraphs, BuildWestCoastGraphs, BuildEastCoastGraphs (`osmgraphhopper_workflows.afl`)
+  - `recreate` flag parameter to control graph rebuilding (default: use cached graph if exists)
+  - Supports routing profiles: car, bike, foot, motorcycle, truck, hike, mtb, racingbike
 - ✅ Regional workflows composing cache lookups with download operations (Africa, Asia, Australia, Canada, Central America, Europe, North America, South America, United States, Continents)
 - ✅ Shapefile download workflow for Europe (`osmshapefiles.afl`) — reuses cache facets, routes through `DownloadShapefile`
 - ✅ World workflow orchestrating all regional workflows (`osmworld.afl`)
 - ✅ Python handler modules with Geofabrik URL registry and factory-pattern handler generation
 - ✅ Multi-format downloader: `download(region, fmt="pbf"|"shp")` supports PBF (default) and Geofabrik free shapefiles
-- ✅ `register_all_handlers(poller)` for batch registration of ~272 event facet handlers
-- ✅ Agent updated to handle geocoding + all OSM data events
-- ✅ 788 tests passing, 89% code coverage
+- ✅ `register_all_handlers(poller)` for batch registration of ~480 event facet handlers
+- ✅ Agent updated to handle geocoding + all OSM data events + GraphHopper routing
+- ✅ 879 tests passing
 
 ### Completed (v0.7.0) - LLM Integration & Multi-Language Agents
 - ✅ **Async AgentPoller**: `register_async()` for async/await handlers (LLM integration)
