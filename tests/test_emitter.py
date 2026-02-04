@@ -122,6 +122,78 @@ class TestWorkflowBody:
         assert body["foreach"]["iterable"] == {"type": "InputRef", "path": ["items"]}
 
 
+class TestScriptBlockEmission:
+    """Test script block emission."""
+
+    def test_script_block_simple(self, emitter):
+        """Script block with code."""
+        ast = parse('facet Test() script "x = 1"')
+        data = emitter.emit_dict(ast)
+
+        f = data["facets"][0]
+        body = f["body"]
+        assert body["type"] == "ScriptBlock"
+        assert body["language"] == "python"
+        assert body["code"] == "x = 1"
+
+    def test_script_block_includes_id(self, emitter):
+        """Script block should have an id."""
+        ast = parse('facet Test() script "pass"')
+        data = emitter.emit_dict(ast)
+
+        body = data["facets"][0]["body"]
+        assert "id" in body
+
+    def test_script_block_event_facet(self, emitter):
+        """Script block in event facet."""
+        ast = parse('event facet Test() script "result = {}"')
+        data = emitter.emit_dict(ast)
+
+        body = data["eventFacets"][0]["body"]
+        assert body["type"] == "ScriptBlock"
+
+
+class TestPromptBlockEmission:
+    """Test prompt block emission."""
+
+    def test_prompt_block_template_only(self, emitter):
+        """Prompt block with only template."""
+        ast = parse('event facet Test() prompt { template "hello" }')
+        data = emitter.emit_dict(ast)
+
+        ef = data["eventFacets"][0]
+        body = ef["body"]
+        assert body["type"] == "PromptBlock"
+        assert body["template"] == "hello"
+        assert "system" not in body
+        assert "model" not in body
+
+    def test_prompt_block_all_directives(self, emitter):
+        """Prompt block with all directives."""
+        source = '''event facet Test()
+prompt {
+    system "sys"
+    template "tmpl"
+    model "model-id"
+}'''
+        ast = parse(source)
+        data = emitter.emit_dict(ast)
+
+        body = data["eventFacets"][0]["body"]
+        assert body["type"] == "PromptBlock"
+        assert body["system"] == "sys"
+        assert body["template"] == "tmpl"
+        assert body["model"] == "model-id"
+
+    def test_prompt_block_includes_id(self, emitter):
+        """Prompt block should have an id."""
+        ast = parse('event facet Test() prompt { template "x" }')
+        data = emitter.emit_dict(ast)
+
+        body = data["eventFacets"][0]["body"]
+        assert "id" in body
+
+
 class TestReferences:
     """Test reference emission."""
 

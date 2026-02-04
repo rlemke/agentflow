@@ -42,9 +42,23 @@ array_type: "[" type "]"
 
 mixin_sig: "with" QNAME "(" [named_args] ")"
 
-// andThen blocks
+// andThen blocks, prompt blocks, and script blocks
 facet_def_tail: "andThen" foreach_clause? block
+              | _NL* "prompt" prompt_block
+              | _NL* "script" script_block
+
 foreach_clause: "foreach" IDENT "in" reference
+
+// Prompt blocks for LLM-based event facets
+prompt_block: "{" _NL* prompt_body "}"
+prompt_body: (prompt_directive _NL*)*
+prompt_directive: "system" STRING -> prompt_system
+                | "template" STRING -> prompt_template
+                | "model" STRING -> prompt_model
+
+// Script blocks for inline code execution
+script_block: STRING
+            | _NL* "python" STRING -> script_python
 
 block: "{" _NL* block_body "}"
 block_body: (step_stmt _NL*)* (yield_stmt _NL*)*

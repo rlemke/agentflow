@@ -762,6 +762,127 @@ class TestEventFacetValidation:
         assert any("Unknown facet" in str(e) for e in result.errors)
 
 
+class TestScriptBlockValidation:
+    """Test script block validation."""
+
+    def test_script_block_valid(self, validator):
+        """Valid script block passes validation."""
+        ast = parse('facet Test() script "x = 1"')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_script_block_empty_code(self, validator):
+        """Script block with empty code should fail."""
+        ast = parse('facet Test() script ""')
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("must contain code" in str(e) for e in result.errors)
+
+    def test_script_block_whitespace_only(self, validator):
+        """Script block with only whitespace should fail."""
+        ast = parse('facet Test() script "   "')
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("must contain code" in str(e) for e in result.errors)
+
+    def test_script_block_event_facet(self, validator):
+        """Event facet with script block validates."""
+        ast = parse('event facet Process() script "result = {}"')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_script_block_with_params(self, validator):
+        """Script block with params validates."""
+        ast = parse(r'facet Transform(x: String) => (y: String) script "result[\"y\"] = params[\"x\"]"')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+
+class TestPromptBlockValidation:
+    """Test prompt block validation."""
+
+    def test_prompt_block_valid(self, validator):
+        """Valid prompt block passes validation."""
+        ast = parse('''event facet Test(x: String) => (y: String)
+prompt {
+    system "System prompt"
+    template "Process {x}"
+    model "claude"
+}''')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_prompt_block_missing_template(self, validator):
+        """Prompt block without template should fail."""
+        ast = parse('''event facet Test(x: String)
+prompt {
+    system "Only system"
+}''')
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("template" in str(e) for e in result.errors)
+
+    def test_prompt_block_invalid_placeholder(self, validator):
+        """Prompt block with invalid placeholder should fail."""
+        ast = parse('''event facet Test(x: String)
+prompt {
+    template "Value is {invalid_param}"
+}''')
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("invalid_param" in str(e) for e in result.errors)
+
+    def test_prompt_block_valid_placeholder(self, validator):
+        """Prompt block with valid placeholder should pass."""
+        ast = parse('''event facet Test(myParam: String)
+prompt {
+    template "Value is {myParam}"
+}''')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_prompt_block_multiple_placeholders(self, validator):
+        """Prompt block can use multiple placeholders."""
+        ast = parse('''event facet Test(a: String, b: String, c: Int)
+prompt {
+    template "{a} and {b} make {c}"
+}''')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_prompt_block_placeholder_in_system(self, validator):
+        """Placeholders in system prompt are also validated."""
+        ast = parse('''event facet Test(role: String)
+prompt {
+    system "You are a {role}."
+    template "Do something"
+}''')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_prompt_block_invalid_placeholder_in_system(self, validator):
+        """Invalid placeholder in system prompt should fail."""
+        ast = parse('''event facet Test(x: String)
+prompt {
+    system "You are a {undefined_role}."
+    template "{x}"
+}''')
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("undefined_role" in str(e) for e in result.errors)
+
+    def test_prompt_block_in_namespace(self, validator):
+        """Prompt block inside namespace is validated."""
+        ast = parse('''namespace ns {
+    event facet Query(q: String) => (answer: String)
+    prompt {
+        template "Question: {q}"
+    }
+}''')
+        result = validator.validate(ast)
+        assert result.is_valid
+
+
 class TestErrorLocation:
     """Test that validation errors include location information."""
 

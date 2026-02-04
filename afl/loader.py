@@ -16,16 +16,27 @@
 
 Provides loading functionality for:
 - File system sources
-- MongoDB sources (stub)
-- Maven artifacts (stub)
+- MongoDB sources
+- Maven artifacts
 """
 
+from __future__ import annotations
+
+import io
+import urllib.request
+import zipfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .source import (
     FileOrigin,
+    MavenOrigin,
+    MongoDBOrigin,
     SourceEntry,
 )
+
+if TYPE_CHECKING:
+    from .config import AFLConfig
 
 
 class SourceLoader:
@@ -59,23 +70,65 @@ class SourceLoader:
         collection_id: str,
         display_name: str,
         is_library: bool = True,
+        config: AFLConfig | None = None,
     ) -> SourceEntry:
-        """Load source from MongoDB.
+        """Load source from MongoDB flows collection.
+
+        Queries the flows collection for a document with the given UUID,
+        then assembles source text from its sources array (filtering for AFL).
 
         Args:
-            collection_id: MongoDB document ID
-            display_name: Human-readable name
+            collection_id: MongoDB document UUID (flows collection)
+            display_name: Human-readable name for provenance
             is_library: Whether this is a library source
+            config: AFL configuration (uses default if not provided)
 
         Returns:
-            SourceEntry with content and provenance
+            SourceEntry with assembled content and provenance
 
         Raises:
-            NotImplementedError: MongoDB loader not yet implemented
+            ValueError: If flow not found or contains no AFL sources
+            ImportError: If pymongo is not installed
         """
-        raise NotImplementedError(
-            "MongoDB loader not yet implemented. "
-            f"Would load document '{collection_id}' ({display_name})"
+        try:
+            from pymongo import MongoClient
+        except ImportError:
+            raise ImportError(
+                "pymongo is required for MongoDB source loading. "
+                "Install with: pip install pymongo"
+            )
+
+        from .config import load_config
+
+        cfg = config if config is not None else load_config()
+        client = MongoClient(cfg.mongodb.url)
+        db = client[cfg.mongodb.database]
+
+        # Query flows collection by UUID
+        flow = db.flows.find_one({"uuid": collection_id})
+        if flow is None:
+            raise ValueError(f"Flow not found: {collection_id}")
+
+        # Assemble source text from sources array
+        sources = flow.get("sources", [])
+        afl_sources = [
+            s.get("content", "")
+            for s in sources
+            if s.get("language") == "afl"
+        ]
+
+        if not afl_sources:
+            raise ValueError(
+                f"Flow '{collection_id}' contains no AFL sources"
+            )
+
+        text = "\n".join(afl_sources)
+        client.close()
+
+        return SourceEntry(
+            text=text,
+            origin=MongoDBOrigin(collection_id=collection_id, display_name=display_name),
+            is_library=is_library,
         )
 
     @staticmethod
@@ -83,27 +136,77 @@ class SourceLoader:
         group_id: str,
         artifact_id: str,
         version: str,
-        classifier: str = "",
+        classifier: str = "sources",
         is_library: bool = True,
+        repository_url: str = "https://repo1.maven.org/maven2",
     ) -> SourceEntry:
         """Load source from Maven repository.
+
+        Downloads the artifact JAR from Maven Central (or specified repo),
+        extracts all .afl files from it, and assembles them into a single source.
 
         Args:
             group_id: Maven group ID (e.g., "com.example")
             artifact_id: Maven artifact ID (e.g., "my-lib")
             version: Maven version (e.g., "1.0.0")
-            classifier: Optional classifier (e.g., "sources")
+            classifier: Classifier (default: "sources")
             is_library: Whether this is a library source
+            repository_url: Maven repository URL
 
         Returns:
-            SourceEntry with content and provenance
+            SourceEntry with assembled content and provenance
 
         Raises:
-            NotImplementedError: Maven loader not yet implemented
+            ValueError: If artifact not found or contains no AFL sources
+            urllib.error.URLError: If download fails
         """
-        coords = f"{group_id}:{artifact_id}:{version}"
+        # Build Maven Central URL
+        group_path = group_id.replace(".", "/")
+        jar_name = f"{artifact_id}-{version}"
         if classifier:
-            coords += f":{classifier}"
-        raise NotImplementedError(
-            f"Maven loader not yet implemented. Would load artifact '{coords}'"
+            jar_name += f"-{classifier}"
+        url = f"{repository_url}/{group_path}/{artifact_id}/{version}/{jar_name}.jar"
+
+        # Download JAR
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                jar_bytes = response.read()
+        except urllib.error.HTTPError as e:
+            coords = f"{group_id}:{artifact_id}:{version}"
+            if classifier:
+                coords += f":{classifier}"
+            raise ValueError(
+                f"Failed to download artifact '{coords}': HTTP {e.code}"
+            ) from e
+
+        # Extract AFL sources from JAR
+        afl_sources: list[str] = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(jar_bytes)) as zf:
+                for name in sorted(zf.namelist()):  # sorted for deterministic order
+                    if name.endswith(".afl"):
+                        content = zf.read(name).decode("utf-8")
+                        afl_sources.append(content)
+        except zipfile.BadZipFile as e:
+            raise ValueError(f"Invalid JAR file from {url}") from e
+
+        if not afl_sources:
+            coords = f"{group_id}:{artifact_id}:{version}"
+            if classifier:
+                coords += f":{classifier}"
+            raise ValueError(
+                f"No .afl files found in artifact '{coords}'"
+            )
+
+        text = "\n".join(afl_sources)
+
+        return SourceEntry(
+            text=text,
+            origin=MavenOrigin(
+                group_id=group_id,
+                artifact_id=artifact_id,
+                version=version,
+                classifier=classifier,
+            ),
+            is_library=is_library,
         )

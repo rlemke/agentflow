@@ -238,11 +238,11 @@ def main(args: list[str] | None = None) -> int:
             doc_id, display_name = mongo_spec.split(":", 1)
             entry = SourceLoader.load_mongodb(doc_id, display_name, is_library=True)
             compiler_input.library_sources.append(entry)
-        except NotImplementedError as e:
+        except (NotImplementedError, ValueError, Exception) as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
 
-    # Handle --maven sources (stub)
+    # Handle --maven sources
     for maven_spec in parsed.maven_sources or []:
         try:
             parts = maven_spec.split(":")
@@ -259,7 +259,7 @@ def main(args: list[str] | None = None) -> int:
                 group_id, artifact_id, version, classifier, is_library=True
             )
             compiler_input.library_sources.append(entry)
-        except NotImplementedError as e:
+        except (NotImplementedError, ValueError, Exception) as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
 

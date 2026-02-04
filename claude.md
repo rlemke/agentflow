@@ -130,8 +130,11 @@ agentflow/
 │   │   ├── test_evaluator.py   # Integration tests for spec examples
 │   │   ├── test_runner_service.py # Distributed runner service tests
 │   │   ├── test_agent_poller.py # AgentPoller library tests
+│   │   ├── test_agent_poller_async.py # Async handler tests
 │   │   ├── test_agent_poller_extended.py # AgentPoller edge case tests
+│   │   ├── test_script_executor.py # Sandboxed script execution tests
 │   │   └── test_addone_agent.py # AddOne agent integration test
+│   ├── test_loader.py          # MongoDB and Maven source loader tests
 │   ├── mcp/                    # MCP server tests
 │   │   ├── test_server.py      # Tool + resource integration tests
 │   │   ├── test_server_extended.py # Continue/resume/resource edge cases
@@ -150,25 +153,65 @@ agentflow/
 │   ├── templates/              # Standalone files for new agent repos
 │   │   ├── CLAUDE.md           # Drop-in CLAUDE.md with full protocol reference
 │   │   └── README.md           # Instructions for using the templates
-│   └── scala/
-│       └── afl-agent/          # Scala agent library (sbt project)
-│           ├── build.sbt       # Scala 3.3.x, mongo-scala-driver, scalatest
-│           ├── project/
-│           │   └── build.properties
-│           ├── src/main/scala/afl/agent/
-│           │   ├── Protocol.scala          # Constants matching constants.json
-│           │   ├── AgentPollerConfig.scala  # Config case class with JSON/env loading
-│           │   ├── AgentPoller.scala        # Poll loop, handler registration, lifecycle
-│           │   ├── MongoOps.scala           # MongoDB operations (claim, read, write, resume)
-│           │   ├── ServerRegistration.scala # Server register/deregister/heartbeat
-│           │   └── model/
-│           │       ├── TaskDocument.scala       # Task BSON codec
-│           │       ├── StepAttributes.scala     # Step params/returns extraction
-│           │       └── ServerDocument.scala      # Server BSON codec
-│           └── src/test/scala/afl/agent/
-│               ├── ProtocolSpec.scala       # Constants verified against constants.json
-│               ├── MongoOpsSpec.scala        # TaskDocument serialization tests
-│               └── AgentPollerSpec.scala     # Poller + config + attributes tests
+│   ├── scala/
+│   │   └── afl-agent/          # Scala agent library (sbt project)
+│   │       ├── build.sbt       # Scala 3.3.x, mongo-scala-driver, scalatest
+│   │       ├── project/
+│   │       │   └── build.properties
+│   │       ├── src/main/scala/afl/agent/
+│   │       │   ├── Protocol.scala          # Constants matching constants.json
+│   │       │   ├── AgentPollerConfig.scala  # Config case class with JSON/env loading
+│   │       │   ├── AgentPoller.scala        # Poll loop, handler registration, lifecycle
+│   │       │   ├── MongoOps.scala           # MongoDB operations (claim, read, write, resume)
+│   │       │   ├── ServerRegistration.scala # Server register/deregister/heartbeat
+│   │       │   └── model/
+│   │       │       ├── TaskDocument.scala       # Task BSON codec
+│   │       │       ├── StepAttributes.scala     # Step params/returns extraction
+│   │       │       └── ServerDocument.scala      # Server BSON codec
+│   │       └── src/test/scala/afl/agent/
+│   │           ├── ProtocolSpec.scala       # Constants verified against constants.json
+│   │           ├── MongoOpsSpec.scala        # TaskDocument serialization tests
+│   │           └── AgentPollerSpec.scala     # Poller + config + attributes tests
+│   ├── go/
+│   │   └── afl-agent/          # Go agent library
+│   │       ├── go.mod          # Module definition
+│   │       ├── protocol.go     # Constants matching constants.json
+│   │       ├── config.go       # Config struct with JSON/env loading
+│   │       ├── models.go       # TaskDocument, StepDocument, ServerDocument
+│   │       ├── mongo_ops.go    # MongoDB operations
+│   │       ├── server_registration.go # Server lifecycle
+│   │       ├── poller.go       # AgentPoller with goroutine pool
+│   │       └── poller_test.go  # Unit tests
+│   ├── typescript/
+│   │   └── afl-agent/          # TypeScript/Node.js agent library
+│   │       ├── package.json    # npm package definition
+│   │       ├── tsconfig.json   # TypeScript configuration
+│   │       └── src/
+│   │           ├── index.ts    # Package exports
+│   │           ├── protocol.ts # Constants
+│   │           ├── config.ts   # AgentPollerConfig
+│   │           ├── models.ts   # Document types
+│   │           ├── mongo-ops.ts # MongoDB operations
+│   │           ├── server-registration.ts # Server lifecycle
+│   │           ├── poller.ts   # AgentPoller with async/await
+│   │           └── poller.test.ts # Jest tests
+│   └── java/
+│       └── afl-agent/          # Java agent library
+│           ├── pom.xml         # Maven configuration
+│           └── src/
+│               ├── main/java/afl/agent/
+│               │   ├── Protocol.java       # Static constants
+│               │   ├── AgentPollerConfig.java # Config record
+│               │   ├── AgentPoller.java    # Poller with ExecutorService
+│               │   ├── Handler.java        # Functional interface
+│               │   ├── MongoOps.java       # MongoDB operations
+│               │   ├── ServerRegistration.java # Server lifecycle
+│               │   └── model/
+│               │       ├── TaskDocument.java
+│               │       ├── StepAttribute.java
+│               │       └── ServerDocument.java
+│               └── test/java/afl/agent/
+│                   └── AgentPollerTest.java # JUnit 5 tests
 ├── examples/                   # Example agents and workflows
 │   └── osm-geocoder/           # OSM geocoding and data processing agent
 │       ├── afl/                # AFL source files (17 files)
@@ -524,6 +567,34 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ Agent updated to handle geocoding + all OSM data events
 - ✅ 788 tests passing, 89% code coverage
 
+### Completed (v0.7.0) - LLM Integration & Multi-Language Agents
+- ✅ **Async AgentPoller**: `register_async()` for async/await handlers (LLM integration)
+- ✅ **Partial results**: `update_step()` for streaming handler output
+- ✅ **Prompt templates**: `prompt {}` block syntax for LLM-based event facets
+  - `system`, `template`, `model` directives
+  - Placeholder validation (`{param_name}` must match facet parameters)
+- ✅ **Script blocks**: `script {}` block syntax for inline Python execution
+  - Sandboxed execution with restricted built-ins
+  - `params` dict for input, `result` dict for output
+- ✅ **Source loaders**: MongoDB and Maven source loading implemented
+  - `SourceLoader.load_mongodb(collection_id, display_name)` for flows collection
+  - `SourceLoader.load_maven(group_id, artifact_id, version, classifier)` for Maven Central
+  - CLI: `--mongo UUID:Name` and `--maven group:artifact:version[:classifier]`
+- ✅ **Go agent library** (`agents/go/afl-agent/`):
+  - `AgentPoller` with goroutine pool for concurrency
+  - `MongoOps`, `ServerRegistration`, `Config` modules
+  - Short name fallback for handler lookup
+  - 6 tests passing
+- ✅ **TypeScript agent library** (`agents/typescript/afl-agent/`):
+  - `AgentPoller` with async/await and `setInterval` polling
+  - Full npm package with Jest tests
+  - `resolveConfig()` for standard config resolution
+- ✅ **Java agent library** (`agents/java/afl-agent/`):
+  - `AgentPoller` with `ExecutorService` for concurrency
+  - Maven project with JUnit 5 tests
+  - `Handler` functional interface for lambda registration
+- ✅ 879 tests passing
+
 ### MCP Protocol Messages
 
 The MCP server uses JSON-RPC 2.0 over stdio. The following protocol messages are relevant:
@@ -574,7 +645,7 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 | Schemas | `SchemaField`, `ArrayType` |
 | Signatures | `FacetSig`, `Parameter`, `TypeRef`, `ReturnClause` |
 | Mixins | `MixinSig`, `MixinCall` |
-| Blocks | `AndThenBlock`, `Block`, `ForeachClause` |
+| Blocks | `AndThenBlock`, `Block`, `ForeachClause`, `PromptBlock`, `ScriptBlock` |
 | Statements | `StepStmt`, `YieldStmt` |
 | Expressions | `CallExpr`, `NamedArg`, `Reference`, `Literal` |
 | Metadata | `SourceLocation`, `ASTNode` |
@@ -614,7 +685,10 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **Yield**: Final output merge statement in a block
 - **Schema**: Named typed structure for defining JSON shapes; usable as a type in parameter signatures
 - **ArrayType**: Array type syntax `[ElementType]` for schema fields and parameters
+- **PromptBlock**: Block syntax for LLM-based event facets with `system`, `template`, and `model` directives
+- **ScriptBlock**: Block syntax for inline sandboxed Python execution in facets
 - **Provenance**: Metadata tracking where source code originated (file, MongoDB, Maven)
+- **Source Loader**: Utility for loading AFL sources from different locations (file, MongoDB, Maven Central)
 
 ### Runtime terms
 - **StepDefinition**: Runtime representation of a step with state and attributes
@@ -636,10 +710,11 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **MCP Server**: Model Context Protocol server exposing AFL tools and resources to LLM agents
 
 ### Agent integration library terms
-- **Agent Integration Library**: Language-specific library for building AFL agents (currently: Python AgentPoller, Scala afl-agent)
+- **Agent Integration Library**: Language-specific library for building AFL agents (Python, Scala, Go, TypeScript, Java)
 - **Protocol Constants**: Shared constants (`agents/protocol/constants.json`) defining collection names, state values, document schemas, and MongoDB operations for cross-language interoperability
 - **afl:resume**: Protocol task inserted by external agents after writing step returns; signals the Python RunnerService to resume the workflow
 - **afl:execute**: Protocol task for executing a compiled workflow from a flow stored in MongoDB
+- **Async Handler**: Handler function that returns a coroutine/Promise/Future; supported in Python (`register_async`), TypeScript, and Java
 
 ### MCP terms
 - **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication

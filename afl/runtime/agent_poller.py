@@ -38,16 +38,26 @@ Example usage::
 
     poller.register("ns.CountDocuments", count_documents)
     poller.start()  # blocks until stopped
+
+For async handlers (e.g., LLM-based handlers)::
+
+    async def llm_handler(payload: dict) -> dict:
+        response = await openai.chat.completions.create(...)
+        return {"response": response}
+
+    poller.register_async("ns.LLMQuery", llm_handler)
 """
 
+import asyncio
+import inspect
 import logging
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 from .entities import (
     ServerDefinition,
@@ -59,6 +69,11 @@ from .persistence import PersistenceAPI
 from .types import generate_id
 
 logger = logging.getLogger(__name__)
+
+# Type aliases for sync and async callbacks
+SyncCallback = Callable[[dict], dict]
+AsyncCallback = Callable[[dict], Awaitable[dict]]
+AnyCallback = Union[SyncCallback, AsyncCallback]
 
 
 def _current_time_ms() -> int:
@@ -103,7 +118,7 @@ class AgentPoller:
         self._config = config or AgentPollerConfig()
 
         self._server_id = generate_id()
-        self._handlers: dict[str, Callable[[dict], dict]] = {}
+        self._handlers: dict[str, AnyCallback] = {}
         self._running = False
         self._stopping = threading.Event()
         self._executor: ThreadPoolExecutor | None = None
@@ -125,12 +140,25 @@ class AgentPoller:
     # Registration
     # =========================================================================
 
-    def register(self, facet_name: str, callback: Callable[[dict], dict]) -> None:
-        """Register a callback for a qualified facet name.
+    def register(self, facet_name: str, callback: SyncCallback) -> None:
+        """Register a synchronous callback for a qualified facet name.
 
         Args:
             facet_name: Qualified event facet name (e.g. "ns.CountDocuments")
-            callback: Function (payload_dict) -> result_dict.
+            callback: Sync function (payload_dict) -> result_dict.
+                      Raise an exception to signal failure.
+        """
+        self._handlers[facet_name] = callback
+
+    def register_async(self, facet_name: str, callback: AsyncCallback) -> None:
+        """Register an async callback for a qualified facet name.
+
+        Async callbacks are useful for LLM-based handlers that need to await
+        API calls. The callback will be invoked with asyncio.run().
+
+        Args:
+            facet_name: Qualified event facet name (e.g. "ns.LLMQuery")
+            callback: Async function (payload_dict) -> result_dict.
                       Raise an exception to signal failure.
         """
         self._handlers[facet_name] = callback
@@ -138,6 +166,60 @@ class AgentPoller:
     def registered_names(self) -> list[str]:
         """Return the list of registered facet names."""
         return list(self._handlers.keys())
+
+    def update_step(self, step_id: str, partial_result: dict) -> None:
+        """Update a step with partial results (for streaming handlers).
+
+        This method can be called from within a handler to incrementally
+        update the step's return attributes before final completion.
+        Useful for streaming LLM responses.
+
+        Args:
+            step_id: The step ID to update
+            partial_result: Dict of return attribute names to values to merge
+
+        Raises:
+            ValueError: If step is not found
+        """
+        from .step import FacetAttributes
+
+        step = self._persistence.get_step(step_id)
+        if not step:
+            raise ValueError(f"Step not found: {step_id}")
+
+        if step.attributes is None:
+            step.attributes = FacetAttributes()
+        if step.attributes.returns is None:
+            step.attributes.returns = {}
+
+        # Merge partial results into existing returns
+        for name, value in partial_result.items():
+            step.attributes.returns[name] = {
+                "name": name,
+                "value": value,
+                "type_hint": self._infer_type_hint(value),
+            }
+
+        self._persistence.save_step(step)
+
+    def _infer_type_hint(self, value: object) -> str:
+        """Infer type hint from a Python value."""
+        if isinstance(value, bool):
+            return "Boolean"
+        elif isinstance(value, int):
+            return "Long"
+        elif isinstance(value, float):
+            return "Double"
+        elif isinstance(value, str):
+            return "String"
+        elif isinstance(value, list):
+            return "List"
+        elif isinstance(value, dict):
+            return "Map"
+        elif value is None:
+            return "Any"
+        else:
+            return "Any"
 
     # =========================================================================
     # Lifecycle
@@ -415,8 +497,11 @@ class AgentPoller:
                 )
                 return
 
-            # Invoke callback
-            result = callback(payload)
+            # Invoke callback (handle both sync and async)
+            if inspect.iscoroutinefunction(callback):
+                result = asyncio.run(callback(payload))
+            else:
+                result = callback(payload)
 
             # Continue the step with the result
             self._evaluator.continue_step(task.step_id, result)

@@ -24,6 +24,8 @@ Validates AST for semantic correctness:
 
 from dataclasses import dataclass, field
 
+import re
+
 from .ast import (
     AndThenBlock,
     CallExpr,
@@ -32,8 +34,10 @@ from .ast import (
     FacetSig,
     Namespace,
     Program,
+    PromptBlock,
     Reference,
     SchemaDecl,
+    ScriptBlock,
     SourceLocation,
     WorkflowDecl,
     YieldStmt,
@@ -463,7 +467,10 @@ class AFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         if decl.body:
-            self._validate_and_then_block(decl.body, decl.sig)
+            if isinstance(decl.body, ScriptBlock):
+                self._validate_script_block(decl.body, decl.sig)
+            else:
+                self._validate_and_then_block(decl.body, decl.sig)
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
@@ -471,7 +478,67 @@ class AFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         if decl.body:
-            self._validate_and_then_block(decl.body, decl.sig)
+            if isinstance(decl.body, PromptBlock):
+                self._validate_prompt_block(decl.body, decl.sig)
+            elif isinstance(decl.body, ScriptBlock):
+                self._validate_script_block(decl.body, decl.sig)
+            else:
+                self._validate_and_then_block(decl.body, decl.sig)
+
+    def _validate_prompt_block(self, block: PromptBlock, sig: FacetSig) -> None:
+        """Validate a prompt block.
+
+        Checks:
+        1. At least a template directive is present
+        2. Placeholder references {param_name} match facet parameters
+        """
+        # Require at least a template
+        if block.template is None:
+            self._result.add_error(
+                "Prompt block must have a 'template' directive",
+                block.location,
+            )
+            return
+
+        # Get valid parameter names
+        param_names = {p.name for p in sig.params}
+
+        # Find all {placeholder} references in template and system
+        placeholder_pattern = re.compile(r"\{(\w+)\}")
+
+        for text, directive_name in [(block.template, "template"), (block.system, "system")]:
+            if text is None:
+                continue
+            for match in placeholder_pattern.finditer(text):
+                placeholder = match.group(1)
+                if placeholder not in param_names:
+                    self._result.add_error(
+                        f"Invalid placeholder '{{{placeholder}}}' in {directive_name}: "
+                        f"no parameter named '{placeholder}'. "
+                        f"Valid parameters are: {sorted(param_names)}",
+                        block.location,
+                    )
+
+    def _validate_script_block(self, block: ScriptBlock, sig: FacetSig) -> None:
+        """Validate a script block.
+
+        Checks:
+        1. Code is not empty
+        2. Language is supported (currently only 'python')
+        """
+        if not block.code or not block.code.strip():
+            self._result.add_error(
+                "Script block must contain code",
+                block.location,
+            )
+            return
+
+        if block.language not in ("python",):
+            self._result.add_error(
+                f"Unsupported script language '{block.language}'. "
+                f"Currently only 'python' is supported.",
+                block.location,
+            )
 
     def _validate_workflow_decl(self, decl: WorkflowDecl) -> None:
         """Validate a workflow declaration."""

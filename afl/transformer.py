@@ -34,10 +34,12 @@ from .ast import (
     Namespace,
     Parameter,
     Program,
+    PromptBlock,
     Reference,
     ReturnClause,
     SchemaDecl,
     SchemaField,
+    ScriptBlock,
     SourceLocation,
     StepStmt,
     TypeRef,
@@ -253,7 +255,7 @@ class AFLTransformer(Transformer):
         return ForeachClause(variable=var, iterable=ref, location=self._loc(meta))
 
     @v_args(meta=True)
-    def facet_def_tail(self, meta, items: list) -> AndThenBlock:
+    def facet_def_tail(self, meta, items: list) -> AndThenBlock | PromptBlock | ScriptBlock:
         foreach = None
         block = None
         for item in items:
@@ -261,7 +263,61 @@ class AFLTransformer(Transformer):
                 foreach = item
             elif isinstance(item, Block):
                 block = item
+            elif isinstance(item, PromptBlock):
+                return item
+            elif isinstance(item, ScriptBlock):
+                return item
         return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+
+    # Prompt block handling
+    @v_args(meta=True)
+    def prompt_block(self, meta, items: list) -> PromptBlock:
+        """Convert prompt_block rule to PromptBlock AST node."""
+        system = None
+        template = None
+        model = None
+        # Flatten items - prompt_body returns a list, so items may be nested
+        directives = items[0] if items and isinstance(items[0], list) else items
+        for item in directives:
+            if isinstance(item, tuple):
+                key, value = item
+                if key == "system":
+                    system = value
+                elif key == "template":
+                    template = value
+                elif key == "model":
+                    model = value
+        return PromptBlock(system=system, template=template, model=model, location=self._loc(meta))
+
+    def prompt_body(self, items: list) -> list:
+        """Collect prompt directives."""
+        return list(items)
+
+    @v_args(meta=True, inline=True)
+    def prompt_system(self, meta, value: str) -> tuple[str, str]:
+        """Handle system directive."""
+        return ("system", value)
+
+    @v_args(meta=True, inline=True)
+    def prompt_template(self, meta, value: str) -> tuple[str, str]:
+        """Handle template directive."""
+        return ("template", value)
+
+    @v_args(meta=True, inline=True)
+    def prompt_model(self, meta, value: str) -> tuple[str, str]:
+        """Handle model directive."""
+        return ("model", value)
+
+    # Script block handling
+    @v_args(meta=True, inline=True)
+    def script_block(self, meta, code: str) -> ScriptBlock:
+        """Convert script_block rule (bare string) to ScriptBlock AST node."""
+        return ScriptBlock(language="python", code=code, location=self._loc(meta))
+
+    @v_args(meta=True, inline=True)
+    def script_python(self, meta, code: str) -> ScriptBlock:
+        """Handle explicit 'python' script directive."""
+        return ScriptBlock(language="python", code=code, location=self._loc(meta))
 
     # Return clause
     @v_args(meta=True)

@@ -94,6 +94,138 @@ class TestEventFacets:
         assert ef.sig.returns is not None
 
 
+class TestScriptBlocks:
+    """Test script block parsing for inline code execution."""
+
+    def test_script_block_simple(self, parser):
+        """Parse facet with simple script block."""
+        from afl.ast import ScriptBlock
+
+        ast = parser.parse('facet Test() script "result = params"')
+        assert len(ast.facets) == 1
+        f = ast.facets[0]
+        assert f.body is not None
+        assert isinstance(f.body, ScriptBlock)
+        assert f.body.language == "python"
+        assert f.body.code == "result = params"
+
+    def test_script_block_explicit_python(self, parser):
+        """Parse script block with explicit python directive."""
+        from afl.ast import ScriptBlock
+
+        source = '''facet Test()
+script
+    python "result = params"'''
+        ast = parser.parse(source)
+        f = ast.facets[0]
+        assert isinstance(f.body, ScriptBlock)
+        assert f.body.language == "python"
+        assert f.body.code == "result = params"
+
+    def test_script_block_with_params_and_returns(self, parser):
+        """Parse script block with parameters and returns."""
+        from afl.ast import ScriptBlock
+
+        source = r'facet Transform(input: String) => (output: String) script "result[\"output\"] = params[\"input\"].upper()"'
+        ast = parser.parse(source)
+        f = ast.facets[0]
+        assert isinstance(f.body, ScriptBlock)
+        assert 'params["input"]' in f.body.code
+
+    def test_script_block_event_facet(self, parser):
+        """Parse event facet with script block."""
+        from afl.ast import ScriptBlock
+
+        ast = parser.parse('event facet Process() script "print(42)"')
+        ef = ast.event_facets[0]
+        assert isinstance(ef.body, ScriptBlock)
+        assert ef.body.code == "print(42)"
+
+    def test_script_block_in_namespace(self, parser):
+        """Parse script block inside namespace."""
+        from afl.ast import ScriptBlock
+
+        source = '''namespace utils {
+    facet Helper() script "pass"
+}'''
+        ast = parser.parse(source)
+        ns = ast.namespaces[0]
+        f = ns.facets[0]
+        assert isinstance(f.body, ScriptBlock)
+
+
+class TestPromptBlocks:
+    """Test prompt block parsing for LLM-based event facets."""
+
+    def test_prompt_block_simple(self, parser):
+        """Parse event facet with simple prompt block."""
+        from afl.ast import PromptBlock
+
+        ast = parser.parse('event facet Test() prompt { template "hello" }')
+        assert len(ast.event_facets) == 1
+        ef = ast.event_facets[0]
+        assert ef.body is not None
+        assert isinstance(ef.body, PromptBlock)
+        assert ef.body.template == "hello"
+        assert ef.body.system is None
+        assert ef.body.model is None
+
+    def test_prompt_block_all_directives(self, parser):
+        """Parse prompt block with all directives."""
+        from afl.ast import PromptBlock
+
+        source = '''event facet Summarize(doc: String) => (summary: String)
+prompt {
+    system "You are a summarizer."
+    template "Summarize: {doc}"
+    model "claude-3-opus"
+}'''
+        ast = parser.parse(source)
+        ef = ast.event_facets[0]
+        assert isinstance(ef.body, PromptBlock)
+        assert ef.body.system == "You are a summarizer."
+        assert ef.body.template == "Summarize: {doc}"
+        assert ef.body.model == "claude-3-opus"
+
+    def test_prompt_block_same_line(self, parser):
+        """Parse prompt block on same line as signature."""
+        from afl.ast import PromptBlock
+
+        ast = parser.parse('event facet Test() prompt { system "sys" template "tmpl" }')
+        ef = ast.event_facets[0]
+        assert isinstance(ef.body, PromptBlock)
+        assert ef.body.system == "sys"
+        assert ef.body.template == "tmpl"
+
+    def test_prompt_block_multiline_template(self, parser):
+        """Parse prompt block with escaped newlines in template."""
+        from afl.ast import PromptBlock
+
+        source = r'event facet Test() prompt { template "Line1\nLine2\nLine3" }'
+        ast = parser.parse(source)
+        ef = ast.event_facets[0]
+        assert isinstance(ef.body, PromptBlock)
+        assert "Line1\nLine2\nLine3" == ef.body.template
+
+    def test_prompt_block_in_namespace(self, parser):
+        """Parse prompt block inside namespace."""
+        from afl.ast import PromptBlock
+
+        source = '''namespace llm {
+    event facet Query(q: String) => (answer: String)
+    prompt {
+        template "{q}"
+    }
+}'''
+        ast = parser.parse(source)
+        assert len(ast.namespaces) == 1
+        ns = ast.namespaces[0]
+        assert len(ns.event_facets) == 1
+        ef = ns.event_facets[0]
+        assert isinstance(ef.body, PromptBlock)
+        assert ef.body.template == "{q}"
+
+
 class TestWorkflows:
     """Test workflow parsing."""
 

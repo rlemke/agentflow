@@ -153,6 +153,43 @@ afl input.afl --no-validate
 
 # Use a custom config file
 afl input.afl --config /path/to/afl.config.json
+
+# Load library sources from MongoDB
+afl input.afl --mongo FLOW_UUID:DisplayName
+
+# Load library sources from Maven Central
+afl input.afl --maven com.example:artifact:1.0
+afl input.afl --maven com.example:artifact:1.0:sources  # with classifier
+```
+
+### Source Loaders
+
+AFL supports loading library sources from multiple locations:
+
+**MongoDB**: Load AFL sources stored in the `flows` collection:
+
+```python
+from afl import SourceLoader
+
+# Load from MongoDB by flow UUID
+entry = SourceLoader.load_mongodb(
+    collection_id="abc123",
+    display_name="MyLibrary",
+    is_library=True
+)
+```
+
+**Maven Central**: Download and extract `.afl` files from Maven artifacts:
+
+```python
+# Load from Maven Central
+entry = SourceLoader.load_maven(
+    group_id="com.example",
+    artifact_id="afl-stdlib",
+    version="1.0.0",
+    classifier="sources",  # optional
+    is_library=True
+)
 ```
 
 ### Configuration
@@ -530,9 +567,19 @@ poller = AgentPoller(
     config=AgentPollerConfig(service_name="my-agent")
 )
 
-# Register handlers for event facets
+# Register sync handlers for event facets
 poller.register("ns.ProcessData", lambda data: {"output": process(data)})
 poller.register("ns.FetchUrl", lambda data: {"content": fetch(data["url"])})
+
+# Register async handlers (for LLM integrations, etc.)
+async def llm_handler(params: dict) -> dict:
+    response = await call_llm_api(params["prompt"])
+    return {"response": response}
+
+poller.register_async("ns.LLMQuery", llm_handler)
+
+# Update step with partial results (for streaming)
+poller.update_step(step_id, {"partial": "streaming data..."})
 
 # Start polling (blocking)
 poller.start()
@@ -604,6 +651,134 @@ cd agents/scala/afl-agent
 sbt compile    # compile
 sbt test       # run 42 tests
 sbt package    # build JAR
+```
+
+### Go
+
+The Go library (`agents/go/afl-agent/`) provides a native Go agent implementation with goroutine-based concurrency.
+
+**Setup:**
+
+```bash
+cd agents/go/afl-agent
+go build ./...
+```
+
+**Usage:**
+
+```go
+package main
+
+import (
+    "context"
+    aflagent "github.com/agentflow/afl-agent"
+)
+
+func main() {
+    cfg := aflagent.ResolveConfig("")
+    poller := aflagent.NewAgentPoller(cfg)
+
+    // Register handlers
+    poller.Register("ns.ProcessData", func(params map[string]interface{}) (map[string]interface{}, error) {
+        input := params["input"].(string)
+        return map[string]interface{}{"output": process(input)}, nil
+    })
+
+    // Start polling (blocking)
+    ctx := context.Background()
+    poller.Start(ctx)
+}
+```
+
+**Build and test:**
+
+```bash
+cd agents/go/afl-agent
+go build ./...   # compile
+go test ./...    # run tests
+```
+
+### TypeScript
+
+The TypeScript library (`agents/typescript/afl-agent/`) provides an async/await-based agent implementation for Node.js.
+
+**Setup:**
+
+```bash
+cd agents/typescript/afl-agent
+npm install
+npm run build
+```
+
+**Usage:**
+
+```typescript
+import { AgentPoller, resolveConfig, Handler } from "@afl/agent";
+
+const config = resolveConfig();
+const poller = new AgentPoller(config);
+
+const processHandler: Handler = async (params) => {
+    const input = params.input as string;
+    return { output: await process(input) };
+};
+
+poller.register("ns.ProcessData", processHandler);
+
+// Start polling
+await poller.start();
+```
+
+**Build and test:**
+
+```bash
+cd agents/typescript/afl-agent
+npm run build   # compile TypeScript
+npm test        # run Jest tests
+```
+
+### Java
+
+The Java library (`agents/java/afl-agent/`) provides a Java 17+ agent implementation with ExecutorService-based concurrency.
+
+**Setup:**
+
+```bash
+cd agents/java/afl-agent
+mvn compile
+```
+
+**Usage:**
+
+```java
+import afl.agent.AgentPoller;
+import afl.agent.AgentPollerConfig;
+import afl.agent.Handler;
+
+public class MyAgent {
+    public static void main(String[] args) throws Exception {
+        AgentPollerConfig config = AgentPollerConfig.resolve(null);
+        AgentPoller poller = new AgentPoller(config);
+
+        // Register handlers
+        poller.register("ns.ProcessData", params -> {
+            String input = (String) params.get("input");
+            return Map.of("output", process(input));
+        });
+
+        // Start polling (blocking)
+        poller.start();
+    }
+}
+```
+
+**Build and test:**
+
+```bash
+cd agents/java/afl-agent
+mvn compile    # compile
+mvn test       # run JUnit tests
+mvn package    # build JAR
 ```
 
 ### Building Agents in Other Languages
@@ -836,6 +1011,38 @@ Facets that trigger agent execution:
 event facet ProcessData(input: String) => (output: String)
 ```
 
+### Prompt Templates
+
+Event facets can use `prompt` blocks for LLM-based handlers:
+
+```
+event facet Summarize(document: String) => (summary: String)
+prompt {
+    system "You are a document summarizer."
+    template "Summarize the following document:\n\n{document}"
+    model "claude-3-opus"
+}
+```
+
+The `template` directive is required. Placeholders `{param_name}` must match facet parameters. The `system` and `model` directives are optional.
+
+### Script Blocks
+
+Facets can include inline Python scripts for simple transformations:
+
+```
+facet Transform(data: String) => (output: String)
+script {
+    python """
+import json
+parsed = json.loads(params["data"])
+result["output"] = parsed["value"].upper()
+"""
+}
+```
+
+Scripts execute in a sandboxed environment with restricted built-ins (no `import`, `open`, `eval`, `exec`). The `params` dict contains input parameters; set values in the `result` dict for return attributes.
+
 ### Workflows
 
 Entry points with execution logic:
@@ -979,8 +1186,14 @@ agentflow/
 │   ├── templates/           # Standalone files for new agent repos
 │   │   ├── CLAUDE.md        # Drop-in CLAUDE.md with full protocol reference
 │   │   └── README.md        # Template usage instructions
-│   └── scala/
-│       └── afl-agent/       # Scala agent library (sbt, Scala 3.3.x)
+│   ├── scala/
+│   │   └── afl-agent/       # Scala agent library (sbt, Scala 3.3.x)
+│   ├── go/
+│   │   └── afl-agent/       # Go agent library (go.mod, goroutine pool)
+│   ├── typescript/
+│   │   └── afl-agent/       # TypeScript/Node.js agent library (npm, async/await)
+│   └── java/
+│       └── afl-agent/       # Java agent library (Maven, ExecutorService)
 ├── examples/                # Example agents and workflows
 │   └── osm-geocoder/        # OSM geocoding + ~272 data event handlers
 │       ├── afl/             # 16 AFL source files

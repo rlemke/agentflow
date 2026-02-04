@@ -174,6 +174,35 @@ class AndThenBlock(ASTNode):
     foreach: ForeachClause | None = None
 
 
+@dataclass
+class PromptBlock(ASTNode):
+    """Prompt block for LLM-based event facets.
+
+    Contains directives for system prompt, template string, and model selection.
+    Templates can include {param_name} placeholders that reference facet parameters.
+    """
+
+    system: str | None = None
+    template: str | None = None
+    model: str | None = None
+
+
+@dataclass
+class ScriptBlock(ASTNode):
+    """Script block for inline code execution.
+
+    Contains code that will be executed by a sandboxed interpreter.
+    The code has access to `params` dict and should set values in `result` dict.
+
+    Attributes:
+        language: Programming language (currently only "python")
+        code: The script source code
+    """
+
+    language: str = "python"
+    code: str = ""
+
+
 # Return clause
 @dataclass
 class ReturnClause(ASTNode):
@@ -199,7 +228,7 @@ class FacetDecl(ASTNode):
     """Facet declaration."""
 
     sig: FacetSig
-    body: AndThenBlock | None = None
+    body: "AndThenBlock | ScriptBlock | None" = None
 
 
 @dataclass
@@ -207,7 +236,7 @@ class EventFacetDecl(ASTNode):
     """Event facet declaration."""
 
     sig: FacetSig
-    body: AndThenBlock | None = None
+    body: "AndThenBlock | PromptBlock | ScriptBlock | None" = None
 
 
 @dataclass

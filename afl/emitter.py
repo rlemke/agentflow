@@ -36,10 +36,12 @@ from .ast import (
     Namespace,
     Parameter,
     Program,
+    PromptBlock,
     Reference,
     ReturnClause,
     SchemaDecl,
     SchemaField,
+    ScriptBlock,
     SourceLocation,
     StepStmt,
     TypeRef,
@@ -167,6 +169,10 @@ class JSONEmitter:
             return self._schema_field(node)
         if isinstance(node, ArrayType):
             return self._array_type(node)
+        if isinstance(node, PromptBlock):
+            return self._prompt_block(node)
+        if isinstance(node, ScriptBlock):
+            return self._script_block(node)
 
         raise ValueError(f"Unknown node type: {type(node)}")
 
@@ -530,6 +536,26 @@ class JSONEmitter:
             "type": "ArrayType",
             "elementType": self._convert(node.element_type),
         }
+
+    def _prompt_block(self, node: PromptBlock) -> dict:
+        """Convert PromptBlock node."""
+        data = {"type": "PromptBlock"}
+        if node.system is not None:
+            data["system"] = node.system
+        if node.template is not None:
+            data["template"] = node.template
+        if node.model is not None:
+            data["model"] = node.model
+        return self._add_metadata(data, node)
+
+    def _script_block(self, node: ScriptBlock) -> dict:
+        """Convert ScriptBlock node."""
+        data = {
+            "type": "ScriptBlock",
+            "language": node.language,
+            "code": node.code,
+        }
+        return self._add_metadata(data, node)
 
     def _concat_expr(self, node: ConcatExpr) -> dict:
         """Convert ConcatExpr node."""
