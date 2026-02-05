@@ -1,6 +1,5 @@
 namespace osm.geo.Asia.cache {
-
-
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Asia
 

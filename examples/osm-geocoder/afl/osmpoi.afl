@@ -1,5 +1,6 @@
 
 namespace osm.geo.POIs {
+    use osm.types
 
     event facet POI(cache: OSMCache) => (pois: OSMCache )
 

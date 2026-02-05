@@ -28,17 +28,21 @@ import re
 
 from .ast import (
     AndThenBlock,
+    ArrayType,
     CallExpr,
     EventFacetDecl,
     FacetDecl,
     FacetSig,
     Namespace,
+    Parameter,
     Program,
     PromptBlock,
     Reference,
     SchemaDecl,
+    SchemaField,
     ScriptBlock,
     SourceLocation,
+    TypeRef,
     WorkflowDecl,
     YieldStmt,
 )
@@ -162,8 +166,13 @@ class AFLValidator:
             self._register_facet(event_facet.sig)
         for workflow in program.workflows:
             self._register_facet(workflow.sig)
+        # Top-level schemas are not allowed - emit error
         for schema in program.schemas:
-            self._register_schema(schema)
+            self._result.add_error(
+                f"Schema '{schema.name}' must be defined inside a namespace. "
+                f"Top-level schemas are not allowed.",
+                schema.location,
+            )
 
         # Namespace declarations
         for namespace in program.namespaces:
@@ -286,6 +295,63 @@ class AFLValidator:
 
         # Not found anywhere
         return None
+
+    # Builtin types that don't require schema resolution
+    BUILTIN_TYPES = {"String", "Long", "Int", "Boolean", "Json"}
+
+    def _validate_type_ref(
+        self, type_node: TypeRef | ArrayType, location: SourceLocation | None = None
+    ) -> None:
+        """Validate a type reference to ensure it resolves to a known type.
+
+        For non-builtin types, validates that the type name resolves to a schema
+        using the same resolution rules as facet references.
+
+        Args:
+            type_node: The type reference or array type to validate
+            location: Source location for error reporting
+        """
+        if isinstance(type_node, ArrayType):
+            # Recursively validate element type
+            self._validate_type_ref(type_node.element_type, type_node.location or location)
+            return
+
+        # It's a TypeRef - check if it's a builtin or needs schema resolution
+        type_name = type_node.name
+        if type_name in self.BUILTIN_TYPES:
+            return  # Builtin types are always valid
+
+        # Not a builtin - must resolve to a schema
+        schema_info = self._resolve_schema_name(type_name, type_node.location or location)
+        if schema_info is None:
+            # _resolve_schema_name already reports ambiguity errors
+            # Only report "unknown type" if it wasn't found at all
+            all_matches = self._schemas_by_short_name.get(type_name, [])
+            if len(all_matches) == 0 and "." not in type_name:
+                # Unqualified name not found
+                self._result.add_error(
+                    f"Unknown type '{type_name}': not a builtin type or known schema. "
+                    f"Schema types must be defined in a namespace and either imported via 'use' "
+                    f"or referenced with a fully qualified name.",
+                    type_node.location or location,
+                )
+            elif "." in type_name and type_name not in self._schema_info:
+                # Qualified name not found
+                self._result.add_error(
+                    f"Unknown schema '{type_name}': no schema found with this qualified name.",
+                    type_node.location or location,
+                )
+
+    def _validate_signature_types(self, sig: FacetSig) -> None:
+        """Validate all type references in a facet/workflow signature."""
+        # Validate parameter types
+        for param in sig.params:
+            self._validate_type_ref(param.type, param.location)
+
+        # Validate return types
+        if sig.returns:
+            for ret_param in sig.returns.params:
+                self._validate_type_ref(ret_param.type, ret_param.location)
 
     def _resolve_facet_name(
         self, name: str, location: SourceLocation | None = None
@@ -463,6 +529,8 @@ class AFLValidator:
 
     def _validate_facet_decl(self, decl: FacetDecl) -> None:
         """Validate a facet declaration."""
+        # Validate type references in signature
+        self._validate_signature_types(decl.sig)
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
@@ -474,6 +542,8 @@ class AFLValidator:
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
+        # Validate type references in signature
+        self._validate_signature_types(decl.sig)
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
@@ -542,6 +612,8 @@ class AFLValidator:
 
     def _validate_workflow_decl(self, decl: WorkflowDecl) -> None:
         """Validate a workflow declaration."""
+        # Validate type references in signature
+        self._validate_signature_types(decl.sig)
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
@@ -775,10 +847,12 @@ class AFLValidator:
                 )
 
     def _validate_schema_decl(self, schema: SchemaDecl) -> None:
-        """Validate a schema declaration for field name uniqueness."""
+        """Validate a schema declaration for field name uniqueness and type references."""
         field_names: dict[str, SourceLocation] = {}
         for f in schema.fields:
             self._check_name_unique(f.name, f.location, field_names, "schema field")
+            # Validate field type reference
+            self._validate_type_ref(f.type, f.location)
 
 
 def validate(program: Program) -> ValidationResult:

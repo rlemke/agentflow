@@ -3,28 +3,30 @@
 // Filters places and administrative boundaries by population.
 // Supports cities, towns, villages, states, countries, counties, etc.
 
-schema PopulationFilterResult {
-    output_path: String
-    feature_count: Long
-    original_count: Long
-    place_type: String
-    min_population: Long
-    max_population: Long
-    filter_applied: String
-    format: String
-    extraction_date: String
-}
-
-schema PopulationStats {
-    total_places: Long
-    total_population: Long
-    min_population: Long
-    max_population: Long
-    avg_population: Long
-    place_type: String
-}
-
 namespace osm.geo.Population {
+    use osm.types
+
+    schema PopulationFilterResult {
+        output_path: String
+        feature_count: Long
+        original_count: Long
+        place_type: String
+        min_population: Long
+        max_population: Long
+        filter_applied: String
+        format: String
+        extraction_date: String
+    }
+
+    schema PopulationStats {
+        total_places: Long
+        total_population: Long
+        min_population: Long
+        max_population: Long
+        avg_population: Long
+        place_type: String
+    }
+
     // Filter GeoJSON by population threshold
     // place_type: "city", "town", "village", "state", "country", "county", "all"
     // operator: "gt", "gte", "lt", "lte", "eq", "between"

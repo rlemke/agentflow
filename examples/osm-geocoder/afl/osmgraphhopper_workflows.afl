@@ -2,6 +2,7 @@
 // Builds routing graphs from OSM caches for entire regions
 
 namespace osm.geo.GraphHopper.Europe {
+    use osm.types
     uses osm.geo.cache.Europe
     uses osm.geo.cache.GraphHopper.Europe
 
@@ -45,6 +46,7 @@ namespace osm.geo.GraphHopper.Europe {
 }
 
 namespace osm.geo.GraphHopper.NorthAmerica {
+    use osm.types
     uses osm.geo.cache.NorthAmerica
     uses osm.geo.cache.GraphHopper.NorthAmerica
 
@@ -65,6 +67,7 @@ namespace osm.geo.GraphHopper.NorthAmerica {
 }
 
 namespace osm.geo.GraphHopper.UnitedStates {
+    use osm.types
     uses osm.geo.cache.UnitedStates
     uses osm.geo.cache.GraphHopper.UnitedStates
 

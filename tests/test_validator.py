@@ -583,13 +583,15 @@ class TestSchemaValidation:
     """Test schema declaration validation."""
 
     def test_duplicate_schema_names(self, validator):
-        """Duplicate schema names should error."""
+        """Duplicate schema names in namespace should error."""
         ast = parse("""
-        schema User {
-            name: String
-        }
-        schema User {
-            email: String
+        namespace app {
+            schema User {
+                name: String
+            }
+            schema User {
+                email: String
+            }
         }
         """)
         result = validator.validate(ast)
@@ -599,10 +601,12 @@ class TestSchemaValidation:
     def test_schema_facet_same_name(self, validator):
         """Schema and facet with same name should error."""
         ast = parse("""
-        schema User {
-            name: String
+        namespace app {
+            schema User {
+                name: String
+            }
+            facet User(name: String)
         }
-        facet User(name: String)
         """)
         result = validator.validate(ast)
         assert not result.is_valid
@@ -611,9 +615,11 @@ class TestSchemaValidation:
     def test_duplicate_field_names(self, validator):
         """Duplicate field names within a schema should error."""
         ast = parse("""
-        schema User {
-            name: String
-            name: Int
+        namespace app {
+            schema User {
+                name: String
+                name: Int
+            }
         }
         """)
         result = validator.validate(ast)
@@ -623,9 +629,11 @@ class TestSchemaValidation:
     def test_valid_schema(self, validator):
         """Valid schema should pass validation."""
         ast = parse("""
-        schema User {
-            name: String
-            age: Int
+        namespace app {
+            schema User {
+                name: String
+                age: Int
+            }
         }
         """)
         result = validator.validate(ast)
@@ -939,15 +947,17 @@ class TestSchemaInstantiation:
     def test_valid_schema_instantiation(self, validator):
         """Valid schema instantiation should pass."""
         ast = parse("""
-        schema Config {
-            timeout: Long
-            retries: Long
-        }
-        event facet DoSomething(config: Config) => (result: String)
-        workflow Example() => (output: String) andThen {
-            cfg = Config(timeout = 30, retries = 3)
-            result = DoSomething(config = cfg.timeout)
-            yield Example(output = result.result)
+        namespace app {
+            schema Config {
+                timeout: Long
+                retries: Long
+            }
+            event facet DoSomething(config: Config) => (result: String)
+            workflow Example() => (output: String) andThen {
+                cfg = Config(timeout = 30, retries = 3)
+                result = DoSomething(config = cfg.timeout)
+                yield Example(output = result.result)
+            }
         }
         """)
         result = validator.validate(ast)
@@ -956,15 +966,17 @@ class TestSchemaInstantiation:
     def test_schema_field_reference(self, validator):
         """Step referencing schema fields should pass."""
         ast = parse("""
-        schema Data {
-            value: String
-            count: Long
-        }
-        facet Process(input: String) => (output: String)
-        workflow Test(x: String) => (result: String) andThen {
-            d = Data(value = $.x, count = 5)
-            p = Process(input = d.value)
-            yield Test(result = p.output)
+        namespace app {
+            schema Data {
+                value: String
+                count: Long
+            }
+            facet Process(input: String) => (output: String)
+            workflow Test(x: String) => (result: String) andThen {
+                d = Data(value = $.x, count = 5)
+                p = Process(input = d.value)
+                yield Test(result = p.output)
+            }
         }
         """)
         result = validator.validate(ast)
@@ -973,14 +985,16 @@ class TestSchemaInstantiation:
     def test_invalid_schema_field_reference(self, validator):
         """Reference to nonexistent schema field should error."""
         ast = parse("""
-        schema Data {
-            value: String
-        }
-        facet Process(input: String) => (output: String)
-        workflow Test(x: String) => (result: String) andThen {
-            d = Data(value = $.x)
-            p = Process(input = d.nonexistent)
-            yield Test(result = p.output)
+        namespace app {
+            schema Data {
+                value: String
+            }
+            facet Process(input: String) => (output: String)
+            workflow Test(x: String) => (result: String) andThen {
+                d = Data(value = $.x)
+                p = Process(input = d.nonexistent)
+                yield Test(result = p.output)
+            }
         }
         """)
         result = validator.validate(ast)
@@ -990,11 +1004,13 @@ class TestSchemaInstantiation:
     def test_unknown_schema_field(self, validator):
         """Unknown field in schema instantiation should error."""
         ast = parse("""
-        schema Config {
-            timeout: Long
-        }
-        workflow Test() andThen {
-            cfg = Config(timeout = 30, unknown = "bad")
+        namespace app {
+            schema Config {
+                timeout: Long
+            }
+            workflow Test() andThen {
+                cfg = Config(timeout = 30, unknown = "bad")
+            }
         }
         """)
         result = validator.validate(ast)
@@ -1004,12 +1020,14 @@ class TestSchemaInstantiation:
     def test_schema_with_mixins_error(self, validator):
         """Schema instantiation with mixins should error."""
         ast = parse("""
-        schema Config {
-            timeout: Long
-        }
-        facet SomeMixin()
-        workflow Test() andThen {
-            cfg = Config(timeout = 30) with SomeMixin()
+        namespace app {
+            schema Config {
+                timeout: Long
+            }
+            facet SomeMixin()
+            workflow Test() andThen {
+                cfg = Config(timeout = 30) with SomeMixin()
+            }
         }
         """)
         result = validator.validate(ast)
@@ -1057,12 +1075,14 @@ class TestSchemaInstantiation:
     def test_schema_with_concat_expression(self, validator):
         """Schema instantiation with concatenation expression should validate."""
         ast = parse("""
-        schema Data {
-            combined: String
-        }
-        workflow Test(a: String, b: String) => (result: String) andThen {
-            d = Data(combined = $.a ++ $.b)
-            yield Test(result = d.combined)
+        namespace app {
+            schema Data {
+                combined: String
+            }
+            workflow Test(a: String, b: String) => (result: String) andThen {
+                d = Data(combined = $.a ++ $.b)
+                yield Test(result = d.combined)
+            }
         }
         """)
         result = validator.validate(ast)
@@ -1071,15 +1091,17 @@ class TestSchemaInstantiation:
     def test_schema_fields_accessible_after_step(self, validator):
         """Schema fields should be accessible in subsequent steps."""
         ast = parse("""
-        schema Request {
-            url: String
-            method: String
-        }
-        facet Fetch(url: String, method: String) => (data: String)
-        workflow Test(input: String) => (result: String) andThen {
-            req = Request(url = $.input, method = "GET")
-            resp = Fetch(url = req.url, method = req.method)
-            yield Test(result = resp.data)
+        namespace app {
+            schema Request {
+                url: String
+                method: String
+            }
+            facet Fetch(url: String, method: String) => (data: String)
+            workflow Test(input: String) => (result: String) andThen {
+                req = Request(url = $.input, method = "GET")
+                resp = Fetch(url = req.url, method = req.method)
+                yield Test(result = resp.data)
+            }
         }
         """)
         result = validator.validate(ast)

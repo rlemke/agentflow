@@ -1,5 +1,5 @@
 namespace osm.geo.World.cache {
-
+    use osm.types
     use osm.geo.Africa.cache
     use osm.geo.Australia.cache
     use osm.geo.Canada.cache

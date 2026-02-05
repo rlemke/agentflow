@@ -1,4 +1,5 @@
 namespace osm.geo.Europe.shapefiles {
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Europe
 

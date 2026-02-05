@@ -537,15 +537,18 @@ class TestSchemaEmission:
     def test_basic_schema(self, emitter):
         """Schema emits correct JSON structure."""
         ast = parse("""
-        schema UserRequest {
-            name: String
-            age: Int
+        namespace app {
+            schema UserRequest {
+                name: String
+                age: Int
+            }
         }
         """)
         data = emitter.emit_dict(ast)
-        assert "schemas" in data
-        assert len(data["schemas"]) == 1
-        schema = data["schemas"][0]
+        ns = data["namespaces"][0]
+        assert "schemas" in ns
+        assert len(ns["schemas"]) == 1
+        schema = ns["schemas"][0]
         assert schema["type"] == "SchemaDecl"
         assert schema["name"] == "UserRequest"
         assert len(schema["fields"]) == 2
@@ -555,12 +558,14 @@ class TestSchemaEmission:
     def test_array_type_in_schema(self, emitter):
         """Array types emit correctly in schema fields."""
         ast = parse("""
-        schema Tagged {
-            tags: [String]
+        namespace app {
+            schema Tagged {
+                tags: [String]
+            }
         }
         """)
         data = emitter.emit_dict(ast)
-        field = data["schemas"][0]["fields"][0]
+        field = data["namespaces"][0]["schemas"][0]["fields"][0]
         assert field["name"] == "tags"
         assert field["type"] == {"type": "ArrayType", "elementType": "String"}
 
@@ -575,12 +580,14 @@ class TestSchemaEmission:
     def test_nested_array_type(self, emitter):
         """Nested array types emit correctly."""
         ast = parse("""
-        schema Matrix {
-            rows: [[Int]]
+        namespace app {
+            schema Matrix {
+                rows: [[Int]]
+            }
         }
         """)
         data = emitter.emit_dict(ast)
-        field = data["schemas"][0]["fields"][0]
+        field = data["namespaces"][0]["schemas"][0]["fields"][0]
         assert field["type"] == {
             "type": "ArrayType",
             "elementType": {"type": "ArrayType", "elementType": "Int"},
@@ -604,15 +611,17 @@ class TestSchemaEmission:
     def test_schema_reference_as_field_type(self, emitter):
         """Schema name as field type emits as string."""
         ast = parse("""
-        schema Address {
-            city: String
-        }
-        schema Person {
-            home: Address
+        namespace app {
+            schema Address {
+                city: String
+            }
+            schema Person {
+                home: Address
+            }
         }
         """)
         data = emitter.emit_dict(ast)
-        person_field = data["schemas"][1]["fields"][0]
+        person_field = data["namespaces"][0]["schemas"][1]["fields"][0]
         assert person_field == {"name": "home", "type": "Address"}
 
 

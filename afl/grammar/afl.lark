@@ -14,7 +14,7 @@
 
 // AFL v1 Grammar (Lark LALR)
 
-start: _NL* (namespace_block | top_level_decl | schema_decl)*
+start: _NL* (namespace_block | top_level_decl)*
 
 // Namespace
 namespace_block: "namespace" QNAME "{" _NL* namespace_body "}" _NL*

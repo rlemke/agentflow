@@ -1,6 +1,6 @@
 namespace osm.geo.Continents.cache {
 // Continents
-
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Continents
 

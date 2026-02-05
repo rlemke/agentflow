@@ -1,5 +1,5 @@
 namespace osm.geo.Africa.cache {
-
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Africa
 

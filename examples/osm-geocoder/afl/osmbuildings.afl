@@ -5,29 +5,31 @@
 // - Building height/levels for 3D visualization
 // - Building attributes (name, address, etc.)
 
-schema BuildingResult {
-    output_path: String
-    feature_count: Long
-    building_type: String
-    total_area_km2: Double
-    with_height_data: Long
-    format: String
-    extraction_date: String
-}
-
-schema BuildingStats {
-    total_buildings: Long
-    total_area_km2: Double
-    residential: Long
-    commercial: Long
-    industrial: Long
-    retail: Long
-    other: Long
-    avg_levels: Double
-    with_height: Long
-}
-
 namespace osm.geo.Buildings {
+    use osm.types
+
+    schema BuildingResult {
+        output_path: String
+        feature_count: Long
+        building_type: String
+        total_area_km2: Double
+        with_height_data: Long
+        format: String
+        extraction_date: String
+    }
+
+    schema BuildingStats {
+        total_buildings: Long
+        total_area_km2: Double
+        residential: Long
+        commercial: Long
+        industrial: Long
+        retail: Long
+        other: Long
+        avg_levels: Double
+        with_height: Long
+    }
+
     // Extract all buildings from a region
     event facet ExtractBuildings(cache: OSMCache,
         building_type: String = "all") => (result: BuildingResult)

@@ -4,13 +4,13 @@
 // Geocode event facet (handled by an external agent), and returns
 // the latitude/longitude result.
 
-schema GeoCoordinate {
-    lat: String
-    lon: String
-    display_name: String
-}
-
 namespace osm.geo {
+
+    schema GeoCoordinate {
+        lat: String
+        lon: String
+        display_name: String
+    }
 
     event facet Geocode(address: String) => (result: GeoCoordinate)
 

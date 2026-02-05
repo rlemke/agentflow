@@ -1,20 +1,21 @@
+namespace osm.types {
+   schema OSMCache {
+      url: String
+      path: String
+      date: String
+      size: Long
+      wasInCache: Boolean
+   }
 
-schema OSMCache {
-   url: String
-   path: String
-   date: String
-   size: Long
-   wasInCache: Boolean
-}
-
-schema GraphHopperCache {
-   osmSource: String
-   graphDir: String
-   profile: String
-   date: String
-   size: Long
-   wasInCache: Boolean
-   version: String
-   nodeCount: Long
-   edgeCount: Long
+   schema GraphHopperCache {
+      osmSource: String
+      graphDir: String
+      profile: String
+      date: String
+      size: Long
+      wasInCache: Boolean
+      version: String
+      nodeCount: Long
+      edgeCount: Long
+   }
 }

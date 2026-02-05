@@ -770,13 +770,17 @@ class TestSchemaDeclarations:
     def test_basic_schema(self, parser):
         """Parse a basic schema with scalar fields."""
         ast = parser.parse("""
-        schema UserRequest {
-            name: String
-            age: Int
+        namespace app {
+            schema UserRequest {
+                name: String
+                age: Int
+            }
         }
         """)
-        assert len(ast.schemas) == 1
-        schema = ast.schemas[0]
+        assert len(ast.namespaces) == 1
+        ns = ast.namespaces[0]
+        assert len(ns.schemas) == 1
+        schema = ns.schemas[0]
         assert isinstance(schema, SchemaDecl)
         assert schema.name == "UserRequest"
         assert len(schema.fields) == 2
@@ -789,12 +793,14 @@ class TestSchemaDeclarations:
     def test_schema_with_array_type(self, parser):
         """Parse a schema with array type fields."""
         ast = parser.parse("""
-        schema TaggedItem {
-            tags: [String]
-            ids: [Long]
+        namespace app {
+            schema TaggedItem {
+                tags: [String]
+                ids: [Long]
+            }
         }
         """)
-        schema = ast.schemas[0]
+        schema = ast.namespaces[0].schemas[0]
         assert len(schema.fields) == 2
         tags_field = schema.fields[0]
         assert tags_field.name == "tags"
@@ -805,17 +811,20 @@ class TestSchemaDeclarations:
     def test_schema_referencing_schema(self, parser):
         """Parse a schema that references another schema as a field type."""
         ast = parser.parse("""
-        schema Address {
-            street: String
-            city: String
-        }
-        schema Person {
-            name: String
-            home: Address
+        namespace app {
+            schema Address {
+                street: String
+                city: String
+            }
+            schema Person {
+                name: String
+                home: Address
+            }
         }
         """)
-        assert len(ast.schemas) == 2
-        person = ast.schemas[1]
+        ns = ast.namespaces[0]
+        assert len(ns.schemas) == 2
+        person = ns.schemas[1]
         assert person.fields[1].name == "home"
         assert isinstance(person.fields[1].type, TypeRef)
         assert person.fields[1].type.name == "Address"
@@ -839,14 +848,17 @@ class TestSchemaDeclarations:
     def test_schema_as_parameter_type(self, parser):
         """Schema name used as a parameter type in facet signature."""
         ast = parser.parse("""
-        schema UserRequest {
-            name: String
+        namespace app {
+            schema UserRequest {
+                name: String
+            }
+            event facet CreateUser(request: UserRequest) => (id: String)
         }
-        event facet CreateUser(request: UserRequest) => (id: String)
         """)
-        assert len(ast.schemas) == 1
-        assert len(ast.event_facets) == 1
-        param = ast.event_facets[0].sig.params[0]
+        ns = ast.namespaces[0]
+        assert len(ns.schemas) == 1
+        assert len(ns.event_facets) == 1
+        param = ns.event_facets[0].sig.params[0]
         assert param.name == "request"
         assert isinstance(param.type, TypeRef)
         assert param.type.name == "UserRequest"
@@ -863,11 +875,13 @@ class TestSchemaDeclarations:
     def test_nested_array_type(self, parser):
         """Nested array type [[String]]."""
         ast = parser.parse("""
-        schema Matrix {
-            rows: [[Int]]
+        namespace app {
+            schema Matrix {
+                rows: [[Int]]
+            }
         }
         """)
-        field = ast.schemas[0].fields[0]
+        field = ast.namespaces[0].schemas[0].fields[0]
         assert isinstance(field.type, ArrayType)
         assert isinstance(field.type.element_type, ArrayType)
         assert isinstance(field.type.element_type.element_type, TypeRef)
@@ -875,18 +889,22 @@ class TestSchemaDeclarations:
 
     def test_empty_schema(self, parser):
         """Parse an empty schema."""
-        ast = parser.parse("schema Empty {}")
-        assert len(ast.schemas) == 1
-        assert ast.schemas[0].name == "Empty"
-        assert ast.schemas[0].fields == []
+        ast = parser.parse("namespace app { schema Empty {} }")
+        assert len(ast.namespaces) == 1
+        ns = ast.namespaces[0]
+        assert len(ns.schemas) == 1
+        assert ns.schemas[0].name == "Empty"
+        assert ns.schemas[0].fields == []
 
     def test_schema_with_qualified_type(self, parser):
         """Schema field with qualified type name."""
         ast = parser.parse("""
-        schema Response {
-            data: app.DataModel
+        namespace app {
+            schema Response {
+                data: other.DataModel
+            }
         }
         """)
-        field = ast.schemas[0].fields[0]
+        field = ast.namespaces[0].schemas[0].fields[0]
         assert isinstance(field.type, TypeRef)
-        assert field.type.name == "app.DataModel"
+        assert field.type.name == "other.DataModel"

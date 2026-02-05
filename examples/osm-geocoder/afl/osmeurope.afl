@@ -1,5 +1,6 @@
 namespace osm.geo.Europe.cache {
 // Europe
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Europe
 

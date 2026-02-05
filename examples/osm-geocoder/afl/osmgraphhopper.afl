@@ -2,6 +2,7 @@
 // Takes OSM cache as input and builds routing graphs
 
 namespace osm.geo.Operations.GraphHopper {
+    use osm.types
 
     // Build a routing graph from an OSM cache
     // If graph exists and recreate=false, returns cached graph

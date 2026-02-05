@@ -23,7 +23,7 @@ AFL is designed as a programming-language-style workflow DSL: workflows are auth
 - **Event Facet**: a facet prefixed with `event` that triggers agent execution.
 - **Workflow**: a facet designated as an entry point for execution.
 - **Step**: an assignment of a call expression within an `andThen` block.
-- **Schema**: a named typed structure (`schema Name { field: Type }`) used as a type in parameter signatures.
+- **Schema**: a named typed structure (`schema Name { field: Type }`) used as a type in parameter signatures. **Schemas must be defined inside a namespace.** When referencing a schema from another namespace, either use a fully-qualified name (`ns.SchemaName`) or import the namespace with `use ns` (if unambiguous).
 
 ### Composition features
 - **Mixins**: `with FacetA() with FacetB()` composes normalized facets.
@@ -693,7 +693,7 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **Mixin**: Composable capability attached to facets/calls
 - **Step**: Named assignment in an `andThen` block
 - **Yield**: Final output merge statement in a block
-- **Schema**: Named typed structure for defining JSON shapes; usable as a type in parameter signatures
+- **Schema**: Named typed structure for defining JSON shapes; must be defined inside a namespace; usable as a type in parameter signatures (with qualified name or `use` import)
 - **ArrayType**: Array type syntax `[ElementType]` for schema fields and parameters
 - **PromptBlock**: Block syntax for LLM-based event facets with `system`, `template`, and `model` directives
 - **ScriptBlock**: Block syntax for inline sandboxed Python execution in facets

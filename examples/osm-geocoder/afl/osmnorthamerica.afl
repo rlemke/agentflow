@@ -1,6 +1,6 @@
 namespace osm.geo.NorthAmerica.cache {
 // NorthAmerica
-
+  use osm.types
   use osm.geo.Operations
   use osm.geo.cache.NorthAmerica
 

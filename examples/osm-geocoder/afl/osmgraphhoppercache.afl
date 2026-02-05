@@ -2,6 +2,8 @@
 // Each facet takes an OSM cache and builds/returns a routing graph
 
 namespace osm.geo.cache.GraphHopper.Africa {
+    use osm.types
+
     event facet AllAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Africa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Algeria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -60,6 +62,8 @@ namespace osm.geo.cache.GraphHopper.Africa {
 }
 
 namespace osm.geo.cache.GraphHopper.Asia {
+    use osm.types
+
     event facet AllAsia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Asia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Afghanistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -106,6 +110,8 @@ namespace osm.geo.cache.GraphHopper.Asia {
 }
 
 namespace osm.geo.cache.GraphHopper.Australia {
+    use osm.types
+
     event facet AllAustralia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Australia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Fiji(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -125,6 +131,8 @@ namespace osm.geo.cache.GraphHopper.Australia {
 }
 
 namespace osm.geo.cache.GraphHopper.Europe {
+    use osm.types
+
     event facet AllEurope(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Europe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Albania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -178,6 +186,8 @@ namespace osm.geo.cache.GraphHopper.Europe {
 }
 
 namespace osm.geo.cache.GraphHopper.NorthAmerica {
+    use osm.types
+
     event facet AllNorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet NorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Canada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -187,6 +197,8 @@ namespace osm.geo.cache.GraphHopper.NorthAmerica {
 }
 
 namespace osm.geo.cache.GraphHopper.SouthAmerica {
+    use osm.types
+
     event facet AllSouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet SouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Argentina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -204,6 +216,8 @@ namespace osm.geo.cache.GraphHopper.SouthAmerica {
 }
 
 namespace osm.geo.cache.GraphHopper.CentralAmerica {
+    use osm.types
+
     event facet AllCentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet CentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Belize(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -219,6 +233,8 @@ namespace osm.geo.cache.GraphHopper.CentralAmerica {
 }
 
 namespace osm.geo.cache.GraphHopper.UnitedStates {
+    use osm.types
+
     event facet AllUnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Alabama(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Alaska(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
@@ -274,6 +290,8 @@ namespace osm.geo.cache.GraphHopper.UnitedStates {
 }
 
 namespace osm.geo.cache.GraphHopper.Canada {
+    use osm.types
+
     event facet AllCanada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet Alberta(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
     event facet BritishColumbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)

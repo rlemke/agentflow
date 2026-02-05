@@ -6,29 +6,31 @@
 // Type/tag filtering supports OSM element types (node, way, relation) and tags.
 // Optional dependency inclusion provides complete geometries for ways/relations.
 
-schema FilterResult {
-    output_path: String
-    feature_count: Long
-    original_count: Long
-    boundary_type: String
-    filter_applied: String
-    format: String
-    extraction_date: String
-}
-
-schema OSMFilterResult {
-    output_path: String
-    feature_count: Long
-    original_count: Long
-    osm_type: String
-    filter_applied: String
-    dependencies_included: Boolean
-    dependency_count: Long
-    format: String
-    extraction_date: String
-}
-
 namespace osm.geo.Filters {
+    use osm.types
+
+    schema FilterResult {
+        output_path: String
+        feature_count: Long
+        original_count: Long
+        boundary_type: String
+        filter_applied: String
+        format: String
+        extraction_date: String
+    }
+
+    schema OSMFilterResult {
+        output_path: String
+        feature_count: Long
+        original_count: Long
+        osm_type: String
+        filter_applied: String
+        dependencies_included: Boolean
+        dependency_count: Long
+        format: String
+        extraction_date: String
+    }
+
     // Filter GeoJSON features by equivalent radius
     // Operator: gt, gte, lt, lte, eq, ne
     event facet FilterByRadius(input_path: String, radius: Double,

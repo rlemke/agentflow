@@ -1,15 +1,17 @@
 // Boundary extraction schemas and event facets
 
-schema BoundaryResult {
-    output_path: String
-    feature_count: Long
-    boundary_type: String
-    admin_levels: String
-    format: String
-    extraction_date: String
-}
-
 namespace osm.geo.Boundaries {
+    use osm.types
+
+    schema BoundaryResult {
+        output_path: String
+        feature_count: Long
+        boundary_type: String
+        admin_levels: String
+        format: String
+        extraction_date: String
+    }
+
     // Administrative boundaries by level (2=country, 4=state, 6=county, 8=city)
     event facet CountryBoundaries(cache: OSMCache) => (result: BoundaryResult)
     event facet StateBoundaries(cache: OSMCache) => (result: BoundaryResult)
