@@ -1,6 +1,6 @@
 """OSM Geocoder event handlers.
 
-Registers handlers for all OSM, Census TIGER, GraphHopper, and visualization event facets.
+Registers handlers for all OSM, Census TIGER, GraphHopper, elevation, and visualization event facets.
 """
 
 from .amenity_handlers import register_amenity_handlers
@@ -8,6 +8,7 @@ from .boundary_handlers import register_boundary_handlers
 from .building_handlers import register_building_handlers
 from .cache_handlers import register_cache_handlers
 from .downloader import download as download_region  # noqa: F401
+from .elevation_handlers import register_elevation_handlers
 from .filter_handlers import register_filter_handlers
 from .graphhopper_handlers import register_graphhopper_handlers
 from .operations_handlers import register_operations_handlers
@@ -25,6 +26,7 @@ __all__ = [
     "register_boundary_handlers",
     "register_building_handlers",
     "register_cache_handlers",
+    "register_elevation_handlers",
     "register_filter_handlers",
     "register_graphhopper_handlers",
     "register_operations_handlers",
@@ -45,6 +47,7 @@ def register_all_handlers(poller) -> None:
     register_boundary_handlers(poller)
     register_building_handlers(poller)
     register_cache_handlers(poller)
+    register_elevation_handlers(poller)
     register_filter_handlers(poller)
     register_graphhopper_handlers(poller)
     register_operations_handlers(poller)
