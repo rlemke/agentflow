@@ -1,0 +1,23 @@
+# AgentFlow OSM Geocoder Agent
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Install requests for Nominatim API
+RUN pip install --no-cache-dir requests
+
+# Copy application code
+COPY afl/ ./afl/
+COPY examples/osm-geocoder/ ./examples/osm-geocoder/
+
+# Set PYTHONPATH for imports
+ENV PYTHONPATH=/app
+
+WORKDIR /app/examples/osm-geocoder
+
+CMD ["python", "agent.py"]

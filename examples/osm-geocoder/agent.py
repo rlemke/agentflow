@@ -10,10 +10,15 @@ This agent polls for event tasks across all OSM namespaces:
 Usage:
     PYTHONPATH=. python examples/osm-geocoder/agent.py
 
+For Docker/MongoDB mode, set environment variables:
+    AFL_MONGODB_URL=mongodb://localhost:27017
+    AFL_MONGODB_DATABASE=afl
+
 Requires:
     pip install requests
 """
 
+import os
 import signal
 
 import requests
@@ -67,7 +72,19 @@ def geocode_handler(payload: dict) -> dict:
 
 def main() -> None:
     """Start the geocoder agent."""
-    store = MemoryStore()
+    # Use MongoStore if MongoDB URL is configured, otherwise use MemoryStore
+    mongodb_url = os.environ.get("AFL_MONGODB_URL")
+    mongodb_database = os.environ.get("AFL_MONGODB_DATABASE", "afl")
+
+    if mongodb_url:
+        from afl.runtime.mongo_store import MongoStore
+
+        print(f"Using MongoDB: {mongodb_url}/{mongodb_database}")
+        store = MongoStore(connection_string=mongodb_url, database_name=mongodb_database)
+    else:
+        print("Using in-memory store (set AFL_MONGODB_URL for MongoDB)")
+        store = MemoryStore()
+
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
 
     config = AgentPollerConfig(

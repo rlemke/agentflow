@@ -71,10 +71,26 @@ namespace chain {
     use handlers
 
     workflow ChainOfThree(start: Long) => (final: Long) andThen {
-        step1 = AddOne(value = $.start)
-        step2 = AddOne(value = step1.result)
-        step3 = AddOne(value = step2.result)
+        step1 = handlers.AddOne(value = $.start)
+        step2 = handlers.AddOne(value = step1.result)
+        step3 = handlers.AddOne(value = step2.result)
         yield ChainOfThree(final = step3.result)
+    }
+}
+''',
+    "parallel-example": '''
+// Parallel workflow - demonstrates concurrent step execution
+namespace parallel {
+    use handlers
+
+    // Two independent AddOne calls can execute in parallel
+    workflow ParallelAdd(a: Long, b: Long) => (sumPlusTwo: Long) andThen {
+        // These two steps have no dependencies on each other
+        addedA = handlers.AddOne(value = $.a)
+        addedB = handlers.AddOne(value = $.b)
+        // This step depends on both previous steps
+        product = handlers.Multiply(a = addedA.result, b = addedB.result)
+        yield ParallelAdd(sumPlusTwo = product.result)
     }
 }
 ''',

@@ -792,12 +792,8 @@ class RunnerService:
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
 
-            # Find workflow AST by name
-            workflow_ast = None
-            for w in program_dict.get("workflows", []):
-                if w["name"] == workflow_name:
-                    workflow_ast = w
-                    break
+            # Find workflow AST by name (supports qualified names like "ns.WorkflowName")
+            workflow_ast = self._find_workflow_in_program(program_dict, workflow_name)
 
             if workflow_ast is None:
                 raise RuntimeError(f"Workflow '{workflow_name}' not found in flow '{flow_id}'")
@@ -843,6 +839,75 @@ class RunnerService:
                 runner.duration = runner.end_time - runner.start_time
                 self._persistence.save_runner(runner)
             raise
+
+    def _find_workflow_in_program(self, program_dict: dict, workflow_name: str) -> dict | None:
+        """Find a workflow in the program AST by name.
+
+        Supports both simple names ("WorkflowName") and qualified names
+        ("namespace.WorkflowName").
+
+        Args:
+            program_dict: The compiled program AST dict
+            workflow_name: The workflow name to find
+
+        Returns:
+            The workflow AST dict, or None if not found
+        """
+        # Check if it's a qualified name (e.g., "handlers.AddOneWorkflow")
+        if "." in workflow_name:
+            parts = workflow_name.split(".")
+            short_name = parts[-1]
+            ns_parts = parts[:-1]
+
+            # Navigate through namespaces
+            declarations = program_dict.get("declarations", [])
+            for ns_name in ns_parts:
+                found = False
+                for decl in declarations:
+                    if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
+                        declarations = decl.get("declarations", [])
+                        found = True
+                        break
+                if not found:
+                    return None
+
+            # Search for workflow at final level
+            for decl in declarations:
+                if decl.get("type") == "WorkflowDecl" and decl.get("name") == short_name:
+                    return decl
+        else:
+            # Simple name: search top-level workflows first
+            for w in program_dict.get("workflows", []):
+                if w.get("name") == workflow_name:
+                    return w
+
+            # Then search inside namespaces
+            for decl in program_dict.get("declarations", []):
+                if decl.get("type") == "Namespace":
+                    result = self._search_namespace_workflows(decl, workflow_name)
+                    if result:
+                        return result
+
+        return None
+
+    def _search_namespace_workflows(self, namespace: dict, workflow_name: str) -> dict | None:
+        """Recursively search a namespace for a workflow by name.
+
+        Args:
+            namespace: The namespace declaration dict
+            workflow_name: The workflow name to find
+
+        Returns:
+            The workflow AST dict, or None if not found
+        """
+        for decl in namespace.get("declarations", []):
+            if decl.get("type") == "WorkflowDecl" and decl.get("name") == workflow_name:
+                return decl
+            if decl.get("type") == "Namespace":
+                result = self._search_namespace_workflows(decl, workflow_name)
+                if result:
+                    return result
+        return None
 
     # =========================================================================
     # Workflow Resume
@@ -901,11 +966,7 @@ class RunnerService:
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
 
-            for w in program_dict.get("workflows", []):
-                if w["name"] == wf.name:
-                    return w
-
-            return None
+            return self._find_workflow_in_program(program_dict, wf.name)
         except Exception:
             logger.debug("Could not load AST for workflow %s", workflow_id, exc_info=True)
             return None

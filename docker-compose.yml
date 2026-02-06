@@ -87,5 +87,40 @@ services:
     profiles:
       - seed
 
+  # OSM Geocoder agent (handles geocoding and OSM data events)
+  agent-osm-geocoder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder
+    container_name: afl-agent-osm-geocoder
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - osm
+
+  # MCP Server (Model Context Protocol for LLM agents)
+  # MCP uses stdio transport, so run interactively:
+  #   docker compose --profile mcp run --rm mcp
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mcp
+    container_name: afl-mcp
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    profiles:
+      - mcp
+
 volumes:
   mongodb_data:
