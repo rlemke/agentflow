@@ -100,7 +100,7 @@ _stmt_end: (_NL+ | ";" _NL* | )
 // Keywords and literals must come before IDENT
 BOOLEAN.2: "true" | "false"
 NULL.2: "null"
-TYPE_BUILTIN.2: "String" | "Long" | "Int" | "Boolean" | "Json"
+TYPE_BUILTIN.2: "String" | "Long" | "Int" | "Double" | "Boolean" | "Json"
 
 STRING: "\"" _STRING_INNER* "\""
 _STRING_INNER: /[^"\\]/ | _ESCAPE

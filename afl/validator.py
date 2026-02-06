@@ -297,7 +297,7 @@ class AFLValidator:
         return None
 
     # Builtin types that don't require schema resolution
-    BUILTIN_TYPES = {"String", "Long", "Int", "Boolean", "Json"}
+    BUILTIN_TYPES = {"String", "Long", "Int", "Double", "Boolean", "Json"}
 
     def _validate_type_ref(
         self, type_node: TypeRef | ArrayType, location: SourceLocation | None = None
