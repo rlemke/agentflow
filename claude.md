@@ -253,6 +253,7 @@ agentflow/
 │       ├── test_europe_train.py # End-to-end Swiss mountain railway pipeline example (mock handlers)
 │       ├── test_japan_bus.py   # End-to-end Japanese mountain bus routes pipeline example (mock handlers)
 │       ├── test_newyork_transit.py # End-to-end New York public transport pipeline example (mock handlers)
+│       ├── test_london_pois.py # End-to-end London points of interest pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -597,6 +598,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end Swiss mountain railway example (`test_europe_train.py`): 5-step mock pipeline (ResolveRegion → ExtractRoutes → EnrichWithElevation → FilterByMaxElevation → RenderMap)
   - End-to-end Japanese mountain bus routes example (`test_japan_bus.py`): 5-step mock pipeline (ResolveRegion → ExtractRoutes → EnrichWithElevation → FilterByMaxElevation → RenderMap)
   - End-to-end New York public transport example (`test_newyork_transit.py`): 3-step mock pipeline (ResolveRegion → PublicTransport → RenderMap)
+  - End-to-end London POI example (`test_london_pois.py`): 3-step mock pipeline (ResolveRegion → POI → RenderMap)
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
