@@ -15,6 +15,7 @@ from .operations_handlers import register_operations_handlers
 from .park_handlers import register_park_handlers
 from .poi_handlers import register_poi_handlers
 from .population_handlers import register_population_handlers
+from .region_handlers import register_region_handlers
 from .road_handlers import register_road_handlers
 from .route_handlers import register_route_handlers
 from .tiger_handlers import register_tiger_handlers
@@ -33,6 +34,7 @@ __all__ = [
     "register_park_handlers",
     "register_poi_handlers",
     "register_population_handlers",
+    "register_region_handlers",
     "register_road_handlers",
     "register_route_handlers",
     "register_tiger_handlers",
@@ -54,6 +56,7 @@ def register_all_handlers(poller) -> None:
     register_park_handlers(poller)
     register_poi_handlers(poller)
     register_population_handlers(poller)
+    register_region_handlers(poller)
     register_road_handlers(poller)
     register_route_handlers(poller)
     register_tiger_handlers(poller)
