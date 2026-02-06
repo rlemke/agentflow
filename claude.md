@@ -214,7 +214,7 @@ agentflow/
 │                   └── AgentPollerTest.java # JUnit 5 tests
 ├── examples/                   # Example agents and workflows
 │   └── osm-geocoder/           # OSM geocoding and data processing agent
-│       ├── afl/                # AFL source files (20 files)
+│       ├── afl/                # AFL source files (22 files)
 │       │   ├── geocoder.afl    # Schema, event facet, geocoding workflows
 │       │   ├── osmtypes.afl    # OSMCache, GraphHopperCache schemas
 │       │   ├── osmcache.afl    # ~250 cache event facets (11 namespaces)
@@ -234,15 +234,20 @@ agentflow/
 │       │   ├── osmunitedstates.afl # US states workflow
 │       │   ├── osmcontinents.afl # Continents workflow
 │       │   ├── osmworld.afl    # World workflow (composes all regions)
-│       │   └── osmshapefiles.afl # Europe shapefile download workflow
-│       ├── handlers/           # Python event handlers (~480 facets)
+│       │   ├── osmshapefiles.afl # Europe shapefile download workflow
+│       │   ├── osmregion.afl  # Region resolution event facets (ResolveRegion, ResolveRegions, ListRegions)
+│       │   └── osmregion_workflows.afl # Region-based elevation+map workflows (BicycleElevationMapByRegion, etc.)
+│       ├── handlers/           # Python event handlers (~480+ facets)
 │       │   ├── __init__.py     # register_all_handlers(poller)
 │       │   ├── cache_handlers.py # ~250 region cache handlers (Geofabrik)
 │       │   ├── operations_handlers.py # 13 data processing handlers
 │       │   ├── poi_handlers.py # 8 POI extraction handlers
-│       │   └── graphhopper_handlers.py # ~200 GraphHopper routing handlers
+│       │   ├── graphhopper_handlers.py # ~200 GraphHopper routing handlers
+│       │   ├── region_resolver.py # Region name resolver (~280 regions, ~78 aliases, 25 geographic features)
+│       │   └── region_handlers.py # ResolveRegion/ResolveRegions/ListRegions handlers
 │       ├── agent.py            # Live agent (AgentPoller + Nominatim API)
 │       ├── test_geocoder.py    # Offline end-to-end test
+│       ├── test_region_resolver.py # Region resolver unit tests (80 tests)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -557,7 +562,7 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ 42 tests passing (protocol constants verification, serialization round-trips, poller unit tests)
 
 ### Completed (v0.5.3) - OSM Geocoder Example
-- ✅ 20 AFL source files defining geographic data processing workflows
+- ✅ 22 AFL source files defining geographic data processing workflows
 - ✅ `OSMCache` and `GraphHopperCache` schema declarations (`osmtypes.afl`)
 - ✅ ~250 cache event facets across 11 geographic namespaces (`osmcache.afl`)
 - ✅ 13 operations event facets: Download, Tile, RoutingGraph, Status, PostGisImport, DownloadShapefile (plus *All variants) (`osmoperations.afl`)
@@ -573,9 +578,17 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ World workflow orchestrating all regional workflows (`osmworld.afl`)
 - ✅ Python handler modules with Geofabrik URL registry and factory-pattern handler generation
 - ✅ Multi-format downloader: `download(region, fmt="pbf"|"shp")` supports PBF (default) and Geofabrik free shapefiles
-- ✅ `register_all_handlers(poller)` for batch registration of ~480 event facet handlers
+- ✅ `register_all_handlers(poller)` for batch registration of ~480+ event facet handlers
 - ✅ Agent updated to handle geocoding + all OSM data events + GraphHopper routing
-- ✅ 879 tests passing
+- ✅ **Region name resolution** (`osmregion.afl`, `region_resolver.py`, `region_handlers.py`):
+  - Resolves human-friendly names ("Colorado", "UK", "the Alps") to Geofabrik download paths
+  - ~280 indexed regions from `REGION_REGISTRY`, ~78 aliases (country abbreviations, US postal codes, Canadian provinces)
+  - 25 geographic features (Alps, Rockies, Scandinavia, Benelux, New England, etc.)
+  - `prefer_continent` disambiguation for ambiguous names (e.g. Georgia)
+  - 3 event facets: `ResolveRegion`, `ResolveRegions`, `ListRegions`
+  - 3 composed region-based workflows: `BicycleElevationMapByRegion`, `HikingElevationMapByRegion`, `RouteMapByRegion`
+  - 80 unit tests for resolver
+- ✅ 879 tests passing (main suite) + 80 region resolver tests
 
 ### Completed (v0.7.0) - LLM Integration & Multi-Language Agents
 - ✅ **Async AgentPoller**: `register_async()` for async/await handlers (LLM integration)
@@ -725,6 +738,7 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **afl:resume**: Protocol task inserted by external agents after writing step returns; signals the Python RunnerService to resume the workflow
 - **afl:execute**: Protocol task for executing a compiled workflow from a flow stored in MongoDB
 - **Async Handler**: Handler function that returns a coroutine/Promise/Future; supported in Python (`register_async`), TypeScript, and Java
+- **Region Resolver**: Pure Python module (`region_resolver.py`) that maps human-friendly region names to Geofabrik download paths using an inverted index of `REGION_REGISTRY`, aliases, and geographic features
 
 ### MCP terms
 - **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication
