@@ -6,7 +6,8 @@ WORKDIR /app
 # Install dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[dashboard,mongodb]" || \
-    pip install --no-cache-dir fastapi uvicorn jinja2 pymongo python-multipart
+    pip install --no-cache-dir fastapi uvicorn jinja2 pymongo python-multipart && \
+    pip install --no-cache-dir python-multipart
 
 # Copy application code
 COPY afl/ ./afl/

@@ -17,6 +17,9 @@ import sys
 # Add parent to path for afl imports
 sys.path.insert(0, "/app")
 
+from afl.config import load_config
+from afl.runtime.mongo_store import MongoStore
+from afl.runtime.evaluator import Evaluator
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
 logging.basicConfig(
@@ -85,18 +88,26 @@ def main():
     logger.info(f"Starting {agent_name}")
     logger.info(f"MongoDB: {mongodb_url}/{database}")
 
+    # Create MongoDB store
+    store = MongoStore(connection_string=mongodb_url, database_name=database)
+
+    # Create evaluator (needed for workflow resumption)
+    evaluator = Evaluator(store)
+
     # Create poller config
     config = AgentPollerConfig(
         service_name=agent_name,
         server_group="docker-agents",
-        mongodb_url=mongodb_url,
-        database=database,
         poll_interval_ms=1000,
         max_concurrent=5,
     )
 
     # Create poller and register handlers
-    poller = AgentPoller(config)
+    poller = AgentPoller(
+        persistence=store,
+        evaluator=evaluator,
+        config=config,
+    )
 
     # Register handlers for various event facets
     poller.register("handlers.AddOne", handle_addone)

@@ -12,7 +12,7 @@ services:
     image: mongo:7
     container_name: afl-mongodb
     ports:
-      - "27017:27017"
+      - "${MONGODB_PORT:-27018}:27017"  # Use 27018 externally to avoid conflicts
     volumes:
       - mongodb_data:/data/db
     healthcheck:

@@ -171,13 +171,17 @@ def seed_database():
             "uuid": task_id,
             "name": "afl:execute",
             "flow_id": addone_flow["uuid"],
+            "workflow_id": "",
             "workflow_name": "handlers.AddOneWorkflow",
+            "runner_id": "",
+            "step_id": "",
             "state": "pending",
             "created": datetime.utcnow().isoformat(),
             "updated": datetime.utcnow().isoformat(),
             "data": {
                 "inputs": {"input": 41},
             },
+            "data_type": "execute",
             "task_list_name": "afl:execute",
             "seeded": True,
         }
