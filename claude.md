@@ -249,6 +249,7 @@ agentflow/
 │       ├── test_geocoder.py    # Offline end-to-end test
 │       ├── test_region_resolver.py # Region resolver unit tests (80 tests)
 │       ├── test_alps_bicycle.py # End-to-end Alps bicycle route pipeline example (mock handlers)
+│       ├── test_colorado_hiking.py # End-to-end Colorado hiking trails pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -589,6 +590,7 @@ Each developer can use their own database name to avoid conflicts:
   - 3 event facets: `ResolveRegion`, `ResolveRegions`, `ListRegions`
   - 3 composed region-based workflows: `BicycleElevationMapByRegion`, `HikingElevationMapByRegion`, `RouteMapByRegion`
   - End-to-end Alps bicycle route example (`test_alps_bicycle.py`): 5-step mock pipeline (ResolveRegion → BicycleRoutes → EnrichWithElevation → FilterByMaxElevation → RenderMap)
+  - End-to-end Colorado hiking trails example (`test_colorado_hiking.py`): 5-step mock pipeline (ResolveRegion → HikingTrails → EnrichWithElevation → FilterByMaxElevation → RenderMap)
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
