@@ -60,6 +60,40 @@ pip install -e ".[dev,test,dashboard,mcp,mongodb]"
 | `dashboard` | fastapi, uvicorn, jinja2 |
 | `mcp` | mcp |
 
+### Docker: One-Command Local Stack
+
+The easiest way to run the full AgentFlow stack is with Docker Compose:
+
+```bash
+# Start everything: MongoDB + Dashboard + Runner + Sample Agent
+docker compose up
+
+# In another terminal, seed example workflows
+docker compose run seed
+```
+
+**Services started:**
+| Service | Port | Description |
+|---------|------|-------------|
+| Dashboard | http://localhost:8080 | Web UI for monitoring workflows |
+| MongoDB | localhost:27017 | Database for workflow state |
+| Runner | - | Distributed execution service |
+| Agent | - | Sample AddOne agent |
+
+**After seeding**, the dashboard will show example workflows you can execute:
+- `handlers.AddOneWorkflow` — Adds 1 to input (try input=41, expect output=42)
+- `handlers.DoubleAddOne` — Adds 1 twice
+- `handlers.MultiplyAndAdd` — Multiplies then adds 1
+- `chain.ChainOfThree` — Three sequential additions
+
+```bash
+# Stop all services
+docker compose down
+
+# Stop and remove data volumes
+docker compose down -v
+```
+
 ### Running Tests
 
 ```bash

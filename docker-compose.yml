@@ -1,0 +1,91 @@
+# AgentFlow Development Stack
+#
+# Start with: docker compose up
+# Dashboard: http://localhost:8080
+# MongoDB: localhost:27017
+#
+# Seed example workflows: docker compose exec seed python /app/seed.py
+
+services:
+  # MongoDB database
+  mongodb:
+    image: mongo:7
+    container_name: afl-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: mongosh --eval "db.runCommand('ping').ok" --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Web dashboard for monitoring workflows
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: afl-dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://localhost:8080/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Distributed runner service
+  runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runner
+    container_name: afl-runner
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Sample AddOne agent (demonstrates event facet handling)
+  agent-addone:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent
+    container_name: afl-agent-addone
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+      - AFL_AGENT_NAME=addone-agent
+      - AFL_AGENT_HANDLERS=handlers.AddOne
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Seed service (runs once to populate example workflows)
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.seed
+    container_name: afl-seed
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    profiles:
+      - seed
+
+volumes:
+  mongodb_data:

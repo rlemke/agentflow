@@ -1,0 +1,15 @@
+# AgentFlow Sample Agent
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Copy application code
+COPY afl/ ./afl/
+COPY docker/agents/ ./agents/
+
+CMD ["python", "-m", "agents.addone_agent"]

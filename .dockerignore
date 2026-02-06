@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+.eggs
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build
+build
+dist
+*.egg
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Tests (keep for development, exclude for production)
+# tests/
+
+# Documentation
+*.md
+docs/
+spec/
+
+# Examples output
+examples/osm-geocoder/test_data/*_elevated*.geojson
+
+# Misc
+.DS_Store
+*.log

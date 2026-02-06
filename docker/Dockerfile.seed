@@ -1,0 +1,16 @@
+# AgentFlow Seed Service
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Copy application code
+COPY afl/ ./afl/
+COPY docker/seed/ ./seed/
+COPY examples/ ./examples/
+
+CMD ["python", "/app/seed/seed.py"]
