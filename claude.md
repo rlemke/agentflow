@@ -261,6 +261,7 @@ agentflow/
 │       ├── test_canada_boundaries.py # End-to-end Canadian boundaries pipeline example (mock handlers)
 │       ├── test_india_filters.py # End-to-end Indian boundary filtering pipeline example (mock handlers)
 │       ├── test_germany_graphhopper.py # End-to-end Germany GraphHopper routing graph example (mock handlers)
+│       ├── test_nigeria_population.py # End-to-end Nigerian population data pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -613,6 +614,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end Canadian boundaries example (`test_canada_boundaries.py`): 4-step mock pipeline (ResolveRegion → StateBoundaries → LakeBoundaries → RenderMap)
   - End-to-end Indian boundary filtering example (`test_india_filters.py`): 5-step mock pipeline (ResolveRegion → ExtractAndFilterByRadius → FilterByTypeAndRadius → FilterByRadius → RenderMap)
   - End-to-end Germany GraphHopper example (`test_germany_graphhopper.py`): 4-step mock pipeline x3 profiles (ResolveRegion → BuildGraph → ValidateGraph → RenderMap)
+  - End-to-end Nigerian population example (`test_nigeria_population.py`): 5-step mock pipeline (ResolveRegion → ExtractPlacesWithPopulation → FilterByPopulation → PopulationStatistics → RenderMap)
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
