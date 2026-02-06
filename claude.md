@@ -256,6 +256,7 @@ agentflow/
 │       ├── test_london_pois.py # End-to-end London points of interest pipeline example (mock handlers)
 │       ├── test_paris_amenities.py # End-to-end Paris amenities pipeline example (mock handlers)
 │       ├── test_australia_roads.py # End-to-end Australian road network pipeline example (mock handlers)
+│       ├── test_berlin_buildings.py # End-to-end Berlin building footprints pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -603,6 +604,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end London POI example (`test_london_pois.py`): 3-step mock pipeline (ResolveRegion → POI → RenderMap)
   - End-to-end Paris amenities example (`test_paris_amenities.py`): 4-step mock pipeline (ResolveRegion → ExtractAmenities → AmenityStatistics → RenderMap)
   - End-to-end Australian road network example (`test_australia_roads.py`): 4-step mock pipeline (ResolveRegion → ExtractRoads → RoadStatistics → RenderMap)
+  - End-to-end Berlin building footprints example (`test_berlin_buildings.py`): 4-step mock pipeline (ResolveRegion → ExtractBuildings → BuildingStatistics → RenderMap)
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
