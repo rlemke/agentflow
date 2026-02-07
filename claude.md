@@ -268,6 +268,7 @@ agentflow/
 │       ├── test_france_cityroutes.py # End-to-end France all-pairs city driving routes pipeline example (mock handlers)
 │       ├── test_usa_cityroutes.py # End-to-end USA all-pairs city driving routes pipeline example (mock handlers)
 │       ├── test_india_cityroutes.py # End-to-end India all-pairs city driving routes pipeline example (mock handlers)
+│       ├── test_china_cityroutes.py # End-to-end China all-pairs city driving routes pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -627,6 +628,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end France all-pairs city routes example (`test_france_cityroutes.py`): 5-step mock pipeline, 5 cities producing C(5,2)=10 pairwise driving routes with distance/duration matrices
   - End-to-end USA all-pairs city routes example (`test_usa_cityroutes.py`): 5-step mock pipeline, 7 cities producing C(7,2)=21 pairwise driving routes with distance/duration matrices and geographic clusters
   - End-to-end India all-pairs city routes example (`test_india_cityroutes.py`): 5-step mock pipeline, 10 cities producing C(10,2)=45 pairwise driving routes with distance/duration matrices and state clusters
+  - End-to-end China all-pairs city routes example (`test_china_cityroutes.py`): 5-step mock pipeline referencing `osmcityrouting.afl` real data pipeline, 12 cities between 3-5M producing C(12,2)=66 pairwise driving routes with G-expressway names and IATA-style matrix headers
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
