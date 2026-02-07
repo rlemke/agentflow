@@ -158,3 +158,134 @@ def run_to_completion(
             return result
 
     return result
+
+
+# =============================================================================
+# Distributed Test Helpers
+# =============================================================================
+
+
+def store_flow(
+    db: "Database",
+    name: str,
+    afl_sources: list[tuple[str, str]],
+) -> str:
+    """Store a flow in MongoDB using MongoStore.save_flow().
+
+    Creates a FlowDefinition with compiled_sources and saves it via the
+    proper MongoStore serialization path so RunnerService can load it.
+
+    Args:
+        db: A pymongo Database instance (e.g. from MongoClient["afl"])
+        name: Human-readable flow name
+        afl_sources: List of (filename, source_text) tuples
+
+    Returns:
+        The flow's UUID string
+    """
+    import uuid as _uuid
+
+    from afl.runtime.entities import FlowDefinition, FlowIdentity, SourceText
+    from afl.runtime.mongo_store import MongoStore
+
+    flow_id = str(_uuid.uuid4())
+    flow = FlowDefinition(
+        uuid=flow_id,
+        name=FlowIdentity(name=name, path=f"/test/{name}", uuid=flow_id),
+        compiled_sources=[
+            SourceText(name=filename, content=content)
+            for filename, content in afl_sources
+        ],
+    )
+
+    # Create a MongoStore wrapping the existing db's client
+    store = MongoStore(client=db.client, database_name=db.name, create_indexes=True)
+    store.save_flow(flow)
+    return flow_id
+
+
+def submit_workflow(
+    db: "Database",
+    flow_id: str,
+    workflow_name: str,
+    inputs: dict | None = None,
+) -> str:
+    """Submit an afl:execute task to the task queue.
+
+    Creates a task document that RunnerService will pick up and execute.
+    Uses task_list_name="default" to match RunnerService's default poll.
+
+    Args:
+        db: A pymongo Database instance
+        flow_id: UUID of the flow to execute
+        workflow_name: Qualified workflow name (e.g. "handlers.AddOneWorkflow")
+        inputs: Workflow input parameters
+
+    Returns:
+        The task's UUID string
+    """
+    import time as _time
+    import uuid as _uuid
+
+    task_id = str(_uuid.uuid4())
+    now_ms = int(_time.time() * 1000)
+
+    task_doc = {
+        "uuid": task_id,
+        "name": "afl:execute",
+        "runner_id": "",
+        "workflow_id": "",
+        "flow_id": flow_id,
+        "step_id": "",
+        "state": "pending",
+        "created": now_ms,
+        "updated": now_ms,
+        "error": None,
+        "task_list_name": "default",
+        "data_type": "execute",
+        "data": {
+            "flow_id": flow_id,
+            "workflow_name": workflow_name,
+            "inputs": inputs or {},
+        },
+    }
+
+    db.tasks.insert_one(task_doc)
+    return task_id
+
+
+def wait_for_task(
+    db: "Database",
+    task_id: str,
+    timeout_s: int = 120,
+    poll_interval_s: float = 2.0,
+) -> dict:
+    """Poll the tasks collection until a task reaches a terminal state.
+
+    Args:
+        db: A pymongo Database instance
+        task_id: UUID of the task to watch
+        timeout_s: Maximum seconds to wait
+        poll_interval_s: Seconds between polls
+
+    Returns:
+        The raw task document from MongoDB
+
+    Raises:
+        TimeoutError: If the task does not complete within timeout_s
+    """
+    import time as _time
+
+    deadline = _time.monotonic() + timeout_s
+    while _time.monotonic() < deadline:
+        doc = db.tasks.find_one({"uuid": task_id})
+        if doc and doc.get("state") not in ("pending", "running"):
+            return doc
+        _time.sleep(poll_interval_s)
+
+    # Fetch final state for the error message
+    doc = db.tasks.find_one({"uuid": task_id})
+    state = doc.get("state", "unknown") if doc else "not found"
+    raise TimeoutError(
+        f"Task {task_id} did not complete within {timeout_s}s (state={state})"
+    )
