@@ -188,8 +188,12 @@ fi
 SCALE_ARGS=""
 SCALE_ARGS="$SCALE_ARGS --scale runner=$RUNNERS"
 SCALE_ARGS="$SCALE_ARGS --scale agent-addone=$AGENTS"
-SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder=$OSM_AGENTS"
-SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder-lite=$OSM_LITE_AGENTS"
+if [ "$OSM_AGENTS" -gt 0 ]; then
+    SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder=$OSM_AGENTS"
+fi
+if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
+    SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder-lite=$OSM_LITE_AGENTS"
+fi
 
 echo "Starting AgentFlow stack..."
 echo "  Runners:          $RUNNERS"
