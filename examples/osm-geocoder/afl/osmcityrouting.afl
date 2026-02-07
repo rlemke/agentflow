@@ -1,0 +1,146 @@
+// City-to-city driving route workflows
+//
+// Resolves a region, downloads OSM data, builds a GraphHopper routing graph,
+// extracts cities with population, filters by population range, computes
+// pairwise driving routes between all qualifying cities, and renders a map.
+//
+// This is a real end-to-end pipeline using existing event facets:
+//   - osm.geo.Region.ResolveRegion          (region_resolver.py)
+//   - osm.geo.Operations.Download           (operations_handlers.py → downloader.py)
+//   - osm.geo.Operations.GraphHopper.*      (graphhopper_handlers.py)
+//   - osm.geo.Population.*                  (osmfilters_population.afl handlers)
+//   - osm.geo.Visualization.RenderLayers    (visualization handlers)
+//
+// Prerequisites: Compile with osmtypes.afl, osmregion.afl, osmoperations.afl,
+//   osmgraphhopper.afl, osmfilters_population.afl, osmvisualization.afl
+
+// --- New event facet: compute pairwise driving routes via GraphHopper ---
+
+namespace osm.geo.Routing {
+    use osm.types
+
+    schema PairwiseRoutingResult {
+        output_path: String
+        route_count: Long
+        city_count: Long
+        total_distance_km: Long
+        total_duration_min: Long
+        avg_distance_km: Long
+        avg_duration_min: Long
+        profile: String
+        format: String
+    }
+
+    // Compute all-pairs shortest-path driving routes between cities in a GeoJSON
+    // using a pre-built GraphHopper routing graph.
+    // Returns a GeoJSON with LineString geometries for each route segment.
+    event facet ComputePairwiseRoutes(
+        cities_path: String,
+        graph: GraphHopperCache
+    ) => (result: PairwiseRoutingResult)
+}
+
+// --- Workflow: full pipeline from region name to rendered route map ---
+
+namespace osm.geo.CityRouting {
+    use osm.types
+    use osm.geo.Region
+    use osm.geo.Operations
+    use osm.geo.Operations.GraphHopper
+    use osm.geo.Population
+    use osm.geo.Routing
+    use osm.geo.Visualization
+
+    workflow CityRouteMap(
+        region: String,
+        min_population: Long = 1000000,
+        max_population: Long = 2000000,
+        profile: String = "car",
+        recreate: Boolean = false,
+        prefer_continent: String = "",
+        title: String = "City Driving Routes",
+        color: String = "#27ae60"
+    ) => (
+        map_path: String,
+        region_name: String,
+        city_count: Long,
+        route_count: Long,
+        total_distance_km: Long,
+        avg_distance_km: Long,
+        node_count: Long,
+        edge_count: Long
+    ) andThen {
+
+        // 1. Resolve the human-friendly name to a Geofabrik download URL
+        //    e.g. "Germany" → download.geofabrik.de/europe/germany-latest.osm.pbf
+        resolved = ResolveRegion(
+            name = $.region,
+            prefer_continent = $.prefer_continent
+        )
+
+        // 2. Download the .osm.pbf file if not already in the local cache
+        //    The handler checks resolved.cache.wasInCache and skips if true
+        downloaded = Download(cache = resolved.cache)
+
+        // 3. Build a GraphHopper routing graph from the PBF
+        //    If recreate=false and graph directory exists, returns the cached graph
+        //    Otherwise: PBF → OSM import → contraction hierarchy → graph directory
+        graph = BuildGraph(
+            cache = resolved.cache,
+            profile = $.profile,
+            recreate = $.recreate
+        )
+
+        // 4. Validate the graph is usable and get node/edge statistics
+        validation = ValidateGraph(graph = graph.graph)
+
+        // 5. Extract all cities with population tags from the same PBF
+        //    Reads place=city nodes, writes GeoJSON with name + population
+        cities = ExtractPlacesWithPopulation(
+            cache = resolved.cache,
+            place_type = "city",
+            min_population = $.min_population
+        )
+
+        // 6. Filter to the desired population range
+        filtered = FilterByPopulationRange(
+            input_path = cities.result.output_path,
+            min_population = $.min_population,
+            max_population = $.max_population
+        )
+
+        // 7. Get population statistics for the filtered set
+        stats = PopulationStatistics(
+            input_path = filtered.result.output_path,
+            place_type = "city"
+        )
+
+        // 8. Compute all-pairs driving routes between filtered cities
+        //    Uses the GraphHopper graph to find shortest paths
+        //    N cities → C(N,2) route segments as LineString geometries
+        routes = ComputePairwiseRoutes(
+            cities_path = filtered.result.output_path,
+            graph = graph.graph
+        )
+
+        // 9. Render the cities + routes as a two-layer map
+        //    Layer 1: city markers (points)
+        //    Layer 2: route segments (linestrings)
+        map = RenderLayers(
+            layers = filtered.result.output_path ++ routes.result.output_path,
+            colors = "#e74c3c" ++ $.color,
+            title = $.title
+        )
+
+        yield CityRouteMap(
+            map_path = map.result.output_path,
+            region_name = resolved.resolution.matched_name,
+            city_count = filtered.result.feature_count,
+            route_count = routes.result.route_count,
+            total_distance_km = routes.result.total_distance_km,
+            avg_distance_km = routes.result.avg_distance_km,
+            node_count = validation.nodeCount,
+            edge_count = validation.edgeCount
+        )
+    }
+}
