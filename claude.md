@@ -265,6 +265,7 @@ agentflow/
 │       ├── test_southafrica_voting.py # End-to-end South Africa voting locations pipeline example (mock handlers)
 │       ├── test_germany_cityroutes.py # End-to-end Germany city-to-city driving routes pipeline example (mock handlers)
 │       ├── test_france_cityroutes.py # End-to-end France all-pairs city driving routes pipeline example (mock handlers)
+│       ├── test_usa_cityroutes.py # End-to-end USA all-pairs city driving routes pipeline example (mock handlers)
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -621,6 +622,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end South Africa voting locations example (`test_southafrica_voting.py`): 5-step mock pipeline (ResolveRegion → ExtractAmenities → AdminBoundary → SearchAmenities → RenderMap)
   - End-to-end Germany city routes example (`test_germany_cityroutes.py`): 5-step mock pipeline (ResolveRegion → ExtractPlacesWithPopulation → FilterByPopulationRange → BuildRoutesBetweenCities → RenderMap)
   - End-to-end France all-pairs city routes example (`test_france_cityroutes.py`): 5-step mock pipeline, 5 cities producing C(5,2)=10 pairwise driving routes with distance/duration matrices
+  - End-to-end USA all-pairs city routes example (`test_usa_cityroutes.py`): 5-step mock pipeline, 7 cities producing C(7,2)=21 pairwise driving routes with distance/duration matrices and geographic clusters
   - 80 unit tests for resolver
 - ✅ 879 tests passing (main suite) + 80 region resolver tests
 
