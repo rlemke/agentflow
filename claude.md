@@ -236,7 +236,8 @@ agentflow/
 │       │   ├── osmworld.afl    # World workflow (composes all regions)
 │       │   ├── osmshapefiles.afl # Europe shapefile download workflow
 │       │   ├── osmregion.afl  # Region resolution event facets (ResolveRegion, ResolveRegions, ListRegions)
-│       │   └── osmregion_workflows.afl # Region-based elevation+map workflows (BicycleElevationMapByRegion, etc.)
+│       │   ├── osmregion_workflows.afl # Region-based elevation+map workflows (BicycleElevationMapByRegion, etc.)
+│       │   └── osmcityrouting.afl # City-to-city pairwise driving route workflow (9-step real pipeline)
 │       ├── handlers/           # Python event handlers (~480+ facets)
 │       │   ├── __init__.py     # register_all_handlers(poller)
 │       │   ├── cache_handlers.py # ~250 region cache handlers (Geofabrik)
@@ -592,6 +593,7 @@ Each developer can use their own database name to avoid conflicts:
   - Regional workflow compositions: BuildMajorEuropeGraphs, BuildNorthAmericaGraphs, BuildWestCoastGraphs, BuildEastCoastGraphs (`osmgraphhopper_workflows.afl`)
   - `recreate` flag parameter to control graph rebuilding (default: use cached graph if exists)
   - Supports routing profiles: car, bike, foot, motorcycle, truck, hike, mtb, racingbike
+- ✅ City-to-city pairwise routing workflow (`osmcityrouting.afl`): 9-step pipeline composing ResolveRegion → Download → BuildGraph → ValidateGraph → ExtractPlacesWithPopulation → FilterByPopulationRange → PopulationStatistics → ComputePairwiseRoutes → RenderLayers; defines `osm.geo.Routing` namespace with `ComputePairwiseRoutes` event facet and `PairwiseRoutingResult` schema
 - ✅ Regional workflows composing cache lookups with download operations (Africa, Asia, Australia, Canada, Central America, Europe, North America, South America, United States, Continents)
 - ✅ Shapefile download workflow for Europe (`osmshapefiles.afl`) — reuses cache facets, routes through `DownloadShapefile`
 - ✅ World workflow orchestrating all regional workflows (`osmworld.afl`)
