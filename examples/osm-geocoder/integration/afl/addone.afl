@@ -1,0 +1,17 @@
+// Simplest integration test workflow: AddOne
+//
+// Demonstrates the full pipeline: AFL source → compile → MongoStore →
+// Evaluator → AgentPoller → handler → completion.
+
+namespace handlers {
+    event facet AddOne(input: Long) => (output: Long)
+}
+
+namespace test {
+    use handlers
+
+    workflow TestAddOne(x: Long) => (result: Long) andThen {
+        step = AddOne(input = $.x)
+        yield TestAddOne(result = step.output)
+    }
+}

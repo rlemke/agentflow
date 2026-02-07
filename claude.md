@@ -245,7 +245,8 @@ agentflow/
 │       │   ├── poi_handlers.py # 8 POI extraction handlers
 │       │   ├── graphhopper_handlers.py # ~200 GraphHopper routing handlers
 │       │   ├── region_resolver.py # Region name resolver (~280 regions, ~78 aliases, 25 geographic features)
-│       │   └── region_handlers.py # ResolveRegion/ResolveRegions/ListRegions handlers
+│       │   ├── region_handlers.py # ResolveRegion/ResolveRegions/ListRegions handlers
+│       │   └── routing_handlers.py # ComputePairwiseRoutes handler (GraphHopper + great-circle fallback)
 │       ├── agent.py            # Live agent (AgentPoller + Nominatim API)
 │       ├── test_geocoder.py    # Offline end-to-end test
 │       ├── test_region_resolver.py # Region resolver unit tests (80 tests)
@@ -269,6 +270,18 @@ agentflow/
 │       ├── test_usa_cityroutes.py # End-to-end USA all-pairs city driving routes pipeline example (mock handlers)
 │       ├── test_india_cityroutes.py # End-to-end India all-pairs city driving routes pipeline example (mock handlers)
 │       ├── test_china_cityroutes.py # End-to-end China all-pairs city driving routes pipeline example (mock handlers)
+│       ├── integration/         # Live integration tests (require MongoDB)
+│       │   ├── conftest.py     # MongoDB fixtures, skip logic
+│       │   ├── helpers.py      # compile_afl_files, extract_workflow, run_to_completion
+│       │   ├── afl/
+│       │   │   ├── addone.afl  # Simple AddOne workflow
+│       │   │   ├── resolve_region_test.afl # Test workflow calling ResolveRegion
+│       │   │   └── population_pipeline.afl # 4-step population workflow
+│       │   ├── test_addone.py  # AddOne: compile AFL → MongoStore → AgentPoller → handler
+│       │   ├── test_region_resolution.py # Multi-file compilation + real region resolver
+│       │   ├── test_population_pipeline.py # Geofabrik download + osmium extraction + stats
+│       │   ├── test_city_routing.py # Full 9-step CityRouteMap pipeline
+│       │   └── README.md       # Prerequisites and usage docs
 │       ├── requirements.txt    # Python dependencies (requests)
 │       └── README.md           # Example documentation
 ├── scripts/                    # Executable convenience scripts
@@ -659,6 +672,17 @@ Each developer can use their own database name to avoid conflicts:
   - Maven project with JUnit 5 tests
   - `Handler` functional interface for lambda registration
 - ✅ 879 tests passing
+
+### Completed (v0.7.1) - Live Integration Examples
+- ✅ **Integration test infrastructure** (`examples/osm-geocoder/integration/`):
+  - `conftest.py`: MongoDB fixtures (MongoStore, Evaluator, AgentPoller), skip logic
+  - `helpers.py`: `compile_afl_files()`, `extract_workflow()`, `run_to_completion()` — compile from real `.afl` files, run through full AgentPoller pipeline
+- ✅ **AddOne integration test** (`test_addone.py`): Simplest case — compile AFL → MongoStore → AgentPoller → handler → completion
+- ✅ **Region resolution integration test** (`test_region_resolution.py`): Multi-file AFL compilation (osmtypes.afl + osmregion.afl) with real `region_resolver.py` (pure Python, no network)
+- ✅ **Population pipeline integration test** (`test_population_pipeline.py`): 4-step pipeline — ResolveRegion → ExtractPlacesWithPopulation → FilterByPopulationRange → PopulationStatistics (requires requests + osmium)
+- ✅ **City routing integration test** (`test_city_routing.py`): Full 9-step CityRouteMap pipeline with all real handlers (requires requests + osmium + folium + GraphHopper)
+- ✅ **ComputePairwiseRoutes handler** (`handlers/routing_handlers.py`): All-pairs shortest-path driving routes via GraphHopper API with great-circle fallback
+- ✅ Tests require `--mongodb` flag, optional deps auto-skipped with `pytest.importorskip`
 
 ### MCP Protocol Messages
 
