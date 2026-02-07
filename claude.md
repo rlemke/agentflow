@@ -282,9 +282,19 @@ agentflow/
 │       │   ├── test_population_pipeline.py # Geofabrik download + osmium extraction + stats
 │       │   ├── test_city_routing.py # Full 9-step CityRouteMap pipeline
 │       │   └── README.md       # Prerequisites and usage docs
-│       ├── requirements.txt    # Python dependencies (requests)
+│       ├── requirements.txt    # Python dependencies (osmium, shapely, pyproj, folium, requests)
 │       └── README.md           # Example documentation
+├── docker/                     # Docker configurations
+│   ├── Dockerfile.dashboard    # Dashboard image
+│   ├── Dockerfile.runner       # Runner service image
+│   ├── Dockerfile.agent        # Sample AddOne agent image
+│   ├── Dockerfile.osm-geocoder # Full OSM agent (osmium, shapely, pyproj, folium, Java, GraphHopper)
+│   ├── Dockerfile.osm-geocoder-lite # Lightweight OSM agent (requests only, no Java)
+│   ├── Dockerfile.seed         # Seed service image
+│   ├── Dockerfile.mcp          # MCP server image
+│   └── README.md               # Docker stack documentation
 ├── scripts/                    # Executable convenience scripts
+│   ├── setup                   # Docker bootstrap: install, build, start with scaling
 │   ├── compile                 # Compile AFL source to JSON
 │   ├── server                  # Run a workflow from MongoDB
 │   ├── runner                  # Start the distributed runner service
@@ -428,7 +438,11 @@ cd agents/scala/afl-agent && sbt package
 ### Convenience scripts
 All scripts are in `scripts/` and are self-contained (no need to set `PYTHONPATH`):
 ```bash
-scripts/compile input.afl -o output.json      # compile AFL to JSON
+scripts/setup                                  # bootstrap Docker stack (install, build, start)
+scripts/setup --runners 3 --agents 2           # start with scaling
+scripts/setup --osm-agents 1 --build           # include OSM agents, force rebuild
+scripts/setup --check-only                     # verify Docker is available
+scripts/compile input.afl -o output.json       # compile AFL to JSON
 scripts/compile input.afl --check              # syntax check only
 scripts/server --workflow MyWorkflow           # execute a workflow from MongoDB
 scripts/server --flow-id ID --input '{"x":1}' # execute with inputs
@@ -442,6 +456,55 @@ scripts/mcp-server --config /path/to/config.json
 scripts/db-stats                               # show database statistics
 scripts/db-stats --json                        # output stats as JSON
 ```
+
+### Docker stack
+The `docker-compose.yml` defines the full development stack. Runner and agent services support horizontal scaling.
+
+```bash
+# Bootstrap: install Docker (if needed), build images, start services
+scripts/setup
+
+# Start with scaling
+scripts/setup --runners 3 --agents 2 --osm-agents 1
+
+# Or use docker compose directly
+docker compose up -d
+docker compose up -d --scale runner=3 --scale agent-addone=2
+
+# Seed example workflows
+docker compose --profile seed run --rm seed
+
+# Run MCP server interactively
+docker compose --profile mcp run --rm mcp
+
+# Stop and clean up
+docker compose down        # stop containers
+docker compose down -v     # stop and remove volumes
+```
+
+#### Services
+
+| Service | Port | Scalable | Description |
+|---------|------|----------|-------------|
+| `mongodb` | 27018 | No | MongoDB 7 database |
+| `dashboard` | 8080 | No | Web dashboard |
+| `runner` | - | Yes | Distributed runner service |
+| `agent-addone` | - | Yes | Sample AddOne agent |
+| `agent-osm-geocoder` | - | Yes | Full OSM agent (osmium, Java, GraphHopper) |
+| `agent-osm-geocoder-lite` | - | Yes | Lightweight OSM agent (requests only) |
+| `seed` | - | No | One-shot workflow seeder (profile: seed) |
+| `mcp` | - | No | MCP server, stdio transport (profile: mcp) |
+
+#### Setup script options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--runners N` | 1 | Runner service instances |
+| `--agents N` | 1 | AddOne agent instances |
+| `--osm-agents N` | 0 | Full OSM Geocoder agent instances |
+| `--osm-lite-agents N` | 0 | Lightweight OSM agent instances |
+| `--build` | - | Force image rebuild before starting |
+| `--check-only` | - | Verify Docker availability, then exit |
 
 ### Configuration
 
@@ -805,6 +868,14 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **afl:execute**: Protocol task for executing a compiled workflow from a flow stored in MongoDB
 - **Async Handler**: Handler function that returns a coroutine/Promise/Future; supported in Python (`register_async`), TypeScript, and Java
 - **Region Resolver**: Pure Python module (`region_resolver.py`) that maps human-friendly region names to Geofabrik download paths using an inverted index of `REGION_REGISTRY`, aliases, and geographic features
+
+### Docker terms
+- **Docker stack**: `docker-compose.yml` defining MongoDB, Dashboard, Runner, Agents, Seed, and MCP services
+- **Setup script**: `scripts/setup` — bootstraps Docker (install check, image build, service start with scaling)
+- **Scalable services**: Runner, AddOne agent, OSM geocoder agents — no `container_name`, support `--scale N`
+- **OSM Geocoder (full)**: `Dockerfile.osm-geocoder` — Python osmium, shapely, pyproj, folium + Java JRE + GraphHopper JAR
+- **OSM Geocoder (lite)**: `Dockerfile.osm-geocoder-lite` — requests only, no Java or geospatial C libraries
+- **GraphHopper JAR**: Downloaded at Docker build time from Maven Central to `/opt/graphhopper/graphhopper-web.jar`
 
 ### MCP terms
 - **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication
