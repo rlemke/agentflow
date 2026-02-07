@@ -1,10 +1,11 @@
 # AgentFlow Development Stack
 #
 # Start with: docker compose up
+# Scale with:  docker compose up --scale runner=3 --scale agent-addone=2
 # Dashboard: http://localhost:8080
 # MongoDB: localhost:27017
 #
-# Seed example workflows: docker compose exec seed python /app/seed.py
+# Seed example workflows: docker compose --profile seed run --rm seed
 
 services:
   # MongoDB database
@@ -42,12 +43,11 @@ services:
       timeout: 5s
       retries: 3
 
-  # Distributed runner service
+  # Distributed runner service (scalable)
   runner:
     build:
       context: .
       dockerfile: docker/Dockerfile.runner
-    container_name: afl-runner
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
@@ -56,12 +56,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Sample AddOne agent (demonstrates event facet handling)
+  # Sample AddOne agent (scalable)
   agent-addone:
     build:
       context: .
       dockerfile: docker/Dockerfile.agent
-    container_name: afl-agent-addone
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
@@ -87,12 +86,26 @@ services:
     profiles:
       - seed
 
-  # OSM Geocoder agent (handles geocoding and OSM data events)
+  # OSM Geocoder agent — full image with Java/GraphHopper (scalable)
   agent-osm-geocoder:
     build:
       context: .
       dockerfile: docker/Dockerfile.osm-geocoder
-    container_name: afl-agent-osm-geocoder
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+    volumes:
+      - graphhopper_data:/data/graphhopper
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # OSM Geocoder agent — lite image, no Java/GraphHopper (scalable)
+  agent-osm-geocoder-lite:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder-lite
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
@@ -100,8 +113,6 @@ services:
       mongodb:
         condition: service_healthy
     restart: unless-stopped
-    profiles:
-      - osm
 
   # MCP Server (Model Context Protocol for LLM agents)
   # MCP uses stdio transport, so run interactively:
@@ -124,3 +135,4 @@ services:
 
 volumes:
   mongodb_data:
+  graphhopper_data:

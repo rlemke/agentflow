@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# AgentFlow Docker Bootstrap Script
+#
+# Checks for Docker, builds images, and starts the stack with optional scaling.
+#
+# Usage:
+#   scripts/setup                          # Start with defaults
+#   scripts/setup --runners 3 --agents 2   # Scale runners and agents
+#   scripts/setup --osm-agents 2           # Include OSM geocoder agents
+#   scripts/setup --check-only             # Just verify Docker is available
+#   scripts/setup --build                  # Force rebuild before starting
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Defaults
+RUNNERS=1
+AGENTS=1
+OSM_AGENTS=0
+OSM_LITE_AGENTS=0
+CHECK_ONLY=false
+FORCE_BUILD=false
+
+usage() {
+    cat <<'EOF'
+Usage: scripts/setup [OPTIONS]
+
+Bootstrap the AgentFlow Docker stack.
+
+Options:
+  --runners N          Number of runner instances (default: 1)
+  --agents N           Number of AddOne agent instances (default: 1)
+  --osm-agents N       Number of OSM Geocoder agents — full image with
+                       Java/GraphHopper (default: 0)
+  --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
+                       (default: 0)
+  --check-only         Verify Docker is available, then exit
+  --build              Force rebuild of all images before starting
+  -h, --help           Show this help message
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Parse arguments
+# ---------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --runners)       RUNNERS="$2";          shift 2 ;;
+        --agents)        AGENTS="$2";           shift 2 ;;
+        --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
+        --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
+        --check-only)    CHECK_ONLY=true;       shift ;;
+        --build)         FORCE_BUILD=true;      shift ;;
+        -h|--help)       usage; exit 0 ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Phase 1: Docker installation check
+# ---------------------------------------------------------------------------
+check_docker() {
+    local missing=false
+
+    if ! command -v docker &>/dev/null; then
+        missing=true
+        echo "Docker CLI not found."
+    fi
+
+    if ! docker compose version &>/dev/null 2>&1; then
+        missing=true
+        echo "docker compose plugin not found."
+    fi
+
+    if [ "$missing" = true ]; then
+        install_docker
+    else
+        echo "Docker is available: $(docker --version)"
+        echo "Compose plugin:      $(docker compose version)"
+    fi
+}
+
+install_docker() {
+    local os
+    os="$(uname -s)"
+
+    case "$os" in
+        Darwin)
+            echo ""
+            echo "On macOS, install Docker Desktop from:"
+            echo "  https://www.docker.com/products/docker-desktop/"
+            echo ""
+            echo "After installing, start Docker Desktop and re-run this script."
+            exit 1
+            ;;
+        Linux)
+            install_docker_linux
+            ;;
+        *)
+            echo "Unsupported OS: $os" >&2
+            echo "Please install Docker manually: https://docs.docker.com/get-docker/" >&2
+            exit 1
+            ;;
+    esac
+}
+
+install_docker_linux() {
+    echo ""
+    echo "Docker is not installed. This script can install it for you."
+    read -rp "Install Docker now? [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "Aborted. Install Docker manually: https://docs.docker.com/get-docker/"
+        exit 1
+    fi
+
+    if command -v apt-get &>/dev/null; then
+        echo "Installing Docker via apt-get..."
+        sudo apt-get update
+        sudo apt-get install -y docker.io docker-compose-v2
+        sudo systemctl enable --now docker
+        sudo usermod -aG docker "$USER"
+        echo "Docker installed. You may need to log out and back in for group changes."
+    elif command -v dnf &>/dev/null; then
+        echo "Installing Docker via dnf..."
+        sudo dnf install -y docker docker-compose-plugin
+        sudo systemctl enable --now docker
+        sudo usermod -aG docker "$USER"
+        echo "Docker installed. You may need to log out and back in for group changes."
+    elif command -v pacman &>/dev/null; then
+        echo "Installing Docker via pacman..."
+        sudo pacman -Sy --noconfirm docker docker-compose
+        sudo systemctl enable --now docker
+        sudo usermod -aG docker "$USER"
+        echo "Docker installed. You may need to log out and back in for group changes."
+    else
+        echo "No supported package manager found (apt-get, dnf, pacman)." >&2
+        echo "Please install Docker manually: https://docs.docker.com/get-docker/" >&2
+        exit 1
+    fi
+
+    # Verify after install
+    if ! docker compose version &>/dev/null 2>&1; then
+        echo "Docker Compose plugin not available after install." >&2
+        echo "Try: sudo apt-get install docker-compose-v2  (or equivalent)" >&2
+        exit 1
+    fi
+}
+
+echo "=== AgentFlow Docker Setup ==="
+echo ""
+check_docker
+echo ""
+
+if [ "$CHECK_ONLY" = true ]; then
+    echo "Docker is ready. Exiting (--check-only)."
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 2: Build images
+# ---------------------------------------------------------------------------
+cd "$PROJECT_DIR"
+
+# Determine which services to build
+SERVICES="mongodb dashboard runner agent-addone"
+if [ "$OSM_AGENTS" -gt 0 ]; then
+    SERVICES="$SERVICES agent-osm-geocoder"
+fi
+if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
+    SERVICES="$SERVICES agent-osm-geocoder-lite"
+fi
+
+if [ "$FORCE_BUILD" = true ]; then
+    echo "Building all images (--build)..."
+    docker compose build $SERVICES
+    echo ""
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 3: Start the stack with scaling
+# ---------------------------------------------------------------------------
+SCALE_ARGS=""
+SCALE_ARGS="$SCALE_ARGS --scale runner=$RUNNERS"
+SCALE_ARGS="$SCALE_ARGS --scale agent-addone=$AGENTS"
+SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder=$OSM_AGENTS"
+SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder-lite=$OSM_LITE_AGENTS"
+
+echo "Starting AgentFlow stack..."
+echo "  Runners:          $RUNNERS"
+echo "  AddOne agents:    $AGENTS"
+echo "  OSM agents:       $OSM_AGENTS"
+echo "  OSM lite agents:  $OSM_LITE_AGENTS"
+echo ""
+
+docker compose up -d $SCALE_ARGS $SERVICES
+
+echo ""
+echo "=== AgentFlow is running ==="
+echo "  Dashboard: http://localhost:8080"
+echo "  MongoDB:   localhost:${MONGODB_PORT:-27018}"
+echo ""
+echo "Useful commands:"
+echo "  docker compose ps          # List running services"
+echo "  docker compose logs -f     # Follow logs"
+echo "  docker compose down        # Stop everything"
+echo ""
+echo "To seed example workflows:"
+echo "  docker compose --profile seed run --rm seed"

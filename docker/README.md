@@ -5,7 +5,10 @@ This directory contains Docker configurations for running the AgentFlow developm
 ## Quick Start
 
 ```bash
-# Start the core stack (MongoDB, Dashboard, Runner, AddOne Agent)
+# Bootstrap: install Docker (if needed), build, and start
+scripts/setup
+
+# Or start manually
 docker compose up -d
 
 # View the dashboard
@@ -18,16 +21,58 @@ docker compose --profile seed run --rm seed
 docker compose logs -f
 ```
 
+## Setup Script
+
+The `scripts/setup` bootstrap script handles Docker installation, image building, and service scaling.
+
+```bash
+# Start with defaults (1 runner, 1 addone agent)
+scripts/setup
+
+# Scale runners and agents
+scripts/setup --runners 3 --agents 2
+
+# Include OSM geocoder agents (full image with Java/GraphHopper)
+scripts/setup --osm-agents 2
+
+# Include lightweight OSM agents (no Java/GraphHopper)
+scripts/setup --osm-lite-agents 2
+
+# Force rebuild before starting
+scripts/setup --build --runners 3
+
+# Just verify Docker is installed
+scripts/setup --check-only
+```
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--runners N` | 1 | Number of runner service instances |
+| `--agents N` | 1 | Number of AddOne agent instances |
+| `--osm-agents N` | 0 | Number of OSM Geocoder agents (full image) |
+| `--osm-lite-agents N` | 0 | Number of OSM Geocoder lite agents |
+| `--build` | - | Force rebuild of all images before starting |
+| `--check-only` | - | Verify Docker is available, then exit |
+
 ## Services
 
 ### Core Services (always started)
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `mongodb` | 27018 | MongoDB database (27018 externally to avoid conflicts) |
-| `dashboard` | 8080 | Web dashboard for monitoring workflows |
-| `runner` | - | Distributed runner service |
-| `agent-addone` | - | Sample agent handling AddOne/Multiply/Greet events |
+| Service | Port | Scalable | Description |
+|---------|------|----------|-------------|
+| `mongodb` | 27018 | No | MongoDB database (27018 externally to avoid conflicts) |
+| `dashboard` | 8080 | No | Web dashboard for monitoring workflows |
+| `runner` | - | Yes | Distributed runner service |
+| `agent-addone` | - | Yes | Sample agent handling AddOne/Multiply/Greet events |
+
+### OSM Agents (started when count > 0)
+
+| Service | Scalable | Description |
+|---------|----------|-------------|
+| `agent-osm-geocoder` | Yes | Full OSM agent with Java, GraphHopper, pyosmium, shapely, folium |
+| `agent-osm-geocoder-lite` | Yes | Lightweight OSM agent (download, cache, region resolution only) |
 
 ### Optional Services (profiles)
 
@@ -38,13 +83,6 @@ Populates the database with example workflows:
 docker compose --profile seed run --rm seed
 ```
 
-#### OSM Profile
-Adds the OSM Geocoder agent for geographic data processing:
-
-```bash
-docker compose --profile osm up -d
-```
-
 #### MCP Profile
 Runs the MCP (Model Context Protocol) server for LLM agent integration:
 
@@ -52,6 +90,43 @@ Runs the MCP (Model Context Protocol) server for LLM agent integration:
 # MCP uses stdio transport, run interactively
 docker compose --profile mcp run --rm mcp
 ```
+
+## Scaling
+
+Runner and agent services can be horizontally scaled. Each instance connects to the same MongoDB and coordinates via distributed locking.
+
+```bash
+# Scale using docker compose directly
+docker compose up -d --scale runner=3 --scale agent-addone=2
+
+# Or use the setup script
+scripts/setup --runners 3 --agents 2 --osm-agents 1
+```
+
+Verify scaling:
+
+```bash
+docker compose ps runner         # Should list 3 instances
+docker compose ps agent-addone   # Should list 2 instances
+```
+
+## OSM Agent Images
+
+Two Dockerfile variants exist for the OSM Geocoder agent:
+
+### Full Image (`Dockerfile.osm-geocoder`)
+Includes everything needed for geographic data processing and routing:
+- **Python**: pyosmium, shapely, pyproj, folium, requests
+- **System**: build-essential, cmake, libboost, libgeos, libproj
+- **Java**: default-jre-headless (for GraphHopper)
+- **GraphHopper**: JAR downloaded at build time to `/opt/graphhopper/`
+
+### Lite Image (`Dockerfile.osm-geocoder-lite`)
+Minimal image for basic operations (download, cache, region resolution):
+- **Python**: requests
+- No Java, no C++ build tools, no geospatial libraries
+
+Choose the full image when you need routing graph operations (BuildGraph, ComputePairwiseRoutes). Use the lite image for cache management and region resolution.
 
 ## Configuration
 
@@ -67,9 +142,9 @@ AFL_MONGODB_DATABASE=afl
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Dashboard │     │   Runner    │     │   Agents    │
-│   (8080)    │     │   Service   │     │  (AddOne,   │
-└──────┬──────┘     └──────┬──────┘     │   OSM, ...) │
-       │                   │            └──────┬──────┘
+│   (8080)    │     │  (×N)       │     │  (×N each)  │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
        └───────────────────┴───────────────────┘
                            │
                     ┌──────┴──────┐
@@ -158,4 +233,19 @@ docker compose up -d
 ```bash
 # Stop and remove containers and volumes
 docker compose down -v
+```
+
+### Verifying OSM Dependencies
+
+```bash
+# Check Python packages in full OSM image
+docker compose exec agent-osm-geocoder python -c "import osmium; print('osmium OK')"
+docker compose exec agent-osm-geocoder python -c "import shapely; print('shapely OK')"
+docker compose exec agent-osm-geocoder python -c "import folium; print('folium OK')"
+
+# Check Java
+docker compose exec agent-osm-geocoder java -version
+
+# Check GraphHopper JAR
+docker compose exec agent-osm-geocoder ls -la /opt/graphhopper/graphhopper-web.jar
 ```

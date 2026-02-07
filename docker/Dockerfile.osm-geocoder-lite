@@ -1,0 +1,23 @@
+# AgentFlow OSM Geocoder Agent (Lite)
+# Basic OSM data processing: download, cache, region resolution
+# No Java/GraphHopper — use the full image for routing graph operations
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install AFL with MongoDB support
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Install requests for Nominatim API and Geofabrik downloads
+RUN pip install --no-cache-dir requests
+
+# Copy application code
+COPY afl/ ./afl/
+COPY examples/osm-geocoder/ ./examples/osm-geocoder/
+
+ENV PYTHONPATH=/app
+WORKDIR /app/examples/osm-geocoder
+
+CMD ["python", "agent.py"]
