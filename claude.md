@@ -134,7 +134,7 @@ agentflow/
 │   │   ├── test_expression.py
 │   │   ├── test_events.py      # Event lifecycle tests
 │   │   ├── test_mongo_store.py # MongoDB persistence tests
-│   │   ├── test_evaluator.py   # Integration tests for spec examples
+│   │   ├── test_evaluator.py   # Integration tests for spec examples, foreach, iteration traces
 │   │   ├── test_runner_service.py # Distributed runner service tests
 │   │   ├── test_agent_poller.py # AgentPoller library tests
 │   │   ├── test_agent_poller_async.py # Async handler tests
@@ -315,6 +315,7 @@ agentflow/
 │   ├── 12_validation.md        # Semantic validation rules
 │   ├── 20_compiler.md          # Compiler architecture
 │   ├── 30_runtime.md           # Runtime specification
+│   ├── 70_examples.md          # Iteration traces for Examples 2, 3, 4
 │   ├── 80_acceptance_tests.md  # Test requirements
 │   └── 90_nonfunctional.md     # Dependencies
 ├── pyproject.toml              # Project configuration
@@ -766,6 +767,22 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ Validator: `_extract_references` recursive walker, `_infer_type` type checker
 - ✅ 963 tests passing
 
+### Completed (v0.8.1) - Multi-Block Fix, Foreach Execution & Iteration Traces
+- ✅ **Multi-block AST resolution fix**: workflows with multiple `andThen` blocks now track block body index via `statement_id="block-N"`; `get_block_ast()` selects the correct body element from list
+- ✅ **Foreach runtime execution**: `andThen foreach var in expr { ... }` creates one sub-block per array element
+  - `StepDefinition` gains `foreach_var`/`foreach_value` fields for iteration binding
+  - `BlockExecutionBeginHandler` evaluates iterable expression, creates sub-blocks with cached body AST
+  - `BlockExecutionContinueHandler` tracks sub-block completion directly (bypasses DependencyGraph)
+  - `FacetInitializationBeginHandler` propagates foreach variable to `EvaluationContext` for expression evaluation
+  - Empty iterables produce no sub-blocks and complete immediately
+- ✅ **Iteration-level trace tests**: step-by-step state progression verification at each commit boundary
+  - Example 2 trace: 8 steps, 8 iterations, `Adder(a=1, b=2) → result=3`
+  - Example 3 trace: 11 steps, 11 iterations, nested `andThen → result=13`
+  - Example 4 trace: 11 steps, 2 evaluator runs (PAUSE at EventTransmit, resume after continue), `result=15`
+  - Key runtime behavior: yield steps are created lazily (when dependencies are available), not eagerly in iteration 0
+- ✅ **Acceptance tests**: event facet blocking at EventTransmit, step continue/resume, multi-run execution, nested statement blocks, facet definition lookup (namespaced EventFacetDecl)
+- ✅ 978 tests passing
+
 ### MCP Protocol Messages
 
 The MCP server uses JSON-RPC 2.0 over stdio. The following protocol messages are relevant:
@@ -882,6 +899,10 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **AFL Agent**: A service that accepts events/tasks, performs the required action, updates the step, and signals the step to continue
 - **AgentPoller**: Standalone polling library for building AFL Agent services without the full RunnerService
 - **AgentPollerConfig**: Configuration dataclass for AgentPoller parameters
+- **Foreach execution**: Runtime model for `andThen foreach var in expr { ... }` — creates N sub-block steps (one per array element), each with `foreach_var`/`foreach_value` bound and a cached body AST; sub-block completion tracked directly without DependencyGraph
+- **Lazy yield creation**: Yield steps are created in the iteration when their dependencies become available, not eagerly in iteration 0; this means total step counts grow over iterations
+- **Block AST cache**: `ExecutionContext._block_ast_cache` stores body AST overrides for foreach sub-blocks and multi-block workflows, checked before hierarchy traversal in `get_block_ast()`
+- **Multi-block index**: When a workflow body is a list of `andThen` blocks, each block step gets `statement_id="block-N"` so `get_block_ast()` can select the correct body element
 - **MCP Server**: Model Context Protocol server exposing AFL tools and resources to LLM agents
 
 ### Agent integration library terms
