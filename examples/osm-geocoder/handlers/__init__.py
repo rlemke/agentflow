@@ -3,6 +3,7 @@
 Registers handlers for all OSM, Census TIGER, GraphHopper, elevation, and visualization event facets.
 """
 
+from .airquality_handlers import register_airquality_handlers
 from .amenity_handlers import register_amenity_handlers
 from .boundary_handlers import register_boundary_handlers
 from .building_handlers import register_building_handlers
@@ -24,6 +25,7 @@ from .visualization_handlers import register_visualization_handlers
 
 __all__ = [
     "register_all_handlers",
+    "register_airquality_handlers",
     "register_amenity_handlers",
     "register_boundary_handlers",
     "register_building_handlers",
@@ -47,6 +49,7 @@ __all__ = [
 
 def register_all_handlers(poller) -> None:
     """Register all event facet handlers with the given poller."""
+    register_airquality_handlers(poller)
     register_amenity_handlers(poller)
     register_boundary_handlers(poller)
     register_building_handlers(poller)

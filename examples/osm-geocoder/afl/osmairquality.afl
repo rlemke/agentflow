@@ -1,0 +1,140 @@
+// Air quality + schools exposure pipeline
+//
+// Mixes OSM school data with OpenAQ air quality readings to compute
+// per-school PM2.5 exposure levels and render a color-coded map.
+//
+// This is the first cross-dataset pipeline combining OSM with a non-OSM API.
+//
+// Prerequisites: Compile with osmtypes.afl, osmregion.afl, osmamenities.afl,
+//   osmvisualization.afl
+
+namespace osm.geo.AirQuality {
+    schema AirQualityResult {
+        output_path: String
+        station_count: Long
+        parameter: String
+        avg_value: Double
+        unit: String
+        format: String
+    }
+
+    schema ExposureCorrelationResult {
+        output_path: String
+        school_count: Long
+        matched_count: Long
+        high_exposure: Long
+        medium_exposure: Long
+        low_exposure: Long
+        avg_pm25: Double
+        format: String
+    }
+
+    schema ExposureStats {
+        total_schools: Long
+        matched_schools: Long
+        high_count: Long
+        medium_count: Long
+        low_count: Long
+        high_pct: Double
+        medium_pct: Double
+        low_pct: Double
+        avg_pm25: Double
+        max_pm25: Double
+        min_pm25: Double
+    }
+
+    // Fetch air quality readings from OpenAQ within a bounding box
+    event facet FetchAirQuality(bbox: String,
+        parameter: String = "pm25",
+        radius_m: Long = 25000) => (result: AirQualityResult)
+
+    // Correlate schools with nearest air quality sensor
+    // Classifies exposure: high >= 35, medium 15-35, low < 15 ug/m3 (WHO PM2.5)
+    event facet CorrelateSchoolAirQuality(schools_path: String,
+        air_quality_path: String,
+        max_distance_km: Double = 10) => (result: ExposureCorrelationResult)
+
+    // Compute aggregate exposure statistics
+    event facet ExposureStatistics(input_path: String) => (stats: ExposureStats)
+}
+
+// --- Workflow: region -> schools + air quality -> correlation -> map ---
+
+namespace osm.geo.SchoolAirQuality {
+    use osm.types
+    use osm.geo.Region
+    use osm.geo.Amenities
+    use osm.geo.AirQuality
+    use osm.geo.Visualization
+
+    workflow SchoolAirQualityMap(
+        region: String,
+        prefer_continent: String = "",
+        parameter: String = "pm25",
+        radius_m: Long = 25000,
+        max_distance_km: Double = 10,
+        title: String = "School Air Quality Exposure",
+        color: String = "#e74c3c"
+    ) => (
+        map_path: String,
+        region_name: String,
+        school_count: Long,
+        station_count: Long,
+        high_exposure: Long,
+        medium_exposure: Long,
+        low_exposure: Long,
+        avg_pm25: Double,
+        max_pm25: Double
+    ) andThen {
+
+        // 1. Resolve region name to OSM cache
+        resolved = ResolveRegion(
+            name = $.region,
+            prefer_continent = $.prefer_continent
+        )
+
+        // 2. Extract schools from OSM (depends on resolved)
+        schools = ExtractAmenities(
+            cache = resolved.cache,
+            category = "education"
+        )
+
+        // 3. Fetch air quality stations from OpenAQ (depends on resolved)
+        air = FetchAirQuality(
+            bbox = resolved.resolution.geofabrik_path,
+            parameter = $.parameter,
+            radius_m = $.radius_m
+        )
+
+        // 4. Correlate each school with nearest sensor
+        correlated = CorrelateSchoolAirQuality(
+            schools_path = schools.result.output_path,
+            air_quality_path = air.result.output_path,
+            max_distance_km = $.max_distance_km
+        )
+
+        // 5. Compute exposure statistics
+        stats = ExposureStatistics(
+            input_path = correlated.result.output_path
+        )
+
+        // 6. Render color-coded map
+        map = RenderMap(
+            geojson_path = correlated.result.output_path,
+            title = $.title,
+            color = $.color
+        )
+
+        yield SchoolAirQualityMap(
+            map_path = map.result.output_path,
+            region_name = resolved.resolution.matched_name,
+            school_count = stats.stats.total_schools,
+            station_count = air.result.station_count,
+            high_exposure = stats.stats.high_count,
+            medium_exposure = stats.stats.medium_count,
+            low_exposure = stats.stats.low_count,
+            avg_pm25 = stats.stats.avg_pm25,
+            max_pm25 = stats.stats.max_pm25
+        )
+    }
+}
