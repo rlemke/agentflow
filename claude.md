@@ -28,8 +28,15 @@ AFL is designed as a programming-language-style workflow DSL: workflows are auth
 ### Composition features
 - **Mixins**: `with FacetA() with FacetB()` composes normalized facets.
 - **Implicit facets**: `implicit name = Call()` declares default values.
-- **andThen / yield blocks**: compose multi-step internal logic.
+- **andThen / yield blocks**: compose multi-step internal logic. Facets/workflows support multiple concurrent `andThen` blocks.
 - **andThen foreach**: iterate over collections with parallel execution.
+- **Statement-level andThen body**: steps can have inline `andThen` blocks (`s = F(x = 1) andThen { ... }`).
+
+### Expression features
+- **Arithmetic operators**: `+`, `-`, `*`, `/`, `%` with standard precedence (`*/%` > `+-` > `++`).
+- **Concatenation**: `++` operator for string concatenation.
+- **Collection literals**: arrays `[1, 2, 3]`, maps `#{"key": "value"}`, indexing `arr[0]`, grouping `(expr)`.
+- **Type checking**: validator catches string+int and bool+arithmetic errors at compile time; unknown-type refs pass through.
 
 ---
 
@@ -39,7 +46,7 @@ AFL is designed as a programming-language-style workflow DSL: workflows are auth
 agentflow/
 ├── afl/                        # AFL compiler package
 │   ├── __init__.py             # Package exports
-│   ├── ast.py                  # AST node dataclasses (27 node types)
+│   ├── ast.py                  # AST node dataclasses (33 node types)
 │   ├── parser.py               # Lark parser wrapper with error handling
 │   ├── transformer.py          # Parse tree → AST transformer
 │   ├── emitter.py              # AST → JSON emitter
@@ -706,7 +713,7 @@ Each developer can use their own database name to avoid conflicts:
   - End-to-end India all-pairs city routes example (`test_india_cityroutes.py`): 5-step mock pipeline, 10 cities producing C(10,2)=45 pairwise driving routes with distance/duration matrices and state clusters
   - End-to-end China all-pairs city routes example (`test_china_cityroutes.py`): 5-step mock pipeline referencing `osmcityrouting.afl` real data pipeline, 12 cities between 3-5M producing C(12,2)=66 pairwise driving routes with G-expressway names and IATA-style matrix headers
   - 80 unit tests for resolver
-- ✅ 879 tests passing (main suite) + 80 region resolver tests
+- ✅ 879+ tests passing (main suite) + 80 region resolver tests
 
 ### Completed (v0.7.0) - LLM Integration & Multi-Language Agents
 - ✅ **Async AgentPoller**: `register_async()` for async/await handlers (LLM integration)
@@ -746,6 +753,18 @@ Each developer can use their own database name to avoid conflicts:
 - ✅ **City routing integration test** (`test_city_routing.py`): Full 9-step CityRouteMap pipeline with all real handlers (requires requests + osmium + folium + GraphHopper)
 - ✅ **ComputePairwiseRoutes handler** (`handlers/routing_handlers.py`): All-pairs shortest-path driving routes via GraphHopper API with great-circle fallback
 - ✅ Tests require `--mongodb` flag, optional deps auto-skipped with `pytest.importorskip`
+
+### Completed (v0.8.0) - Expressions, Collections & Multiple Blocks
+- ✅ **BinaryExpr**: arithmetic operators `+`, `-`, `*`, `/`, `%` with correct precedence hierarchy (`*/%` > `+-` > `++`)
+- ✅ **Statement-level andThen body**: steps can have inline `andThen` blocks for sub-workflows
+- ✅ **Multiple andThen blocks**: facets/workflows support multiple concurrent `andThen` blocks; runtime creates one block step per entry
+- ✅ **Collection literals**: array `[expr, ...]`, map `#{"key": expr, ...}`, indexing `expr[expr]`, grouping `(expr)`
+- ✅ **Expression type checking**: lightweight type inference catches string+int and bool+arithmetic errors at compile time; unknown-type refs pass through
+- ✅ Grammar: `postfix_expr` for indexing, `additive_expr`/`multiplicative_expr` for arithmetic precedence
+- ✅ AST: `BinaryExpr`, `ArrayLiteral`, `MapEntry`, `MapLiteral`, `IndexExpr` nodes
+- ✅ Runtime: expression evaluation and dependency extraction for all new expression types
+- ✅ Validator: `_extract_references` recursive walker, `_infer_type` type checker
+- ✅ 963 tests passing
 
 ### MCP Protocol Messages
 
@@ -799,7 +818,7 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 | Mixins | `MixinSig`, `MixinCall` |
 | Blocks | `AndThenBlock`, `Block`, `ForeachClause`, `PromptBlock`, `ScriptBlock` |
 | Statements | `StepStmt`, `YieldStmt` |
-| Expressions | `CallExpr`, `NamedArg`, `Reference`, `Literal` |
+| Expressions | `CallExpr`, `NamedArg`, `Reference`, `Literal`, `ConcatExpr`, `BinaryExpr`, `ArrayLiteral`, `MapEntry`, `MapLiteral`, `IndexExpr` |
 | Metadata | `SourceLocation`, `ASTNode` |
 
 ---
@@ -839,6 +858,10 @@ Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, 
 - **ArrayType**: Array type syntax `[ElementType]` for schema fields and parameters
 - **PromptBlock**: Block syntax for LLM-based event facets with `system`, `template`, and `model` directives
 - **ScriptBlock**: Block syntax for inline sandboxed Python execution in facets
+- **BinaryExpr**: Arithmetic expression node (`+`, `-`, `*`, `/`, `%`) with operator precedence
+- **ArrayLiteral**: Array literal expression `[elem, ...]`
+- **MapLiteral**: Map literal expression `#{"key": value, ...}`
+- **IndexExpr**: Index/subscript expression `target[index]`
 - **Provenance**: Metadata tracking where source code originated (file, MongoDB, Maven)
 - **Source Loader**: Utility for loading AFL sources from different locations (file, MongoDB, Maven Central)
 
