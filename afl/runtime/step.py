@@ -134,6 +134,10 @@ class StepDefinition:
     # Versioning
     version: VersionInfo = field(default_factory=VersionInfo)
 
+    # Foreach iteration binding
+    foreach_var: str | None = None
+    foreach_value: Any = None
+
     # Metadata
     timestamp: str | None = None  # Last update timestamp
 

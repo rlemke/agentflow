@@ -97,8 +97,18 @@ class FacetInitializationBeginHandler(StateHandler):
         For InputRef ($.) resolution:
         - If this step is in the workflow root block → use workflow root params
         - If this step is in a nested block → use the block's container step params
+        - If this step is in a foreach sub-block → foreach variable is also available
         """
         inputs = self._resolve_inputs()
+
+        # Check for foreach variable on the containing block
+        foreach_var = None
+        foreach_value = None
+        if self.step.block_id:
+            block_step = self.context._find_step(self.step.block_id)
+            if block_step and block_step.foreach_var is not None:
+                foreach_var = block_step.foreach_var
+                foreach_value = block_step.foreach_value
 
         # Build step output getter
         def get_step_output(step_name: str, attr_name: str) -> object:
@@ -114,6 +124,8 @@ class FacetInitializationBeginHandler(StateHandler):
             inputs=inputs,
             get_step_output=get_step_output,
             step_id=self.step.id,
+            foreach_var=foreach_var,
+            foreach_value=foreach_value,
         )
 
     def _resolve_inputs(self) -> dict:

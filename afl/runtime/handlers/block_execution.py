@@ -49,6 +49,10 @@ class BlockExecutionBeginHandler(StateHandler):
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
 
+        # Check for foreach clause
+        if "foreach" in block_ast:
+            return self._process_foreach(block_ast)
+
         # Build dependency graph
         workflow_inputs = self._get_workflow_inputs()
         graph = DependencyGraph.from_ast(
@@ -72,6 +76,79 @@ class BlockExecutionBeginHandler(StateHandler):
 
         self.step.request_state_change(True)
         return StateChangeResult(step=self.step)
+
+    def _process_foreach(self, block_ast: dict) -> StateChangeResult:
+        """Process a foreach block by creating sub-blocks per element.
+
+        Args:
+            block_ast: The block AST with a "foreach" key
+
+        Returns:
+            StateChangeResult
+        """
+        from ..expression import EvaluationContext, ExpressionEvaluator
+        from ..step import StepDefinition
+        from ..types import ObjectType
+
+        foreach = block_ast["foreach"]
+        variable = foreach.get("variable", "")
+        iterable_expr = foreach.get("iterable")
+
+        # Build body AST (block_ast without foreach)
+        body_ast = {k: v for k, v in block_ast.items() if k != "foreach"}
+
+        # Evaluate the iterable expression
+        inputs = self._build_foreach_eval_inputs()
+        eval_ctx = EvaluationContext(
+            inputs=inputs,
+            get_step_output=lambda s, a: None,
+            step_id=self.step.id,
+        )
+        evaluator = ExpressionEvaluator()
+        iterable = evaluator.evaluate(iterable_expr, eval_ctx)
+
+        if not iterable:
+            # Empty iterable — no sub-blocks to create, complete immediately
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        # Create a sub-block for each element
+        for i, element in enumerate(iterable):
+            sub_block = StepDefinition.create(
+                workflow_id=self.step.workflow_id,
+                object_type=ObjectType.AND_THEN,
+                facet_name="",
+                container_id=self.step.container_id,
+                block_id=self.step.id,
+                root_id=self.step.root_id or self.step.container_id,
+            )
+            sub_block.foreach_var = variable
+            sub_block.foreach_value = element
+
+            # Cache the body AST for this sub-block
+            self.context.set_block_ast_cache(sub_block.id, body_ast)
+
+            logger.debug(
+                "Foreach sub-block created: block_id=%s index=%d var=%s value=%s",
+                sub_block.id,
+                i,
+                variable,
+                element,
+            )
+            self.context.changes.add_created_step(sub_block)
+
+        self.step.request_state_change(True)
+        return StateChangeResult(step=self.step)
+
+    def _build_foreach_eval_inputs(self) -> dict:
+        """Build input dict for evaluating the foreach iterable expression."""
+        # Get workflow root params
+        workflow_root = self.context.get_workflow_root()
+        inputs = {}
+        if workflow_root:
+            for name, attr in workflow_root.attributes.params.items():
+                inputs[name] = attr.value
+        return inputs
 
     def _get_workflow_inputs(self) -> set[str]:
         """Get valid input parameter names for this block's scope.
@@ -144,6 +221,11 @@ class BlockExecutionContinueHandler(StateHandler):
 
     def process_state(self) -> StateChangeResult:
         """Continue block execution."""
+        # Check if this is a foreach block — use sub-block tracking instead
+        block_ast = self.context.get_block_ast(self.step)
+        if block_ast and "foreach" in block_ast:
+            return self._continue_foreach()
+
         # Get the dependency graph (may need to rebuild after resume)
         graph = self.context.get_block_graph(self.step.id)
         if graph is None:
@@ -204,6 +286,48 @@ class BlockExecutionContinueHandler(StateHandler):
         else:
             # Waiting for steps to complete
             return self.stay(push=True)
+
+    def _continue_foreach(self) -> StateChangeResult:
+        """Continue a foreach block by checking sub-block completion.
+
+        For foreach blocks, we track sub-blocks (children with block_id=self.step.id)
+        instead of using a DependencyGraph.
+
+        Returns:
+            StateChangeResult
+        """
+        # Get all sub-blocks
+        sub_blocks = list(self.context.persistence.get_steps_by_block(self.step.id))
+
+        # Include pending created/updated sub-blocks
+        for pending in self.context.changes.created_steps:
+            if pending.block_id == self.step.id and pending not in sub_blocks:
+                sub_blocks.append(pending)
+        for pending in self.context.changes.updated_steps:
+            for i, s in enumerate(sub_blocks):
+                if s.id == pending.id:
+                    sub_blocks[i] = pending
+
+        if not sub_blocks:
+            # No sub-blocks (empty iterable), complete
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        completed = sum(1 for s in sub_blocks if s.is_complete)
+        total = len(sub_blocks)
+
+        logger.debug(
+            "Foreach block continue: block_id=%s progress=%d/%d",
+            self.step.id,
+            completed,
+            total,
+        )
+
+        if completed == total:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        return self.stay(push=True)
 
     def _rebuild_graph(self):
         """Rebuild the dependency graph for this block.

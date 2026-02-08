@@ -138,11 +138,14 @@ class StatementBlocksBeginHandler(StateHandler):
 
         # The body could be a single andThen block or a list of blocks
         bodies = body if isinstance(body, list) else [body]
-        for _block_body in bodies:
+        for i, _block_body in enumerate(bodies):
+            # Use "block-N" as statement_id to track which body this block corresponds to
+            statement_id = f"block-{i}" if len(bodies) > 1 else None
             block_step = StepDefinition.create(
                 workflow_id=self.step.workflow_id,
                 object_type=ObjectType.AND_THEN,
                 facet_name="",
+                statement_id=statement_id,
                 container_id=self.step.id,
                 container_type=self.step.object_type,
                 root_id=self.step.root_id or self.step.id,

@@ -77,6 +77,9 @@ class ExecutionContext:
     # Cache for block dependency graphs
     _block_graphs: dict[StepId, DependencyGraph] = field(default_factory=dict)
 
+    # Cache for block AST overrides (e.g., foreach sub-blocks)
+    _block_ast_cache: dict[StepId, dict] = field(default_factory=dict)
+
     # Cache for completed steps by name within blocks
     _completed_step_cache: dict[str, StepDefinition] = field(default_factory=dict)
 
@@ -101,9 +104,13 @@ class ExecutionContext:
 
         Resolves the correct AST body for this block by tracing
         up the containment hierarchy:
+        - If block AST cache has an entry → return cached AST
         - If container is workflow root → workflow body
         - If container has an inline andThen body (statement-level) → that body
         - If container calls a facet with a body (facet-level) → facet body
+
+        For multi-block workflows (body is a list), the block's statement_id
+        encodes the index ("block-N") to select the correct body element.
 
         Args:
             block_step: The block step to resolve AST for
@@ -111,10 +118,15 @@ class ExecutionContext:
         Returns:
             The andThen block AST dict, or None
         """
+        # Check block AST cache first (used by foreach sub-blocks)
+        if block_step.id in self._block_ast_cache:
+            return self._block_ast_cache[block_step.id]
+
         if not block_step.container_id:
             # Block has no container — shouldn't normally happen
             if self.workflow_ast:
-                return self.workflow_ast.get("body")
+                body = self.workflow_ast.get("body")
+                return self._select_block_body(body, block_step)
             return None
 
         # Find the container step
@@ -126,7 +138,8 @@ class ExecutionContext:
         # this block represents the workflow's andThen body
         if container.container_id is None:
             if self.workflow_ast:
-                return self.workflow_ast.get("body")
+                body = self.workflow_ast.get("body")
+                return self._select_block_body(body, block_step)
             return None
 
         # Check for statement-level inline body on the container
@@ -141,6 +154,35 @@ class ExecutionContext:
                 return facet_def["body"]
 
         return None
+
+    def _select_block_body(self, body: Any, block_step: StepDefinition) -> dict | None:
+        """Select the correct body element for a block step.
+
+        When a workflow has multiple andThen blocks, the body is a list.
+        The block step's statement_id encodes "block-N" to select the
+        correct element.
+
+        Args:
+            body: The body (dict for single block, list for multiple)
+            block_step: The block step
+
+        Returns:
+            The selected body dict, or None
+        """
+        if body is None:
+            return None
+        if isinstance(body, list):
+            # Multi-block: extract index from statement_id
+            if block_step.statement_id and str(block_step.statement_id).startswith("block-"):
+                try:
+                    index = int(str(block_step.statement_id).split("-", 1)[1])
+                    if 0 <= index < len(body):
+                        return body[index]
+                except (ValueError, IndexError):
+                    pass
+            # Fallback: return first body if no index
+            return body[0] if body else None
+        return body
 
     def _find_step(self, step_id: StepId) -> StepDefinition | None:
         """Find a step by ID, checking pending changes first.
@@ -404,6 +446,15 @@ class ExecutionContext:
                 if result:
                     return result
         return None
+
+    def set_block_ast_cache(self, block_id: StepId, ast: dict) -> None:
+        """Cache a block AST for direct lookup (e.g., foreach sub-blocks).
+
+        Args:
+            block_id: The block step ID
+            ast: The AST dict to cache
+        """
+        self._block_ast_cache[block_id] = ast
 
     def clear_caches(self) -> None:
         """Clear caches for new iteration."""

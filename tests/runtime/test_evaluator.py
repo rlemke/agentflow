@@ -2246,3 +2246,1485 @@ class TestSchemaInstantiationRuntime:
         # e.value = "HelloWorld"
         # output = "HelloWorld"
         assert result.outputs.get("output") == "HelloWorld"
+
+
+# =========================================================================
+# Spec Example 21.3: Multiple concurrent andThen blocks
+# =========================================================================
+
+
+class TestSpecExample21_3:
+    """Tests for spec example 21.3: Multiple concurrent andThen blocks.
+
+    ```afl
+    namespace test.three {
+      facet Value(input: Long, output: Long)
+      workflow TestThree(input: Long = 1) => (output1: Long, output2: Long, output3: Long)
+        andThen { a=Value(input=$.input+1); b=Value(input=$.input+10); c=Value(input=a.input+b.input); yield TestThree(output1=c.input) }
+        andThen { a=Value(input=$.input+1); b=Value(input=$.input+10); c=Value(input=a.input+b.input); yield TestThree(output2=c.input) }
+        andThen { a=Value(input=$.input+1); b=Value(input=$.input+10); c=Value(input=a.input+b.input); yield TestThree(output3=c.input) }
+    }
+    ```
+
+    Expected: output1 = output2 = output3 = 13
+    """
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    def _make_block_body(self, output_name):
+        """Create an andThen block body for one concurrent block."""
+        return {
+            "type": "AndThenBlock",
+            "steps": [
+                {
+                    "type": "StepStmt",
+                    "id": f"step-a-{output_name}",
+                    "name": "a",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Value",
+                        "args": [
+                            {
+                                "name": "input",
+                                "value": {
+                                    "type": "BinaryExpr",
+                                    "operator": "+",
+                                    "left": {"type": "InputRef", "path": ["input"]},
+                                    "right": {"type": "Int", "value": 1},
+                                },
+                            }
+                        ],
+                    },
+                },
+                {
+                    "type": "StepStmt",
+                    "id": f"step-b-{output_name}",
+                    "name": "b",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Value",
+                        "args": [
+                            {
+                                "name": "input",
+                                "value": {
+                                    "type": "BinaryExpr",
+                                    "operator": "+",
+                                    "left": {"type": "InputRef", "path": ["input"]},
+                                    "right": {"type": "Int", "value": 10},
+                                },
+                            }
+                        ],
+                    },
+                },
+                {
+                    "type": "StepStmt",
+                    "id": f"step-c-{output_name}",
+                    "name": "c",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Value",
+                        "args": [
+                            {
+                                "name": "input",
+                                "value": {
+                                    "type": "BinaryExpr",
+                                    "operator": "+",
+                                    "left": {"type": "StepRef", "path": ["a", "input"]},
+                                    "right": {"type": "StepRef", "path": ["b", "input"]},
+                                },
+                            }
+                        ],
+                    },
+                },
+            ],
+            "yield": {
+                "type": "YieldStmt",
+                "id": f"yield-{output_name}",
+                "call": {
+                    "type": "CallExpr",
+                    "target": "TestThree",
+                    "args": [
+                        {
+                            "name": output_name,
+                            "value": {"type": "StepRef", "path": ["c", "input"]},
+                        }
+                    ],
+                },
+            },
+        }
+
+    @pytest.fixture
+    def workflow_ast(self):
+        """AST for TestThree workflow with 3 concurrent andThen blocks."""
+        return {
+            "type": "WorkflowDecl",
+            "name": "TestThree",
+            "params": [{"name": "input", "type": "Long"}],
+            "returns": [
+                {"name": "output1", "type": "Long"},
+                {"name": "output2", "type": "Long"},
+                {"name": "output3", "type": "Long"},
+            ],
+            "body": [
+                self._make_block_body("output1"),
+                self._make_block_body("output2"),
+                self._make_block_body("output3"),
+            ],
+        }
+
+    def test_multiple_concurrent_blocks(self, evaluator, workflow_ast):
+        """Test that 3 concurrent blocks produce correct outputs."""
+        result = evaluator.execute(workflow_ast, inputs={"input": 1})
+
+        assert result.success is True
+        assert result.status == ExecutionStatus.COMPLETED
+        # Each block: a.input = 1+1=2, b.input = 1+10=11, c.input = 2+11=13
+        assert result.outputs.get("output1") == 13
+        assert result.outputs.get("output2") == 13
+        assert result.outputs.get("output3") == 13
+
+    def test_three_blocks_created(self, store, evaluator, workflow_ast):
+        """Test that 3 AND_THEN block steps are created for the workflow root."""
+        result = evaluator.execute(workflow_ast, inputs={"input": 1})
+        assert result.success is True
+
+        # Find all block steps
+        all_steps = list(store.get_all_steps())
+        block_steps = [s for s in all_steps if s.object_type == ObjectType.AND_THEN]
+        # 3 blocks (one per andThen), each at the workflow root level
+        root = [s for s in all_steps if s.container_id is None][0]
+        root_blocks = [s for s in block_steps if s.container_id == root.id]
+        assert len(root_blocks) == 3
+
+    def test_independent_step_names_across_blocks(self, store, evaluator, workflow_ast):
+        """Test that steps named a, b, c exist independently in each block."""
+        result = evaluator.execute(workflow_ast, inputs={"input": 1})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        # Find all completed variable assignment steps
+        var_steps = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.VARIABLE_ASSIGNMENT and s.is_complete
+        ]
+        # Each block has a, b, c → 9 variable assignment steps total
+        # (excluding the workflow root which is also WORKFLOW type, not VAR)
+        assert len(var_steps) == 9
+
+
+# =========================================================================
+# Foreach Runtime Execution Tests
+# =========================================================================
+
+
+class TestForeachExecution:
+    """Tests for foreach runtime execution.
+
+    ```afl
+    namespace test.foreach {
+      facet Value(input: Long)
+      workflow ProcessAll(items: Json) => (count: Long)
+        andThen foreach r in $.items {
+          v = Value(input = r)
+          yield ProcessAll(count = v.input)
+        }
+    }
+    ```
+    """
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    @pytest.fixture
+    def workflow_ast(self):
+        """AST for ProcessAll workflow with foreach."""
+        return {
+            "type": "WorkflowDecl",
+            "name": "ProcessAll",
+            "params": [{"name": "items", "type": "Json"}],
+            "returns": [{"name": "count", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "foreach": {
+                    "variable": "r",
+                    "iterable": {"type": "InputRef", "path": ["items"]},
+                },
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-v",
+                        "name": "v",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["r"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "ProcessAll",
+                        "args": [
+                            {
+                                "name": "count",
+                                "value": {"type": "StepRef", "path": ["v", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+    def test_foreach_creates_sub_blocks(self, store, evaluator, workflow_ast):
+        """Verify N sub-block steps created for N-element array."""
+        result = evaluator.execute(workflow_ast, inputs={"items": [10, 20, 30]})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        block_steps = [s for s in all_steps if s.object_type == ObjectType.AND_THEN]
+        # 1 foreach block + 3 sub-blocks
+        assert len(block_steps) == 4
+
+        # The 3 sub-blocks should have foreach_var set
+        sub_blocks = [s for s in block_steps if s.foreach_var == "r"]
+        assert len(sub_blocks) == 3
+
+    def test_foreach_variable_resolution(self, store, evaluator, workflow_ast):
+        """Verify foreach variable resolves correctly in child steps."""
+        result = evaluator.execute(workflow_ast, inputs={"items": [42]})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        # Find the Value step (v) — should have input = 42
+        var_steps = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.VARIABLE_ASSIGNMENT
+            and s.facet_name == "Value"
+            and s.is_complete
+        ]
+        assert len(var_steps) == 1
+        assert var_steps[0].get_attribute("input") == 42
+
+    def test_foreach_parallel_execution(self, store, evaluator, workflow_ast):
+        """Verify all foreach iterations run to completion."""
+        result = evaluator.execute(workflow_ast, inputs={"items": [1, 2, 3, 4, 5]})
+        assert result.success is True
+        assert result.status == ExecutionStatus.COMPLETED
+
+        all_steps = list(store.get_all_steps())
+        # 5 Value steps should be complete
+        value_steps = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.VARIABLE_ASSIGNMENT
+            and s.facet_name == "Value"
+            and s.is_complete
+        ]
+        assert len(value_steps) == 5
+
+        # Verify foreach values
+        foreach_values = sorted([s.get_attribute("input") for s in value_steps])
+        assert foreach_values == [1, 2, 3, 4, 5]
+
+    def test_foreach_empty_array(self, store, evaluator, workflow_ast):
+        """Verify empty array produces no sub-blocks, workflow completes."""
+        result = evaluator.execute(workflow_ast, inputs={"items": []})
+        assert result.success is True
+        assert result.status == ExecutionStatus.COMPLETED
+
+        all_steps = list(store.get_all_steps())
+        # Only the workflow root + 1 foreach block (no sub-blocks)
+        block_steps = [s for s in all_steps if s.object_type == ObjectType.AND_THEN]
+        assert len(block_steps) == 1  # Just the foreach block itself
+
+        # No Value steps created
+        value_steps = [
+            s for s in all_steps if s.object_type == ObjectType.VARIABLE_ASSIGNMENT
+        ]
+        assert len(value_steps) == 0
+
+
+# =========================================================================
+# Iteration-Level Trace Tests (Features 12-14)
+# =========================================================================
+
+
+class TestIterationTraces:
+    """Iteration-by-iteration trace tests matching spec/70_examples.md.
+
+    These tests verify step-by-step state progression at each commit
+    boundary, matching the traces documented in the specification.
+    """
+
+    def _run_one_iteration(self, evaluator, context):
+        """Run a single iteration and commit.
+
+        Returns:
+            True if progress was made
+        """
+        context.clear_caches()
+        progress = evaluator._run_iteration(context)
+        evaluator._commit_iteration(context)
+        return progress
+
+    def _get_step_states(self, store, workflow_id):
+        """Get a dict of facet_name/statement_id → state for all steps."""
+        steps = list(store.get_steps_by_workflow(workflow_id))
+        result = {}
+        for s in steps:
+            # Use a combo of facet_name or statement_id for identification
+            key = s.facet_name or str(s.statement_id) or s.object_type
+            result[s.id] = (key, s.state, s.is_complete)
+        return steps
+
+    def _count_complete(self, steps):
+        """Count complete steps from a list."""
+        return sum(1 for s in steps if s.is_complete)
+
+    def _count_at_state(self, steps, state):
+        """Count steps at a specific state."""
+        return sum(1 for s in steps if s.state == state)
+
+    # ===================================================================
+    # Example 2 Trace: 8 steps, 8 iterations
+    # ===================================================================
+
+    def test_example_2_full_trace(self):
+        """Test Example 2 iteration trace: Adder(a=1, b=2) → result=3.
+
+        Spec: 8 steps, 8 iterations (0-7), output result=3.
+        """
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        # Reuse the Example 2 fixtures
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Adder",
+                    "params": [
+                        {"name": "a", "type": "Long"},
+                        {"name": "b", "type": "Long"},
+                    ],
+                    "returns": [{"name": "sum", "type": "Long"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s1",
+                                "name": "s1",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["a"]},
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s2",
+                                "name": "s2",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["b"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-Adder",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Adder",
+                                "args": [
+                                    {
+                                        "name": "sum",
+                                        "value": {
+                                            "type": "BinaryExpr",
+                                            "operator": "+",
+                                            "left": {"type": "StepRef", "path": ["s1", "input"]},
+                                            "right": {"type": "StepRef", "path": ["s2", "input"]},
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "AddWorkflow",
+            "params": [
+                {"name": "x", "type": "Long"},
+                {"name": "y", "type": "Long"},
+            ],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-addition",
+                        "name": "addition",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Adder",
+                            "args": [
+                                {
+                                    "name": "a",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                },
+                                {
+                                    "name": "b",
+                                    "value": {"type": "InputRef", "path": ["y"]},
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-AW",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "AddWorkflow",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["addition", "sum"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        inputs = {"x": 1, "y": 2}
+        wf_id = "wf-trace-2"
+
+        # Manually set up the execution context
+        from afl.runtime.types import WorkflowId
+
+        wf_id = WorkflowId(wf_id)
+        defaults = evaluator._extract_defaults(workflow_ast, inputs)
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            workflow_ast=workflow_ast,
+            workflow_defaults=defaults,
+            program_ast=program_ast,
+        )
+
+        # Create initial step and commit
+        root_step = evaluator._create_workflow_step(workflow_ast, wf_id, defaults)
+        context.changes.add_created_step(root_step)
+        evaluator._commit_iteration(context)
+
+        # --- Iteration 0: 6 steps created (yields deferred); s1, s2 complete
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 6  # AddWorkflow, block_AW, addition, block_Adder, s1, s2
+        assert self._count_complete(steps) == 2  # s1, s2
+
+        # --- Iteration 1: yield_Adder created and completes (lazy)
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 7  # + yield_Adder
+        assert self._count_complete(steps) == 3  # s1, s2, yield_Adder
+
+        # --- Iteration 2: block_Adder completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 4  # + block_Adder
+
+        # --- Iteration 3: addition completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 5  # + addition
+
+        # --- Iteration 4: yield_AW created and completes (lazy)
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 8  # + yield_AW (all 8 now exist)
+        assert self._count_complete(steps) == 6  # + yield_AW
+
+        # --- Iteration 5: block_AW completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 7  # + block_AW
+
+        # --- Iteration 6: AddWorkflow completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 8  # ALL complete
+
+        # --- Iteration 7: Fixed point
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is False
+
+        # Verify final output
+        root = store.get_workflow_root(wf_id)
+        assert root is not None
+        assert root.is_complete
+        output = root.attributes.returns.get("result")
+        assert output is not None
+        assert output.value == 3
+
+    # ===================================================================
+    # Example 3 Trace: 11 steps, 11 iterations
+    # ===================================================================
+
+    def test_example_3_full_trace(self):
+        """Test Example 3 iteration trace: nested andThen → result=13.
+
+        Spec: 11 steps, 11 iterations (0-10), output result=13.
+        """
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.types import WorkflowId
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "SomeFacet",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Adder",
+                    "params": [
+                        {"name": "a", "type": "Long"},
+                        {"name": "b", "type": "Long"},
+                    ],
+                    "returns": [{"name": "sum", "type": "Long"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s1",
+                                "name": "s1",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "SomeFacet",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["a"]},
+                                        }
+                                    ],
+                                },
+                                "body": {
+                                    "type": "AndThenBlock",
+                                    "steps": [
+                                        {
+                                            "type": "StepStmt",
+                                            "id": "step-subStep1",
+                                            "name": "subStep1",
+                                            "call": {
+                                                "type": "CallExpr",
+                                                "target": "Value",
+                                                "args": [
+                                                    {
+                                                        "name": "input",
+                                                        "value": {
+                                                            "type": "InputRef",
+                                                            "path": ["input"],
+                                                        },
+                                                    }
+                                                ],
+                                            },
+                                        },
+                                    ],
+                                    "yield": {
+                                        "type": "YieldStmt",
+                                        "id": "yield-SF",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "SomeFacet",
+                                            "args": [
+                                                {
+                                                    "name": "output",
+                                                    "value": {
+                                                        "type": "BinaryExpr",
+                                                        "operator": "+",
+                                                        "left": {
+                                                            "type": "StepRef",
+                                                            "path": ["subStep1", "input"],
+                                                        },
+                                                        "right": {"type": "Int", "value": 10},
+                                                    },
+                                                }
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s2",
+                                "name": "s2",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["b"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-Adder",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Adder",
+                                "args": [
+                                    {
+                                        "name": "sum",
+                                        "value": {
+                                            "type": "BinaryExpr",
+                                            "operator": "+",
+                                            "left": {
+                                                "type": "StepRef",
+                                                "path": ["s1", "output"],
+                                            },
+                                            "right": {
+                                                "type": "StepRef",
+                                                "path": ["s2", "input"],
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "AddWorkflow",
+            "params": [
+                {"name": "x", "type": "Long"},
+                {"name": "y", "type": "Long"},
+            ],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-addition",
+                        "name": "addition",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Adder",
+                            "args": [
+                                {
+                                    "name": "a",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                },
+                                {
+                                    "name": "b",
+                                    "value": {"type": "InputRef", "path": ["y"]},
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-AW",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "AddWorkflow",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["addition", "sum"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        inputs = {"x": 1, "y": 2}
+        wf_id = WorkflowId("wf-trace-3")
+        defaults = evaluator._extract_defaults(workflow_ast, inputs)
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            workflow_ast=workflow_ast,
+            workflow_defaults=defaults,
+            program_ast=program_ast,
+        )
+
+        root_step = evaluator._create_workflow_step(workflow_ast, wf_id, defaults)
+        context.changes.add_created_step(root_step)
+        evaluator._commit_iteration(context)
+
+        # --- Iteration 0: 8 steps created (yields deferred); s2 and subStep1 complete
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 8  # AddWorkflow, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1
+        assert self._count_complete(steps) == 2  # s2, subStep1
+
+        # --- Iteration 1: yield_SF created and completes (lazy)
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 9  # + yield_SF
+        assert self._count_complete(steps) == 3
+
+        # --- Iteration 2: block_s1 completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 4
+
+        # --- Iteration 3: s1 completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 5
+
+        # --- Iteration 4: yield_Adder created and completes (lazy)
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 10  # + yield_Adder
+        assert self._count_complete(steps) == 6
+
+        # --- Iteration 5: block_Adder completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 7
+
+        # --- Iteration 6: addition completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 8
+
+        # --- Iteration 7: yield_AW created and completes (lazy)
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 11  # + yield_AW (all 11 now exist)
+        assert self._count_complete(steps) == 9
+
+        # --- Iteration 8: block_AW completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 10
+
+        # --- Iteration 9: AddWorkflow completes
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is True
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 11  # ALL complete
+
+        # --- Iteration 10: Fixed point
+        progress = self._run_one_iteration(evaluator, context)
+        assert progress is False
+
+        # Verify final output
+        root = store.get_workflow_root(wf_id)
+        assert root is not None
+        assert root.is_complete
+        assert root.attributes.returns["result"].value == 13
+
+    # ===================================================================
+    # Example 4 Trace: 11 steps, 2 evaluator runs
+    # ===================================================================
+
+    def test_example_4_full_trace(self):
+        """Test Example 4 iteration trace: event facet blocks, then resumes.
+
+        Spec: 11 steps, 2 evaluator runs, output result=15.
+        subStep1 calls CountDocuments (event), blocks at EventTransmit.
+        """
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.types import WorkflowId
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "SomeFacet",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+                {
+                    "type": "EventFacetDecl",
+                    "name": "CountDocuments",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Adder",
+                    "params": [
+                        {"name": "a", "type": "Long"},
+                        {"name": "b", "type": "Long"},
+                    ],
+                    "returns": [{"name": "sum", "type": "Long"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s1",
+                                "name": "s1",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "SomeFacet",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["a"]},
+                                        }
+                                    ],
+                                },
+                                "body": {
+                                    "type": "AndThenBlock",
+                                    "steps": [
+                                        {
+                                            "type": "StepStmt",
+                                            "id": "step-subStep1",
+                                            "name": "subStep1",
+                                            "call": {
+                                                "type": "CallExpr",
+                                                "target": "CountDocuments",
+                                                "args": [
+                                                    {
+                                                        "name": "input",
+                                                        "value": {"type": "Int", "value": 3},
+                                                    }
+                                                ],
+                                            },
+                                        },
+                                    ],
+                                    "yield": {
+                                        "type": "YieldStmt",
+                                        "id": "yield-SF",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "SomeFacet",
+                                            "args": [
+                                                {
+                                                    "name": "output",
+                                                    "value": {
+                                                        "type": "BinaryExpr",
+                                                        "operator": "+",
+                                                        "left": {
+                                                            "type": "StepRef",
+                                                            "path": ["subStep1", "input"],
+                                                        },
+                                                        "right": {"type": "Int", "value": 10},
+                                                    },
+                                                }
+                                            ],
+                                        },
+                                    },
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s2",
+                                "name": "s2",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["b"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-Adder",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Adder",
+                                "args": [
+                                    {
+                                        "name": "sum",
+                                        "value": {
+                                            "type": "BinaryExpr",
+                                            "operator": "+",
+                                            "left": {
+                                                "type": "StepRef",
+                                                "path": ["s1", "output"],
+                                            },
+                                            "right": {
+                                                "type": "StepRef",
+                                                "path": ["s2", "input"],
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "AddWorkflow",
+            "params": [
+                {"name": "x", "type": "Long"},
+                {"name": "y", "type": "Long"},
+            ],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-addition",
+                        "name": "addition",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Adder",
+                            "args": [
+                                {
+                                    "name": "a",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                },
+                                {
+                                    "name": "b",
+                                    "value": {"type": "InputRef", "path": ["y"]},
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-AW",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "AddWorkflow",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["addition", "sum"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        # ===== Evaluator Run 1: execute until PAUSED =====
+        result1 = evaluator.execute(
+            workflow_ast, inputs={"x": 1, "y": 2}, program_ast=program_ast
+        )
+        assert result1.status == ExecutionStatus.PAUSED
+        assert result1.success is True
+
+        wf_id = result1.workflow_id
+
+        # After Run 1: 8 steps (yields deferred), s2 complete, subStep1 at EventTransmit
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert len(steps) == 8  # yields not yet created
+        assert self._count_complete(steps) == 1  # s2
+        assert self._count_at_state(steps, StepState.EVENT_TRANSMIT) == 1  # subStep1
+
+        # Verify the event was created
+        assert store.event_count() == 1
+
+        # Find the blocked step
+        blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT]
+        assert len(blocked) == 1
+        assert blocked[0].facet_name == "CountDocuments"
+
+        # ===== External: continue the blocked step =====
+        evaluator.continue_step(blocked[0].id)
+
+        # ===== Evaluator Run 2: resume =====
+        result2 = evaluator.resume(
+            wf_id,
+            workflow_ast,
+            program_ast=program_ast,
+            inputs={"x": 1, "y": 2},
+        )
+        assert result2.status == ExecutionStatus.COMPLETED
+        assert result2.success is True
+
+        # After Run 2: all 11 steps complete
+        steps = list(store.get_steps_by_workflow(wf_id))
+        assert self._count_complete(steps) == 11
+
+        # Verify output: subStep1.input=3, output=3+10=13, s2.input=2, sum=13+2=15
+        assert result2.outputs["result"] == 15
+
+    # ===================================================================
+    # Acceptance tests from spec/80_acceptance_tests.md
+    # ===================================================================
+
+    def test_event_facet_blocks_at_transmit(self):
+        """Verify subStep1 (CountDocuments) blocks at EventTransmit."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "EventFacetDecl",
+                    "name": "CountDocuments",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestEvent",
+            "params": [],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-1",
+                        "name": "sub",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "CountDocuments",
+                            "args": [
+                                {"name": "input", "value": {"type": "Int", "value": 42}}
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestEvent",
+                        "args": [],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        event_blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT]
+        assert len(event_blocked) == 1
+        assert event_blocked[0].facet_name == "CountDocuments"
+
+    def test_step_continue_resumes_step(self):
+        """Verify continue_step() unblocks from EventTransmit."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "EventFacetDecl",
+                    "name": "CountDocuments",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestContinue",
+            "params": [],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-1",
+                        "name": "sub",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "CountDocuments",
+                            "args": [
+                                {"name": "input", "value": {"type": "Int", "value": 5}}
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestContinue",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["sub", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result1 = evaluator.execute(workflow_ast, program_ast=program_ast)
+        assert result1.status == ExecutionStatus.PAUSED
+
+        # Find and continue the blocked step
+        steps = list(store.get_steps_by_workflow(result1.workflow_id))
+        blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT][0]
+        evaluator.continue_step(blocked.id)
+
+        # Resume should complete
+        result2 = evaluator.resume(
+            result1.workflow_id, workflow_ast, program_ast=program_ast
+        )
+        assert result2.status == ExecutionStatus.COMPLETED
+        assert result2.outputs["result"] == 5
+
+    def test_multi_run_execution(self):
+        """Verify evaluator pauses at fixed point, resumes after StepContinue."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "EventFacetDecl",
+                    "name": "External",
+                    "params": [{"name": "x", "type": "Long"}],
+                    "returns": [{"name": "y", "type": "Long"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "MultiRun",
+            "params": [],
+            "returns": [{"name": "output", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-ext",
+                        "name": "ext",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "External",
+                            "args": [
+                                {"name": "x", "value": {"type": "Int", "value": 10}}
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "MultiRun",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["ext", "x"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        # Run 1: pauses
+        result1 = evaluator.execute(workflow_ast, program_ast=program_ast)
+        assert result1.status == ExecutionStatus.PAUSED
+        iterations_run1 = result1.iterations
+
+        # Continue
+        blocked = [
+            s
+            for s in store.get_steps_by_workflow(result1.workflow_id)
+            if s.state == StepState.EVENT_TRANSMIT
+        ][0]
+        evaluator.continue_step(blocked.id)
+
+        # Run 2: completes
+        result2 = evaluator.resume(
+            result1.workflow_id, workflow_ast, program_ast=program_ast
+        )
+        assert result2.status == ExecutionStatus.COMPLETED
+        assert result2.iterations > 0
+
+    def test_nested_statement_block(self):
+        """Verify s1 with inline andThen creates block_s1."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "SomeFacet",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestNested",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "output", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-s1",
+                        "name": "s1",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "SomeFacet",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                }
+                            ],
+                        },
+                        "body": {
+                            "type": "AndThenBlock",
+                            "steps": [
+                                {
+                                    "type": "StepStmt",
+                                    "id": "step-sub",
+                                    "name": "sub",
+                                    "call": {
+                                        "type": "CallExpr",
+                                        "target": "Value",
+                                        "args": [
+                                            {
+                                                "name": "input",
+                                                "value": {"type": "InputRef", "path": ["input"]},
+                                            }
+                                        ],
+                                    },
+                                },
+                            ],
+                            "yield": {
+                                "type": "YieldStmt",
+                                "id": "yield-SF",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "SomeFacet",
+                                    "args": [
+                                        {
+                                            "name": "output",
+                                            "value": {"type": "StepRef", "path": ["sub", "input"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestNested",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["s1", "output"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, inputs={"x": 7}, program_ast=program_ast)
+        assert result.success is True
+        assert result.outputs["output"] == 7
+
+        # Verify block_s1 was created
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        block_steps = [s for s in steps if s.object_type == ObjectType.AND_THEN]
+        # block_AW (workflow body) + block_s1 (statement-level)
+        assert len(block_steps) == 2
+
+    def test_facet_definition_lookup(self):
+        """Verify EventTransmitHandler detects EventFacetDecl."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "test",
+                    "declarations": [
+                        {
+                            "type": "EventFacetDecl",
+                            "name": "MyEvent",
+                            "params": [{"name": "input", "type": "Long"}],
+                            "returns": [{"name": "output", "type": "Long"}],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestLookup",
+            "params": [],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-1",
+                        "name": "ev",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "MyEvent",
+                            "args": [
+                                {"name": "input", "value": {"type": "Int", "value": 1}}
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestLookup",
+                        "args": [],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+        # Should pause because MyEvent is an EventFacetDecl
+        assert result.status == ExecutionStatus.PAUSED
+
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        event_blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT]
+        assert len(event_blocked) == 1
+        assert event_blocked[0].facet_name == "test.MyEvent"
