@@ -108,3 +108,121 @@ No other parsing, compiler, or DSL libraries are permitted in v1:
 - JSON output format is considered stable within MAJOR version
 - `type` field present on all nodes
 - Location fields optional (controlled by flag)
+
+---
+
+## Build & Run Reference
+
+### Setup virtual environment
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"                           # dev only
+pip install -e ".[dev,test,dashboard,mcp,mongodb]" # full stack
+```
+
+### CLI usage
+```bash
+afl input.afl -o output.json       # compile to JSON
+echo 'facet Test()' | afl          # parse from stdin
+afl input.afl --check              # syntax check only
+afl input.afl --config config.json # custom config
+```
+
+### Services
+```bash
+python -m afl.dashboard                              # dashboard (port 8080)
+python -m afl.dashboard --port 9000 --reload         # dev mode
+python -m afl.runtime.runner                         # runner service
+python -m afl.runtime.runner --topics TopicA TopicB  # filtered topics
+python -m afl.runtime.runner --max-concurrent 10     # increase concurrency
+python -m afl.mcp                                    # MCP server (stdio)
+```
+
+### Scala agent library
+```bash
+cd agents/scala/afl-agent && sbt compile  # compile
+cd agents/scala/afl-agent && sbt test     # run tests
+cd agents/scala/afl-agent && sbt package  # package JAR
+```
+
+### Convenience scripts
+All scripts are in `scripts/` and are self-contained:
+```bash
+scripts/setup                                  # bootstrap Docker stack
+scripts/setup --runners 3 --agents 2           # start with scaling
+scripts/compile input.afl -o output.json       # compile AFL
+scripts/server --workflow MyWorkflow           # execute workflow
+scripts/runner                                 # start runner
+scripts/dashboard                              # start dashboard
+scripts/mcp-server                             # start MCP server
+scripts/db-stats                               # show DB statistics
+```
+
+### Docker stack
+The `docker-compose.yml` defines the full development stack:
+```bash
+scripts/setup                                               # bootstrap
+scripts/setup --runners 3 --agents 2 --osm-agents 1        # with scaling
+docker compose up -d                                        # start directly
+docker compose --profile seed run --rm seed                 # seed workflows
+docker compose --profile mcp run --rm mcp                   # MCP server
+docker compose down                                         # stop
+docker compose down -v                                      # stop + remove volumes
+```
+
+#### Services
+
+| Service | Port | Scalable | Description |
+|---------|------|----------|-------------|
+| `mongodb` | 27018 | No | MongoDB 7 database |
+| `dashboard` | 8080 | No | Web dashboard |
+| `runner` | - | Yes | Distributed runner service |
+| `agent-addone` | - | Yes | Sample AddOne agent |
+| `agent-osm-geocoder` | - | Yes | Full OSM agent (osmium, Java, GraphHopper) |
+| `agent-osm-geocoder-lite` | - | Yes | Lightweight OSM agent (requests only) |
+| `seed` | - | No | One-shot workflow seeder (profile: seed) |
+| `mcp` | - | No | MCP server, stdio transport (profile: mcp) |
+
+#### Setup script options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--runners N` | 1 | Runner service instances |
+| `--agents N` | 1 | AddOne agent instances |
+| `--osm-agents N` | 0 | Full OSM Geocoder agent instances |
+| `--osm-lite-agents N` | 0 | Lightweight OSM agent instances |
+| `--build` | - | Force image rebuild before starting |
+| `--check-only` | - | Verify Docker availability, then exit |
+
+### Configuration
+
+AFL uses a JSON config file (`afl.config.json`) for service connections. Resolution order:
+
+1. Explicit `--config FILE` CLI argument
+2. `AFL_CONFIG` environment variable
+3. `afl.config.json` in the current directory, `~/.afl/`, or `/etc/afl/`
+4. Environment variables (`AFL_MONGODB_*`)
+5. Built-in defaults
+
+**Example configuration:**
+```json
+{
+  "mongodb": {
+    "url": "mongodb://localhost:27017",
+    "username": "",
+    "password": "",
+    "authSource": "admin",
+    "database": "afl"
+  }
+}
+```
+
+**Environment variables:**
+| Variable | Default |
+|----------|---------|
+| `AFL_MONGODB_URL` | `mongodb://localhost:27017` |
+| `AFL_MONGODB_USERNAME` | (empty) |
+| `AFL_MONGODB_PASSWORD` | (empty) |
+| `AFL_MONGODB_AUTH_SOURCE` | `admin` |
+| `AFL_MONGODB_DATABASE` | `afl` |

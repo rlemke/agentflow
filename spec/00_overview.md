@@ -32,3 +32,74 @@ All specified runtime features are implemented:
 | Multi-run execution model | `30_runtime.md` §10.2, `50_event_system.md` §8 | Evaluator returns `PAUSED` at fixed point with event-blocked steps; `resume()` re-enters the iteration loop |
 
 See `spec/70_examples.md` Examples 2–4 for detailed execution traces demonstrating these features.
+
+---
+
+## Glossary
+
+### Compiler terms
+- **AgentFlow**: The platform for distributed workflow execution
+- **AFL**: Agent Flow Language — the DSL for defining workflows
+- **Facet**: Base declaration type with parameters
+- **Event Facet**: Facet that triggers external execution
+- **Workflow**: Entry point facet with execution body
+- **Mixin**: Composable capability attached to facets/calls
+- **Step**: Named assignment in an `andThen` block
+- **Yield**: Final output merge statement in a block
+- **Schema**: Named typed structure for defining JSON shapes; must be defined inside a namespace; usable as a type in parameter signatures (with qualified name or `use` import)
+- **ArrayType**: Array type syntax `[ElementType]` for schema fields and parameters
+- **PromptBlock**: Block syntax for LLM-based event facets with `system`, `template`, and `model` directives
+- **ScriptBlock**: Block syntax for inline sandboxed Python execution in facets
+- **BinaryExpr**: Arithmetic expression node (`+`, `-`, `*`, `/`, `%`) with operator precedence
+- **ArrayLiteral**: Array literal expression `[elem, ...]`
+- **MapLiteral**: Map literal expression `#{"key": value, ...}`
+- **IndexExpr**: Index/subscript expression `target[index]`
+- **Provenance**: Metadata tracking where source code originated (file, MongoDB, Maven)
+- **Source Loader**: Utility for loading AFL sources from different locations (file, MongoDB, Maven Central)
+
+### Runtime terms
+- **StepDefinition**: Runtime representation of a step with state and attributes
+- **StepState**: Current execution state (e.g., `state.facet.initialization.Begin`)
+- **StateChanger**: Drives step through state machine transitions
+- **StateHandler**: Processes specific states (initialization, execution, completion)
+- **Evaluator**: Main execution loop; runs iterations until fixed point
+- **Iteration**: Single pass over all eligible steps; changes committed atomically
+- **DependencyGraph**: Maps step references to determine creation order
+- **PersistenceAPI**: Protocol for step/event storage (in-memory or database)
+- **EventDefinition**: Domain lifecycle record for external work — tracks what needs to happen, the payload, and outcome (Created → Dispatched → Processing → Completed/Error)
+- **TaskDefinition**: Claimable work item in the distributed queue — provides routing, atomic claiming, and locking so runners can compete safely. Created alongside an EventDefinition at EVENT_TRANSMIT; consumed by runners/agents (see `spec/50_event_system.md` §9)
+- **RunnerService**: Long-lived distributed process that polls for blocked steps and tasks
+- **RunnerConfig**: Configuration dataclass for runner service parameters
+- **ToolRegistry**: Registry of handler functions for event facet dispatch
+- **AFL Agent**: A service that accepts events/tasks, performs the required action, updates the step, and signals the step to continue
+- **AgentPoller**: Standalone polling library for building AFL Agent services without the full RunnerService
+- **AgentPollerConfig**: Configuration dataclass for AgentPoller parameters
+- **Foreach execution**: Runtime model for `andThen foreach var in expr { ... }` — creates N sub-block steps (one per array element), each with `foreach_var`/`foreach_value` bound and a cached body AST; sub-block completion tracked directly without DependencyGraph
+- **Lazy yield creation**: Yield steps are created in the iteration when their dependencies become available, not eagerly in iteration 0; this means total step counts grow over iterations
+- **Block AST cache**: `ExecutionContext._block_ast_cache` stores body AST overrides for foreach sub-blocks and multi-block workflows, checked before hierarchy traversal in `get_block_ast()`
+- **Multi-block index**: When a workflow body is a list of `andThen` blocks, each block step gets `statement_id="block-N"` so `get_block_ast()` can select the correct body element
+- **MCP Server**: Model Context Protocol server exposing AFL tools and resources to LLM agents
+
+### Agent integration library terms
+- **Agent Integration Library**: Language-specific library for building AFL agents (Python, Scala, Go, TypeScript, Java)
+- **Protocol Constants**: Shared constants (`agents/protocol/constants.json`) defining collection names, state values, document schemas, and MongoDB operations for cross-language interoperability
+- **afl:resume**: Protocol task inserted by external agents after writing step returns; signals the Python RunnerService to resume the workflow
+- **afl:execute**: Protocol task for executing a compiled workflow from a flow stored in MongoDB
+- **Async Handler**: Handler function that returns a coroutine/Promise/Future; supported in Python (`register_async`), TypeScript, and Java
+- **Region Resolver**: Pure Python module (`region_resolver.py`) that maps human-friendly region names to Geofabrik download paths using an inverted index of `REGION_REGISTRY`, aliases, and geographic features
+
+### Docker terms
+- **Docker stack**: `docker-compose.yml` defining MongoDB, Dashboard, Runner, Agents, Seed, and MCP services
+- **Setup script**: `scripts/setup` — bootstraps Docker (install check, image build, service start with scaling)
+- **Scalable services**: Runner, AddOne agent, OSM geocoder agents — no `container_name`, support `--scale N`
+- **OSM Geocoder (full)**: `Dockerfile.osm-geocoder` — Python osmium, shapely, pyproj, folium + Java JRE + GraphHopper JAR
+- **OSM Geocoder (lite)**: `Dockerfile.osm-geocoder-lite` — requests only, no Java or geospatial C libraries
+- **GraphHopper JAR**: Downloaded at Docker build time from Maven Central to `/opt/graphhopper/graphhopper-web.jar`
+
+### MCP terms
+- **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication
+- **Tool**: MCP action endpoint (has side effects); invoked via `tools/call` with name + arguments
+- **Resource**: MCP read-only data endpoint; accessed via `resources/read` with a URI
+- **stdio transport**: Default MCP transport; server reads/writes JSON-RPC on stdin/stdout
+- **TextContent**: MCP response content type; all AFL tools return `TextContent` with JSON payloads
+- **inputSchema**: JSON Schema attached to each Tool definition; SDK validates arguments before dispatch

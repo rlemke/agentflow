@@ -226,7 +226,53 @@ templates, deploy. No orchestration code required.
 
 ---
 
-## 5. Implementation Priority
+## 5. MCP Protocol Reference
+
+### 5.1 Protocol Messages
+
+The MCP server uses JSON-RPC 2.0 over stdio. The following protocol messages are relevant:
+
+| Message | Direction | AFL Handler |
+|---------|-----------|-------------|
+| `initialize` | Client → Server | SDK auto-handles; advertises `tools` + `resources` capabilities |
+| `notifications/initialized` | Client → Server | SDK auto-handles |
+| `ping` | Bidirectional | SDK auto-handles |
+| `tools/list` | Client → Server | `list_tools()` → returns 6 Tool definitions with JSON Schema |
+| `tools/call` | Client → Server | `call_tool(name, arguments)` → dispatches to `_tool_*` functions |
+| `resources/list` | Client → Server | `list_resources()` → returns 10 Resource definitions with `afl://` URIs |
+| `resources/read` | Client → Server | `read_resource(uri)` → routes to `_handle_resource()` |
+
+Messages **not implemented**: `prompts/*`, `completion`, `resources/subscribe`, `sampling/createMessage`, `logging/setLevel`.
+
+### 5.2 MCP Tools — Parameters and Returns
+
+| Tool | Parameters | Returns |
+|------|-----------|---------|
+| `afl_compile` | `source: str` | `{ success, json?, errors? }` |
+| `afl_validate` | `source: str` | `{ valid, errors: [{ message, line?, column? }] }` |
+| `afl_execute_workflow` | `source: str`, `workflow_name: str`, `inputs?: dict` | `{ success, workflow_id, status, iterations, outputs, error? }` |
+| `afl_continue_step` | `step_id: str`, `result?: dict` | `{ success, error? }` |
+| `afl_resume_workflow` | `workflow_id: str`, `source: str`, `workflow_name: str`, `inputs?: dict` | `{ success, workflow_id, status, iterations, outputs, error? }` |
+| `afl_manage_runner` | `runner_id: str`, `action: str` (cancel/pause/resume) | `{ success, error? }` |
+
+### 5.3 MCP Resources — URI Patterns and Response Schemas
+
+| URI Pattern | Response Shape |
+|-------------|---------------|
+| `afl://runners` | `[{ uuid, workflow_id, workflow_name, state, start_time, end_time, duration, parameters }]` |
+| `afl://runners/{id}` | `{ uuid, workflow_id, workflow_name, state, start_time, end_time, duration, parameters }` |
+| `afl://runners/{id}/steps` | `[{ id, workflow_id, object_type, state, statement_id, container_id, block_id, facet_name?, params?, returns? }]` |
+| `afl://runners/{id}/logs` | `[{ uuid, order, runner_id, step_id, note_type, note_originator, note_importance, message, state, time }]` |
+| `afl://steps/{id}` | `{ id, workflow_id, object_type, state, statement_id, container_id, block_id, facet_name?, params?, returns? }` |
+| `afl://flows` | `[{ uuid, name, path, workflows: [{ uuid, name, version }], sources, facets }]` |
+| `afl://flows/{id}` | `{ uuid, name, path, workflows, sources, facets }` |
+| `afl://flows/{id}/source` | `{ uuid, name, sources: [{ name, content, language }] }` |
+| `afl://servers` | `[{ uuid, server_group, service_name, server_name, state, start_time, ping_time, topics, handlers, handled }]` |
+| `afl://tasks` | `[{ uuid, name, runner_id, workflow_id, flow_id, step_id, state, created, updated, task_list_name, data_type }]` |
+
+---
+
+## 6. Implementation Priority
 
 Suggested ordering based on impact and dependency:
 
