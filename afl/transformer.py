@@ -96,6 +96,9 @@ class AFLTransformer(Transformer):
     def INTEGER(self, token: Token) -> int:
         return int(token)
 
+    def FLOAT(self, token: Token) -> float:
+        return float(token)
+
     def BOOLEAN(self, token: Token) -> bool:
         return str(token) == "true"
 
@@ -135,6 +138,8 @@ class AFLTransformer(Transformer):
             kind = "string"
         elif isinstance(value, bool):
             kind = "boolean"
+        elif isinstance(value, float):
+            kind = "double"
         elif isinstance(value, int):
             kind = "integer"
         elif value is None:

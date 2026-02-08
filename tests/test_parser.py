@@ -425,6 +425,41 @@ class TestLiterals:
         assert arg.value.kind == "null"
         assert arg.value.value is None
 
+    def test_float_literal(self, parser):
+        """Parse float literal."""
+        source = "implicit pi = Circle(radius = 3.14)"
+        ast = parser.parse(source)
+        arg = ast.implicits[0].call.args[0]
+        assert isinstance(arg.value, Literal)
+        assert arg.value.kind == "double"
+        assert arg.value.value == 3.14
+
+    def test_float_literal_small(self, parser):
+        """Parse float literal with leading zero."""
+        source = "implicit val = Config(threshold = 0.5)"
+        ast = parser.parse(source)
+        arg = ast.implicits[0].call.args[0]
+        assert isinstance(arg.value, Literal)
+        assert arg.value.kind == "double"
+        assert arg.value.value == 0.5
+
+    def test_float_literal_scientific(self, parser):
+        """Parse float literal with scientific notation."""
+        source = "implicit val = Config(scale = 1.0e10)"
+        ast = parser.parse(source)
+        arg = ast.implicits[0].call.args[0]
+        assert isinstance(arg.value, Literal)
+        assert arg.value.kind == "double"
+        assert arg.value.value == 1.0e10
+
+    def test_float_default_param(self, parser):
+        """Parse parameter with float default value."""
+        ast = parser.parse("facet Search(max_distance: Double = 10.5)")
+        param = ast.facets[0].sig.params[0]
+        assert isinstance(param.default, Literal)
+        assert param.default.kind == "double"
+        assert param.default.value == 10.5
+
 
 class TestForeach:
     """Test foreach parsing."""

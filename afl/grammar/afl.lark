@@ -96,7 +96,7 @@ reference: INPUT_REF | step_ref
 step_ref: IDENT ("." IDENT)+
 INPUT_REF: "$." IDENT ("." IDENT)*
 
-literal: STRING | INTEGER | BOOLEAN | NULL
+literal: STRING | FLOAT | INTEGER | BOOLEAN | NULL
 
 // Schema declarations
 schema_decl: "schema" IDENT "{" _NL* schema_fields "}" _stmt_end
@@ -118,6 +118,8 @@ TYPE_BUILTIN.2: "String" | "Long" | "Int" | "Double" | "Boolean" | "Json"
 STRING: "\"" _STRING_INNER* "\""
 _STRING_INNER: /[^"\\]/ | _ESCAPE
 _ESCAPE: "\\" /./
+
+FLOAT.2: /[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?/
 
 INTEGER: /[0-9]+/
 

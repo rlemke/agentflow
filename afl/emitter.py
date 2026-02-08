@@ -114,7 +114,7 @@ class JSONEmitter:
         if node is None:
             return None
 
-        if isinstance(node, (str, int, bool)):
+        if isinstance(node, (str, int, float, bool)):
             return node
 
         if isinstance(node, list):
@@ -527,6 +527,8 @@ class JSONEmitter:
             return {"type": "String", "value": node.value}
         elif node.kind == "integer":
             return {"type": "Int", "value": node.value}
+        elif node.kind == "double":
+            return {"type": "Double", "value": node.value}
         elif node.kind == "boolean":
             return {"type": "Boolean", "value": node.value}
         else:

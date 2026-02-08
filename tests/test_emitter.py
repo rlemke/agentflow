@@ -271,6 +271,25 @@ class TestLiterals:
         arg = data["implicits"][0]["call"]["args"][0]
         assert arg["value"] == {"type": "Null"}
 
+    def test_float_literal(self, emitter):
+        """Float literal."""
+        ast = parse("implicit pi = Circle(radius = 3.14)")
+        data = emitter.emit_dict(ast)
+
+        arg = data["implicits"][0]["call"]["args"][0]
+        assert arg["value"] == {"type": "Double", "value": 3.14}
+
+    def test_float_default(self, emitter):
+        """Float default value emitted correctly."""
+        ast = parse("facet Search(max_distance: Double = 10.5)")
+        data = emitter.emit_dict(ast)
+        param = data["facets"][0]["params"][0]
+        assert param == {
+            "name": "max_distance",
+            "type": "Double",
+            "default": {"type": "Double", "value": 10.5},
+        }
+
 
 class TestMixins:
     """Test mixin emission."""

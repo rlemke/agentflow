@@ -89,6 +89,8 @@ class ExpressionEvaluator:
             return expr.get("value", "")
         elif expr_type == "Int":
             return int(expr.get("value", 0))
+        elif expr_type == "Double":
+            return float(expr.get("value", 0.0))
         elif expr_type == "Boolean":
             return bool(expr.get("value", False))
         elif expr_type == "Null":

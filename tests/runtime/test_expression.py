@@ -74,6 +74,13 @@ class TestExpressionEvaluator:
         result = evaluator.evaluate(expr, basic_context)
         assert result is None
 
+    def test_literal_double(self, evaluator, basic_context):
+        """Test double literal evaluation."""
+        expr = {"type": "Double", "value": 3.14}
+        result = evaluator.evaluate(expr, basic_context)
+        assert result == 3.14
+        assert isinstance(result, float)
+
     def test_input_ref(self, evaluator, basic_context):
         """Test input reference evaluation."""
         expr = {"type": "InputRef", "path": ["input"]}
