@@ -1106,3 +1106,328 @@ class TestSchemaInstantiation:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestBinaryExprValidation:
+    """Test validation of BinaryExpr in references."""
+
+    def test_valid_refs_in_binary(self, validator):
+        """Valid references in binary expressions pass."""
+        ast = parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(a: Long) => (output: Long) andThen {
+            s = Value(input = $.a + 1)
+            yield Test(output = s.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_input_ref_in_binary(self, validator):
+        """Invalid input reference in binary expr should error."""
+        ast = parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(a: Long) => (output: Long) andThen {
+            s = Value(input = $.nonexistent + 1)
+            yield Test(output = s.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("nonexistent" in str(e) for e in result.errors)
+
+    def test_invalid_step_ref_in_binary(self, validator):
+        """Invalid step reference in binary expr should error."""
+        ast = parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(a: Long) => (output: Long) andThen {
+            s = Value(input = unknown.output + 1)
+            yield Test(output = s.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("unknown" in str(e) for e in result.errors)
+
+    def test_nested_binary_in_concat(self, validator):
+        """References in binary inside concat should be validated."""
+        ast = parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(a: Long, b: Long) => (output: String) andThen {
+            s = Value(input = $.a + $.b)
+            yield Test(output = s.output ++ s.output)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_step_ref_binary_chain(self, validator):
+        """Chain of arithmetic with step refs should validate."""
+        ast = parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s1 = Value(input = $.input + 1)
+            s2 = Value(input = s1.output + 1)
+            yield Test(output = s2.output + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestMultipleBlockValidation:
+    """Test validation of multiple andThen blocks."""
+
+    def test_valid_multi_block(self, validator):
+        """Multiple andThen blocks with valid refs should pass."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s1 = V(input = $.input)
+                yield Test(a = s1.output)
+            } andThen {
+                s2 = V(input = $.input)
+                yield Test(b = s2.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_same_step_names_across_blocks(self, validator):
+        """Same step names in different blocks should pass (independent scopes)."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s = V(input = $.input)
+                yield Test(a = s.output)
+            } andThen {
+                s = V(input = $.input)
+                yield Test(b = s.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_ref_in_second_block(self, validator):
+        """Invalid reference in second block should error."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s1 = V(input = $.input)
+                yield Test(a = s1.output)
+            } andThen {
+                s2 = V(input = $.nonexistent)
+                yield Test(b = s2.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("nonexistent" in str(e) for e in result.errors)
+
+
+class TestCollectionLiteralValidation:
+    """Test validation of references inside collection literals."""
+
+    def test_valid_refs_in_array(self, validator):
+        """Valid references inside array should pass."""
+        ast = parse("""
+        facet V(items: String) => (output: Long)
+        workflow Test(x: Long) andThen {
+            s = V(items = "test")
+            s2 = V(items = [$.x, s.output])
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_input_ref_in_array(self, validator):
+        """Invalid input reference inside array should error."""
+        ast = parse("""
+        facet V(items: String)
+        workflow Test(x: Long) andThen {
+            s = V(items = [$.nonexistent])
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("nonexistent" in str(e) for e in result.errors)
+
+    def test_invalid_step_ref_in_array(self, validator):
+        """Invalid step reference inside array should error."""
+        ast = parse("""
+        facet V(items: String)
+        workflow Test(x: Long) andThen {
+            s = V(items = [missing.output])
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("missing" in str(e) for e in result.errors)
+
+    def test_valid_refs_in_map(self, validator):
+        """Valid references inside map should pass."""
+        ast = parse("""
+        facet V(config: String) => (output: Long)
+        workflow Test(x: Long) andThen {
+            s = V(config = "test")
+            s2 = V(config = #{"a": $.x, "b": s.output})
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_ref_in_map_value(self, validator):
+        """Invalid reference in map value should error."""
+        ast = parse("""
+        facet V(config: String)
+        workflow Test(x: Long) andThen {
+            s = V(config = #{"a": $.missing})
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("missing" in str(e) for e in result.errors)
+
+    def test_valid_refs_in_index_expr(self, validator):
+        """Valid references in index expression should pass."""
+        ast = parse("""
+        facet V(items: String) => (output: String)
+        workflow Test(idx: Long) andThen {
+            s = V(items = "test")
+            s2 = V(items = s.output[$.idx])
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_nested_collections_validation(self, validator):
+        """Nested collections with valid references should pass."""
+        ast = parse("""
+        facet V(items: String) => (output: Long)
+        workflow Test(x: Long) andThen {
+            s = V(items = "test")
+            s2 = V(items = [[$.x], [s.output]])
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestExpressionTypeChecking:
+    """Test expression type checking in the validator."""
+
+    def test_string_plus_int_error(self, validator):
+        """String + Int should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = "hello" + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_int_plus_string_error(self, validator):
+        """Int + String should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = 1 + "hello")
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_int_plus_int_valid(self, validator):
+        """Int + Int should be valid."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = 1 + 2)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_int_multiply_int_valid(self, validator):
+        """Int * Int should be valid."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = 3 * 4)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_boolean_arithmetic_error(self, validator):
+        """Boolean in arithmetic should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = true - 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Boolean" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_ref_plus_int_passes(self, validator):
+        """Reference + Int should pass (Unknown type, no error)."""
+        ast = parse("""
+        facet V(x: Long) => (output: Long)
+        workflow Test(a: Long) andThen {
+            s = V(x = $.a + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_step_ref_plus_int_passes(self, validator):
+        """Step reference + Int should pass."""
+        ast = parse("""
+        facet V(x: Long) => (output: Long)
+        workflow Test(a: Long) andThen {
+            s1 = V(x = $.a)
+            s2 = V(x = s1.output + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_string_concat_valid(self, validator):
+        """String ++ String is always valid (concat, not arithmetic)."""
+        ast = parse("""
+        facet V(x: String)
+        workflow Test() andThen {
+            s = V(x = "hello" ++ " " ++ "world")
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_nested_binary_type_error(self, validator):
+        """Nested binary with type error should be caught."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = 1 + 2 * "bad")
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) for e in result.errors)
+
+    def test_string_multiply_error(self, validator):
+        """String * Int should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = "abc" * 3)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) for e in result.errors)

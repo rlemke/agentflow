@@ -287,6 +287,21 @@ class DependencyGraph:
             self._extract_refs_from_value(value.get("left"), deps)
             self._extract_refs_from_value(value.get("right"), deps)
 
+        elif value_type == "ArrayLiteral":
+            # Array literal: check all elements
+            for element in value.get("elements", []):
+                self._extract_refs_from_value(element, deps)
+
+        elif value_type == "MapLiteral":
+            # Map literal: check all entry values
+            for entry in value.get("entries", []):
+                self._extract_refs_from_value(entry.get("value"), deps)
+
+        elif value_type == "IndexExpr":
+            # Index expression: check target and index
+            self._extract_refs_from_value(value.get("target"), deps)
+            self._extract_refs_from_value(value.get("index"), deps)
+
         # InputRef ($.) doesn't create dependencies - it references workflow input
 
     def can_create(self, statement_id: str, completed: set[str]) -> bool:

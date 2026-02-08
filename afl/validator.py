@@ -28,11 +28,17 @@ import re
 
 from .ast import (
     AndThenBlock,
+    ArrayLiteral,
     ArrayType,
+    BinaryExpr,
     CallExpr,
+    ConcatExpr,
     EventFacetDecl,
     FacetDecl,
     FacetSig,
+    IndexExpr,
+    Literal,
+    MapLiteral,
     Namespace,
     Parameter,
     Program,
@@ -527,6 +533,14 @@ class AFLValidator:
         else:
             names[name] = location
 
+    def _validate_body(self, body, sig: FacetSig) -> None:
+        """Validate a body, handling single or list of AndThenBlocks."""
+        if isinstance(body, list):
+            for block in body:
+                self._validate_and_then_block(block, sig)
+        elif isinstance(body, AndThenBlock):
+            self._validate_and_then_block(body, sig)
+
     def _validate_facet_decl(self, decl: FacetDecl) -> None:
         """Validate a facet declaration."""
         # Validate type references in signature
@@ -538,7 +552,7 @@ class AFLValidator:
             if isinstance(decl.body, ScriptBlock):
                 self._validate_script_block(decl.body, decl.sig)
             else:
-                self._validate_and_then_block(decl.body, decl.sig)
+                self._validate_body(decl.body, decl.sig)
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
@@ -553,7 +567,7 @@ class AFLValidator:
             elif isinstance(decl.body, ScriptBlock):
                 self._validate_script_block(decl.body, decl.sig)
             else:
-                self._validate_and_then_block(decl.body, decl.sig)
+                self._validate_body(decl.body, decl.sig)
 
     def _validate_prompt_block(self, block: PromptBlock, sig: FacetSig) -> None:
         """Validate a prompt block.
@@ -618,7 +632,7 @@ class AFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         if decl.body:
-            self._validate_and_then_block(decl.body, decl.sig)
+            self._validate_body(decl.body, decl.sig)
 
     def _validate_and_then_block(self, body: AndThenBlock, containing_sig: FacetSig) -> None:
         """Validate an andThen block."""
@@ -691,6 +705,10 @@ class AFLValidator:
                 step.name,  # Current step being defined
             )
 
+            # Validate inline step body if present
+            if step.body:
+                self._validate_and_then_block(step.body, containing_sig)
+
         # Validate yield statements and check for duplicate targets
         yield_targets_used: set[str] = set()
         for yield_stmt in body.block.yield_stmts:
@@ -706,6 +724,90 @@ class AFLValidator:
             else:
                 yield_targets_used.add(target)
 
+    def _extract_references(self, expr) -> list[Reference]:
+        """Recursively extract all Reference nodes from an expression tree."""
+        if isinstance(expr, Reference):
+            return [expr]
+        if isinstance(expr, BinaryExpr):
+            return self._extract_references(expr.left) + self._extract_references(expr.right)
+        if isinstance(expr, ConcatExpr):
+            refs = []
+            for operand in expr.operands:
+                refs.extend(self._extract_references(operand))
+            return refs
+        if isinstance(expr, ArrayLiteral):
+            refs = []
+            for element in expr.elements:
+                refs.extend(self._extract_references(element))
+            return refs
+        if isinstance(expr, MapLiteral):
+            refs = []
+            for entry in expr.entries:
+                refs.extend(self._extract_references(entry.value))
+            return refs
+        if isinstance(expr, IndexExpr):
+            return self._extract_references(expr.target) + self._extract_references(expr.index)
+        return []
+
+    _NUMERIC_TYPES = {"Int", "Long", "Double"}
+
+    def _infer_type(self, expr) -> str:
+        """Infer the type of an expression for type checking.
+
+        Returns:
+            Type name string: "String", "Int", "Long", "Double", "Boolean", "Null",
+            "Array", "Map", or "Unknown" for references and complex expressions.
+        """
+        if isinstance(expr, Literal):
+            if expr.kind == "string":
+                return "String"
+            elif expr.kind == "integer":
+                return "Int"
+            elif expr.kind == "boolean":
+                return "Boolean"
+            elif expr.kind == "null":
+                return "Null"
+            return "Unknown"
+        if isinstance(expr, Reference):
+            return "Unknown"
+        if isinstance(expr, ConcatExpr):
+            return "String"
+        if isinstance(expr, BinaryExpr):
+            left_type = self._infer_type(expr.left)
+            right_type = self._infer_type(expr.right)
+            # Check for type errors
+            if left_type != "Unknown" and right_type != "Unknown":
+                if left_type == "String" or right_type == "String":
+                    self._result.add_error(
+                        f"Type error: cannot use arithmetic operator '{expr.operator}' "
+                        f"with String operand (use '++' for concatenation)",
+                        getattr(expr, "location", None),
+                    )
+                    return "Unknown"
+                if left_type == "Boolean" or right_type == "Boolean":
+                    self._result.add_error(
+                        f"Type error: cannot use arithmetic operator '{expr.operator}' "
+                        f"with Boolean operand",
+                        getattr(expr, "location", None),
+                    )
+                    return "Unknown"
+            # If either is Unknown, allow it (runtime will catch errors)
+            if left_type in self._NUMERIC_TYPES and right_type in self._NUMERIC_TYPES:
+                # Promote to widest type
+                if "Double" in (left_type, right_type):
+                    return "Double"
+                if "Long" in (left_type, right_type):
+                    return "Long"
+                return "Int"
+            return "Unknown"
+        if isinstance(expr, ArrayLiteral):
+            return "Array"
+        if isinstance(expr, MapLiteral):
+            return "Map"
+        if isinstance(expr, IndexExpr):
+            return "Unknown"
+        return "Unknown"
+
     def _validate_call_references(
         self,
         call: CallExpr,
@@ -717,17 +819,19 @@ class AFLValidator:
     ) -> None:
         """Validate references in a call expression."""
         for arg in call.args:
-            if isinstance(arg.value, Reference):
+            for ref in self._extract_references(arg.value):
                 self._validate_reference(
-                    arg.value, input_attrs, steps, step_returns, foreach_var, current_step
+                    ref, input_attrs, steps, step_returns, foreach_var, current_step
                 )
+            # Type check expressions
+            self._infer_type(arg.value)
 
         # Also validate mixin call arguments
         for mixin in call.mixins:
             for arg in mixin.args:
-                if isinstance(arg.value, Reference):
+                for ref in self._extract_references(arg.value):
                     self._validate_reference(
-                        arg.value, input_attrs, steps, step_returns, foreach_var, current_step
+                        ref, input_attrs, steps, step_returns, foreach_var, current_step
                     )
 
     def _validate_reference(

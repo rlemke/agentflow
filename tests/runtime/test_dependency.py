@@ -177,3 +177,150 @@ class TestDependencyGraph:
         # a must come before b, b must come before c
         assert order.index("a") < order.index("b")
         assert order.index("b") < order.index("c")
+
+
+class TestCollectionDependencyExtraction:
+    """Tests for dependency extraction from collection literals."""
+
+    def test_deps_in_array_literal(self):
+        """Step refs inside ArrayLiteral create dependencies."""
+        block_ast = {
+            "steps": [
+                {"id": "a", "name": "a", "call": {"target": "V", "args": []}},
+                {
+                    "id": "b",
+                    "name": "b",
+                    "call": {
+                        "target": "V",
+                        "args": [
+                            {
+                                "name": "items",
+                                "value": {
+                                    "type": "ArrayLiteral",
+                                    "elements": [
+                                        {"type": "StepRef", "path": ["a", "out"]},
+                                        {"type": "Int", "value": 1},
+                                    ],
+                                },
+                            }
+                        ],
+                    },
+                },
+            ]
+        }
+        graph = DependencyGraph.from_ast(block_ast, set())
+        assert "a" in graph.dependencies["b"]
+
+    def test_deps_in_map_literal(self):
+        """Step refs inside MapLiteral create dependencies."""
+        block_ast = {
+            "steps": [
+                {"id": "a", "name": "a", "call": {"target": "V", "args": []}},
+                {
+                    "id": "b",
+                    "name": "b",
+                    "call": {
+                        "target": "V",
+                        "args": [
+                            {
+                                "name": "config",
+                                "value": {
+                                    "type": "MapLiteral",
+                                    "entries": [
+                                        {
+                                            "key": "val",
+                                            "value": {"type": "StepRef", "path": ["a", "out"]},
+                                        }
+                                    ],
+                                },
+                            }
+                        ],
+                    },
+                },
+            ]
+        }
+        graph = DependencyGraph.from_ast(block_ast, set())
+        assert "a" in graph.dependencies["b"]
+
+    def test_deps_in_index_expr(self):
+        """Step refs in IndexExpr create dependencies."""
+        block_ast = {
+            "steps": [
+                {"id": "a", "name": "a", "call": {"target": "V", "args": []}},
+                {
+                    "id": "b",
+                    "name": "b",
+                    "call": {
+                        "target": "V",
+                        "args": [
+                            {
+                                "name": "item",
+                                "value": {
+                                    "type": "IndexExpr",
+                                    "target": {"type": "StepRef", "path": ["a", "out"]},
+                                    "index": {"type": "Int", "value": 0},
+                                },
+                            }
+                        ],
+                    },
+                },
+            ]
+        }
+        graph = DependencyGraph.from_ast(block_ast, set())
+        assert "a" in graph.dependencies["b"]
+
+    def test_deps_in_index_expr_index(self):
+        """Step refs in IndexExpr index position create dependencies."""
+        block_ast = {
+            "steps": [
+                {"id": "a", "name": "a", "call": {"target": "V", "args": []}},
+                {"id": "c", "name": "c", "call": {"target": "V", "args": []}},
+                {
+                    "id": "b",
+                    "name": "b",
+                    "call": {
+                        "target": "V",
+                        "args": [
+                            {
+                                "name": "item",
+                                "value": {
+                                    "type": "IndexExpr",
+                                    "target": {"type": "StepRef", "path": ["a", "out"]},
+                                    "index": {"type": "StepRef", "path": ["c", "idx"]},
+                                },
+                            }
+                        ],
+                    },
+                },
+            ]
+        }
+        graph = DependencyGraph.from_ast(block_ast, set())
+        assert "a" in graph.dependencies["b"]
+        assert "c" in graph.dependencies["b"]
+
+    def test_no_deps_from_input_refs_in_collections(self):
+        """InputRef inside collections does not create dependencies."""
+        block_ast = {
+            "steps": [
+                {
+                    "id": "a",
+                    "name": "a",
+                    "call": {
+                        "target": "V",
+                        "args": [
+                            {
+                                "name": "items",
+                                "value": {
+                                    "type": "ArrayLiteral",
+                                    "elements": [
+                                        {"type": "InputRef", "path": ["x"]},
+                                    ],
+                                },
+                            }
+                        ],
+                    },
+                }
+            ]
+        }
+        graph = DependencyGraph.from_ast(block_ast, {"x"})
+        assert graph.dependencies["a"] == set()

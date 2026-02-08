@@ -43,9 +43,10 @@ array_type: "[" type "]"
 mixin_sig: "with" QNAME "(" [named_args] ")"
 
 // andThen blocks, prompt blocks, and script blocks
-facet_def_tail: "andThen" foreach_clause? block
+facet_def_tail: "andThen" foreach_clause? block more_andthen_block*
               | _NL* "prompt" prompt_block
               | _NL* "script" script_block
+more_andthen_block: "andThen" foreach_clause? block
 
 foreach_clause: "foreach" IDENT "in" reference
 
@@ -60,9 +61,10 @@ prompt_directive: "system" STRING -> prompt_system
 script_block: STRING
             | _NL* "python" STRING -> script_python
 
-block: "{" _NL* block_body "}"
+block: "{" _NL* block_body "}" _NL*
 block_body: (step_stmt _NL*)* (yield_stmt _NL*)*
-step_stmt: IDENT "=" call_expr
+step_stmt: IDENT "=" call_expr step_body?
+step_body: "andThen" foreach_clause? block
 
 yield_stmt: "yield" call_expr
 
@@ -76,8 +78,19 @@ named_arg: IDENT "=" _NL* expr
 
 // Expressions
 expr: concat_expr
-concat_expr: atom_expr ("++" _NL* atom_expr)*
-atom_expr: literal | reference
+concat_expr: additive_expr ("++" _NL* additive_expr)*
+additive_expr: multiplicative_expr (ADD_OP _NL* multiplicative_expr)*
+multiplicative_expr: postfix_expr (MUL_OP _NL* postfix_expr)*
+postfix_expr: atom_expr ("[" expr "]")*
+atom_expr: literal | reference | array_literal | map_literal | "(" expr ")"
+
+// Collection literals
+array_literal: "[" _NL* (expr (_NL* "," _NL* expr)* _NL*)? "]"
+map_literal: "#{" _NL* (map_entry (_NL* "," _NL* map_entry)* _NL*)? "}"
+map_entry: (STRING | IDENT) ":" _NL* expr
+
+ADD_OP: "+" | "-"
+MUL_OP: "*" | "/" | "%"
 
 reference: INPUT_REF | step_ref
 step_ref: IDENT ("." IDENT)+

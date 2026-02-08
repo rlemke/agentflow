@@ -64,7 +64,7 @@ class Parameter(ASTNode):
 
     name: str
     type: "TypeRef | ArrayType"
-    default: "Literal | Reference | ConcatExpr | None" = None
+    default: "Literal | Reference | ConcatExpr | BinaryExpr | None" = None
 
 
 # Expressions
@@ -88,7 +88,46 @@ class Reference(ASTNode):
 class ConcatExpr(ASTNode):
     """Concatenation expression: expr ++ expr ++ ..."""
 
-    operands: list["Literal | Reference | ConcatExpr"]
+    operands: list["Literal | Reference | ConcatExpr | BinaryExpr"]
+
+
+@dataclass
+class BinaryExpr(ASTNode):
+    """Binary arithmetic expression: expr op expr"""
+
+    operator: str  # "+", "-", "*", "/", "%"
+    left: "Literal | Reference | ConcatExpr | BinaryExpr"
+    right: "Literal | Reference | ConcatExpr | BinaryExpr"
+
+
+@dataclass
+class ArrayLiteral(ASTNode):
+    """Array literal: [elem1, elem2, ...]"""
+
+    elements: list
+
+
+@dataclass
+class MapEntry(ASTNode):
+    """Map entry: key: value"""
+
+    key: str
+    value: object  # expression node
+
+
+@dataclass
+class MapLiteral(ASTNode):
+    """Map literal: #{key1: val1, key2: val2, ...}"""
+
+    entries: list  # list[MapEntry]
+
+
+@dataclass
+class IndexExpr(ASTNode):
+    """Index expression: target[index]"""
+
+    target: object  # expression node
+    index: object  # expression node
 
 
 @dataclass
@@ -96,7 +135,7 @@ class NamedArg(ASTNode):
     """Named argument: name = expr"""
 
     name: str
-    value: "Literal | Reference | ConcatExpr"
+    value: "Literal | Reference | ConcatExpr | BinaryExpr | ArrayLiteral | MapLiteral | IndexExpr"
 
 
 # Mixins
@@ -130,10 +169,11 @@ class CallExpr(ASTNode):
 # Statements
 @dataclass
 class StepStmt(ASTNode):
-    """Step statement: name = CallExpr"""
+    """Step statement: name = CallExpr [andThen block]"""
 
     name: str
     call: CallExpr
+    body: "AndThenBlock | None" = None
 
 
 @dataclass
@@ -228,7 +268,7 @@ class FacetDecl(ASTNode):
     """Facet declaration."""
 
     sig: FacetSig
-    body: "AndThenBlock | ScriptBlock | None" = None
+    body: "list[AndThenBlock] | AndThenBlock | ScriptBlock | None" = None
 
 
 @dataclass
@@ -236,7 +276,7 @@ class EventFacetDecl(ASTNode):
     """Event facet declaration."""
 
     sig: FacetSig
-    body: "AndThenBlock | PromptBlock | ScriptBlock | None" = None
+    body: "list[AndThenBlock] | AndThenBlock | PromptBlock | ScriptBlock | None" = None
 
 
 @dataclass
@@ -244,7 +284,7 @@ class WorkflowDecl(ASTNode):
     """Workflow declaration."""
 
     sig: FacetSig
-    body: AndThenBlock | None = None
+    body: "list[AndThenBlock] | AndThenBlock | None" = None
 
 
 @dataclass

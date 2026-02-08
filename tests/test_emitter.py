@@ -759,3 +759,259 @@ class TestUnknownNodeType:
         emitter = JSONEmitter()
         with pytest.raises(ValueError, match="Unknown node type"):
             emitter._convert(object())
+
+
+class TestBinaryExprEmission:
+    """Test BinaryExpr JSON emission."""
+
+    def test_simple_addition(self):
+        """BinaryExpr emits correct JSON structure."""
+        ast = parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input + 1)
+            yield Test(output = s.input)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "BinaryExpr"
+        assert arg_value["operator"] == "+"
+        assert arg_value["left"] == {"type": "InputRef", "path": ["input"]}
+        assert arg_value["right"] == {"type": "Int", "value": 1}
+
+    def test_nested_binary(self):
+        """Nested BinaryExpr emits correct tree."""
+        ast = parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(a: Long, b: Long) => (output: Long) andThen {
+            s = Value(input = $.a + $.b * 2)
+            yield Test(output = s.input)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "BinaryExpr"
+        assert arg_value["operator"] == "+"
+        assert arg_value["right"]["type"] == "BinaryExpr"
+        assert arg_value["right"]["operator"] == "*"
+
+    def test_binary_with_step_ref(self):
+        """BinaryExpr with step reference emits correctly."""
+        ast = parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s1 = Value(input = $.input)
+            s2 = Value(input = s1.input + 1)
+            yield Test(output = s2.input)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step2 = data["workflows"][0]["body"]["steps"][1]
+        arg_value = step2["call"]["args"][0]["value"]
+        assert arg_value["type"] == "BinaryExpr"
+        assert arg_value["left"]["type"] == "StepRef"
+        assert arg_value["left"]["path"] == ["s1", "input"]
+
+
+class TestStepBodyEmission:
+    """Test step body emission."""
+
+    def test_step_with_body(self):
+        """Step with inline body emits body key."""
+        ast = parse("""
+        facet Outer(input: Long) => (output: Long)
+        facet Inner(value: Long) => (result: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Outer(input = $.input) andThen {
+                inner = Inner(value = $.input)
+                yield Outer(output = inner.result)
+            }
+            yield Test(output = s.output)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        assert "body" in step
+        assert step["body"]["type"] == "AndThenBlock"
+        assert len(step["body"]["steps"]) == 1
+        assert step["body"]["steps"][0]["name"] == "inner"
+
+    def test_step_without_body(self):
+        """Step without body has no body key."""
+        ast = parse("""
+        facet Value(input: Long)
+        workflow Test(input: Long) andThen {
+            s = Value(input = $.input)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        assert "body" not in step
+
+
+class TestMultipleBlockEmission:
+    """Test multiple andThen block emission."""
+
+    def test_multi_block_emission(self):
+        """Multiple andThen blocks emit as array."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s1 = V(input = $.input)
+                yield Test(a = s1.output)
+            } andThen {
+                s2 = V(input = $.input)
+                yield Test(b = s2.output)
+            }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        body = data["workflows"][0]["body"]
+        assert isinstance(body, list)
+        assert len(body) == 2
+        assert body[0]["type"] == "AndThenBlock"
+        assert body[1]["type"] == "AndThenBlock"
+
+    def test_single_block_backward_compat(self):
+        """Single andThen block emits as object (not array)."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = V(input = $.input)
+            yield Test(output = s.output)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        body = data["workflows"][0]["body"]
+        assert isinstance(body, dict)
+        assert body["type"] == "AndThenBlock"
+
+
+class TestCollectionLiteralEmission:
+    """Test JSON emission for collection literals."""
+
+    def test_array_literal_emission(self):
+        """Array literal emits correct JSON."""
+        ast = parse("""
+        facet V(items: String)
+        workflow Test(a: Long, b: Long) andThen {
+            s = V(items = [1, 2, 3])
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "ArrayLiteral"
+        assert len(arg_value["elements"]) == 3
+        assert arg_value["elements"][0] == {"type": "Int", "value": 1}
+        assert arg_value["elements"][1] == {"type": "Int", "value": 2}
+
+    def test_empty_array_emission(self):
+        """Empty array literal emits correct JSON."""
+        ast = parse("""
+        facet V(items: String)
+        workflow Test() andThen {
+            s = V(items = [])
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "ArrayLiteral"
+        assert arg_value["elements"] == []
+
+    def test_map_literal_emission(self):
+        """Map literal emits correct JSON."""
+        ast = parse("""
+        facet V(config: String)
+        workflow Test() andThen {
+            s = V(config = #{"key": "value", "num": 42})
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "MapLiteral"
+        assert len(arg_value["entries"]) == 2
+        assert arg_value["entries"][0]["key"] == "key"
+        assert arg_value["entries"][0]["value"] == {"type": "String", "value": "value"}
+        assert arg_value["entries"][1]["key"] == "num"
+        assert arg_value["entries"][1]["value"] == {"type": "Int", "value": 42}
+
+    def test_empty_map_emission(self):
+        """Empty map literal emits correct JSON."""
+        ast = parse("""
+        facet V(config: String)
+        workflow Test() andThen {
+            s = V(config = #{})
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "MapLiteral"
+        assert arg_value["entries"] == []
+
+    def test_index_expr_emission(self):
+        """Index expression emits correct JSON."""
+        ast = parse("""
+        facet V(items: String) => (output: String)
+        workflow Test() andThen {
+            s = V(items = "test")
+            s2 = V(items = s.output[0])
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][1]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "IndexExpr"
+        assert arg_value["target"]["type"] == "StepRef"
+        assert arg_value["index"] == {"type": "Int", "value": 0}
+
+    def test_nested_collections_emission(self):
+        """Nested arrays and maps emit correct JSON."""
+        ast = parse("""
+        facet V(items: String)
+        workflow Test() andThen {
+            s = V(items = [[1, 2], [3, 4]])
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "ArrayLiteral"
+        assert len(arg_value["elements"]) == 2
+        assert arg_value["elements"][0]["type"] == "ArrayLiteral"
+        assert arg_value["elements"][1]["type"] == "ArrayLiteral"
+
+    def test_array_with_refs_emission(self):
+        """Array with references emits correct JSON."""
+        ast = parse("""
+        facet V(items: String) => (output: Long)
+        workflow Test(x: Long) andThen {
+            s = V(items = "test")
+            s2 = V(items = [$.x, s.output])
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][1]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "ArrayLiteral"
+        assert arg_value["elements"][0]["type"] == "InputRef"
+        assert arg_value["elements"][1]["type"] == "StepRef"

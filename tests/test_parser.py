@@ -19,6 +19,7 @@ import pytest
 from afl import (
     AFLParser,
     ArrayType,
+    BinaryExpr,
     Literal,
     ParseError,
     Program,
@@ -908,3 +909,435 @@ class TestSchemaDeclarations:
         field = ast.namespaces[0].schemas[0].fields[0]
         assert isinstance(field.type, TypeRef)
         assert field.type.name == "other.DataModel"
+
+
+class TestArithmeticExpressions:
+    """Test arithmetic expression parsing."""
+
+    def test_addition(self, parser):
+        """Parse addition expression."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input + 1)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "+"
+        assert isinstance(arg.value.left, Reference)
+        assert isinstance(arg.value.right, Literal)
+        assert arg.value.right.value == 1
+
+    def test_subtraction(self, parser):
+        """Parse subtraction expression."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input - 1)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "-"
+
+    def test_multiplication(self, parser):
+        """Parse multiplication expression."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input * 2)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "*"
+
+    def test_division(self, parser):
+        """Parse division expression."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input / 2)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "/"
+
+    def test_modulo(self, parser):
+        """Parse modulo expression."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input % 3)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "%"
+
+    def test_precedence_mul_over_add(self, parser):
+        """Multiplication binds tighter than addition."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(a: Long, b: Long, c: Long) => (output: Long) andThen {
+            s = Value(input = $.a + $.b * $.c)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        expr = step.call.args[0].value
+        # Should be: a + (b * c)
+        assert isinstance(expr, BinaryExpr)
+        assert expr.operator == "+"
+        assert isinstance(expr.left, Reference)
+        assert isinstance(expr.right, BinaryExpr)
+        assert expr.right.operator == "*"
+
+    def test_left_associative_addition(self, parser):
+        """Addition is left-associative."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(a: Long, b: Long, c: Long) => (output: Long) andThen {
+            s = Value(input = $.a + $.b + $.c)
+            yield Test(output = s.input)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        expr = step.call.args[0].value
+        # Should be: (a + b) + c
+        assert isinstance(expr, BinaryExpr)
+        assert expr.operator == "+"
+        assert isinstance(expr.left, BinaryExpr)
+        assert expr.left.operator == "+"
+
+    def test_concat_with_arithmetic(self, parser):
+        """Concat has lower precedence than arithmetic."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(a: Long, b: Long) => (output: String) andThen {
+            s = Value(input = $.a + $.b)
+            yield Test(output = s.input ++ "px")
+        }
+        """)
+        yield_stmt = ast.workflows[0].body.block.yield_stmts[0]
+        arg = yield_stmt.call.args[0]
+        from afl.ast import ConcatExpr
+
+        assert isinstance(arg.value, ConcatExpr)
+        assert len(arg.value.operands) == 2
+
+    def test_step_ref_in_arithmetic(self, parser):
+        """Step references work in arithmetic expressions."""
+        ast = parser.parse("""
+        facet Value(input: Long, output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s1 = Value(input = $.input)
+            s2 = Value(input = s1.input + 1)
+            yield Test(output = s2.input)
+        }
+        """)
+        step2 = ast.workflows[0].body.block.steps[1]
+        arg = step2.call.args[0]
+        assert isinstance(arg.value, BinaryExpr)
+        assert arg.value.operator == "+"
+        assert isinstance(arg.value.left, Reference)
+        assert arg.value.left.path == ["s1", "input"]
+
+    def test_param_default_arithmetic(self, parser):
+        """Arithmetic expressions are NOT valid as defaults (only literals/refs)."""
+        # Arithmetic in defaults is valid syntactically since expr covers it
+        ast = parser.parse("facet Config(timeout: Long = 30 * 1000)")
+        param = ast.facets[0].sig.params[0]
+        assert isinstance(param.default, BinaryExpr)
+        assert param.default.operator == "*"
+
+
+class TestStepBody:
+    """Test statement-level andThen body parsing."""
+
+    def test_inline_body(self, parser):
+        """Parse step with inline andThen body."""
+        ast = parser.parse("""
+        facet Outer(input: Long) => (output: Long)
+        facet Inner(value: Long) => (result: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Outer(input = $.input) andThen {
+                inner = Inner(value = $.input)
+                yield Outer(output = inner.result)
+            }
+            yield Test(output = s.output)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        assert step.name == "s"
+        assert step.body is not None
+        from afl.ast import AndThenBlock
+        assert isinstance(step.body, AndThenBlock)
+        assert len(step.body.block.steps) == 1
+        assert step.body.block.steps[0].name == "inner"
+        assert len(step.body.block.yield_stmts) == 1
+
+    def test_no_body(self, parser):
+        """Step without body has body=None."""
+        ast = parser.parse("""
+        facet Value(input: Long) => (output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = Value(input = $.input)
+            yield Test(output = s.output)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        assert step.body is None
+
+    def test_body_with_foreach(self, parser):
+        """Parse step body with foreach clause."""
+        ast = parser.parse("""
+        facet Source(input: Long) => (items: Json)
+        facet Process(item: Long) => (result: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            src = Source(input = $.input) andThen foreach item in $.items {
+                p = Process(item = $.item)
+                yield Source(items = p.result)
+            }
+            yield Test(output = src.items)
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        assert step.body is not None
+        assert step.body.foreach is not None
+        assert step.body.foreach.variable == "item"
+
+
+class TestMultipleAndThenBlocks:
+    """Test multiple andThen blocks on facets/workflows."""
+
+    def test_two_andthen_blocks(self, parser):
+        """Parse facet with two andThen blocks."""
+        ast = parser.parse("""
+        facet Process(input: Long) => (a: Long, b: Long)
+        facet Inner(value: Long) => (result: Long)
+        workflow Test(input: Long) => (x: Long, y: Long) andThen {
+                s1 = Process(input = $.input)
+                yield Test(x = s1.a)
+            }
+            andThen {
+                s2 = Process(input = $.input)
+                yield Test(y = s2.b)
+            }
+        """)
+        body = ast.workflows[0].body
+        assert isinstance(body, list)
+        assert len(body) == 2
+        from afl.ast import AndThenBlock
+        assert all(isinstance(b, AndThenBlock) for b in body)
+        assert body[0].block.steps[0].name == "s1"
+        assert body[1].block.steps[0].name == "s2"
+
+    def test_three_andthen_blocks(self, parser):
+        """Parse workflow with three andThen blocks."""
+        ast = parser.parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Multi(input: Long) => (a: Long, b: Long, c: Long) andThen {
+            s1 = V(input = $.input)
+            yield Multi(a = s1.output)
+        } andThen {
+            s2 = V(input = $.input)
+            yield Multi(b = s2.output)
+        } andThen {
+            s3 = V(input = $.input)
+            yield Multi(c = s3.output)
+        }
+        """)
+        body = ast.workflows[0].body
+        assert isinstance(body, list)
+        assert len(body) == 3
+
+    def test_single_still_works(self, parser):
+        """Single andThen block still produces AndThenBlock (not list)."""
+        ast = parser.parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (output: Long) andThen {
+            s = V(input = $.input)
+            yield Test(output = s.output)
+        }
+        """)
+        from afl.ast import AndThenBlock
+        assert isinstance(ast.workflows[0].body, AndThenBlock)
+
+    def test_multi_block_with_foreach(self, parser):
+        """Multiple blocks, one with foreach."""
+        ast = parser.parse("""
+        facet Source() => (items: Json)
+        facet Process(item: Long) => (result: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                src = Source()
+                yield Test(a = src.items)
+            }
+            andThen foreach item in $.input {
+                p = Process(item = $.item)
+                yield Test(b = p.result)
+            }
+        """)
+        body = ast.workflows[0].body
+        assert isinstance(body, list)
+        assert len(body) == 2
+        assert body[0].foreach is None
+        assert body[1].foreach is not None
+        assert body[1].foreach.variable == "item"
+
+
+class TestCollectionLiterals:
+    """Test array, map, and index expression parsing."""
+
+    def test_empty_array(self, parser):
+        """Parse empty array literal."""
+        ast = parser.parse("""
+        facet V(items: Json)
+        workflow Test() andThen {
+            s = V(items = [])
+        }
+        """)
+        from afl.ast import ArrayLiteral
+        step = ast.workflows[0].body.block.steps[0]
+        arg = step.call.args[0]
+        assert isinstance(arg.value, ArrayLiteral)
+        assert arg.value.elements == []
+
+    def test_array_with_literals(self, parser):
+        """Parse array with literal elements."""
+        ast = parser.parse("""
+        facet V(items: Json)
+        workflow Test() andThen {
+            s = V(items = [1, 2, 3])
+        }
+        """)
+        from afl.ast import ArrayLiteral
+        step = ast.workflows[0].body.block.steps[0]
+        arr = step.call.args[0].value
+        assert isinstance(arr, ArrayLiteral)
+        assert len(arr.elements) == 3
+        assert all(isinstance(e, Literal) for e in arr.elements)
+
+    def test_nested_array(self, parser):
+        """Parse nested array literal."""
+        ast = parser.parse("""
+        facet V(items: Json)
+        workflow Test() andThen {
+            s = V(items = [[1, 2], [3, 4]])
+        }
+        """)
+        from afl.ast import ArrayLiteral
+        arr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(arr, ArrayLiteral)
+        assert len(arr.elements) == 2
+        assert all(isinstance(e, ArrayLiteral) for e in arr.elements)
+
+    def test_array_with_refs(self, parser):
+        """Parse array with reference elements."""
+        ast = parser.parse("""
+        facet V(items: Json) => (output: Json)
+        workflow Test(a: Long, b: Long) andThen {
+            s = V(items = [$.a, $.b])
+        }
+        """)
+        from afl.ast import ArrayLiteral
+        arr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(arr, ArrayLiteral)
+        assert len(arr.elements) == 2
+        assert all(isinstance(e, Reference) for e in arr.elements)
+
+    def test_map_literal(self, parser):
+        """Parse map literal."""
+        ast = parser.parse("""
+        facet V(config: Json)
+        workflow Test() andThen {
+            s = V(config = #{"host": "localhost", "port": 8080})
+        }
+        """)
+        from afl.ast import MapLiteral
+        m = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(m, MapLiteral)
+        assert len(m.entries) == 2
+        assert m.entries[0].key == "host"
+        assert m.entries[1].key == "port"
+
+    def test_empty_map(self, parser):
+        """Parse empty map literal."""
+        ast = parser.parse("""
+        facet V(config: Json)
+        workflow Test() andThen {
+            s = V(config = #{})
+        }
+        """)
+        from afl.ast import MapLiteral
+        m = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(m, MapLiteral)
+        assert m.entries == []
+
+    def test_map_with_refs(self, parser):
+        """Parse map with reference values."""
+        ast = parser.parse("""
+        facet V(config: Json) => (output: Json)
+        workflow Test(host: String, port: Long) andThen {
+            s = V(config = #{"host": $.host, "port": $.port})
+        }
+        """)
+        from afl.ast import MapLiteral
+        m = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(m, MapLiteral)
+        assert len(m.entries) == 2
+        assert isinstance(m.entries[0].value, Reference)
+
+    def test_index_expression(self, parser):
+        """Parse index expression."""
+        ast = parser.parse("""
+        facet V(items: Json) => (output: Json)
+        workflow Test(input: Json) andThen {
+            s = V(items = $.input[0])
+        }
+        """)
+        from afl.ast import IndexExpr
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, IndexExpr)
+        assert isinstance(expr.target, Reference)
+        assert isinstance(expr.index, Literal)
+        assert expr.index.value == 0
+
+    def test_index_on_array_literal(self, parser):
+        """Parse index on array literal."""
+        ast = parser.parse("""
+        facet V(item: Json)
+        workflow Test() andThen {
+            s = V(item = [1, 2, 3][1])
+        }
+        """)
+        from afl.ast import IndexExpr, ArrayLiteral
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, IndexExpr)
+        assert isinstance(expr.target, ArrayLiteral)
+
+    def test_grouped_expression(self, parser):
+        """Parse grouped expression with parentheses."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test(a: Long, b: Long) andThen {
+            s = V(input = ($.a + $.b) * 2)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, BinaryExpr)
+        assert expr.operator == "*"
+        assert isinstance(expr.left, BinaryExpr)
+        assert expr.left.operator == "+"

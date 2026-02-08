@@ -18,7 +18,9 @@ from lark import Token, Transformer, v_args
 
 from .ast import (
     AndThenBlock,
+    ArrayLiteral,
     ArrayType,
+    BinaryExpr,
     Block,
     CallExpr,
     ConcatExpr,
@@ -27,7 +29,10 @@ from .ast import (
     FacetSig,
     ForeachClause,
     ImplicitDecl,
+    IndexExpr,
     Literal,
+    MapEntry,
+    MapLiteral,
     MixinCall,
     MixinSig,
     NamedArg,
@@ -166,8 +171,71 @@ class AFLTransformer(Transformer):
         # Otherwise create a ConcatExpr with all operands
         return ConcatExpr(operands=list(items), location=self._loc(meta))
 
+    @v_args(meta=True)
+    def additive_expr(self, meta, items: list):
+        # items alternates: expr, op, expr, op, expr, ...
+        if len(items) == 1:
+            return items[0]
+        # Left-associative binary tree
+        result = items[0]
+        i = 1
+        while i < len(items):
+            op = str(items[i])
+            right = items[i + 1]
+            result = BinaryExpr(operator=op, left=result, right=right, location=self._loc(meta))
+            i += 2
+        return result
+
+    @v_args(meta=True)
+    def multiplicative_expr(self, meta, items: list):
+        # items alternates: expr, op, expr, op, expr, ...
+        if len(items) == 1:
+            return items[0]
+        # Left-associative binary tree
+        result = items[0]
+        i = 1
+        while i < len(items):
+            op = str(items[i])
+            right = items[i + 1]
+            result = BinaryExpr(operator=op, left=result, right=right, location=self._loc(meta))
+            i += 2
+        return result
+
+    def ADD_OP(self, token: Token) -> str:
+        return str(token)
+
+    def MUL_OP(self, token: Token) -> str:
+        return str(token)
+
+    @v_args(meta=True)
+    def postfix_expr(self, meta, items: list):
+        # First item is the base expression, subsequent items are index expressions
+        if len(items) == 1:
+            return items[0]
+        # Build left-associative IndexExpr chain
+        result = items[0]
+        for index_expr in items[1:]:
+            result = IndexExpr(target=result, index=index_expr, location=self._loc(meta))
+        return result
+
     def atom_expr(self, items: list):
         return items[0]
+
+    # Collection literals
+    @v_args(meta=True)
+    def array_literal(self, meta, items: list) -> ArrayLiteral:
+        return ArrayLiteral(elements=list(items), location=self._loc(meta))
+
+    @v_args(meta=True)
+    def map_entry(self, meta, items: list) -> MapEntry:
+        key = items[0]
+        value = items[1]
+        return MapEntry(key=str(key), value=value, location=self._loc(meta))
+
+    @v_args(meta=True)
+    def map_literal(self, meta, items: list) -> MapLiteral:
+        entries = [item for item in items if isinstance(item, MapEntry)]
+        return MapLiteral(entries=entries, location=self._loc(meta))
 
     # Named arguments
     @v_args(meta=True, inline=True)
@@ -210,9 +278,23 @@ class AFLTransformer(Transformer):
         return CallExpr(name=name, args=args, mixins=mixins, location=self._loc(meta))
 
     # Statements
-    @v_args(meta=True, inline=True)
-    def step_stmt(self, meta, name: str, call: CallExpr) -> StepStmt:
-        return StepStmt(name=name, call=call, location=self._loc(meta))
+    @v_args(meta=True)
+    def step_stmt(self, meta, items: list) -> StepStmt:
+        name = items[0]
+        call = items[1]
+        body = items[2] if len(items) > 2 else None
+        return StepStmt(name=name, call=call, body=body, location=self._loc(meta))
+
+    @v_args(meta=True)
+    def step_body(self, meta, items: list) -> AndThenBlock:
+        foreach = None
+        block = None
+        for item in items:
+            if isinstance(item, ForeachClause):
+                foreach = item
+            elif isinstance(item, Block):
+                block = item
+        return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
 
     @v_args(meta=True, inline=True)
     def yield_stmt(self, meta, call: CallExpr) -> YieldStmt:
@@ -255,7 +337,7 @@ class AFLTransformer(Transformer):
         return ForeachClause(variable=var, iterable=ref, location=self._loc(meta))
 
     @v_args(meta=True)
-    def facet_def_tail(self, meta, items: list) -> AndThenBlock | PromptBlock | ScriptBlock:
+    def more_andthen_block(self, meta, items: list) -> AndThenBlock:
         foreach = None
         block = None
         for item in items:
@@ -263,11 +345,34 @@ class AFLTransformer(Transformer):
                 foreach = item
             elif isinstance(item, Block):
                 block = item
-            elif isinstance(item, PromptBlock):
+        return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+
+    @v_args(meta=True)
+    def facet_def_tail(self, meta, items: list):
+        # Check for prompt or script blocks
+        for item in items:
+            if isinstance(item, PromptBlock):
                 return item
             elif isinstance(item, ScriptBlock):
                 return item
-        return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+
+        # Build the first andThen block from inline components
+        foreach = None
+        block = None
+        more_blocks = []
+        for item in items:
+            if isinstance(item, ForeachClause):
+                foreach = item
+            elif isinstance(item, Block):
+                block = item
+            elif isinstance(item, AndThenBlock):
+                more_blocks.append(item)
+
+        first_block = AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+
+        if more_blocks:
+            return [first_block] + more_blocks
+        return first_block
 
     # Prompt block handling
     @v_args(meta=True)

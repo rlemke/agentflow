@@ -131,24 +131,25 @@ class StatementBlocksBeginHandler(StateHandler):
 
         return None
 
-    def _create_block_steps(self, body: dict) -> None:
+    def _create_block_steps(self, body) -> None:
         """Create block steps for andThen blocks in body."""
         from ..step import StepDefinition
         from ..types import ObjectType
 
-        # The body could be a single andThen or multiple
-        # For now, treat body as a single block
-        block_step = StepDefinition.create(
-            workflow_id=self.step.workflow_id,
-            object_type=ObjectType.AND_THEN,
-            facet_name="",
-            container_id=self.step.id,
-            container_type=self.step.object_type,
-            root_id=self.step.root_id or self.step.id,
-        )
+        # The body could be a single andThen block or a list of blocks
+        bodies = body if isinstance(body, list) else [body]
+        for _block_body in bodies:
+            block_step = StepDefinition.create(
+                workflow_id=self.step.workflow_id,
+                object_type=ObjectType.AND_THEN,
+                facet_name="",
+                container_id=self.step.id,
+                container_type=self.step.object_type,
+                root_id=self.step.root_id or self.step.id,
+            )
 
-        # Add to pending changes
-        self.context.changes.add_created_step(block_step)
+            # Add to pending changes
+            self.context.changes.add_created_step(block_step)
 
 
 class StatementBlocksContinueHandler(StateHandler):

@@ -449,3 +449,165 @@ class TestBinaryExprEdgeCases:
         }
         with pytest.raises(EvaluationError, match="Type error"):
             evaluator.evaluate(expr, ctx)
+
+
+class TestCollectionEvaluation:
+    """Tests for collection literal evaluation."""
+
+    @pytest.fixture
+    def evaluator(self):
+        return ExpressionEvaluator()
+
+    @pytest.fixture
+    def ctx(self):
+        def get_step_output(step_name, attr_name):
+            outputs = {"s1": {"items": [10, 20, 30], "name": "test"}}
+            if step_name in outputs and attr_name in outputs[step_name]:
+                return outputs[step_name][attr_name]
+            raise ValueError(f"Not found: {step_name}.{attr_name}")
+
+        return EvaluationContext(
+            inputs={"x": 5, "idx": 1},
+            get_step_output=get_step_output,
+        )
+
+    def test_empty_array(self, evaluator, ctx):
+        """Empty ArrayLiteral evaluates to empty list."""
+        expr = {"type": "ArrayLiteral", "elements": []}
+        assert evaluator.evaluate(expr, ctx) == []
+
+    def test_array_with_literals(self, evaluator, ctx):
+        """ArrayLiteral with literals evaluates correctly."""
+        expr = {
+            "type": "ArrayLiteral",
+            "elements": [
+                {"type": "Int", "value": 1},
+                {"type": "Int", "value": 2},
+                {"type": "Int", "value": 3},
+            ],
+        }
+        assert evaluator.evaluate(expr, ctx) == [1, 2, 3]
+
+    def test_array_with_refs(self, evaluator, ctx):
+        """ArrayLiteral with input references evaluates correctly."""
+        expr = {
+            "type": "ArrayLiteral",
+            "elements": [
+                {"type": "InputRef", "path": ["x"]},
+                {"type": "Int", "value": 10},
+            ],
+        }
+        assert evaluator.evaluate(expr, ctx) == [5, 10]
+
+    def test_nested_array(self, evaluator, ctx):
+        """Nested ArrayLiteral evaluates correctly."""
+        expr = {
+            "type": "ArrayLiteral",
+            "elements": [
+                {"type": "ArrayLiteral", "elements": [{"type": "Int", "value": 1}]},
+                {"type": "ArrayLiteral", "elements": [{"type": "Int", "value": 2}]},
+            ],
+        }
+        assert evaluator.evaluate(expr, ctx) == [[1], [2]]
+
+    def test_empty_map(self, evaluator, ctx):
+        """Empty MapLiteral evaluates to empty dict."""
+        expr = {"type": "MapLiteral", "entries": []}
+        assert evaluator.evaluate(expr, ctx) == {}
+
+    def test_map_with_literals(self, evaluator, ctx):
+        """MapLiteral with literal values evaluates correctly."""
+        expr = {
+            "type": "MapLiteral",
+            "entries": [
+                {"key": "name", "value": {"type": "String", "value": "test"}},
+                {"key": "count", "value": {"type": "Int", "value": 42}},
+            ],
+        }
+        assert evaluator.evaluate(expr, ctx) == {"name": "test", "count": 42}
+
+    def test_map_with_refs(self, evaluator, ctx):
+        """MapLiteral with references evaluates correctly."""
+        expr = {
+            "type": "MapLiteral",
+            "entries": [
+                {"key": "val", "value": {"type": "InputRef", "path": ["x"]}},
+            ],
+        }
+        assert evaluator.evaluate(expr, ctx) == {"val": 5}
+
+    def test_index_on_array(self, evaluator, ctx):
+        """IndexExpr on array evaluates correctly."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {
+                "type": "ArrayLiteral",
+                "elements": [
+                    {"type": "String", "value": "a"},
+                    {"type": "String", "value": "b"},
+                    {"type": "String", "value": "c"},
+                ],
+            },
+            "index": {"type": "Int", "value": 1},
+        }
+        assert evaluator.evaluate(expr, ctx) == "b"
+
+    def test_index_on_map(self, evaluator, ctx):
+        """IndexExpr on map evaluates correctly."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {
+                "type": "MapLiteral",
+                "entries": [
+                    {"key": "name", "value": {"type": "String", "value": "test"}},
+                ],
+            },
+            "index": {"type": "String", "value": "name"},
+        }
+        assert evaluator.evaluate(expr, ctx) == "test"
+
+    def test_index_on_step_ref(self, evaluator, ctx):
+        """IndexExpr on step reference evaluates correctly."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {"type": "StepRef", "path": ["s1", "items"]},
+            "index": {"type": "Int", "value": 2},
+        }
+        assert evaluator.evaluate(expr, ctx) == 30
+
+    def test_index_with_input_ref(self, evaluator, ctx):
+        """IndexExpr with input ref as index evaluates correctly."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {"type": "StepRef", "path": ["s1", "items"]},
+            "index": {"type": "InputRef", "path": ["idx"]},
+        }
+        assert evaluator.evaluate(expr, ctx) == 20
+
+    def test_index_out_of_bounds(self, evaluator, ctx):
+        """IndexExpr with invalid index raises EvaluationError."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {
+                "type": "ArrayLiteral",
+                "elements": [{"type": "Int", "value": 1}],
+            },
+            "index": {"type": "Int", "value": 99},
+        }
+        with pytest.raises(EvaluationError, match="Index error"):
+            evaluator.evaluate(expr, ctx)
+
+    def test_index_key_not_found(self, evaluator, ctx):
+        """IndexExpr with missing key raises EvaluationError."""
+        expr = {
+            "type": "IndexExpr",
+            "target": {
+                "type": "MapLiteral",
+                "entries": [
+                    {"key": "a", "value": {"type": "Int", "value": 1}},
+                ],
+            },
+            "index": {"type": "String", "value": "missing"},
+        }
+        with pytest.raises(EvaluationError, match="Index error"):
+            evaluator.evaluate(expr, ctx)

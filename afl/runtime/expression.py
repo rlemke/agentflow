@@ -101,6 +101,12 @@ class ExpressionEvaluator:
             return self._eval_concat(expr, ctx)
         elif expr_type == "BinaryExpr":
             return self._eval_binary(expr, ctx)
+        elif expr_type == "ArrayLiteral":
+            return self._eval_array_literal(expr, ctx)
+        elif expr_type == "MapLiteral":
+            return self._eval_map_literal(expr, ctx)
+        elif expr_type == "IndexExpr":
+            return self._eval_index(expr, ctx)
         else:
             # Unknown type, try to return value directly
             if "value" in expr:
@@ -292,6 +298,36 @@ class ExpressionEvaluator:
             raise EvaluationError(
                 str(expr),
                 f"Type error in {operator} operation: {e}",
+                ctx.step_id,
+            ) from e
+
+
+    def _eval_array_literal(self, expr: dict, ctx: EvaluationContext) -> list:
+        """Evaluate an array literal."""
+        elements = expr.get("elements", [])
+        return [self.evaluate(elem, ctx) for elem in elements]
+
+    def _eval_map_literal(self, expr: dict, ctx: EvaluationContext) -> dict:
+        """Evaluate a map literal."""
+        entries = expr.get("entries", [])
+        result = {}
+        for entry in entries:
+            key = entry.get("key", "")
+            value = self.evaluate(entry.get("value"), ctx)
+            result[key] = value
+        return result
+
+    def _eval_index(self, expr: dict, ctx: EvaluationContext) -> Any:
+        """Evaluate an index expression (target[index])."""
+        target = self.evaluate(expr.get("target"), ctx)
+        index = self.evaluate(expr.get("index"), ctx)
+
+        try:
+            return target[index]
+        except (KeyError, IndexError, TypeError) as e:
+            raise EvaluationError(
+                str(expr),
+                f"Index error: {e}",
                 ctx.step_id,
             ) from e
 

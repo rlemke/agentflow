@@ -19,8 +19,10 @@ from typing import Any
 
 from .ast import (
     AndThenBlock,
+    ArrayLiteral,
     ArrayType,
     ASTNode,
+    BinaryExpr,
     Block,
     CallExpr,
     ConcatExpr,
@@ -29,7 +31,10 @@ from .ast import (
     FacetSig,
     ForeachClause,
     ImplicitDecl,
+    IndexExpr,
     Literal,
+    MapEntry,
+    MapLiteral,
     MixinCall,
     MixinSig,
     NamedArg,
@@ -161,6 +166,16 @@ class JSONEmitter:
             return self._reference(node)
         if isinstance(node, ConcatExpr):
             return self._concat_expr(node)
+        if isinstance(node, BinaryExpr):
+            return self._binary_expr(node)
+        if isinstance(node, ArrayLiteral):
+            return self._array_literal(node)
+        if isinstance(node, MapLiteral):
+            return self._map_literal(node)
+        if isinstance(node, MapEntry):
+            return self._map_entry(node)
+        if isinstance(node, IndexExpr):
+            return self._index_expr(node)
         if isinstance(node, SourceLocation):
             return self._location(node)
         if isinstance(node, SchemaDecl):
@@ -297,6 +312,14 @@ class JSONEmitter:
         }
         return self._add_metadata(data, node)
 
+    def _emit_body(self, body) -> Any:
+        """Emit a body field, handling single vs multiple andThen blocks."""
+        if isinstance(body, list):
+            if len(body) == 1:
+                return self._convert(body[0])
+            return self._convert(body)
+        return self._convert(body)
+
     def _facet_decl(self, node: FacetDecl) -> dict:
         """Convert FacetDecl node."""
         data = {
@@ -311,7 +334,7 @@ class JSONEmitter:
         if node.sig.mixins:
             data["mixins"] = self._convert(node.sig.mixins)
         if node.body:
-            data["body"] = self._convert(node.body)
+            data["body"] = self._emit_body(node.body)
 
         return self._add_metadata(data, node)
 
@@ -329,7 +352,7 @@ class JSONEmitter:
         if node.sig.mixins:
             data["mixins"] = self._convert(node.sig.mixins)
         if node.body:
-            data["body"] = self._convert(node.body)
+            data["body"] = self._emit_body(node.body)
 
         return self._add_metadata(data, node)
 
@@ -347,7 +370,7 @@ class JSONEmitter:
         if node.sig.mixins:
             data["mixins"] = self._convert(node.sig.mixins)
         if node.body:
-            data["body"] = self._convert(node.body)
+            data["body"] = self._emit_body(node.body)
 
         return self._add_metadata(data, node)
 
@@ -448,6 +471,8 @@ class JSONEmitter:
             "name": node.name,
             "call": self._convert(node.call),
         }
+        if node.body:
+            data["body"] = self._convert(node.body)
         return self._add_metadata(data, node)
 
     def _yield_stmt(self, node: YieldStmt) -> dict:
@@ -562,6 +587,44 @@ class JSONEmitter:
         return {
             "type": "ConcatExpr",
             "operands": self._convert(node.operands),
+        }
+
+    def _binary_expr(self, node: BinaryExpr) -> dict:
+        """Convert BinaryExpr node."""
+        return {
+            "type": "BinaryExpr",
+            "operator": node.operator,
+            "left": self._convert(node.left),
+            "right": self._convert(node.right),
+        }
+
+    def _array_literal(self, node: ArrayLiteral) -> dict:
+        """Convert ArrayLiteral node."""
+        return {
+            "type": "ArrayLiteral",
+            "elements": [self._convert(e) for e in node.elements],
+        }
+
+    def _map_entry(self, node: MapEntry) -> dict:
+        """Convert MapEntry node."""
+        return {
+            "key": node.key,
+            "value": self._convert(node.value),
+        }
+
+    def _map_literal(self, node: MapLiteral) -> dict:
+        """Convert MapLiteral node."""
+        return {
+            "type": "MapLiteral",
+            "entries": [self._convert(e) for e in node.entries],
+        }
+
+    def _index_expr(self, node: IndexExpr) -> dict:
+        """Convert IndexExpr node."""
+        return {
+            "type": "IndexExpr",
+            "target": self._convert(node.target),
+            "index": self._convert(node.index),
         }
 
 
