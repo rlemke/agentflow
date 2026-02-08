@@ -3728,3 +3728,344 @@ class TestIterationTraces:
         event_blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT]
         assert len(event_blocked) == 1
         assert event_blocked[0].facet_name == "test.MyEvent"
+
+    def test_block_ast_resolution_nested(self):
+        """Verify get_block_ast() resolves the correct AST for nested statement-level blocks.
+
+        When a step has an inline andThen body, the block created for it should
+        use that inline body, not the facet-level body.
+
+        AFL structure:
+            facet Value(input: Long)
+            facet Inner(input: Long) => (output: Long)
+              andThen { v = Value(input = $.input); yield Inner(output = v.input) }
+            workflow TestResolve(x: Long) => (result: Long)
+              andThen {
+                s = Inner(input = $.x)
+                  andThen { sub = Value(input = $.input + 10); yield Inner(output = sub.input) }
+                yield TestResolve(result = s.output)
+              }
+
+        Expected: result = x + 10 (inline body overrides facet body).
+        """
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Inner",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-v",
+                                "name": "v",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["input"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-Inner",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Inner",
+                                "args": [
+                                    {
+                                        "name": "output",
+                                        "value": {"type": "StepRef", "path": ["v", "input"]},
+                                    }
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestResolve",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-s",
+                        "name": "s",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Inner",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                }
+                            ],
+                        },
+                        # Statement-level andThen overrides the facet body
+                        "body": {
+                            "type": "AndThenBlock",
+                            "steps": [
+                                {
+                                    "type": "StepStmt",
+                                    "id": "step-sub",
+                                    "name": "sub",
+                                    "call": {
+                                        "type": "CallExpr",
+                                        "target": "Value",
+                                        "args": [
+                                            {
+                                                "name": "input",
+                                                "value": {
+                                                    "type": "BinaryExpr",
+                                                    "operator": "+",
+                                                    "left": {
+                                                        "type": "InputRef",
+                                                        "path": ["input"],
+                                                    },
+                                                    "right": {"type": "Int", "value": 10},
+                                                },
+                                            }
+                                        ],
+                                    },
+                                },
+                            ],
+                            "yield": {
+                                "type": "YieldStmt",
+                                "id": "yield-Inner-inline",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Inner",
+                                    "args": [
+                                        {
+                                            "name": "output",
+                                            "value": {
+                                                "type": "StepRef",
+                                                "path": ["sub", "input"],
+                                            },
+                                        }
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-TR",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestResolve",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["s", "output"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(
+            workflow_ast, inputs={"x": 5}, program_ast=program_ast
+        )
+        assert result.success is True
+        # Inline body: sub.input = $.input + 10 = 5 + 10 = 15
+        assert result.outputs["result"] == 15
+
+        # Verify 2 AND_THEN block steps: workflow body block + statement-level block_s
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        block_steps = [s for s in steps if s.object_type == ObjectType.AND_THEN]
+        assert len(block_steps) == 2
+
+        # Verify that the step inside the statement-level block is "sub" (from inline
+        # body), not "v" (from facet body). statement_id uses the AST "id" field.
+        step_ids = {s.statement_id for s in steps if s.statement_id}
+        assert "step-sub" in step_ids
+        assert "step-v" not in step_ids
+
+    def test_facet_level_block_creation(self):
+        """Verify calling a facet with an andThen body creates a block from the facet definition.
+
+        AFL structure:
+            facet Value(input: Long)
+            facet Adder(a: Long, b: Long) => (sum: Long)
+              andThen { s1 = Value(input = $.a); s2 = Value(input = $.b);
+                        yield Adder(sum = s1.input + s2.input) }
+            workflow TestFacetBlock(x: Long) => (result: Long)
+              andThen { add = Adder(a = $.x, b = 10);
+                        yield TestFacetBlock(result = add.sum) }
+
+        Expected: result = x + 10 (e.g., x=5 → result=15).
+        """
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Adder",
+                    "params": [
+                        {"name": "a", "type": "Long"},
+                        {"name": "b", "type": "Long"},
+                    ],
+                    "returns": [{"name": "sum", "type": "Long"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s1",
+                                "name": "s1",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["a"]},
+                                        }
+                                    ],
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-s2",
+                                "name": "s2",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "Value",
+                                    "args": [
+                                        {
+                                            "name": "input",
+                                            "value": {"type": "InputRef", "path": ["b"]},
+                                        }
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-Adder",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Adder",
+                                "args": [
+                                    {
+                                        "name": "sum",
+                                        "value": {
+                                            "type": "BinaryExpr",
+                                            "operator": "+",
+                                            "left": {
+                                                "type": "StepRef",
+                                                "path": ["s1", "input"],
+                                            },
+                                            "right": {
+                                                "type": "StepRef",
+                                                "path": ["s2", "input"],
+                                            },
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        }
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestFacetBlock",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-add",
+                        "name": "add",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Adder",
+                            "args": [
+                                {
+                                    "name": "a",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                },
+                                {
+                                    "name": "b",
+                                    "value": {"type": "Int", "value": 10},
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-TFB",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestFacetBlock",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["add", "sum"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(
+            workflow_ast, inputs={"x": 5}, program_ast=program_ast
+        )
+        assert result.success is True
+        assert result.outputs["result"] == 15
+
+        # Verify 2 AND_THEN block steps: workflow body block + facet-level block for Adder
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        block_steps = [s for s in steps if s.object_type == ObjectType.AND_THEN]
+        assert len(block_steps) == 2
+
+        # Verify add step has facet_name == "Adder" (statement_id uses AST "id" field)
+        add_steps = [s for s in steps if s.statement_id == "step-add"]
+        assert len(add_steps) == 1
+        assert add_steps[0].facet_name == "Adder"
+
+        # Verify steps inside the Adder block are s1 and s2 (from the facet body)
+        step_ids = {s.statement_id for s in steps if s.statement_id}
+        assert "step-s1" in step_ids
+        assert "step-s2" in step_ids

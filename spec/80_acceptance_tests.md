@@ -1,17 +1,50 @@
 ## Acceptance Tests (80_acceptance_tests.md)
 
-The implementation includes pytest tests that verify parser and emitter correctness.
+The implementation includes pytest tests that verify parser, emitter, validator, runtime, dashboard, and MCP correctness.
 
 ---
 
 ## Test Summary
 
-| Test File | Tests | Coverage |
-|-----------|-------|----------|
-| `tests/test_parser.py` | 50 | Parser functionality |
-| `tests/test_emitter.py` | 34 | JSON emission |
-| `tests/test_validator.py` | 40 | Semantic validation |
-| **Total** | **124** | **~82%** |
+| Category | Test File | Tests | Coverage |
+|----------|-----------|-------|----------|
+| Compiler | `tests/test_parser.py` | 96 | Parser functionality |
+| Compiler | `tests/test_emitter.py` | 69 | JSON emission |
+| Compiler | `tests/test_validator.py` | 103 | Semantic validation |
+| Compiler | `tests/test_source.py` | 33 | Source input and provenance |
+| Compiler | `tests/test_config.py` | 16 | Configuration loading |
+| Compiler | `tests/test_cli.py` | 25 | CLI argument parsing and error handling |
+| Compiler | `tests/test_loader.py` | 13 | MongoDB and Maven source loaders |
+| Compiler | `tests/test_runner_main.py` | 5 | Runner CLI entry point |
+| Runtime | `tests/runtime/test_types.py` | 8 | StepId, BlockId, ObjectType, FacetAttributes |
+| Runtime | `tests/runtime/test_states.py` | 15 | State constants and transitions |
+| Runtime | `tests/runtime/test_step.py` | 13 | StepDefinition and StepTransition |
+| Runtime | `tests/runtime/test_entities.py` | 29 | Runtime entity types |
+| Runtime | `tests/runtime/test_memory_store.py` | 9 | In-memory persistence |
+| Runtime | `tests/runtime/test_mongo_store.py` | 32 | MongoDB persistence (mongomock) |
+| Runtime | `tests/runtime/test_dependency.py` | 10 | DependencyGraph from AST |
+| Runtime | `tests/runtime/test_expression.py` | 51 | Expression evaluation (InputRef, StepRef, BinaryExpr, ConcatExpr) |
+| Runtime | `tests/runtime/test_events.py` | 15 | Event lifecycle |
+| Runtime | `tests/runtime/test_evaluator.py` | 68 | Spec examples, iteration traces, acceptance tests |
+| Runtime | `tests/runtime/test_script_executor.py` | 25 | Sandboxed script execution |
+| Runtime | `tests/runtime/test_runner_service.py` | 105 | Distributed runner service |
+| Runtime | `tests/runtime/test_agent_poller.py` | 14 | AgentPoller core |
+| Runtime | `tests/runtime/test_agent_poller_async.py` | 10 | Async handler tests |
+| Runtime | `tests/runtime/test_agent_poller_extended.py` | 19 | AgentPoller edge cases |
+| Runtime | `tests/runtime/test_agent.py` | 19 | Agent integration |
+| Runtime | `tests/runtime/test_addone_agent.py` | 7 | AddOne agent end-to-end |
+| Runtime | `tests/runtime/test_resume_task.py` | 7 | Resume task protocol |
+| Dashboard | `tests/dashboard/test_app.py` | 3 | App creation and route registration |
+| Dashboard | `tests/dashboard/test_filters.py` | 22 | Jinja2 filter unit tests |
+| Dashboard | `tests/dashboard/test_routes.py` | 44 | Route integration tests |
+| Dashboard | `tests/dashboard/test_step_routes.py` | 14 | Step detail and name resolution |
+| Dashboard | `tests/dashboard/test_workflows.py` | 13 | Workflow routes |
+| Dashboard | `tests/dashboard/test_dependencies.py` | 5 | Dependency injection |
+| MCP | `tests/mcp/test_server.py` | 32 | Tool + resource integration |
+| MCP | `tests/mcp/test_server_extended.py` | 16 | Continue/resume/resource edge cases |
+| MCP | `tests/mcp/test_serializers.py` | 12 | Serializer unit tests |
+| MCP | `tests/mcp/test_store.py` | 3 | MongoStore singleton factory |
+| **Total** | | **980** | |
 
 ---
 
@@ -225,50 +258,59 @@ The implementation includes pytest tests that verify parser and emitter correctn
 # Setup
 python3 -m venv .venv
 source .venv/bin/activate
-pip install lark pytest pytest-cov
+pip install -e ".[dev]"
 
 # Run all tests
-PYTHONPATH=. pytest tests/ -v
+pytest tests/ -v
 
 # Run with coverage
-PYTHONPATH=. pytest tests/ --cov=afl --cov-report=term-missing
+pytest tests/ --cov=afl --cov-report=term-missing
 
 # Run specific test file
-PYTHONPATH=. pytest tests/test_parser.py -v
+pytest tests/test_parser.py -v
 
 # Run specific test class
-PYTHONPATH=. pytest tests/test_parser.py::TestWorkflows -v
+pytest tests/test_parser.py::TestWorkflows -v
 
 # Run specific test
-PYTHONPATH=. pytest tests/test_parser.py::TestBasicParsing::test_simple_facet -v
+pytest tests/test_parser.py::TestBasicParsing::test_simple_facet -v
 
 # Run tests matching pattern
-PYTHONPATH=. pytest tests/ -k "namespace" -v
+pytest tests/ -k "namespace" -v
 ```
-
----
 
 ---
 
 ## Runtime Tests
 
-The runtime implementation includes pytest tests that verify evaluator, state machine, and execution correctness.
+The runtime implementation includes pytest tests that verify evaluator, state machine, persistence, and execution correctness.
 
 ### Runtime Test Summary
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `tests/runtime/test_types.py` | — | Type system (StepId, BlockId, ObjectType, FacetAttributes) |
-| `tests/runtime/test_states.py` | — | State constants and transitions |
-| `tests/runtime/test_step.py` | — | StepDefinition and StepTransition |
-| `tests/runtime/test_persistence.py` | — | PersistenceAPI and IterationChanges |
-| `tests/runtime/test_dependency.py` | — | DependencyGraph from AST |
-| `tests/runtime/test_expression.py` | — | Expression evaluation (InputRef, StepRef, BinaryExpr, ConcatExpr) |
-| `tests/runtime/test_evaluator.py` | — | Integration tests for spec examples 21.1 and 21.2 |
+| `tests/runtime/test_types.py` | 8 | Type system (StepId, BlockId, ObjectType, FacetAttributes) |
+| `tests/runtime/test_states.py` | 15 | State constants and transitions |
+| `tests/runtime/test_step.py` | 13 | StepDefinition and StepTransition |
+| `tests/runtime/test_entities.py` | 29 | Runtime entity types |
+| `tests/runtime/test_memory_store.py` | 9 | In-memory persistence |
+| `tests/runtime/test_mongo_store.py` | 32 | MongoDB persistence (mongomock) |
+| `tests/runtime/test_dependency.py` | 10 | DependencyGraph from AST |
+| `tests/runtime/test_expression.py` | 51 | Expression evaluation (InputRef, StepRef, BinaryExpr, ConcatExpr) |
+| `tests/runtime/test_events.py` | 15 | Event lifecycle management |
+| `tests/runtime/test_evaluator.py` | 68 | Integration tests, iteration traces, acceptance tests |
+| `tests/runtime/test_script_executor.py` | 25 | Sandboxed script execution |
+| `tests/runtime/test_runner_service.py` | 105 | Distributed runner service |
+| `tests/runtime/test_agent_poller.py` | 14 | AgentPoller core polling |
+| `tests/runtime/test_agent_poller_async.py` | 10 | Async handler tests |
+| `tests/runtime/test_agent_poller_extended.py` | 19 | AgentPoller edge cases |
+| `tests/runtime/test_agent.py` | 19 | Agent integration |
+| `tests/runtime/test_addone_agent.py` | 7 | AddOne agent end-to-end |
+| `tests/runtime/test_resume_task.py` | 7 | Resume task protocol |
 
-### Required Runtime Tests (Partial Coverage)
+### Iteration Trace Acceptance Tests (all implemented)
 
-The following tests are required to verify behavior described in `spec/70_examples.md` Examples 2–4. The underlying features are implemented and covered by end-to-end tests in `test_evaluator.py`, but dedicated **iteration-level trace** tests have not yet been written:
+All 10 acceptance tests from `spec/70_examples.md` Examples 2–4 are implemented in `tests/runtime/test_evaluator.py::TestIterationTraces`:
 
 | Test Name | Validates | Spec Reference |
 |-----------|-----------|----------------|
@@ -282,23 +324,3 @@ The following tests are required to verify behavior described in `spec/70_exampl
 | `test_example_2_full_trace` | Full iteration-by-iteration trace for Example 2 (8 steps, 8 iterations) | Example 2 |
 | `test_example_3_full_trace` | Full iteration-by-iteration trace for Example 3 (11 steps, 11 iterations) | Example 3 |
 | `test_example_4_full_trace` | Full iteration-by-iteration trace for Example 4 (11 steps, 2 evaluator runs) | Example 4 |
-
----
-
-## Coverage Report
-
-```
-Name                      Stmts   Miss  Cover
----------------------------------------------
-afl/__init__.py               5      0   100%
-afl/ast.py                   78      0   100%
-afl/cli.py                   47     47     0%
-afl/emitter.py              223     32    81%
-afl/grammar/__init__.py       0      0   100%
-afl/parser.py                40      6    82%
-afl/transformer.py          219     12    90%
----------------------------------------------
-TOTAL                       612     97    81%
-```
-
-Note: CLI coverage is 0% because it's tested manually, not via pytest.
