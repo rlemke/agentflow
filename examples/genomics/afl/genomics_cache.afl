@@ -1,0 +1,53 @@
+// Per-entity download facets for genomics resources
+//
+// Three categories of cached downloads:
+//   Reference genomes  — GRCh38, GRCh37, T2T-CHM13, hg19, GRCm39
+//   Annotation databases — dbSNP, ClinVar, gnomAD, VEP, GENCODE
+//   SRA read archives   — 1000 Genomes Project samples
+
+// -----------------------------------------------------------------------
+// Reference genome downloads
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.reference {
+
+    use genomics.cache.types
+
+    event facet GRCh38() => (cache: GenomicsCache)
+    event facet GRCh37() => (cache: GenomicsCache)
+    event facet T2TCHM13() => (cache: GenomicsCache)
+    event facet Hg19() => (cache: GenomicsCache)
+    event facet GRCm39() => (cache: GenomicsCache)
+}
+
+// -----------------------------------------------------------------------
+// Annotation database downloads
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.annotation {
+
+    use genomics.cache.types
+
+    event facet DbSNP156() => (cache: GenomicsCache)
+    event facet DbSNP155() => (cache: GenomicsCache)
+    event facet ClinVar() => (cache: GenomicsCache)
+    event facet GnomAD4() => (cache: GenomicsCache)
+    event facet GnomAD3() => (cache: GenomicsCache)
+    event facet VepCache112() => (cache: GenomicsCache)
+    event facet Gencode46() => (cache: GenomicsCache)
+}
+
+// -----------------------------------------------------------------------
+// SRA read archive downloads
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.sra {
+
+    use genomics.cache.types
+
+    event facet SRR622461() => (cache: GenomicsCache)
+    event facet SRR622458() => (cache: GenomicsCache)
+    event facet SRR622459() => (cache: GenomicsCache)
+    event facet ERR009378() => (cache: GenomicsCache)
+    event facet SRR13604789() => (cache: GenomicsCache)
+}

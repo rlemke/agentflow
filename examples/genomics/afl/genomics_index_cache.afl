@@ -1,0 +1,44 @@
+// Derived aligner index caches
+//
+// Builds aligner-specific indices from cached reference genomes.
+// Analogous to GraphHopper cache in the OSM example.
+
+// -----------------------------------------------------------------------
+// BWA indices (supports all 5 references)
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.index.bwa {
+
+    use genomics.cache.types
+
+    event facet GRCh38(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet GRCh37(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet T2TCHM13(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet Hg19(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet GRCm39(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+}
+
+// -----------------------------------------------------------------------
+// STAR indices (RNA-seq aligner, needs annotation)
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.index.star {
+
+    use genomics.cache.types
+
+    event facet GRCh38(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet GRCh37(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet T2TCHM13(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+}
+
+// -----------------------------------------------------------------------
+// Bowtie2 indices
+// -----------------------------------------------------------------------
+
+namespace genomics.cache.index.bowtie2 {
+
+    use genomics.cache.types
+
+    event facet GRCh38(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    event facet GRCh37(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+}

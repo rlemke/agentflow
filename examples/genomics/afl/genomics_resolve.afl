@@ -1,0 +1,27 @@
+// Name-based resource resolution
+//
+// Resolves human-friendly names (e.g. "hg38", "dbsnp", "clinvar")
+// to their canonical cache entries and download facets.
+
+namespace genomics.cache.Resolve {
+
+    use genomics.cache.types
+
+    event facet ResolveReference(
+        name: String,
+        prefer_source: String = ""
+    ) => (cache: GenomicsCache, resolution: ResourceResolution)
+
+    event facet ResolveAnnotation(
+        name: String,
+        version: String = "latest"
+    ) => (cache: GenomicsCache, resolution: ResourceResolution)
+
+    event facet ResolveSample(
+        accession: String
+    ) => (cache: GenomicsCache, resolution: ResourceResolution)
+
+    event facet ListResources(
+        category: String = ""
+    ) => (result: ResourceListResult)
+}

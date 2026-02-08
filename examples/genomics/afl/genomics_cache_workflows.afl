@@ -1,0 +1,75 @@
+// Cache-aware genomics workflows
+//
+// Compose resolution, caching, and indexing into high-level workflows
+// that can be used as entry points for the genomics pipeline.
+
+namespace genomics.cache.workflows {
+
+    use genomics.cache.types
+
+    // Resolve a reference genome by name, then build an aligner index
+    workflow PrepareReference(
+        reference_name: String,
+        aligner: String = "bwa"
+    ) => (cache: GenomicsCache, index: IndexCache) andThen {
+        resolved = ResolveReference(name = $.reference_name)
+        indexed = Index(cache = resolved.cache, aligner = $.aligner)
+        yield PrepareReference(
+            cache = resolved.cache,
+            index = indexed.cache
+        )
+    }
+
+    // Resolve an SRA sample accession and prepare for processing
+    workflow PrepareSample(
+        accession: String,
+        sample_id: String = ""
+    ) => (cache: GenomicsCache, resolution: ResourceResolution) andThen {
+        resolved = ResolveSample(accession = $.accession)
+        downloaded = Download(cache = resolved.cache)
+        yield PrepareSample(
+            cache = downloaded.cache,
+            resolution = resolved.resolution
+        )
+    }
+
+    // Full cache-aware cohort analysis pipeline
+    workflow CachedCohortAnalysis(
+        dataset_id: String,
+        reference_name: String = "hg38",
+        accessions: Json
+    ) => (package_path: String, variant_count: Long,
+          sample_count: Long) andThen {
+        ref = ResolveReference(name = $.reference_name)
+        annot = ResolveAnnotation(name = "dbsnp")
+        indexed = Index(cache = ref.cache, aligner = "bwa")
+        joint = JointGenotype(
+            gvcf_dir = "/gvcf/cohort/",
+            reference_build = ref.resolution.matched_name,
+            sample_count = 4
+        )
+        norm = NormalizeFilter(
+            vcf_path = joint.result.cohort_vcf_path,
+            reference_build = ref.resolution.matched_name
+        )
+        annotated = Annotate(
+            vcf_path = norm.result.filtered_vcf_path,
+            annotation_path = annot.cache.path
+        )
+        stats = CohortAnalytics(
+            variant_table_path = annotated.result.variant_table_path,
+            dataset_id = $.dataset_id
+        )
+        published = Publish(
+            variant_table_path = annotated.result.variant_table_path,
+            qc_report_path = stats.result.qc_report_path,
+            stats_path = stats.result.stats_path,
+            dataset_id = $.dataset_id
+        )
+        yield CachedCohortAnalysis(
+            package_path = published.result.package_path,
+            variant_count = annotated.result.variant_count,
+            sample_count = joint.result.sample_count
+        )
+    }
+}

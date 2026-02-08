@@ -1,0 +1,21 @@
+// Low-level cache operations
+//
+// Configuration facets and operational event facets for managing
+// the genomics cache (download, index, validate, status, checksum).
+
+namespace genomics.cache.Operations.Data {
+
+    facet CacheDate(date: String = "latest") => (date: String)
+    facet CacheForce(force: Boolean = false) => (force: Boolean)
+}
+
+namespace genomics.cache.Operations {
+
+    use genomics.cache.types
+
+    event facet Download(cache: GenomicsCache) => (cache: GenomicsCache)
+    event facet Index(cache: GenomicsCache, aligner: String) => (cache: IndexCache)
+    event facet Validate(cache: GenomicsCache) => (valid: Boolean, message: String)
+    event facet Status(cache: GenomicsCache) => (status: String, size: Long, date: String)
+    event facet Checksum(cache: GenomicsCache) => (checksum: String, algorithm: String)
+}
