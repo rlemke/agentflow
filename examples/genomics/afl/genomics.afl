@@ -1,0 +1,215 @@
+// Genomics cohort analysis pipeline
+//
+// Demonstrates two AFL workflow patterns:
+//   SamplePipeline  — andThen foreach fan-out (per-sample QC, alignment, variant calling)
+//   CohortAnalysis  — linear andThen fan-in  (joint genotyping, annotation, publishing)
+
+// -----------------------------------------------------------------------
+// Shared type schemas
+// -----------------------------------------------------------------------
+
+namespace genomics.types {
+
+    schema QcReport {
+        sample_id: String
+        total_reads: Long
+        passed_reads: Long
+        failed_reads: Long
+        pass_rate: Double
+        clean_fastq_path: String
+        tool_version: String
+    }
+
+    schema AlignmentResult {
+        sample_id: String
+        bam_path: String
+        total_reads: Long
+        mapped_reads: Long
+        mapping_rate: Double
+        duplicate_rate: Double
+        mean_coverage: Double
+    }
+
+    schema VariantResult {
+        sample_id: String
+        gvcf_path: String
+        variant_count: Long
+        snp_count: Long
+        indel_count: Long
+    }
+
+    schema ReferenceBundle {
+        fasta_path: String
+        annotation_path: String
+        build: String
+        size_bytes: Long
+    }
+
+    schema CohortVariantResult {
+        cohort_vcf_path: String
+        filtered_vcf_path: String
+        sample_count: Long
+        variant_count: Long
+        pass_rate: Double
+    }
+
+    schema AnnotationResult {
+        variant_table_path: String
+        variant_count: Long
+        annotated_count: Long
+        gene_count: Long
+    }
+
+    schema CohortStatsResult {
+        qc_report_path: String
+        stats_path: String
+        sample_count: Long
+        mean_depth: Double
+        variant_count: Long
+    }
+
+    schema AnalysisPackage {
+        package_path: String
+        manifest_path: String
+        dataset_id: String
+        sample_count: Long
+        variant_count: Long
+        build: String
+    }
+}
+
+// -----------------------------------------------------------------------
+// Event facets (agent-handled processing steps)
+// -----------------------------------------------------------------------
+
+namespace genomics.Facets {
+
+    use genomics.types
+
+    event facet IngestReference(
+        reference_build: String
+    ) => (result: ReferenceBundle)
+
+    event facet QcReads(
+        sample_id: String,
+        r1_uri: String,
+        r2_uri: String
+    ) => (result: QcReport)
+
+    event facet AlignReads(
+        sample_id: String,
+        clean_fastq_path: String,
+        reference_build: String
+    ) => (result: AlignmentResult)
+
+    event facet CallVariants(
+        sample_id: String,
+        bam_path: String,
+        reference_build: String
+    ) => (result: VariantResult)
+
+    event facet JointGenotype(
+        gvcf_dir: String,
+        reference_build: String,
+        sample_count: Long
+    ) => (result: CohortVariantResult)
+
+    event facet NormalizeFilter(
+        vcf_path: String,
+        reference_build: String
+    ) => (result: CohortVariantResult)
+
+    event facet Annotate(
+        vcf_path: String,
+        annotation_path: String
+    ) => (result: AnnotationResult)
+
+    event facet CohortAnalytics(
+        variant_table_path: String,
+        dataset_id: String
+    ) => (result: CohortStatsResult)
+
+    event facet Publish(
+        variant_table_path: String,
+        qc_report_path: String,
+        stats_path: String,
+        dataset_id: String
+    ) => (result: AnalysisPackage)
+}
+
+// -----------------------------------------------------------------------
+// Workflows
+// -----------------------------------------------------------------------
+
+namespace genomics.pipeline {
+
+    use genomics.types
+
+    // Per-sample fan-out: QC -> Align -> Call Variants for each sample
+    workflow SamplePipeline(
+        samples: Json,
+        reference_build: String = "GRCh38"
+    ) => (gvcf_path: String, sample_id: String, variant_count: Long) andThen foreach sample in $.samples {
+        qc = QcReads(
+            sample_id = $.sample.sample_id,
+            r1_uri = $.sample.r1_uri,
+            r2_uri = $.sample.r2_uri
+        )
+        aligned = AlignReads(
+            sample_id = qc.result.sample_id,
+            clean_fastq_path = qc.result.clean_fastq_path,
+            reference_build = $.reference_build
+        )
+        called = CallVariants(
+            sample_id = aligned.result.sample_id,
+            bam_path = aligned.result.bam_path,
+            reference_build = $.reference_build
+        )
+        yield SamplePipeline(
+            gvcf_path = called.result.gvcf_path,
+            sample_id = called.result.sample_id,
+            variant_count = called.result.variant_count
+        )
+    }
+
+    // Cohort fan-in: joint genotyping, annotation, and publishing
+    workflow CohortAnalysis(
+        dataset_id: String,
+        reference_build: String = "GRCh38",
+        gvcf_dir: String
+    ) => (package_path: String, cohort_vcf_path: String,
+          variant_table_path: String, total_variants: Long,
+          sample_count: Long) andThen {
+        ref = IngestReference(reference_build = $.reference_build)
+        joint = JointGenotype(
+            gvcf_dir = $.gvcf_dir,
+            reference_build = $.reference_build,
+            sample_count = 4
+        )
+        norm = NormalizeFilter(
+            vcf_path = joint.result.cohort_vcf_path,
+            reference_build = $.reference_build
+        )
+        annotated = Annotate(
+            vcf_path = norm.result.filtered_vcf_path,
+            annotation_path = ref.result.annotation_path
+        )
+        stats = CohortAnalytics(
+            variant_table_path = annotated.result.variant_table_path,
+            dataset_id = $.dataset_id
+        )
+        published = Publish(
+            variant_table_path = annotated.result.variant_table_path,
+            qc_report_path = stats.result.qc_report_path,
+            stats_path = stats.result.stats_path,
+            dataset_id = $.dataset_id
+        )
+        yield CohortAnalysis(
+            package_path = published.result.package_path,
+            cohort_vcf_path = joint.result.cohort_vcf_path,
+            variant_table_path = annotated.result.variant_table_path,
+            total_variants = annotated.result.variant_count,
+            sample_count = joint.result.sample_count
+        )
+    }
+}

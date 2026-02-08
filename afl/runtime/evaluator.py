@@ -122,6 +122,17 @@ class ExecutionContext:
         if block_step.id in self._block_ast_cache:
             return self._block_ast_cache[block_step.id]
 
+        # Foreach sub-blocks: derive body from parent foreach block's AST
+        # (cache may be empty after resume, so reconstruct on the fly)
+        if block_step.foreach_var is not None and block_step.block_id:
+            parent = self._find_step(block_step.block_id)
+            if parent:
+                parent_ast = self.get_block_ast(parent)
+                if parent_ast and "foreach" in parent_ast:
+                    body_ast = {k: v for k, v in parent_ast.items() if k != "foreach"}
+                    self._block_ast_cache[block_step.id] = body_ast
+                    return body_ast
+
         if not block_step.container_id:
             # Block has no container — shouldn't normally happen
             if self.workflow_ast:
