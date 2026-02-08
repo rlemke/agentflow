@@ -69,6 +69,8 @@ namespace example.2 {
 
 ### Iteration-by-Iteration Trace
 
+> **Note:** Yield steps are created **lazily** — they are not created in iteration 0 with the other steps. Instead, yields are created by `BlockExecutionContinue` only when all their referenced steps are committed as complete. See `spec/30_runtime.md` §11.1 for details.
+
 **Iteration 0 — Setup**
 
 The evaluator creates the root step `AddWorkflow_run` for `AddWorkflow(x=1, y=2)`.
@@ -76,28 +78,26 @@ The evaluator creates the root step `AddWorkflow_run` for `AddWorkflow(x=1, y=2)
 | Step            | State progression                                                             |
 |-----------------|-------------------------------------------------------------------------------|
 | AddWorkflow_run | Created → facet.initialization.Begin → ... → statement.blocks.Begin (creates block_AW) → statement.blocks.Continue (BLOCKED — waiting on block_AW) |
-| block_AW        | Created → block.execution.Begin (creates addition, yield_AW) → block.execution.Continue (BLOCKED — waiting on addition, yield_AW) |
+| block_AW        | Created → block.execution.Begin (creates addition) → block.execution.Continue (BLOCKED — waiting on addition; yield_AW deferred) |
 | addition        | Created → facet.initialization.Begin → ... → statement.blocks.Begin (creates block_Adder) → statement.blocks.Continue (BLOCKED — waiting on block_Adder) |
-| yield_AW        | Created → facet.initialization.Begin (BLOCKED — yield_AW depends on addition.sum, addition not yet complete) |
-| block_Adder     | Created → block.execution.Begin (creates s1, s2, yield_Adder) → block.execution.Continue (BLOCKED — waiting on s1, s2, yield_Adder) |
+| block_Adder     | Created → block.execution.Begin (creates s1, s2) → block.execution.Continue (BLOCKED — waiting on s1, s2; yield_Adder deferred) |
 | s1              | Created → facet.initialization.Begin → ... → statement.Complete ✓ |
 | s2              | Created → facet.initialization.Begin → ... → statement.Complete ✓ |
-| yield_Adder     | Created → facet.initialization.Begin (BLOCKED — depends on s1.input and s2.input, but s1/s2 just completed in this iteration so not yet committed) |
 
-**Commit 0:** All 8 steps created. s1 and s2 reach `statement.Complete`. All others blocked.
+**Commit 0:** 6 steps created. s1 and s2 reach `statement.Complete`. Yield steps not yet created (dependencies not yet committed).
 
 > **Parallelism:** s1 and s2 are independent — they execute in parallel within the same iteration.
 
-**Iteration 1 — yield_Adder unblocks**
+**Iteration 1 — yield_Adder created and completes**
 
-s1 and s2 are now committed as complete. yield_Adder can evaluate `s1.input + s2.input`.
+s1 and s2 are now committed as complete. `BlockExecutionContinue` for block_Adder creates yield_Adder (lazy creation). yield_Adder evaluates `s1.input + s2.input` and completes in the same iteration.
 
 | Step            | State progression                                                   |
 |-----------------|---------------------------------------------------------------------|
-| yield_Adder     | facet.initialization.Begin → ... → statement.Complete ✓             |
+| yield_Adder     | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_Adder     | block.execution.Continue — still waiting (yield_Adder just finished, not yet committed) |
 
-**Commit 1:** yield_Adder reaches `statement.Complete`.
+**Commit 1:** yield_Adder created and reaches `statement.Complete`. Total: 7 steps.
 
 **Iteration 2 — block_Adder completes**
 
@@ -119,16 +119,16 @@ block_Adder is complete, so `addition` can advance past `statement.blocks.Contin
 
 **Commit 3:** addition reaches `statement.Complete`. Its attributes now include `sum = 3`.
 
-**Iteration 4 — yield_AW unblocks**
+**Iteration 4 — yield_AW created and completes**
 
-addition is complete with `sum = 3`, so yield_AW can evaluate `addition.sum`.
+addition is complete with `sum = 3`. `BlockExecutionContinue` for block_AW creates yield_AW (lazy creation). yield_AW evaluates `addition.sum` and completes in the same iteration.
 
 | Step      | State progression                                                   |
 |-----------|---------------------------------------------------------------------|
-| yield_AW  | facet.initialization.Begin → ... → statement.Complete ✓             |
+| yield_AW  | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_AW  | block.execution.Continue — still waiting (yield_AW not yet committed) |
 
-**Commit 4:** yield_AW reaches `statement.Complete`.
+**Commit 4:** yield_AW created and reaches `statement.Complete`. Total: 8 steps (all steps now exist).
 
 **Iteration 5 — block_AW completes**
 
@@ -158,16 +158,16 @@ No step makes progress. The evaluator terminates.
 
 ### Parallelism Summary
 
-| Iteration | Steps Progressed                     | Notes                                    |
-|-----------|--------------------------------------|------------------------------------------|
-| 0         | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2, yield_Adder (blocked), yield_AW (blocked) | Setup: 8 steps created; s1 ‖ s2 run in parallel |
-| 1         | yield_Adder                          | Unblocked by s1 + s2 completion          |
-| 2         | block_Adder                          | All children complete                    |
-| 3         | addition                             | Child block complete                     |
-| 4         | yield_AW                             | Unblocked by addition completion         |
-| 5         | block_AW                             | All children complete                    |
-| 6         | AddWorkflow_run                      | Child block complete — workflow done      |
-| 7         | (none)                               | Fixed point — evaluator terminates        |
+| Iteration | Steps Created | Steps Progressed                     | Notes                                    |
+|-----------|--------------|--------------------------------------|------------------------------------------|
+| 0         | 6            | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2 | Setup: 6 steps created; s1 ‖ s2 run in parallel; yields deferred |
+| 1         | +1 (7)       | yield_Adder                          | Lazy creation + completion; s1/s2 committed |
+| 2         | —            | block_Adder                          | All children complete                    |
+| 3         | —            | addition                             | Child block complete                     |
+| 4         | +1 (8)       | yield_AW                             | Lazy creation + completion; addition committed |
+| 5         | —            | block_AW                             | All children complete                    |
+| 6         | —            | AddWorkflow_run                      | Child block complete — workflow done      |
+| 7         | —            | (none)                               | Fixed point — evaluator terminates        |
 
 The only true parallelism is **s1 ‖ s2** in iteration 0: both are `Value` facets with no inter-dependencies, so they execute and complete within the same iteration.
 
@@ -249,38 +249,37 @@ Blocking point: `facet.initialization.Begin` — blocks if referenced step attri
 
 ### Iteration-by-Iteration Trace
 
+> **Note:** Yield steps are created **lazily** — see `spec/30_runtime.md` §11.1.
+
 **Iteration 0 — Setup**
 
-All 11 steps are created in a cascade as each parent processes and creates children within the same iteration. Steps run through their state machines until they block.
+Steps are created in a cascade as each parent processes and creates children within the same iteration. Yield steps are deferred until their dependencies are committed.
 
 | Step            | State progression |
 |-----------------|-------------------|
 | AddWorkflow_run | Created → ... → statement.blocks.Begin (creates block_AW) → statement.blocks.Continue (BLOCKED — waiting on block_AW) |
-| block_AW        | Created → block.execution.Begin (creates addition, yield_AW) → block.execution.Continue (BLOCKED — waiting on addition, yield_AW) |
+| block_AW        | Created → block.execution.Begin (creates addition) → block.execution.Continue (BLOCKED — waiting on addition; yield_AW deferred) |
 | addition        | Created → ... → statement.blocks.Begin (creates block_Adder) → statement.blocks.Continue (BLOCKED — waiting on block_Adder) |
-| yield_AW        | Created → facet.initialization.Begin (BLOCKED — needs addition.sum, addition not yet complete) |
-| block_Adder     | Created → block.execution.Begin (creates s1, s2, yield_Adder) → block.execution.Continue (BLOCKED — waiting on s1, s2, yield_Adder) |
+| block_Adder     | Created → block.execution.Begin (creates s1, s2) → block.execution.Continue (BLOCKED — waiting on s1, s2; yield_Adder deferred) |
 | s1              | Created → ... → statement.blocks.Begin (creates block_s1) → statement.blocks.Continue (BLOCKED — waiting on block_s1) |
 | s2              | Created → ... → statement.Complete ✓ |
-| yield_Adder     | Created → facet.initialization.Begin (BLOCKED — needs s1.output, s1 not yet complete) |
-| block_s1        | Created → block.execution.Begin (creates subStep1, yield_SF) → block.execution.Continue (BLOCKED — waiting on subStep1, yield_SF) |
+| block_s1        | Created → block.execution.Begin (creates subStep1) → block.execution.Continue (BLOCKED — waiting on subStep1; yield_SF deferred) |
 | subStep1        | Created → ... → statement.Complete ✓ |
-| yield_SF        | Created → facet.initialization.Begin (BLOCKED — needs subStep1.input, not yet committed) |
 
-**Commit 0:** 11 steps created. s2 and subStep1 reach `statement.Complete`. All others blocked.
+**Commit 0:** 8 steps created. s2 and subStep1 reach `statement.Complete`. Yield steps not yet created.
 
 > **Parallelism:** s1 ‖ s2 are siblings with no data dependency. subStep1 (inside s1's block) also runs in the same iteration as s2.
 
-**Iteration 1 — yield_SF unblocks**
+**Iteration 1 — yield_SF created and completes**
 
-subStep1 is now committed as complete. yield_SF can evaluate `subStep1.input + 10 = 1 + 10 = 11`.
+subStep1 is now committed as complete. `BlockExecutionContinue` for block_s1 creates yield_SF (lazy creation). yield_SF evaluates `subStep1.input + 10 = 1 + 10 = 11` and completes in the same iteration.
 
 | Step       | State progression |
 |------------|-------------------|
-| yield_SF   | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_SF   | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_s1   | block.execution.Continue — still waiting (yield_SF not yet committed) |
 
-**Commit 1:** yield_SF reaches `statement.Complete`.
+**Commit 1:** yield_SF created and reaches `statement.Complete`. Total: 9 steps.
 
 **Iteration 2 — block_s1 completes**
 
@@ -302,16 +301,16 @@ block_s1 is complete, so s1 advances past `statement.blocks.Continue`.
 
 **Commit 3:** s1 reaches `statement.Complete` with `output = 11`.
 
-**Iteration 4 — yield_Adder unblocks**
+**Iteration 4 — yield_Adder created and completes**
 
-s1 is complete (output = 11), s2 was already complete (input = 2). yield_Adder evaluates `s1.output + s2.input = 11 + 2 = 13`.
+s1 is complete (output = 11), s2 was already complete (input = 2). `BlockExecutionContinue` for block_Adder creates yield_Adder (lazy creation). yield_Adder evaluates `s1.output + s2.input = 11 + 2 = 13` and completes in the same iteration.
 
 | Step         | State progression |
 |--------------|-------------------|
-| yield_Adder  | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_Adder  | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_Adder  | block.execution.Continue — still waiting (yield_Adder not yet committed) |
 
-**Commit 4:** yield_Adder reaches `statement.Complete`.
+**Commit 4:** yield_Adder created and reaches `statement.Complete`. Total: 10 steps.
 
 **Iteration 5 — block_Adder completes**
 
@@ -331,16 +330,16 @@ All children of block_Adder (s1, s2, yield_Adder) are now complete.
 
 **Commit 6:** addition reaches `statement.Complete` with `sum = 13`.
 
-**Iteration 7 — yield_AW unblocks**
+**Iteration 7 — yield_AW created and completes**
 
-addition is complete with sum = 13, so yield_AW can evaluate `addition.sum`.
+addition is complete with sum = 13. `BlockExecutionContinue` for block_AW creates yield_AW (lazy creation). yield_AW evaluates `addition.sum` and completes in the same iteration.
 
 | Step     | State progression |
 |----------|-------------------|
-| yield_AW | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_AW | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_AW | block.execution.Continue — still waiting (yield_AW not yet committed) |
 
-**Commit 7:** yield_AW reaches `statement.Complete`.
+**Commit 7:** yield_AW created and reaches `statement.Complete`. Total: 11 steps (all steps now exist).
 
 **Iteration 8 — block_AW completes**
 
@@ -370,19 +369,19 @@ No step makes progress. The evaluator terminates.
 
 ### Concurrency Summary
 
-| Iteration | Steps progressed | Notes |
-|-----------|-----------------|-------|
-| 0 | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1, yield_AW (blocked), yield_Adder (blocked), yield_SF (blocked) | Setup: 11 steps created; s1 ‖ s2 run in parallel |
-| 1 | yield_SF | Unblocked by subStep1 completion |
-| 2 | block_s1 | All children complete |
-| 3 | s1 | Child block complete (output = 11) |
-| 4 | yield_Adder | Unblocked by s1 + s2 completion |
-| 5 | block_Adder | All children complete |
-| 6 | addition | Child block complete (sum = 13) |
-| 7 | yield_AW | Unblocked by addition completion |
-| 8 | block_AW | All children complete |
-| 9 | AddWorkflow_run | Child block complete — workflow done |
-| 10 | (none) | Fixed point — evaluator terminates |
+| Iteration | Steps Created | Steps Progressed | Notes |
+|-----------|--------------|-----------------|-------|
+| 0 | 8 | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1 | Setup: 8 steps created; s1 ‖ s2 in parallel; yields deferred |
+| 1 | +1 (9) | yield_SF | Lazy creation + completion; subStep1 committed |
+| 2 | — | block_s1 | All children complete |
+| 3 | — | s1 | Child block complete (output = 11) |
+| 4 | +1 (10) | yield_Adder | Lazy creation + completion; s1/s2 committed |
+| 5 | — | block_Adder | All children complete |
+| 6 | — | addition | Child block complete (sum = 13) |
+| 7 | +1 (11) | yield_AW | Lazy creation + completion; addition committed |
+| 8 | — | block_AW | All children complete |
+| 9 | — | AddWorkflow_run | Child block complete — workflow done |
+| 10 | — | (none) | Fixed point — evaluator terminates |
 
 The only true parallelism is **s1 ‖ s2** in iteration 0: both are siblings in Adder's `andThen` with no inter-dependency. However, s1 blocks at `statement.blocks.Continue` while s2 runs to completion — s2 finishes in iteration 0 while s1 takes until iteration 3 (waiting for its nested block_s1 → subStep1 → yield_SF chain).
 
@@ -479,24 +478,23 @@ Execution is split into two evaluator runs, separated by external microservice p
 
 **Iteration 0 — Setup and cascade**
 
-All 11 steps are created in a cascade. Each parent creates its children within the same iteration. Steps advance until they block.
+> **Note:** Yield steps are created **lazily** — see `spec/30_runtime.md` §11.1.
+
+Steps are created in a cascade. Each parent creates its children within the same iteration. Yield steps are deferred until their dependencies are committed.
 
 | Step            | State progression |
 |-----------------|-------------------|
 | AddWorkflow_run | Created → ... → statement.blocks.Begin (creates block_AW) → statement.blocks.Continue (BLOCKED — waiting on block_AW) |
-| block_AW        | Created → block.execution.Begin (creates addition, yield_AW) → block.execution.Continue (BLOCKED) |
+| block_AW        | Created → block.execution.Begin (creates addition) → block.execution.Continue (BLOCKED — yield_AW deferred) |
 | addition        | Created → ... → statement.blocks.Begin (creates block_Adder) → statement.blocks.Continue (BLOCKED) |
-| yield_AW        | Created → facet.initialization.Begin (BLOCKED — needs addition.sum) |
-| block_Adder     | Created → block.execution.Begin (creates s1, s2, yield_Adder) → block.execution.Continue (BLOCKED) |
+| block_Adder     | Created → block.execution.Begin (creates s1, s2) → block.execution.Continue (BLOCKED — yield_Adder deferred) |
 | s1              | Created → ... → statement.blocks.Begin (creates block_s1) → statement.blocks.Continue (BLOCKED) |
 | s2              | Created → ... → statement.Complete ✓ |
-| yield_Adder     | Created → facet.initialization.Begin (BLOCKED — needs s1.output) |
-| block_s1        | Created → block.execution.Begin (creates subStep1, yield_SF) → block.execution.Continue (BLOCKED) |
+| block_s1        | Created → block.execution.Begin (creates subStep1) → block.execution.Continue (BLOCKED — yield_SF deferred) |
 | subStep1        | Created → facet.initialization.Begin → ... → **EventTransmit** (creates EventDefinition for "example.4.CountDocuments") → **BLOCKED** (waiting for external agent) |
-| yield_SF        | Created → facet.initialization.Begin (BLOCKED — needs subStep1.input, subStep1 not yet complete) |
 
 **Commit 0 contents:**
-- 11 created steps
+- 8 created steps (yield steps deferred)
 - 1 created event: `CountDocuments` (state: `event.Created`, payload: `{input: "some.file"}`)
 - s2 reaches `statement.Complete`
 - subStep1 parked at `EventTransmit`
@@ -505,7 +503,7 @@ All 11 steps are created in a cascade. Each parent creates its children within t
 
 No step can make progress. subStep1 is blocked on an external event. All other blocked steps are waiting (directly or transitively) on subStep1. The evaluator pauses.
 
-> **Cache state at pause:** All 11 steps and the CountDocuments event are persisted in the database. The evaluator has no more internal work to do.
+> **Cache state at pause:** 8 steps and the CountDocuments event are persisted in the database. The evaluator has no more internal work to do.
 
 ---
 
@@ -563,16 +561,16 @@ subStep1 was parked at `EventTransmit`. With `StepContinue` received, it can now
 
 **Commit 2:** subStep1 reaches `statement.Complete`.
 
-**Iteration 3 — yield_SF unblocks**
+**Iteration 3 — yield_SF created and completes**
 
-subStep1 is committed as complete. yield_SF can evaluate `subStep1.input + 10`.
+subStep1 is committed as complete. `BlockExecutionContinue` for block_s1 creates yield_SF (lazy creation). yield_SF evaluates `subStep1.input + 10` and completes in the same iteration.
 
 | Step       | State progression |
 |------------|-------------------|
-| yield_SF   | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_SF   | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_s1   | block.execution.Continue — still waiting (yield_SF not yet committed) |
 
-**Commit 3:** yield_SF reaches `statement.Complete`.
+**Commit 3:** yield_SF created and reaches `statement.Complete`. Total: 9 steps.
 
 **Iteration 4 — block_s1 completes**
 
@@ -594,16 +592,16 @@ block_s1 is complete, so s1 advances past `statement.blocks.Continue`.
 
 **Commit 5:** s1 reaches `statement.Complete` with `output` from yield_SF.
 
-**Iteration 6 — yield_Adder unblocks**
+**Iteration 6 — yield_Adder created and completes**
 
-s1 and s2 are both complete. yield_Adder evaluates `s1.output + s2.input`.
+s1 and s2 are both complete. `BlockExecutionContinue` for block_Adder creates yield_Adder (lazy creation). yield_Adder evaluates `s1.output + s2.input` and completes in the same iteration.
 
 | Step         | State progression |
 |--------------|-------------------|
-| yield_Adder  | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_Adder  | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_Adder  | block.execution.Continue — still waiting |
 
-**Commit 6:** yield_Adder reaches `statement.Complete`.
+**Commit 6:** yield_Adder created and reaches `statement.Complete`. Total: 10 steps.
 
 **Iteration 7 — block_Adder completes**
 
@@ -621,14 +619,16 @@ s1 and s2 are both complete. yield_Adder evaluates `s1.output + s2.input`.
 
 **Commit 8:** addition reaches `statement.Complete` with `sum` from yield_Adder.
 
-**Iteration 9 — yield_AW unblocks**
+**Iteration 9 — yield_AW created and completes**
+
+`BlockExecutionContinue` for block_AW creates yield_AW (lazy creation). yield_AW evaluates `addition.sum` and completes in the same iteration.
 
 | Step     | State progression |
 |----------|-------------------|
-| yield_AW | facet.initialization.Begin → ... → statement.Complete ✓ |
+| yield_AW | **Created** → facet.initialization.Begin → ... → statement.Complete ✓ (lazy creation) |
 | block_AW | block.execution.Continue — still waiting |
 
-**Commit 9:** yield_AW reaches `statement.Complete`.
+**Commit 9:** yield_AW created and reaches `statement.Complete`. Total: 11 steps (all steps now exist).
 
 **Iteration 10 — block_AW completes**
 
@@ -652,22 +652,22 @@ s1 and s2 are both complete. yield_Adder evaluates `s1.output + s2.input`.
 
 ### Concurrency Summary
 
-| Iteration | Steps progressed | Notes |
-|-----------|-----------------|-------|
-| 0 | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1 (event-blocked), yield_AW (blocked), yield_Adder (blocked), yield_SF (blocked) | Setup: 11 steps created; **s1 ‖ s2** run in parallel; subStep1 blocks at EventTransmit |
-| 1 | (none) | Fixed point — evaluator pauses, cache committed to DB |
-| — | *External: CountDocuments agent processes event* | event.Created → Dispatched → Processing → Completed + StepContinue |
-| 2 | subStep1 | Resumes past EventTransmit → statement.Complete |
-| 3 | yield_SF | Unblocked by subStep1 completion |
-| 4 | block_s1 | All children complete |
-| 5 | s1 | Child block complete |
-| 6 | yield_Adder | Unblocked by s1 + s2 completion |
-| 7 | block_Adder | All children complete |
-| 8 | addition | Child block complete |
-| 9 | yield_AW | Unblocked by addition completion |
-| 10 | block_AW | All children complete |
-| 11 | AddWorkflow_run | Child block complete — workflow done |
-| 12 | (none) | Fixed point — evaluator terminates |
+| Iteration | Steps Created | Steps progressed | Notes |
+|-----------|---------------|-----------------|-------|
+| 0 | 8 | AddWorkflow_run, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1 (event-blocked) | Setup: 8 steps created (yields deferred); **s1 ‖ s2** run in parallel; subStep1 blocks at EventTransmit |
+| 1 | — | (none) | Fixed point — evaluator pauses, cache committed to DB |
+| — | — | *External: CountDocuments agent processes event* | event.Created → Dispatched → Processing → Completed + StepContinue |
+| 2 | — | subStep1 | Resumes past EventTransmit → statement.Complete |
+| 3 | +1 (yield_SF) | yield_SF | Lazy creation: yield_SF created and completes |
+| 4 | — | block_s1 | All children complete |
+| 5 | — | s1 | Child block complete |
+| 6 | +1 (yield_Adder) | yield_Adder | Lazy creation: yield_Adder created and completes |
+| 7 | — | block_Adder | All children complete |
+| 8 | — | addition | Child block complete |
+| 9 | +1 (yield_AW) | yield_AW | Lazy creation: yield_AW created and completes |
+| 10 | — | block_AW | All children complete |
+| 11 | — | AddWorkflow_run | Child block complete — workflow done |
+| 12 | — | (none) | Fixed point — evaluator terminates |
 
 **True parallelism:** s1 ‖ s2 in iteration 0 (siblings with no data dependency). However, s1 blocks at `statement.blocks.Continue` while s2 completes immediately. s2 finishes in iteration 0; s1 does not complete until iteration 5 (waiting for the external event chain: CountDocuments agent → subStep1 → yield_SF → block_s1).
 
@@ -677,10 +677,15 @@ Each commit atomically persists all `IterationChanges` (created steps, updated s
 
 | Commit | What is persisted | Significance |
 |--------|------------------|--------------|
-| 0 | 11 steps (s2 complete, subStep1 at EventTransmit) + 1 event (CountDocuments, state: event.Created) | **Event becomes visible to external agents.** This is the handoff point — the CountDocuments microservice can now poll and find this event. |
+| 0 | 8 steps (s2 complete, subStep1 at EventTransmit) + 1 event (CountDocuments, state: event.Created) | **Event becomes visible to external agents.** Yield steps deferred. This is the handoff point — the CountDocuments microservice can now poll and find this event. |
 | 1 | (no changes — fixed point) | Evaluator pauses. All internal work exhausted. |
-| 2 | subStep1 → statement.Complete | First commit after external event completes. Unblocks the yield_SF → block_s1 → s1 chain. |
-| 3–11 | One step completes per commit | Standard unwinding of parent-child hierarchy (same pattern as Example 3). |
+| 2 | subStep1 → statement.Complete | First commit after external event completes. Unblocks the yield chain. |
+| 3 | +1 step (yield_SF created and completes) | Lazy yield creation — total: 9 steps |
+| 4–5 | block_s1, s1 complete | Hierarchy unwinding |
+| 6 | +1 step (yield_Adder created and completes) | Lazy yield creation — total: 10 steps |
+| 7–8 | block_Adder, addition complete | Hierarchy unwinding |
+| 9 | +1 step (yield_AW created and completes) | Lazy yield creation — total: 11 steps (all steps now exist) |
+| 10–11 | block_AW, AddWorkflow_run complete | Final hierarchy unwinding — workflow done |
 
 ### Microservice Interaction Model
 
@@ -688,7 +693,7 @@ Each commit atomically persists all `IterationChanges` (created steps, updated s
      Evaluator                  Database                  CountDocuments Agent
         │                          │                              │
         │── commit 0 ─────────▶   │                              │
-        │   (11 steps + event)     │                              │
+        │   (8 steps + event)      │                              │
         │                          │  ◀── poll for events ────── │
         │                          │                              │
         │   (paused at             │  ── event.Created found ──▶ │
@@ -718,7 +723,8 @@ Each commit atomically persists all `IterationChanges` (created steps, updated s
 
 | Aspect | Example 3 | Example 4 |
 |--------|-----------|-----------|
-| Steps | 11 | 11 (same structure) |
+| Steps at iteration 0 | 8 (yields deferred) | 8 (yields deferred, same structure) |
+| Total steps (final) | 11 | 11 (same structure) |
 | subStep1 facet | `Value` (regular) | `CountDocuments` (event) |
 | subStep1 at EventTransmit | Pass-through | **Blocks** — waits for external agent |
 | Evaluator runs | 1 continuous run | 2 runs separated by external processing |

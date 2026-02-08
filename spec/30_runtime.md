@@ -282,7 +282,50 @@ Using the compiled AST, the evaluator MUST:
 
 Steps MUST NOT be created prematurely.
 
-### 11.1 Facet Definition Resolution
+### 11.1 Lazy Yield Creation
+
+> **Implemented** — yield steps are created by `BlockExecutionContinueHandler._create_ready_steps()` only when dependencies are satisfied.
+
+Yield steps (`YieldAssignment`) are created **lazily** — they are not created in the same iteration as regular steps. Instead, yield steps are created by `BlockExecutionContinue` only when all of their dependencies (referenced steps) are committed as complete.
+
+This means:
+- In a block with steps `s1`, `s2`, and `yield F(sum = s1.input + s2.input)`, the yield step is **not** created in the iteration that creates `s1` and `s2`.
+- The yield step is created in the first iteration where `s1` and `s2` are both committed as `statement.Complete`.
+- Because the yield's dependencies are already satisfied at creation time, the yield step runs to `statement.Complete` in the same iteration it is created.
+
+**Rationale:** The `DependencyGraph` treats yield steps the same as regular steps — they are only "ready" when their dependencies are in the completed set. Since steps completed within the current iteration are not yet committed, yields cannot see them as complete until the next iteration.
+
+**Effect on step counts:** The total number of steps in a workflow grows over iterations as yield steps are created. For example, a workflow with 8 total steps may have only 6 steps after iteration 0, with the remaining 2 yield steps created in later iterations.
+
+**Effect on iteration counts:** Lazy yield creation does not change the total number of iterations. Yield steps complete in the same iteration they are created, so no additional iterations are needed.
+
+### 11.2 Multi-Block Body Index
+
+> **Implemented** — `StatementBlocksBeginHandler._create_block_steps()` assigns `statement_id="block-N"` for multi-block workflows.
+
+When a workflow or facet has multiple `andThen` blocks, each block step is assigned a `statement_id` of `"block-N"` (where N is the zero-based index into the body list). This allows `get_block_ast()` to resolve the correct body element for each block.
+
+### 11.3 Foreach Block Execution
+
+> **Implemented** — `BlockExecutionBeginHandler._process_foreach()` creates sub-blocks per array element.
+
+When a block has a `foreach` clause (`andThen foreach var in expr { ... }`), the `BlockExecutionBegin` handler:
+
+1. Evaluates the iterable expression using the current evaluation context.
+2. Creates one sub-block step per array element, each with:
+   - `object_type=AND_THEN`
+   - `block_id` set to the parent foreach block
+   - `foreach_var` and `foreach_value` set for the iteration variable binding
+3. Caches the body AST (block without foreach clause) for each sub-block.
+4. Skips normal `DependencyGraph` creation — sub-blocks handle their own dependencies.
+
+The `BlockExecutionContinue` handler detects foreach blocks and tracks sub-block completion directly (all sub-blocks must reach `statement.Complete`).
+
+The `FacetInitializationBegin` handler propagates `foreach_var`/`foreach_value` from the containing block step to the `EvaluationContext`, making the iteration variable available in child step expressions.
+
+Empty iterables produce no sub-blocks and the foreach block completes immediately.
+
+### 11.4 Facet Definition Resolution
 
 > **Implemented** — `get_facet_definition()` performs qualified and short-name lookups across the Program AST.
 
@@ -293,6 +336,15 @@ The evaluator MUST have access to the **full Program AST** (not just the `Workfl
 - **Statement-level block creation** (§8.2): The handler must distinguish between statement-level and facet-level blocks.
 
 The evaluator's `ExecutionContext` MUST provide a `get_facet_definition(facet_name)` method that returns the full facet declaration node from the Program AST.
+
+### 11.5 Block AST Cache
+
+> **Implemented** — `ExecutionContext._block_ast_cache` provides direct AST lookup for foreach sub-blocks and multi-block bodies.
+
+The `ExecutionContext` maintains a `_block_ast_cache` that maps block step IDs to their AST bodies. This cache is checked first in `get_block_ast()`, before traversing the containment hierarchy. It is used by:
+
+- **Foreach sub-blocks** (§11.3): Each sub-block's body AST is cached at creation time.
+- **Multi-block bodies** (§11.2): `_select_block_body()` uses the block's `statement_id` to index into the body list.
 
 ---
 
