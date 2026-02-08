@@ -187,3 +187,11 @@
   - Key runtime behavior: yield steps are created lazily (when dependencies are available), not eagerly in iteration 0
 - **Acceptance tests**: event facet blocking at EventTransmit, step continue/resume, multi-run execution, nested statement blocks, facet definition lookup (namespaced EventFacetDecl)
 - 978 tests passing
+
+## Completed (v0.8.2) - Schema Field Comma Separators
+- **Grammar**: `schema_fields` rule now requires commas between field definitions, consistent with `params` rule
+- **Syntax**: `schema Foo { name: String, age: Int }` (commas required between fields, no trailing comma)
+- Empty schemas and single-field schemas unchanged (no comma needed)
+- Updated all 18 AFL example files (~45 schemas) across genomics and OSM geocoder examples
+- Updated spec documentation (`10_language.md`, `12_validation.md`)
+- 987 tests passing
