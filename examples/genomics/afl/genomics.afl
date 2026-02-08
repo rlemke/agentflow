@@ -11,69 +11,69 @@
 namespace genomics.types {
 
     schema QcReport {
-        sample_id: String
-        total_reads: Long
-        passed_reads: Long
-        failed_reads: Long
-        pass_rate: Double
-        clean_fastq_path: String
+        sample_id: String,
+        total_reads: Long,
+        passed_reads: Long,
+        failed_reads: Long,
+        pass_rate: Double,
+        clean_fastq_path: String,
         tool_version: String
     }
 
     schema AlignmentResult {
-        sample_id: String
-        bam_path: String
-        total_reads: Long
-        mapped_reads: Long
-        mapping_rate: Double
-        duplicate_rate: Double
+        sample_id: String,
+        bam_path: String,
+        total_reads: Long,
+        mapped_reads: Long,
+        mapping_rate: Double,
+        duplicate_rate: Double,
         mean_coverage: Double
     }
 
     schema VariantResult {
-        sample_id: String
-        gvcf_path: String
-        variant_count: Long
-        snp_count: Long
+        sample_id: String,
+        gvcf_path: String,
+        variant_count: Long,
+        snp_count: Long,
         indel_count: Long
     }
 
     schema ReferenceBundle {
-        fasta_path: String
-        annotation_path: String
-        build: String
+        fasta_path: String,
+        annotation_path: String,
+        build: String,
         size_bytes: Long
     }
 
     schema CohortVariantResult {
-        cohort_vcf_path: String
-        filtered_vcf_path: String
-        sample_count: Long
-        variant_count: Long
+        cohort_vcf_path: String,
+        filtered_vcf_path: String,
+        sample_count: Long,
+        variant_count: Long,
         pass_rate: Double
     }
 
     schema AnnotationResult {
-        variant_table_path: String
-        variant_count: Long
-        annotated_count: Long
+        variant_table_path: String,
+        variant_count: Long,
+        annotated_count: Long,
         gene_count: Long
     }
 
     schema CohortStatsResult {
-        qc_report_path: String
-        stats_path: String
-        sample_count: Long
-        mean_depth: Double
+        qc_report_path: String,
+        stats_path: String,
+        sample_count: Long,
+        mean_depth: Double,
         variant_count: Long
     }
 
     schema AnalysisPackage {
-        package_path: String
-        manifest_path: String
-        dataset_id: String
-        sample_count: Long
-        variant_count: Long
+        package_path: String,
+        manifest_path: String,
+        dataset_id: String,
+        sample_count: Long,
+        variant_count: Long,
         build: String
     }
 }

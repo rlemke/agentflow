@@ -20,14 +20,14 @@ namespace osm.geo.Routing {
     use osm.types
 
     schema PairwiseRoutingResult {
-        output_path: String
-        route_count: Long
-        city_count: Long
-        total_distance_km: Long
-        total_duration_min: Long
-        avg_distance_km: Long
-        avg_duration_min: Long
-        profile: String
+        output_path: String,
+        route_count: Long,
+        city_count: Long,
+        total_distance_km: Long,
+        total_duration_min: Long,
+        avg_distance_km: Long,
+        avg_duration_min: Long,
+        profile: String,
         format: String
     }
 

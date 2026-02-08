@@ -13,31 +13,31 @@ namespace osm.geo.Elevation {
     use osm.types
 
     schema ElevationStats {
-        min_elevation_ft: Long
-        max_elevation_ft: Long
-        elevation_gain_ft: Long
-        elevation_loss_ft: Long
-        avg_elevation_ft: Long
+        min_elevation_ft: Long,
+        max_elevation_ft: Long,
+        elevation_gain_ft: Long,
+        elevation_loss_ft: Long,
+        avg_elevation_ft: Long,
         points_sampled: Long
     }
 
     schema ElevatedRoute {
-        route_id: String
-        name: String
-        route_type: String
-        network: String
-        geometry: Json
-        elevation_profile: Json
+        route_id: String,
+        name: String,
+        route_type: String,
+        network: String,
+        geometry: Json,
+        elevation_profile: Json,
         stats: ElevationStats
     }
 
     schema ElevatedRouteResult {
-        output_path: String
-        routes: Json
-        feature_count: Long
-        matched_count: Long
-        filter_applied: String
-        elevation_source: String
+        output_path: String,
+        routes: Json,
+        feature_count: Long,
+        matched_count: Long,
+        filter_applied: String,
+        elevation_source: String,
         extraction_date: String
     }
 

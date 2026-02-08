@@ -4,11 +4,11 @@ namespace osm.geo.Boundaries {
     use osm.types
 
     schema BoundaryResult {
-        output_path: String
-        feature_count: Long
-        boundary_type: String
-        admin_levels: String
-        format: String
+        output_path: String,
+        feature_count: Long,
+        boundary_type: String,
+        admin_levels: String,
+        format: String,
         extraction_date: String
     }
 

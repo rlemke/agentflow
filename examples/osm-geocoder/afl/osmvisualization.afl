@@ -5,19 +5,19 @@
 
 namespace osm.geo.Visualization {
     schema MapResult {
-        output_path: String
-        format: String
-        feature_count: Long
-        bounds: String
-        title: String
+        output_path: String,
+        format: String,
+        feature_count: Long,
+        bounds: String,
+        title: String,
         extraction_date: String
     }
 
     schema LayerStyle {
-        color: String
-        fill_color: String
-        weight: Long
-        opacity: Double
+        color: String,
+        fill_color: String,
+        weight: Long,
+        opacity: Double,
         fill_opacity: Double
     }
     // Generate interactive HTML map with Leaflet + OSM tiles

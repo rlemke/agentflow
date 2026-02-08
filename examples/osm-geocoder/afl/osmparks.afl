@@ -10,32 +10,32 @@ namespace osm.geo.Parks {
     use osm.types
 
     schema ParkResult {
-        output_path: String
-        feature_count: Long
-        park_type: String
-        protect_classes: String
-        total_area_km2: Double
-        format: String
+        output_path: String,
+        feature_count: Long,
+        park_type: String,
+        protect_classes: String,
+        total_area_km2: Double,
+        format: String,
         extraction_date: String
     }
 
     schema ParkStats {
-        total_parks: Long
-        total_area_km2: Double
-        national_parks: Long
-        state_parks: Long
-        nature_reserves: Long
-        other_protected: Long
+        total_parks: Long,
+        total_area_km2: Double,
+        national_parks: Long,
+        state_parks: Long,
+        nature_reserves: Long,
+        other_protected: Long,
         park_type: String
     }
 
     schema ParkFeature {
-        osm_id: Long
-        name: String
-        park_type: String
-        protect_class: String
-        designation: String
-        operator: String
+        osm_id: Long,
+        name: String,
+        park_type: String,
+        protect_class: String,
+        designation: String,
+        operator: String,
         area_km2: Double
     }
 

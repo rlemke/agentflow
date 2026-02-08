@@ -99,8 +99,8 @@ INPUT_REF: "$." IDENT ("." IDENT)*
 literal: STRING | FLOAT | INTEGER | BOOLEAN | NULL
 
 // Schema declarations
-schema_decl: "schema" IDENT "{" _NL* schema_fields "}" _stmt_end
-schema_fields: (schema_field _NL*)*
+schema_decl: "schema" IDENT "{" _NL* [schema_fields] "}" _stmt_end
+schema_fields: schema_field (_NL* "," _NL* schema_field)* _NL*
 schema_field: IDENT ":" type
 
 // Implicit declarations

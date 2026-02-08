@@ -617,7 +617,7 @@ class TestSchemaValidation:
         ast = parse("""
         namespace app {
             schema User {
-                name: String
+                name: String,
                 name: Int
             }
         }
@@ -631,7 +631,7 @@ class TestSchemaValidation:
         ast = parse("""
         namespace app {
             schema User {
-                name: String
+                name: String,
                 age: Int
             }
         }
@@ -949,7 +949,7 @@ class TestSchemaInstantiation:
         ast = parse("""
         namespace app {
             schema Config {
-                timeout: Long
+                timeout: Long,
                 retries: Long
             }
             event facet DoSomething(config: Config) => (result: String)
@@ -968,7 +968,7 @@ class TestSchemaInstantiation:
         ast = parse("""
         namespace app {
             schema Data {
-                value: String
+                value: String,
                 count: Long
             }
             facet Process(input: String) => (output: String)
@@ -1039,7 +1039,7 @@ class TestSchemaInstantiation:
         ast = parse("""
         namespace app {
             schema Settings {
-                name: String
+                name: String,
                 value: Long
             }
             facet Process(s: Settings) => (result: String)
@@ -1093,7 +1093,7 @@ class TestSchemaInstantiation:
         ast = parse("""
         namespace app {
             schema Request {
-                url: String
+                url: String,
                 method: String
             }
             facet Fetch(url: String, method: String) => (data: String)

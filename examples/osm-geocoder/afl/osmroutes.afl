@@ -10,19 +10,19 @@ namespace osm.geo.Routes {
     use osm.types
 
     schema RouteResult {
-        output_path: String
-        feature_count: Long
-        route_type: String
-        network_level: String
-        include_infrastructure: Boolean
-        format: String
+        output_path: String,
+        feature_count: Long,
+        route_type: String,
+        network_level: String,
+        include_infrastructure: Boolean,
+        format: String,
         extraction_date: String
     }
 
     schema RouteStats {
-        route_count: Long
-        total_length_km: Double
-        infrastructure_count: Long
+        route_count: Long,
+        total_length_km: Double,
+        infrastructure_count: Long,
         route_type: String
     }
 

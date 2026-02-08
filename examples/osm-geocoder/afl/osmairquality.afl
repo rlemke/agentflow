@@ -10,36 +10,36 @@
 
 namespace osm.geo.AirQuality {
     schema AirQualityResult {
-        output_path: String
-        station_count: Long
-        parameter: String
-        avg_value: Double
-        unit: String
+        output_path: String,
+        station_count: Long,
+        parameter: String,
+        avg_value: Double,
+        unit: String,
         format: String
     }
 
     schema ExposureCorrelationResult {
-        output_path: String
-        school_count: Long
-        matched_count: Long
-        high_exposure: Long
-        medium_exposure: Long
-        low_exposure: Long
-        avg_pm25: Double
+        output_path: String,
+        school_count: Long,
+        matched_count: Long,
+        high_exposure: Long,
+        medium_exposure: Long,
+        low_exposure: Long,
+        avg_pm25: Double,
         format: String
     }
 
     schema ExposureStats {
-        total_schools: Long
-        matched_schools: Long
-        high_count: Long
-        medium_count: Long
-        low_count: Long
-        high_pct: Double
-        medium_pct: Double
-        low_pct: Double
-        avg_pm25: Double
-        max_pm25: Double
+        total_schools: Long,
+        matched_schools: Long,
+        high_count: Long,
+        medium_count: Long,
+        low_count: Long,
+        high_pct: Double,
+        medium_pct: Double,
+        low_pct: Double,
+        avg_pm25: Double,
+        max_pm25: Double,
         min_pm25: Double
     }
 

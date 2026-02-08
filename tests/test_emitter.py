@@ -558,7 +558,7 @@ class TestSchemaEmission:
         ast = parse("""
         namespace app {
             schema UserRequest {
-                name: String
+                name: String,
                 age: Int
             }
         }

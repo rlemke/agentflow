@@ -189,7 +189,7 @@ Schemas can be instantiated in step statements, creating data objects.
 #### Valid Schema Instantiation
 ```afl
 schema Config {
-    timeout: Long
+    timeout: Long,
     retries: Long
 }
 
@@ -228,7 +228,7 @@ workflow Test() andThen {
 Schema fields are stored as **returns** (not params), making them accessible via `step.field`:
 ```afl
 schema Request {
-    url: String
+    url: String,
     method: String
 }
 facet Fetch(url: String, method: String) => (data: String)

@@ -9,41 +9,41 @@
 namespace genomics.cache.types {
 
     schema GenomicsCache {
-        url: String
-        path: String
-        date: String
-        size: Long
-        wasInCache: Boolean
-        checksum: String
+        url: String,
+        path: String,
+        date: String,
+        size: Long,
+        wasInCache: Boolean,
+        checksum: String,
         resource_type: String
     }
 
     schema IndexCache {
-        source_path: String
-        index_dir: String
-        aligner: String
-        date: String
-        size: Long
-        wasInCache: Boolean
-        version: String
-        contig_count: Long
+        source_path: String,
+        index_dir: String,
+        aligner: String,
+        date: String,
+        size: Long,
+        wasInCache: Boolean,
+        version: String,
+        contig_count: Long,
         total_bases: Long
     }
 
     schema ResourceResolution {
-        query: String
-        matched_name: String
-        resource_namespace: String
-        category: String
-        source_url: String
-        is_ambiguous: Boolean
+        query: String,
+        matched_name: String,
+        resource_namespace: String,
+        category: String,
+        source_url: String,
+        is_ambiguous: Boolean,
         disambiguation: String
     }
 
     schema ResourceListResult {
-        resource_count: Long
-        resources: Json
-        category_count: Long
+        resource_count: Long,
+        resources: Json,
+        category_count: Long,
         categories: Json
     }
 }

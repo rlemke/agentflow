@@ -11,25 +11,25 @@ namespace osm.geo.Amenities {
     use osm.types
 
     schema AmenityResult {
-        output_path: String
-        feature_count: Long
-        amenity_category: String
-        amenity_types: String
-        format: String
+        output_path: String,
+        feature_count: Long,
+        amenity_category: String,
+        amenity_types: String,
+        format: String,
         extraction_date: String
     }
 
     schema AmenityStats {
-        total_amenities: Long
-        food: Long
-        shopping: Long
-        services: Long
-        healthcare: Long
-        education: Long
-        entertainment: Long
-        transport: Long
-        other: Long
-        with_name: Long
+        total_amenities: Long,
+        food: Long,
+        shopping: Long,
+        services: Long,
+        healthcare: Long,
+        education: Long,
+        entertainment: Long,
+        transport: Long,
+        other: Long,
+        with_name: Long,
         with_opening_hours: Long
     }
 

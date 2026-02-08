@@ -808,7 +808,7 @@ class TestSchemaDeclarations:
         ast = parser.parse("""
         namespace app {
             schema UserRequest {
-                name: String
+                name: String,
                 age: Int
             }
         }
@@ -831,7 +831,7 @@ class TestSchemaDeclarations:
         ast = parser.parse("""
         namespace app {
             schema TaggedItem {
-                tags: [String]
+                tags: [String],
                 ids: [Long]
             }
         }
@@ -849,11 +849,11 @@ class TestSchemaDeclarations:
         ast = parser.parse("""
         namespace app {
             schema Address {
-                street: String
+                street: String,
                 city: String
             }
             schema Person {
-                name: String
+                name: String,
                 home: Address
             }
         }
@@ -870,7 +870,7 @@ class TestSchemaDeclarations:
         ast = parser.parse("""
         namespace app {
             schema Config {
-                key: String
+                key: String,
                 value: String
             }
         }

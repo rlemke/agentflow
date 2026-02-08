@@ -4,23 +4,23 @@
 // Supports Congressional Districts, State Legislative Districts, and Voting Precincts.
 
 schema TIGERCache {
-    url: String
-    path: String
-    date: String
-    size: Long
-    wasInCache: Boolean
-    year: Long
-    district_type: String
+    url: String,
+    path: String,
+    date: String,
+    size: Long,
+    wasInCache: Boolean,
+    year: Long,
+    district_type: String,
     state_fips: String
 }
 
 schema VotingDistrictResult {
-    output_path: String
-    feature_count: Long
-    district_type: String
-    state: String
-    year: Long
-    format: String
+    output_path: String,
+    feature_count: Long,
+    district_type: String,
+    state: String,
+    year: Long,
+    format: String,
     extraction_date: String
 }
 

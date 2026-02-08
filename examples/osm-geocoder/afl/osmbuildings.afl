@@ -9,24 +9,24 @@ namespace osm.geo.Buildings {
     use osm.types
 
     schema BuildingResult {
-        output_path: String
-        feature_count: Long
-        building_type: String
-        total_area_km2: Double
-        with_height_data: Long
-        format: String
+        output_path: String,
+        feature_count: Long,
+        building_type: String,
+        total_area_km2: Double,
+        with_height_data: Long,
+        format: String,
         extraction_date: String
     }
 
     schema BuildingStats {
-        total_buildings: Long
-        total_area_km2: Double
-        residential: Long
-        commercial: Long
-        industrial: Long
-        retail: Long
-        other: Long
-        avg_levels: Double
+        total_buildings: Long,
+        total_area_km2: Double,
+        residential: Long,
+        commercial: Long,
+        industrial: Long,
+        retail: Long,
+        other: Long,
+        avg_levels: Double,
         with_height: Long
     }
 

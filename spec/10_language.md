@@ -183,7 +183,7 @@ workflow ProcessAllRegions(regions: Json) => (results: Json) andThen foreach r i
 
 ### Schema declaration and instantiation
 schema Config {
-    timeout: Long
+    timeout: Long,
     retries: Long
 }
 

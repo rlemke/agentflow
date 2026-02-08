@@ -7,8 +7,8 @@
 namespace osm.geo {
 
     schema GeoCoordinate {
-        lat: String
-        lon: String
+        lat: String,
+        lon: String,
         display_name: String
     }
 

@@ -9,27 +9,27 @@ namespace osm.geo.Roads {
     use osm.types
 
     schema RoadResult {
-        output_path: String
-        feature_count: Long
-        road_class: String
-        total_length_km: Double
-        with_speed_limit: Long
-        format: String
+        output_path: String,
+        feature_count: Long,
+        road_class: String,
+        total_length_km: Double,
+        with_speed_limit: Long,
+        format: String,
         extraction_date: String
     }
 
     schema RoadStats {
-        total_roads: Long
-        total_length_km: Double
-        motorway_km: Double
-        primary_km: Double
-        secondary_km: Double
-        tertiary_km: Double
-        residential_km: Double
-        other_km: Double
-        with_speed_limit: Long
-        with_surface: Long
-        with_lanes: Long
+        total_roads: Long,
+        total_length_km: Double,
+        motorway_km: Double,
+        primary_km: Double,
+        secondary_km: Double,
+        tertiary_km: Double,
+        residential_km: Double,
+        other_km: Double,
+        with_speed_limit: Long,
+        with_surface: Long,
+        with_lanes: Long,
         one_way_count: Long
     }
 

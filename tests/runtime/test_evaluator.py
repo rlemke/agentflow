@@ -1956,7 +1956,7 @@ class TestSchemaInstantiationRuntime:
 
         ```afl
         schema Config {
-            timeout: Long
+            timeout: Long,
             retries: Long
         }
         facet Value(input: Long) => (output: Long)
@@ -2046,7 +2046,7 @@ class TestSchemaInstantiationRuntime:
 
         ```afl
         schema Data {
-            value: Long
+            value: Long,
             multiplier: Long
         }
         facet Multiply(a: Long, b: Long) => (result: Long)
