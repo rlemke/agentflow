@@ -15,7 +15,8 @@
 """Script execution for AFL script blocks.
 
 Provides sandboxed execution of Python scripts defined in facet script blocks.
-Scripts receive input via `params` dict and return output via `result` dict.
+Scripts run in a subprocess with enforced timeout. They receive input via
+``params`` dict and return output via ``result`` dict.
 
 Example usage::
 
@@ -27,13 +28,18 @@ Example usage::
     # result == {"output": "HELLO"}
 
 Security Note:
-    The default executor uses a restricted global namespace that excludes
-    dangerous builtins. For production use with untrusted code, consider
-    using RestrictedPython or a sandboxed subprocess.
+    Scripts execute in a subprocess with a restricted global namespace that
+    excludes dangerous builtins. The timeout is enforced via
+    ``subprocess.run(timeout=...)``.
 """
 
 from __future__ import annotations
 
+import base64
+import builtins as _builtins_mod
+import json
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -55,76 +61,125 @@ class ScriptResult:
     error: str | None = None
 
 
-# Allowed builtins for sandboxed execution
-_SAFE_BUILTINS = {
+# Names of builtins allowed in sandboxed execution
+_SAFE_BUILTIN_NAMES: list[str] = [
     # Types
-    "bool": bool,
-    "int": int,
-    "float": float,
-    "str": str,
-    "list": list,
-    "dict": dict,
-    "tuple": tuple,
-    "set": set,
-    "frozenset": frozenset,
-    "bytes": bytes,
-    "bytearray": bytearray,
+    "bool", "int", "float", "str", "list", "dict", "tuple",
+    "set", "frozenset", "bytes", "bytearray",
     # Functions
-    "len": len,
-    "range": range,
-    "enumerate": enumerate,
-    "zip": zip,
-    "map": map,
-    "filter": filter,
-    "sorted": sorted,
-    "reversed": reversed,
-    "min": min,
-    "max": max,
-    "sum": sum,
-    "abs": abs,
-    "round": round,
-    "all": all,
-    "any": any,
-    "isinstance": isinstance,
-    "issubclass": issubclass,
-    "hasattr": hasattr,
-    "getattr": getattr,
-    "setattr": setattr,
-    "type": type,
-    "repr": repr,
-    "print": print,  # Captured output could be logged
-    # None, True, False
-    "None": None,
-    "True": True,
-    "False": False,
+    "len", "range", "enumerate", "zip", "map", "filter",
+    "sorted", "reversed", "min", "max", "sum", "abs", "round",
+    "all", "any", "isinstance", "issubclass",
+    "hasattr", "getattr", "setattr", "type", "repr", "print",
+    # Constants
+    "None", "True", "False",
     # Exceptions (for catching)
-    "Exception": Exception,
-    "ValueError": ValueError,
-    "TypeError": TypeError,
-    "KeyError": KeyError,
-    "IndexError": IndexError,
-    "AttributeError": AttributeError,
-}
+    "Exception", "ValueError", "TypeError",
+    "KeyError", "IndexError", "AttributeError",
+]
+
+# Allowed builtins for sandboxed execution (used by tests and reference)
+_SAFE_BUILTINS = {name: getattr(_builtins_mod, name) for name in _SAFE_BUILTIN_NAMES}
+
+
+def _build_worker_script(code: str, params_json: str) -> str:
+    """Build the Python source for the subprocess worker.
+
+    The worker reconstructs the safe-builtins sandbox, deserializes params,
+    executes the user code, and writes the result dict as JSON to stdout.
+    User ``print()`` calls are captured via ``io.StringIO`` so they don't
+    corrupt the JSON output protocol.
+
+    Args:
+        code: User script source code
+        params_json: JSON-serialized params dict
+
+    Returns:
+        Python source string suitable for ``python -c``
+    """
+    code_b64 = base64.b64encode(code.encode()).decode()
+    names_repr = repr(_SAFE_BUILTIN_NAMES)
+    params_repr = repr(params_json)
+    code_repr = repr(code_b64)
+    lines = [
+        "import builtins as _b, base64 as _base64, io as _io, json as _json, sys as _sys",
+        f"_names = {names_repr}",
+        "_safe = {n: getattr(_b, n) for n in _names}",
+        "_real_stdout = _sys.stdout",
+        "_capture = _io.StringIO()",
+        "_safe['print'] = lambda *a, **kw: print(*a, **kw, file=_capture)",
+        "_result = {}",
+        f"_params = _json.loads({params_repr})",
+        "_sandbox = {'__builtins__': _safe, 'params': _params, 'result': _result}",
+        f"_code = _base64.b64decode({code_repr}).decode()",
+        "try:",
+        "    _compiled = compile(_code, '<script>', 'exec')",
+        "    exec(_compiled, _sandbox)",
+        "    _json.dump({'success': True, 'result': _result}, _real_stdout)",
+        "except SyntaxError as _e:",
+        "    _json.dump({'success': False, 'error': f'Syntax error in script: {_e}'}, _real_stdout)",
+        "except Exception as _e:",
+        "    _json.dump({'success': False, 'error': f'Script execution error: {type(_e).__name__}: {_e}'}, _real_stdout)",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _parse_worker_output(stdout: str, stderr: str) -> ScriptResult:
+    """Parse JSON output from the subprocess worker.
+
+    Args:
+        stdout: Subprocess stdout (should contain JSON)
+        stderr: Subprocess stderr (used for error context)
+
+    Returns:
+        ScriptResult parsed from the worker output
+    """
+    if not stdout.strip():
+        err_detail = stderr.strip() if stderr.strip() else "no output from script subprocess"
+        return ScriptResult(
+            success=False,
+            result={},
+            error=f"Script execution error: {err_detail}",
+        )
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return ScriptResult(
+            success=False,
+            result={},
+            error=f"Script execution error: invalid output from script subprocess",
+        )
+
+    if data.get("success"):
+        return ScriptResult(success=True, result=data.get("result", {}))
+
+    return ScriptResult(
+        success=False,
+        result={},
+        error=data.get("error", "Unknown script error"),
+    )
 
 
 class ScriptExecutor:
-    """Executes Python scripts in a sandboxed environment.
+    """Executes Python scripts in a sandboxed subprocess.
 
     Scripts have access to:
-    - `params`: Input parameters (read-only dict)
-    - `result`: Output dict (should be populated by the script)
+    - ``params``: Input parameters (read-only dict)
+    - ``result``: Output dict (should be populated by the script)
     - Safe builtins (no __import__, exec, eval, open, etc.)
 
+    The timeout is enforced via ``subprocess.run(timeout=...)``.
+
     Attributes:
-        timeout: Execution timeout in seconds (not enforced in basic mode)
+        timeout: Execution timeout in seconds (enforced via subprocess)
     """
 
     def __init__(self, timeout: float = 30.0):
         """Initialize the executor.
 
         Args:
-            timeout: Maximum execution time in seconds (informational only
-                     in basic mode; use with subprocess for enforcement)
+            timeout: Maximum execution time in seconds (enforced via subprocess)
         """
         self.timeout = timeout
 
@@ -138,7 +193,7 @@ class ScriptExecutor:
 
         Args:
             code: The script source code
-            params: Input parameters (available as `params` in script)
+            params: Input parameters (available as ``params`` in script)
             language: Script language (only "python" supported)
 
         Returns:
@@ -161,7 +216,7 @@ class ScriptExecutor:
         code: str,
         params: dict[str, Any],
     ) -> ScriptResult:
-        """Execute Python code in a sandboxed environment.
+        """Execute Python code in a sandboxed subprocess.
 
         Args:
             code: Python source code
@@ -170,35 +225,33 @@ class ScriptExecutor:
         Returns:
             ScriptResult with execution outcome
         """
-        # Prepare sandboxed globals
-        result: dict[str, Any] = {}
-        sandbox_globals = {
-            "__builtins__": _SAFE_BUILTINS,
-            "params": dict(params),  # Copy to prevent modification
-            "result": result,
-        }
+        # Serialize params — fail early if not JSON-serializable
+        try:
+            params_json = json.dumps(params)
+        except (TypeError, ValueError) as e:
+            return ScriptResult(
+                success=False,
+                result={},
+                error=f"Script execution error: params not serializable: {e}",
+            )
+
+        worker_code = _build_worker_script(code, params_json)
 
         try:
-            # Compile to check for syntax errors
-            compiled = compile(code, "<script>", "exec")
-
-            # Execute in sandboxed namespace
-            exec(compiled, sandbox_globals)
-
-            return ScriptResult(success=True, result=result)
-
-        except SyntaxError as e:
+            proc = subprocess.run(
+                [sys.executable, "-c", worker_code],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+        except subprocess.TimeoutExpired:
             return ScriptResult(
                 success=False,
                 result={},
-                error=f"Syntax error in script: {e}",
+                error=f"Script timed out after {self.timeout}s",
             )
-        except Exception as e:
-            return ScriptResult(
-                success=False,
-                result={},
-                error=f"Script execution error: {type(e).__name__}: {e}",
-            )
+
+        return _parse_worker_output(proc.stdout, proc.stderr)
 
 
 def execute_script(

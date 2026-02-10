@@ -214,3 +214,11 @@
 - **Configurable cache paths**: `AFL_CACHE_DIR` for OSM cache, `AFL_GENOMICS_CACHE_DIR` for genomics cache (supports `hdfs://` URIs)
 - **Optional dependency**: `pyarrow>=14.0` in `[hdfs]` extra
 - 1049 tests passing
+
+## Completed (v0.9.2) - ScriptExecutor Subprocess Timeout
+- **Subprocess execution**: `ScriptExecutor._execute_python` now runs scripts in a subprocess via `subprocess.run([sys.executable, "-c", ...])` instead of in-process `exec()`
+- **Timeout enforcement**: `timeout` parameter (default 30s) is enforced via `subprocess.run(timeout=...)`, killing runaway scripts
+- **Safe builtins**: `_SAFE_BUILTIN_NAMES` list drives sandbox reconstruction in both parent and subprocess; user `print()` calls captured via `io.StringIO` to prevent JSON protocol corruption
+- **Worker protocol**: user code is base64-encoded, params serialized as JSON in, result dict serialized as JSON out via stdout
+- **Error handling**: `subprocess.TimeoutExpired` → `ScriptResult(success=False, error="Script timed out after {timeout}s")`; non-serializable params fail early before subprocess launch
+- 1056 tests passing

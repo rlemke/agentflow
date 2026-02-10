@@ -188,6 +188,62 @@ result["isinstance"] = isinstance(42, int)
         assert original_params["x"] == 1
 
 
+class TestScriptTimeout:
+    """Tests for subprocess timeout enforcement."""
+
+    def test_timeout_enforced(self):
+        """Script exceeding timeout should fail with timed out error."""
+        executor = ScriptExecutor(timeout=1)
+        result = executor.execute("while True: pass")
+        assert not result.success
+        assert "timed out" in result.error
+
+    def test_fast_script_within_timeout(self):
+        """Script completing within timeout should succeed."""
+        executor = ScriptExecutor(timeout=5)
+        result = executor.execute('result["x"] = 42')
+        assert result.success
+        assert result.result == {"x": 42}
+
+    def test_default_timeout(self):
+        """Default timeout should be 30 seconds."""
+        executor = ScriptExecutor()
+        assert executor.timeout == 30.0
+
+
+class TestSubprocessEdgeCases:
+    """Tests for subprocess execution edge cases."""
+
+    def test_non_json_serializable_params(self):
+        """Non-JSON-serializable params should fail before subprocess."""
+        executor = ScriptExecutor()
+        result = executor.execute('result["x"] = 1', params={"obj": object()})
+        assert not result.success
+        assert "not serializable" in result.error
+
+    def test_non_json_serializable_result(self):
+        """Non-JSON-serializable result should produce an error."""
+        executor = ScriptExecutor()
+        result = executor.execute('result["s"] = {1, 2, 3}')
+        assert not result.success
+
+    def test_large_result(self):
+        """Large results should serialize correctly."""
+        executor = ScriptExecutor()
+        result = executor.execute('result["data"] = list(range(1000))')
+        assert result.success
+        assert result.result["data"] == list(range(1000))
+
+    def test_print_does_not_corrupt_output(self):
+        """print() in user code should not corrupt JSON output."""
+        executor = ScriptExecutor()
+        result = executor.execute(
+            'print("debug info")\nresult["x"] = 42'
+        )
+        assert result.success
+        assert result.result == {"x": 42}
+
+
 class TestExecuteScriptFunction:
     """Tests for execute_script convenience function."""
 
