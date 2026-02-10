@@ -133,6 +133,47 @@ services:
     profiles:
       - mcp
 
+  # HDFS NameNode — start with: docker compose --profile hdfs up -d
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: afl-namenode
+    hostname: namenode
+    ports:
+      - "9870:9870"   # Web UI
+      - "8020:8020"   # RPC (hdfs://namenode:8020)
+    environment:
+      - CLUSTER_NAME=agentflow
+      - CORE_CONF_fs___defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs___replication=1
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    healthcheck:
+      test: curl -f http://localhost:9870 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - hdfs
+
+  # HDFS DataNode
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: afl-datanode
+    hostname: datanode
+    environment:
+      - CORE_CONF_fs___defaultFS=hdfs://namenode:8020
+      - SERVICE_PRECONDITION=namenode:8020
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    depends_on:
+      namenode:
+        condition: service_healthy
+    profiles:
+      - hdfs
+
 volumes:
   mongodb_data:
   graphhopper_data:
+  hadoop_namenode:
+  hadoop_datanode:

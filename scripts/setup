@@ -20,6 +20,7 @@ RUNNERS=1
 AGENTS=1
 OSM_AGENTS=0
 OSM_LITE_AGENTS=0
+HDFS=false
 CHECK_ONLY=false
 FORCE_BUILD=false
 
@@ -36,6 +37,7 @@ Options:
                        Java/GraphHopper (default: 0)
   --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
                        (default: 0)
+  --hdfs               Start HDFS namenode + datanode services
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -51,6 +53,7 @@ while [[ $# -gt 0 ]]; do
         --agents)        AGENTS="$2";           shift 2 ;;
         --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
         --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
+        --hdfs)          HDFS=true;             shift ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -176,9 +179,15 @@ if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
     SERVICES="$SERVICES agent-osm-geocoder-lite"
 fi
 
+PROFILE_ARGS=""
+if [ "$HDFS" = true ]; then
+    SERVICES="$SERVICES namenode datanode"
+    PROFILE_ARGS="--profile hdfs"
+fi
+
 if [ "$FORCE_BUILD" = true ]; then
     echo "Building all images (--build)..."
-    docker compose build $SERVICES
+    docker compose $PROFILE_ARGS build $SERVICES
     echo ""
 fi
 
@@ -200,14 +209,19 @@ echo "  Runners:          $RUNNERS"
 echo "  AddOne agents:    $AGENTS"
 echo "  OSM agents:       $OSM_AGENTS"
 echo "  OSM lite agents:  $OSM_LITE_AGENTS"
+echo "  HDFS:             $HDFS"
 echo ""
 
-docker compose up -d $SCALE_ARGS $SERVICES
+docker compose $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
 
 echo ""
 echo "=== AgentFlow is running ==="
 echo "  Dashboard: http://localhost:8080"
 echo "  MongoDB:   localhost:${MONGODB_PORT:-27018}"
+if [ "$HDFS" = true ]; then
+    echo "  HDFS UI:   http://localhost:9870"
+    echo "  HDFS RPC:  hdfs://localhost:8020"
+fi
 echo ""
 echo "Useful commands:"
 echo "  docker compose ps          # List running services"

@@ -168,6 +168,8 @@ scripts/setup --runners 3 --agents 2 --osm-agents 1        # with scaling
 docker compose up -d                                        # start directly
 docker compose --profile seed run --rm seed                 # seed workflows
 docker compose --profile mcp run --rm mcp                   # MCP server
+docker compose --profile hdfs up -d                         # start HDFS
+scripts/setup --hdfs                                        # bootstrap with HDFS
 docker compose down                                         # stop
 docker compose down -v                                      # stop + remove volumes
 ```
@@ -184,6 +186,8 @@ docker compose down -v                                      # stop + remove volu
 | `agent-osm-geocoder-lite` | - | Yes | Lightweight OSM agent (requests only) |
 | `seed` | - | No | One-shot workflow seeder (profile: seed) |
 | `mcp` | - | No | MCP server, stdio transport (profile: mcp) |
+| `namenode` | 9870, 8020 | No | HDFS NameNode (profile: hdfs) |
+| `datanode` | - | No | HDFS DataNode (profile: hdfs) |
 
 #### Setup script options
 
@@ -193,6 +197,7 @@ docker compose down -v                                      # stop + remove volu
 | `--agents N` | 1 | AddOne agent instances |
 | `--osm-agents N` | 0 | Full OSM Geocoder agent instances |
 | `--osm-lite-agents N` | 0 | Lightweight OSM agent instances |
+| `--hdfs` | - | Start HDFS namenode + datanode services |
 | `--build` | - | Force image rebuild before starting |
 | `--check-only` | - | Verify Docker availability, then exit |
 
