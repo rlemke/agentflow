@@ -23,7 +23,7 @@ Handles:
 from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
-from ..expression import EvaluationContext, evaluate_args
+from ..expression import EvaluationContext, ExpressionEvaluator, evaluate_args
 from ..types import ObjectType
 from .base import StateHandler
 
@@ -78,6 +78,18 @@ class FacetInitializationBeginHandler(StateHandler):
         try:
             args = stmt_def.args
             evaluated = evaluate_args(args, ctx)
+
+            # Apply facet defaults for any params not provided in the call
+            if self.step.facet_name:
+                facet_def = self.context.get_facet_definition(self.step.facet_name)
+                if facet_def:
+                    expr_eval = ExpressionEvaluator()
+                    for param in facet_def.get("params", []):
+                        param_name = param.get("name", "")
+                        if param_name not in evaluated and "default" in param:
+                            evaluated[param_name] = expr_eval.evaluate(
+                                param["default"], ctx
+                            )
 
             # For schema instantiation, store values as returns (accessible via step.field)
             # For facet calls, store values as params

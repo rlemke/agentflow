@@ -2,8 +2,8 @@
 """Offline test for the Volcano Query agent.
 
 Demonstrates the full workflow execution cycle with mock handlers
-(no network calls). Four-step pipeline: LoadVolcanoData → FilterByRegion
-→ FilterByElevation → FormatVolcanoes.
+(no network calls). Six-step pipeline: LoadVolcanoData (Cache → Download
+→ FilterByType) → FilterByRegion → FilterByElevation → FormatVolcanoes.
 
 Run from the repo root:
 
@@ -18,11 +18,21 @@ from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 # Runtime AST for:
 #
 #   namespace volcano {
-#       event facet LoadVolcanoData() => (result: VolcanoDataset)
+#       event facet CheckRegionCache(region: String) => (result: VolcanoCache)
+#       event facet DownloadVolcanoData(region: String, cache_path: String) => (result: VolcanoDataset)
+#       event facet FilterByType(volcanoes: Json, volcano_type: String) => (result: VolcanoDataset)
 #       event facet FilterByRegion(volcanoes: Json, state: String) => (result: VolcanoList)
 #       event facet FilterByElevation(volcanoes: Json, min_elevation_ft: Long) => (result: VolcanoList)
 #       event facet FormatVolcanoes(volcanoes: Json, count: Long) => (result: FormattedResult)
 #       event facet RenderMap(volcanoes: Json, title: String) => (result: MapResult)
+#
+#       facet LoadVolcanoData(region: String = "US", volcano_type: String = "all")
+#           => (result: VolcanoDataset) andThen {
+#           cache = CheckRegionCache(region = $.region)
+#           raw = DownloadVolcanoData(region = $.region, cache_path = cache.result.path)
+#           typed = FilterByType(volcanoes = raw.result.volcanoes, volcano_type = $.volcano_type)
+#           yield LoadVolcanoData(result = typed.result)
+#       }
 #   }
 #
 PROGRAM_AST = {
@@ -34,8 +44,28 @@ PROGRAM_AST = {
             "declarations": [
                 {
                     "type": "EventFacetDecl",
-                    "name": "LoadVolcanoData",
-                    "params": [],
+                    "name": "CheckRegionCache",
+                    "params": [
+                        {"name": "region", "type": "String"},
+                    ],
+                    "returns": [{"name": "result", "type": "VolcanoCache"}],
+                },
+                {
+                    "type": "EventFacetDecl",
+                    "name": "DownloadVolcanoData",
+                    "params": [
+                        {"name": "region", "type": "String"},
+                        {"name": "cache_path", "type": "String"},
+                    ],
+                    "returns": [{"name": "result", "type": "VolcanoDataset"}],
+                },
+                {
+                    "type": "EventFacetDecl",
+                    "name": "FilterByType",
+                    "params": [
+                        {"name": "volcanoes", "type": "Json"},
+                        {"name": "volcano_type", "type": "String"},
+                    ],
                     "returns": [{"name": "result", "type": "VolcanoDataset"}],
                 },
                 {
@@ -73,6 +103,96 @@ PROGRAM_AST = {
                         {"name": "title", "type": "String"},
                     ],
                     "returns": [{"name": "result", "type": "MapResult"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "LoadVolcanoData",
+                    "params": [
+                        {"name": "region", "type": "String", "default": {"type": "String", "value": "US"}},
+                        {"name": "volcano_type", "type": "String", "default": {"type": "String", "value": "all"}},
+                    ],
+                    "returns": [{"name": "result", "type": "VolcanoDataset"}],
+                    "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                            {
+                                "type": "StepStmt",
+                                "id": "step-cache",
+                                "name": "cache",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "CheckRegionCache",
+                                    "args": [
+                                        {
+                                            "name": "region",
+                                            "value": {"type": "InputRef", "path": ["region"]},
+                                        },
+                                    ],
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-download",
+                                "name": "raw",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "DownloadVolcanoData",
+                                    "args": [
+                                        {
+                                            "name": "region",
+                                            "value": {"type": "InputRef", "path": ["region"]},
+                                        },
+                                        {
+                                            "name": "cache_path",
+                                            "value": {
+                                                "type": "StepRef",
+                                                "path": ["cache", "result", "path"],
+                                            },
+                                        },
+                                    ],
+                                },
+                            },
+                            {
+                                "type": "StepStmt",
+                                "id": "step-filter-type",
+                                "name": "typed",
+                                "call": {
+                                    "type": "CallExpr",
+                                    "target": "FilterByType",
+                                    "args": [
+                                        {
+                                            "name": "volcanoes",
+                                            "value": {
+                                                "type": "StepRef",
+                                                "path": ["raw", "result", "volcanoes"],
+                                            },
+                                        },
+                                        {
+                                            "name": "volcano_type",
+                                            "value": {"type": "InputRef", "path": ["volcano_type"]},
+                                        },
+                                    ],
+                                },
+                            },
+                        ],
+                        "yield": {
+                            "type": "YieldStmt",
+                            "id": "yield-LoadVolcanoData",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "LoadVolcanoData",
+                                "args": [
+                                    {
+                                        "name": "result",
+                                        "value": {
+                                            "type": "StepRef",
+                                            "path": ["typed", "result"],
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
                 },
             ],
         },
@@ -231,11 +351,39 @@ MOCK_ALL_VOLCANOES = [
 ]
 
 
-def mock_load_handler(payload: dict) -> dict:
+def mock_cache_handler(payload: dict) -> dict:
+    """Check cache for the region (always returns cached)."""
+    region = payload.get("region", "US")
+    return {
+        "result": {
+            "region": region,
+            "path": f"/data/volcanoes/{region.lower()}.json",
+            "cached": True,
+        }
+    }
+
+
+def mock_download_handler(payload: dict) -> dict:
     """Return full mock dataset."""
     return {
         "result": {
             "volcanoes": json.dumps(MOCK_ALL_VOLCANOES),
+        }
+    }
+
+
+def mock_filter_type_handler(payload: dict) -> dict:
+    """Filter by volcano type (all = passthrough)."""
+    volcanoes_raw = payload.get("volcanoes", "[]")
+    volcano_type = payload.get("volcano_type", "all")
+    volcanoes = json.loads(volcanoes_raw) if isinstance(volcanoes_raw, str) else volcanoes_raw
+    if volcano_type.lower() == "all":
+        matches = volcanoes
+    else:
+        matches = [v for v in volcanoes if v["type"].lower() == volcano_type.lower()]
+    return {
+        "result": {
+            "volcanoes": json.dumps(matches),
         }
     }
 
@@ -300,12 +448,15 @@ def main() -> None:
         evaluator=evaluator,
         config=AgentPollerConfig(service_name="test-volcano"),
     )
-    poller.register("volcano.LoadVolcanoData", mock_load_handler)
+    poller.register("volcano.CheckRegionCache", mock_cache_handler)
+    poller.register("volcano.DownloadVolcanoData", mock_download_handler)
+    poller.register("volcano.FilterByType", mock_filter_type_handler)
     poller.register("volcano.FilterByRegion", mock_filter_region_handler)
     poller.register("volcano.FilterByElevation", mock_filter_elevation_handler)
     poller.register("volcano.FormatVolcanoes", mock_format_handler)
 
-    # 1. Execute workflow — pauses at the LoadVolcanoData event step
+    # 1. Execute workflow — LoadVolcanoData expands its body,
+    #    pauses at the CheckRegionCache event step
     print("Executing FindVolcanoes workflow...")
     result = evaluator.execute(
         WORKFLOW_AST,
@@ -313,51 +464,75 @@ def main() -> None:
         program_ast=PROGRAM_AST,
     )
     print(f"  Status: {result.status}")
-    assert result.status == ExecutionStatus.PAUSED, "Should pause at LoadVolcanoData event"
+    assert result.status == ExecutionStatus.PAUSED, "Should pause at CheckRegionCache event"
 
-    # 2. Agent processes the LoadVolcanoData event
-    print("Agent processing LoadVolcanoData event...")
+    # 2. Agent processes the CheckRegionCache event
+    print("Agent processing CheckRegionCache event...")
     dispatched = poller.poll_once()
     print(f"  Dispatched: {dispatched} task(s)")
     assert dispatched == 1
 
-    # 3. Resume — hits FilterByRegion event, pauses again
-    print("Resuming workflow (should pause at FilterByRegion)...")
+    # 3. Resume — hits DownloadVolcanoData event, pauses again
+    print("Resuming workflow (should pause at DownloadVolcanoData)...")
     result2 = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
     print(f"  Status: {result2.status}")
-    assert result2.status == ExecutionStatus.PAUSED, "Should pause at FilterByRegion event"
+    assert result2.status == ExecutionStatus.PAUSED, "Should pause at DownloadVolcanoData event"
 
-    # 4. Agent processes the FilterByRegion event
-    print("Agent processing FilterByRegion event...")
+    # 4. Agent processes the DownloadVolcanoData event
+    print("Agent processing DownloadVolcanoData event...")
     dispatched2 = poller.poll_once()
     print(f"  Dispatched: {dispatched2} task(s)")
     assert dispatched2 == 1
 
-    # 5. Resume — hits FilterByElevation event, pauses again
-    print("Resuming workflow (should pause at FilterByElevation)...")
+    # 5. Resume — hits FilterByType event, pauses again
+    print("Resuming workflow (should pause at FilterByType)...")
     result3 = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
     print(f"  Status: {result3.status}")
-    assert result3.status == ExecutionStatus.PAUSED, "Should pause at FilterByElevation event"
+    assert result3.status == ExecutionStatus.PAUSED, "Should pause at FilterByType event"
 
-    # 6. Agent processes the FilterByElevation event
-    print("Agent processing FilterByElevation event...")
+    # 6. Agent processes the FilterByType event
+    print("Agent processing FilterByType event...")
     dispatched3 = poller.poll_once()
     print(f"  Dispatched: {dispatched3} task(s)")
     assert dispatched3 == 1
 
-    # 7. Resume — hits FormatVolcanoes event, pauses again
-    print("Resuming workflow (should pause at FormatVolcanoes)...")
+    # 7. Resume — LoadVolcanoData body completes, hits FilterByRegion event, pauses
+    print("Resuming workflow (should pause at FilterByRegion)...")
     result4 = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
     print(f"  Status: {result4.status}")
-    assert result4.status == ExecutionStatus.PAUSED, "Should pause at FormatVolcanoes event"
+    assert result4.status == ExecutionStatus.PAUSED, "Should pause at FilterByRegion event"
 
-    # 8. Agent processes the FormatVolcanoes event
-    print("Agent processing FormatVolcanoes event...")
+    # 8. Agent processes the FilterByRegion event
+    print("Agent processing FilterByRegion event...")
     dispatched4 = poller.poll_once()
     print(f"  Dispatched: {dispatched4} task(s)")
     assert dispatched4 == 1
 
-    # 9. Resume to completion
+    # 9. Resume — hits FilterByElevation event, pauses again
+    print("Resuming workflow (should pause at FilterByElevation)...")
+    result5 = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
+    print(f"  Status: {result5.status}")
+    assert result5.status == ExecutionStatus.PAUSED, "Should pause at FilterByElevation event"
+
+    # 10. Agent processes the FilterByElevation event
+    print("Agent processing FilterByElevation event...")
+    dispatched5 = poller.poll_once()
+    print(f"  Dispatched: {dispatched5} task(s)")
+    assert dispatched5 == 1
+
+    # 11. Resume — hits FormatVolcanoes event, pauses again
+    print("Resuming workflow (should pause at FormatVolcanoes)...")
+    result6 = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
+    print(f"  Status: {result6.status}")
+    assert result6.status == ExecutionStatus.PAUSED, "Should pause at FormatVolcanoes event"
+
+    # 12. Agent processes the FormatVolcanoes event
+    print("Agent processing FormatVolcanoes event...")
+    dispatched6 = poller.poll_once()
+    print(f"  Dispatched: {dispatched6} task(s)")
+    assert dispatched6 == 1
+
+    # 13. Resume to completion
     print("Resuming workflow to completion...")
     final = evaluator.resume(result.workflow_id, WORKFLOW_AST, PROGRAM_AST)
     print(f"  Status: {final.status}")

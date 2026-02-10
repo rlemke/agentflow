@@ -4,7 +4,9 @@ Provides ~30 notable US volcanoes with real name, state, elevation,
 type, and coordinate data. No external API calls needed.
 
 Each handler implements ONE atomic operation:
-- LoadVolcanoData: return the full dataset
+- CheckRegionCache: check if volcano data is cached for a region
+- DownloadVolcanoData: download/load raw volcano data
+- FilterByType: filter volcanoes by type
 - FilterByRegion: filter by state name
 - FilterByElevation: filter by minimum elevation
 - FormatVolcanoes: format as human-readable text
@@ -59,12 +61,53 @@ US_VOLCANOES = [
 ]
 
 
-def load_volcano_data_handler(payload: dict) -> dict:
-    """Return the full volcano dataset as JSON."""
-    log.info("LoadVolcanoData: returning %d volcanoes", len(US_VOLCANOES))
+def check_region_cache_handler(payload: dict) -> dict:
+    """Check if volcano data is cached for the given region."""
+    region = payload.get("region", "US")
+    cache_path = f"/data/volcanoes/{region.lower()}.json"
+    log.info("CheckRegionCache: region=%s, path=%s (always cached)", region, cache_path)
+    return {
+        "result": {
+            "region": region,
+            "path": cache_path,
+            "cached": True,
+        }
+    }
+
+
+def download_volcano_data_handler(payload: dict) -> dict:
+    """Download/load raw volcano data for the given region."""
+    region = payload.get("region", "US")
+    cache_path = payload.get("cache_path", "")
+    log.info("DownloadVolcanoData: region=%s, cache_path=%s, returning %d volcanoes",
+             region, cache_path, len(US_VOLCANOES))
     return {
         "result": {
             "volcanoes": json.dumps(US_VOLCANOES),
+        }
+    }
+
+
+def filter_by_type_handler(payload: dict) -> dict:
+    """Filter volcanoes by volcano type."""
+    volcanoes_raw = payload.get("volcanoes", "[]")
+    volcano_type = payload.get("volcano_type", "all")
+
+    if isinstance(volcanoes_raw, str):
+        volcanoes = json.loads(volcanoes_raw)
+    else:
+        volcanoes = volcanoes_raw
+
+    if volcano_type.lower() == "all":
+        matches = volcanoes
+    else:
+        matches = [v for v in volcanoes if v["type"].lower() == volcano_type.lower()]
+
+    log.info("FilterByType: %d matches for type=%s", len(matches), volcano_type)
+
+    return {
+        "result": {
+            "volcanoes": json.dumps(matches),
         }
     }
 
@@ -192,7 +235,9 @@ def render_map_handler(payload: dict) -> dict:
 
 def register_volcano_handlers(poller) -> None:
     """Register all volcano event facet handlers with the given poller."""
-    poller.register(f"{NAMESPACE}.LoadVolcanoData", load_volcano_data_handler)
+    poller.register(f"{NAMESPACE}.CheckRegionCache", check_region_cache_handler)
+    poller.register(f"{NAMESPACE}.DownloadVolcanoData", download_volcano_data_handler)
+    poller.register(f"{NAMESPACE}.FilterByType", filter_by_type_handler)
     poller.register(f"{NAMESPACE}.FilterByRegion", filter_by_region_handler)
     poller.register(f"{NAMESPACE}.FilterByElevation", filter_by_elevation_handler)
     poller.register(f"{NAMESPACE}.FormatVolcanoes", format_volcanoes_handler)

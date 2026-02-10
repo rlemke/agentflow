@@ -1,11 +1,12 @@
 // Volcano Query — composable pipeline for querying US volcano data
 //
 // Demonstrates atomic event facets composed into multi-step workflows:
-//   LoadVolcanoData → FilterByRegion → FilterByElevation → FormatVolcanoes
+//   LoadVolcanoData (Cache → Download → FilterByType) → FilterByRegion → FilterByElevation → FormatVolcanoes
 //
-// Each event facet does ONE thing. The workflow composes them into a pipeline.
-// An LLM agent sees the facet catalog (signatures) and can compose new
-// workflows from the same building blocks.
+// LoadVolcanoData is a composed facet whose andThen body chains three event
+// facets: CheckRegionCache, DownloadVolcanoData, FilterByType.
+// The remaining event facets (FilterByRegion, FilterByElevation, FormatVolcanoes,
+// RenderMap) are atomic. Workflows compose all of them into pipelines.
 
 namespace volcano {
 
@@ -28,9 +29,19 @@ namespace volcano {
         title: String
     }
 
+    schema VolcanoCache {
+        region: String,
+        path: String,
+        cached: Boolean
+    }
+
     // ── Atomic event facets (each does ONE thing) ──────────────────────
 
-    event facet LoadVolcanoData() => (result: VolcanoDataset)
+    event facet CheckRegionCache(region: String) => (result: VolcanoCache)
+
+    event facet DownloadVolcanoData(region: String, cache_path: String) => (result: VolcanoDataset)
+
+    event facet FilterByType(volcanoes: Json, volcano_type: String) => (result: VolcanoDataset)
 
     event facet FilterByRegion(volcanoes: Json, state: String) => (result: VolcanoList)
 
@@ -39,6 +50,15 @@ namespace volcano {
     event facet FormatVolcanoes(volcanoes: Json, count: Long) => (result: FormattedResult)
 
     event facet RenderMap(volcanoes: Json, title: String) => (result: MapResult)
+
+    // ── Composed facet (Cache → Download → FilterByType) ────────────────
+
+    facet LoadVolcanoData(region: String = "US", volcano_type: String = "all") => (result: VolcanoDataset) andThen {
+        cache = CheckRegionCache(region = $.region)
+        raw = DownloadVolcanoData(region = $.region, cache_path = cache.result.path)
+        typed = FilterByType(volcanoes = raw.result.volcanoes, volcano_type = $.volcano_type)
+        yield LoadVolcanoData(result = typed.result)
+    }
 
     // ── Composed workflows ─────────────────────────────────────────────
 

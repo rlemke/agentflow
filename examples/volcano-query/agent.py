@@ -2,7 +2,9 @@
 """Volcano Query Agent — handles atomic volcano data pipeline events.
 
 This agent polls for event tasks in the volcano namespace:
-- volcano.LoadVolcanoData: load the full volcano dataset
+- volcano.CheckRegionCache: check if volcano data is cached for a region
+- volcano.DownloadVolcanoData: download/load raw volcano data
+- volcano.FilterByType: filter volcanoes by type
 - volcano.FilterByRegion: filter volcanoes by state
 - volcano.FilterByElevation: filter volcanoes by minimum elevation
 - volcano.FormatVolcanoes: format volcano data for display
@@ -62,8 +64,9 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown)
 
     print("Volcano Query agent started. Press Ctrl+C to stop.")
-    print("Listening for volcano.LoadVolcanoData, volcano.FilterByRegion,")
-    print("  volcano.FilterByElevation, volcano.FormatVolcanoes, volcano.RenderMap events...")
+    print("Listening for volcano.CheckRegionCache, volcano.DownloadVolcanoData,")
+    print("  volcano.FilterByType, volcano.FilterByRegion, volcano.FilterByElevation,")
+    print("  volcano.FormatVolcanoes, volcano.RenderMap events...")
     poller.start()
 
 
