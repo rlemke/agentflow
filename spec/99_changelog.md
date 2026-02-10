@@ -222,3 +222,11 @@
 - **Worker protocol**: user code is base64-encoded, params serialized as JSON in, result dict serialized as JSON out via stdout
 - **Error handling**: `subprocess.TimeoutExpired` → `ScriptResult(success=False, error="Script timed out after {timeout}s")`; non-serializable params fail early before subprocess launch
 - 1056 tests passing
+
+## Completed (v0.9.3) - Composed Facet Decomposition & Default Parameters
+- **Composed facet**: `LoadVolcanoData` decomposed from a single event facet into a regular facet with `andThen` body chaining three event facets: `CheckRegionCache` → `DownloadVolcanoData` → `FilterByType`
+- **Facet default parameter resolution**: `FacetInitializationBeginHandler` now applies default values from the facet definition for any params not provided in the call; fixes InputRef (`$.param`) resolution in facet bodies when callers omit defaulted args
+- **New event facets**: `CheckRegionCache(region)` → `VolcanoCache`, `DownloadVolcanoData(region, cache_path)` → `VolcanoDataset`, `FilterByType(volcanoes, volcano_type)` → `VolcanoDataset`
+- **New schema**: `VolcanoCache { region, path, cached }` for cache check results
+- **Volcano-query example**: 7 event facets + 1 composed facet, 6 pause/resume cycles (was 4 event facets, 4 cycles)
+- 1056 tests passing
