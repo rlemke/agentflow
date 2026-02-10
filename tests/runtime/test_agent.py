@@ -28,6 +28,9 @@ from afl.runtime import (
 )
 from afl.runtime.agent import (
     ClaudeAgentRunner,
+    LLMHandler,
+    LLMHandlerConfig,
+    ToolDefinition,
     ToolRegistry,
 )
 
@@ -688,3 +691,678 @@ class TestClaudeAgentRunnerWithMockClient:
         call = client.messages.calls[0]
         user_msg = call["messages"][0]["content"]
         assert "Count all documents in the database" in user_msg
+
+
+# =========================================================================
+# Prompt Template Evaluation tests
+# =========================================================================
+
+
+class TestPromptTemplateEvaluation:
+    """Tests for prompt template interpolation from PromptBlock."""
+
+    def test_template_interpolation(self, example4_workflow_ast, example4_program_ast):
+        """Prompt template placeholders are filled with param values."""
+        # Add a PromptBlock to the EventFacetDecl
+        for decl in example4_program_ast["declarations"]:
+            if decl.get("name") == "CountDocuments":
+                decl["body"] = {
+                    "type": "PromptBlock",
+                    "template": "Count documents for input={input}",
+                }
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 42})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        call = client.messages.calls[0]
+        user_msg = call["messages"][0]["content"]
+        assert "Count documents for input=3" in user_msg
+
+    def test_system_override_from_prompt_block(self, example4_workflow_ast, example4_program_ast):
+        """System prompt from PromptBlock overrides default."""
+        for decl in example4_program_ast["declarations"]:
+            if decl.get("name") == "CountDocuments":
+                decl["body"] = {
+                    "type": "PromptBlock",
+                    "system": "You are a document counter.",
+                    "template": "Count for {input}",
+                }
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 10})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        call = client.messages.calls[0]
+        assert call["system"] == "You are a document counter."
+
+    def test_model_override_from_prompt_block(self, example4_workflow_ast, example4_program_ast):
+        """Model from PromptBlock overrides default."""
+        for decl in example4_program_ast["declarations"]:
+            if decl.get("name") == "CountDocuments":
+                decl["body"] = {
+                    "type": "PromptBlock",
+                    "template": "Count for {input}",
+                    "model": "claude-opus-4-20250514",
+                }
+
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 10})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        call = client.messages.calls[0]
+        assert call["model"] == "claude-opus-4-20250514"
+
+    def test_multi_param_interpolation(self):
+        """Multiple parameters interpolated in template."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+        )
+
+        # Build a tool definition with a prompt block
+        tool_def = ToolDefinition(
+            name="TestFacet",
+            description="Test",
+            input_schema={"type": "object", "properties": {}, "required": []},
+            param_names=["name", "age"],
+            return_names=["result"],
+            prompt_block={
+                "type": "PromptBlock",
+                "template": "Hello {name}, you are {age} years old.",
+            },
+        )
+
+        # Create a mock step with params
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="TestFacet",
+        )
+        step.set_attribute("name", "Alice", is_return=False)
+        step.set_attribute("age", 30, is_return=False)
+
+        system, template, model = runner._evaluate_prompt_template(step, [tool_def])
+        assert template == "Hello Alice, you are 30 years old."
+
+    def test_missing_param_safe_default(self):
+        """Missing params use {param} as safe default."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+        )
+
+        tool_def = ToolDefinition(
+            name="TestFacet",
+            description="Test",
+            input_schema={"type": "object", "properties": {}, "required": []},
+            param_names=["name"],
+            return_names=[],
+            prompt_block={
+                "type": "PromptBlock",
+                "template": "Hello {name}, your id is {id}.",
+            },
+        )
+
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="TestFacet",
+        )
+        step.set_attribute("name", "Bob", is_return=False)
+
+        system, template, model = runner._evaluate_prompt_template(step, [tool_def])
+        assert template == "Hello Bob, your id is {id}."
+
+    def test_no_prompt_block_fallback(self):
+        """No PromptBlock returns all None."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+        )
+
+        tool_def = ToolDefinition(
+            name="TestFacet",
+            description="Test",
+            input_schema={"type": "object", "properties": {}, "required": []},
+            param_names=[],
+            return_names=[],
+        )
+
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="TestFacet",
+        )
+
+        system, template, model = runner._evaluate_prompt_template(step, [tool_def])
+        assert system is None
+        assert template is None
+        assert model is None
+
+
+# =========================================================================
+# Multi-Turn Tool Use tests
+# =========================================================================
+
+
+class TestMultiTurnToolUse:
+    """Tests for multi-turn tool use loop."""
+
+    def test_single_turn_unchanged(self, example4_workflow_ast, example4_program_ast):
+        """Single tool_use response still works as before."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 42})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert len(client.messages.calls) == 1
+
+    def test_intermediate_tool_then_final(self, example4_workflow_ast, example4_program_ast):
+        """Intermediate tool call followed by target tool call."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # First response: intermediate tool (not CountDocuments)
+        intermediate = MockToolUseBlock("SearchIndex", {"query": "test"})
+        intermediate.id = "toolu_search"
+        resp1 = MockResponse([intermediate])
+        resp1.stop_reason = "tool_use"
+
+        # Second response: target tool
+        resp2 = MockResponse([MockToolUseBlock("CountDocuments", {"output": 50})])
+
+        client.messages.add_response(resp1)
+        client.messages.add_response(resp2)
+
+        # Register handler for intermediate tool
+        registry = ToolRegistry()
+        registry.register("SearchIndex", lambda p: {"results": ["doc1"]})
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            tool_registry=registry,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert len(client.messages.calls) == 2
+
+    def test_max_turns_exceeded(self, example4_workflow_ast, example4_program_ast):
+        """Multi-turn loop stops after max_turns."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # Always return intermediate tool (never the target)
+        def make_intermediate():
+            block = MockToolUseBlock("SearchIndex", {"query": "test"})
+            block.id = "toolu_search"
+            resp = MockResponse([block])
+            resp.stop_reason = "tool_use"
+            return resp
+
+        # Queue more responses than max_turns * (max_retries + 1)
+        for _ in range(50):
+            client.messages.add_response(make_intermediate())
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_turns=2,
+            max_retries=0,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        # Should still complete (empty result)
+        assert result.success is True
+        # Max 2 turns with 0 retries = 2 calls
+        assert len(client.messages.calls) == 2
+
+    def test_end_turn_without_tool_use(self, example4_workflow_ast, example4_program_ast):
+        """end_turn stop_reason without tool_use triggers retry or returns empty."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        text_resp = MockResponse([MockTextBlock("I can't do that.")])
+        text_resp.stop_reason = "end_turn"
+        client.messages.set_response(text_resp)
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_retries=0,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        # Returns empty result, workflow still completes
+        assert result.success is True
+
+    def test_multiple_intermediate_tools_in_one_turn(
+        self, example4_workflow_ast, example4_program_ast
+    ):
+        """Multiple intermediate tools in a single response are all executed."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # Response with two intermediate tools
+        block1 = MockToolUseBlock("ToolA", {"a": 1})
+        block1.id = "toolu_a"
+        block2 = MockToolUseBlock("ToolB", {"b": 2})
+        block2.id = "toolu_b"
+        resp1 = MockResponse([block1, block2])
+        resp1.stop_reason = "tool_use"
+
+        # Final answer
+        resp2 = MockResponse([MockToolUseBlock("CountDocuments", {"output": 100})])
+
+        client.messages.add_response(resp1)
+        client.messages.add_response(resp2)
+
+        calls = []
+        registry = ToolRegistry()
+        # Register specific intermediate handlers (not a default, to avoid catching CountDocuments
+        # in _dispatch_single_step before reaching Claude)
+        registry.register("ToolA", lambda p: (calls.append("ToolA"), p)[1])
+        registry.register("ToolB", lambda p: (calls.append("ToolB"), p)[1])
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            tool_registry=registry,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert "ToolA" in calls
+        assert "ToolB" in calls
+
+
+# =========================================================================
+# Intelligent Retry tests
+# =========================================================================
+
+
+class TestIntelligentRetry:
+    """Tests for retry when Claude doesn't call target tool."""
+
+    def test_retry_succeeds_on_second_attempt(
+        self, example4_workflow_ast, example4_program_ast
+    ):
+        """Retry succeeds when second attempt uses the target tool."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # First attempt: text only (no tool use)
+        text_resp = MockResponse([MockTextBlock("Let me think...")])
+        text_resp.stop_reason = "end_turn"
+
+        # Second attempt (after retry): correct tool use
+        tool_resp = MockResponse([MockToolUseBlock("CountDocuments", {"output": 77})])
+
+        client.messages.add_response(text_resp)
+        client.messages.add_response(tool_resp)
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_retries=2,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert len(client.messages.calls) == 2
+
+    def test_retry_message_contains_facet_name(
+        self, example4_workflow_ast, example4_program_ast
+    ):
+        """Retry message includes the expected facet name."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # First attempt: text only
+        text_resp = MockResponse([MockTextBlock("Hmm...")])
+        text_resp.stop_reason = "end_turn"
+
+        # Second attempt: success
+        tool_resp = MockResponse([MockToolUseBlock("CountDocuments", {"output": 1})])
+
+        client.messages.add_response(text_resp)
+        client.messages.add_response(tool_resp)
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_retries=1,
+        )
+
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        # Second call should include retry message
+        second_call = client.messages.calls[1]
+        messages = second_call["messages"]
+        # Find the retry message
+        retry_found = False
+        for msg in messages:
+            content = msg.get("content", "")
+            if isinstance(content, str) and "CountDocuments" in content:
+                retry_found = True
+                break
+        assert retry_found
+
+    def test_retries_exhausted_returns_empty(
+        self, example4_workflow_ast, example4_program_ast
+    ):
+        """All retries exhausted returns empty dict."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+
+        # All attempts: text only
+        text_resp = MockResponse([MockTextBlock("Can't do it.")])
+        text_resp.stop_reason = "end_turn"
+        client.messages.set_response(text_resp)
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_retries=2,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        # 1 initial + 2 retries = 3 calls
+        assert len(client.messages.calls) == 3
+        # Workflow still completes (empty result)
+        assert result.success is True
+
+    def test_no_retry_when_first_attempt_succeeds(
+        self, example4_workflow_ast, example4_program_ast
+    ):
+        """No retry needed when first attempt succeeds."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 42})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_retries=2,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert len(client.messages.calls) == 1
+
+
+# =========================================================================
+# LLMHandler tests
+# =========================================================================
+
+
+class TestLLMHandler:
+    """Tests for standalone LLMHandler utility class."""
+
+    def test_basic_call(self):
+        """LLMHandler dispatches to Claude and returns tool_use result."""
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("process", {"result": "done"})])
+        )
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            tool_definitions=[{
+                "name": "process",
+                "description": "Process input",
+                "input_schema": {"type": "object", "properties": {"result": {"type": "string"}}},
+            }],
+        )
+
+        result = handler.handle({"input": "test"})
+        assert result == {"result": "done"}
+
+    def test_prompt_interpolation(self):
+        """LLMHandler interpolates prompt template with payload."""
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("process", {"output": "ok"})])
+        )
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            prompt_template="Process the data: {data} with mode={mode}",
+            tool_definitions=[{
+                "name": "process",
+                "description": "Process",
+                "input_schema": {"type": "object", "properties": {}},
+            }],
+        )
+
+        handler.handle({"data": "test_data", "mode": "fast"})
+
+        call = client.messages.calls[0]
+        user_msg = call["messages"][0]["content"]
+        assert "Process the data: test_data with mode=fast" in user_msg
+
+    def test_custom_system_prompt(self):
+        """LLMHandler uses custom system prompt from config."""
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("process", {})])
+        )
+
+        config = LLMHandlerConfig(system_prompt="You are a specialized counter.")
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            config=config,
+            tool_definitions=[{
+                "name": "process",
+                "description": "Process",
+                "input_schema": {"type": "object", "properties": {}},
+            }],
+        )
+
+        handler.handle({"input": "test"})
+
+        call = client.messages.calls[0]
+        assert call["system"] == "You are a specialized counter."
+
+    def test_tool_registry_intermediate(self):
+        """LLMHandler handles intermediate tool calls via registry."""
+        client = MockAnthropicClient()
+
+        # First response: intermediate tool
+        intermediate = MockToolUseBlock("lookup", {"key": "abc"})
+        intermediate.id = "toolu_lookup"
+        resp1 = MockResponse([intermediate])
+        resp1.stop_reason = "tool_use"
+
+        # Second response: final answer (no handler for "answer")
+        resp2 = MockResponse([MockToolUseBlock("answer", {"result": "42"})])
+
+        client.messages.add_response(resp1)
+        client.messages.add_response(resp2)
+
+        registry = ToolRegistry()
+        registry.register("lookup", lambda p: {"value": "found_it"})
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            tool_registry=registry,
+            tool_definitions=[{
+                "name": "lookup",
+                "description": "Lookup",
+                "input_schema": {"type": "object", "properties": {}},
+            }],
+        )
+
+        result = handler.handle({"input": "test"})
+        assert result == {"result": "42"}
+        assert len(client.messages.calls) == 2
+
+    def test_async_variant(self):
+        """handle_async wraps handle()."""
+        import asyncio
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("process", {"result": "async_done"})])
+        )
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            tool_definitions=[{
+                "name": "process",
+                "description": "Process",
+                "input_schema": {"type": "object", "properties": {}},
+            }],
+        )
+
+        result = asyncio.run(handler.handle_async({"input": "test"}))
+        assert result == {"result": "async_done"}

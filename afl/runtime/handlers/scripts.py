@@ -15,12 +15,13 @@
 """Script phase handlers.
 
 Handles facet and statement script execution phases.
-In the current implementation, these are pass-through states.
+FacetScriptsBeginHandler executes ScriptBlock bodies when present.
 """
 
 from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
+from ..script_executor import ScriptExecutor
 from .base import StateHandler
 
 if TYPE_CHECKING:
@@ -30,12 +31,41 @@ if TYPE_CHECKING:
 class FacetScriptsBeginHandler(StateHandler):
     """Handler for state.facet.scripts.Begin.
 
-    Executes facet-level scripts. Currently a pass-through.
+    Executes facet-level scripts via ScriptExecutor when the facet
+    has a ScriptBlock body. Otherwise passes through.
     """
 
     def process_state(self) -> StateChangeResult:
         """Begin facet scripts execution."""
-        # Currently no facet scripts to execute
+        # Look up facet definition
+        facet_def = self.context.get_facet_definition(self.step.facet_name)
+        if facet_def is None:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        body = facet_def.get("body")
+        if body is None or body.get("type") != "ScriptBlock":
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        # Build params dict from step attributes
+        params: dict = {}
+        for name, attr in self.step.attributes.params.items():
+            params[name] = attr.value
+
+        # Execute script
+        code = body.get("code", "")
+        language = body.get("language", "python")
+        executor = ScriptExecutor()
+        result = executor.execute(code, params, language)
+
+        if not result.success:
+            return self.error(RuntimeError(result.error or "Script execution failed"))
+
+        # Write results to step returns
+        for name, value in result.result.items():
+            self.step.set_attribute(name, value, is_return=True)
+
         self.step.request_state_change(True)
         return StateChangeResult(step=self.step)
 

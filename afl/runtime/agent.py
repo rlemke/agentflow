@@ -60,6 +60,7 @@ class ToolDefinition:
     input_schema: dict
     param_names: list[str]
     return_names: list[str]
+    prompt_block: dict | None = None
 
 
 class ToolRegistry:
@@ -135,6 +136,8 @@ class ClaudeAgentRunner:
         system_prompt: str | None = None,
         tool_registry: ToolRegistry | None = None,
         max_dispatches: int = 100,
+        max_turns: int = 10,
+        max_retries: int = 2,
     ) -> None:
         self.evaluator = evaluator
         self.persistence = persistence
@@ -143,6 +146,8 @@ class ClaudeAgentRunner:
         self.system_prompt = system_prompt
         self.tool_registry = tool_registry or ToolRegistry()
         self.max_dispatches = max_dispatches
+        self.max_turns = max_turns
+        self.max_retries = max_retries
 
     def run(
         self,
@@ -252,6 +257,167 @@ class ClaudeAgentRunner:
             task_description=task_description,
         )
 
+    def _evaluate_prompt_template(
+        self,
+        step: StepDefinition,
+        tool_defs: list[ToolDefinition],
+    ) -> tuple[str | None, str | None, str | None]:
+        """Evaluate prompt template from the facet's PromptBlock.
+
+        Args:
+            step: The step being dispatched
+            tool_defs: Available tool definitions
+
+        Returns:
+            Tuple of (system_prompt, user_template, model_override).
+            Any element may be None if not specified in the prompt block.
+        """
+        # Find matching tool definition
+        tool_def = None
+        for td in tool_defs:
+            if td.name == step.facet_name:
+                tool_def = td
+                break
+
+        if tool_def is None or tool_def.prompt_block is None:
+            return None, None, None
+
+        block = tool_def.prompt_block
+
+        # Build safe default dict for interpolation
+        param_values: dict[str, Any] = {}
+        for name, attr in step.attributes.params.items():
+            param_values[name] = attr.value
+
+        class SafeDict(dict):
+            def __missing__(self, key: str) -> str:
+                return f"{{{key}}}"
+
+        safe_params = SafeDict(param_values)
+
+        # Extract system prompt
+        system = block.get("system")
+
+        # Evaluate template
+        template = block.get("template")
+        evaluated = None
+        if template:
+            evaluated = template.format_map(safe_params)
+
+        # Model override
+        model_override = block.get("model")
+
+        return system, evaluated, model_override
+
+    def _execute_tool_call(
+        self,
+        tool_name: str,
+        tool_input: dict,
+        tool_defs: list[ToolDefinition],
+    ) -> dict:
+        """Execute an intermediate tool call.
+
+        Args:
+            tool_name: Name of the tool to execute
+            tool_input: Input parameters for the tool
+
+        Returns:
+            Tool result dict
+        """
+        result = self.tool_registry.handle(tool_name, tool_input)
+        if result is not None:
+            return result
+        # No handler — pass through input as result
+        return tool_input
+
+    def _build_retry_message(self, facet_name: str, attempt: int) -> str:
+        """Build a retry message for Claude when it didn't use the target tool.
+
+        Args:
+            facet_name: The expected tool name
+            attempt: Current retry attempt number
+
+        Returns:
+            Retry message string
+        """
+        return (
+            f"You must use the '{facet_name}' tool to provide the result. "
+            f"Please call the '{facet_name}' tool with the appropriate values. "
+            f"(Retry attempt {attempt})"
+        )
+
+    def _multi_turn_loop(
+        self,
+        messages: list[dict],
+        system: str,
+        model: str,
+        claude_tools: list[dict],
+        tool_defs: list[ToolDefinition],
+        step: StepDefinition,
+    ) -> dict | None:
+        """Run multi-turn conversation loop with tool use.
+
+        Args:
+            messages: Conversation messages so far
+            system: System prompt
+            model: Model to use
+            claude_tools: Anthropic tool definitions
+            tool_defs: Internal tool definitions
+            step: Step being dispatched
+
+        Returns:
+            Result dict if target tool_use found, None if loop exhausted
+        """
+        for _turn in range(self.max_turns):
+            response = self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system,
+                messages=messages,
+                tools=claude_tools,
+            )
+
+            # Check for target facet tool_use (the final answer)
+            for block in response.content:
+                if (
+                    getattr(block, "type", None) == "tool_use"
+                    and block.name == step.facet_name
+                ):
+                    return block.input
+
+            # If stop_reason is not tool_use, Claude is done without calling target
+            if response.stop_reason != "tool_use":
+                return None
+
+            # Execute intermediate tool calls and build assistant + tool_result messages
+            assistant_content = []
+            tool_results = []
+            for block in response.content:
+                if getattr(block, "type", None) == "tool_use":
+                    assistant_content.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    })
+                    result = self._execute_tool_call(block.name, block.input, tool_defs)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": str(result),
+                    })
+                elif getattr(block, "type", None) == "text":
+                    assistant_content.append({
+                        "type": "text",
+                        "text": block.text,
+                    })
+
+            messages.append({"role": "assistant", "content": assistant_content})
+            messages.append({"role": "user", "content": tool_results})
+
+        # Max turns exhausted
+        return None
+
     def _call_claude(
         self,
         *,
@@ -262,38 +428,55 @@ class ClaudeAgentRunner:
         workflow_name: str,
         task_description: str | None,
     ) -> dict:
-        """Make a single Claude API call for an event facet step.
+        """Dispatch an event facet step to Claude with multi-turn and retry.
 
         Returns:
             Result dict from Claude's tool_use response
         """
-        system = self.system_prompt or (
+        # Evaluate prompt template
+        template_system, template_msg, model_override = self._evaluate_prompt_template(
+            step, tool_defs
+        )
+
+        system = template_system or self.system_prompt or (
             f"You are an agent in workflow '{workflow_name}'. Use tools to complete tasks."
         )
+        model = model_override or self.model
 
-        # Build user message with context
-        parts = [f"Workflow: {workflow_name}"]
-        if task_description:
-            parts.append(f"Task: {task_description}")
-        parts.append(f"Event facet: {step.facet_name}")
-        parts.append(f"Parameters: {payload}")
-        parts.append("Please use the appropriate tool to provide the result.")
-        user_message = "\n".join(parts)
+        # Build user message
+        if template_msg:
+            user_message = template_msg
+        else:
+            parts = [f"Workflow: {workflow_name}"]
+            if task_description:
+                parts.append(f"Task: {task_description}")
+            parts.append(f"Event facet: {step.facet_name}")
+            parts.append(f"Parameters: {payload}")
+            parts.append("Please use the appropriate tool to provide the result.")
+            user_message = "\n".join(parts)
 
-        response = self.anthropic_client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            system=system,
-            messages=[{"role": "user", "content": user_message}],
-            tools=claude_tools,
-        )
+        messages = [{"role": "user", "content": user_message}]
 
-        # Extract tool_use result matching the facet name
-        for block in response.content:
-            if getattr(block, "type", None) == "tool_use" and block.name == step.facet_name:
-                return block.input
+        # Multi-turn loop with retry
+        for attempt in range(self.max_retries + 1):
+            result = self._multi_turn_loop(
+                list(messages),  # Copy to allow retry from scratch
+                system,
+                model,
+                claude_tools,
+                tool_defs,
+                step,
+            )
+            if result is not None:
+                return result
 
-        # No matching tool_use found — return empty result
+            # Append retry message for next attempt
+            if attempt < self.max_retries:
+                retry_msg = self._build_retry_message(step.facet_name, attempt + 1)
+                messages.append({"role": "assistant", "content": "I wasn't able to use the tool."})
+                messages.append({"role": "user", "content": retry_msg})
+
+        # All retries exhausted
         return {}
 
     def _extract_tool_definitions(self, program_ast: dict | None) -> list[ToolDefinition]:
@@ -338,6 +521,12 @@ class ClaudeAgentRunner:
             description += f" Parameters: {param_desc}."
         description += " Return the result values."
 
+        # Extract prompt block if present
+        prompt_block = None
+        body = decl.get("body")
+        if body and body.get("type") == "PromptBlock":
+            prompt_block = body
+
         return ToolDefinition(
             name=name,
             description=description,
@@ -348,6 +537,7 @@ class ClaudeAgentRunner:
             },
             param_names=param_names,
             return_names=return_names,
+            prompt_block=prompt_block,
         )
 
     def _to_anthropic_tool(self, tool_def: ToolDefinition) -> dict:
@@ -357,3 +547,164 @@ class ClaudeAgentRunner:
             "description": tool_def.description,
             "input_schema": tool_def.input_schema,
         }
+
+
+@dataclass
+class LLMHandlerConfig:
+    """Configuration for LLMHandler.
+
+    Attributes:
+        model: Claude model to use
+        system_prompt: System prompt for the conversation
+        max_tokens: Maximum tokens for the response
+        max_turns: Maximum multi-turn conversation rounds
+        max_retries: Maximum retry attempts
+    """
+
+    model: str = "claude-sonnet-4-20250514"
+    system_prompt: str = "You are a helpful assistant. Use tools to provide results."
+    max_tokens: int = 4096
+    max_turns: int = 10
+    max_retries: int = 2
+
+
+class LLMHandler:
+    """Standalone LLM-backed handler for use with AgentPoller.register().
+
+    Provides a simple payload-in, result-out interface backed by Claude.
+    No Evaluator or workflow awareness — just dispatches to the API
+    with optional prompt templates, multi-turn tool use, and retry.
+
+    Usage:
+        handler = LLMHandler(
+            anthropic_client=anthropic.Anthropic(),
+            config=LLMHandlerConfig(model="claude-sonnet-4-20250514"),
+            tool_definitions=[...],
+        )
+        result = handler.handle({"input": "some data"})
+    """
+
+    def __init__(
+        self,
+        anthropic_client: Any,
+        config: LLMHandlerConfig | None = None,
+        *,
+        tool_definitions: list[dict] | None = None,
+        tool_registry: ToolRegistry | None = None,
+        prompt_template: str | None = None,
+    ) -> None:
+        self.anthropic_client = anthropic_client
+        self.config = config or LLMHandlerConfig()
+        self.tool_definitions = tool_definitions or []
+        self.tool_registry = tool_registry or ToolRegistry()
+        self.prompt_template = prompt_template
+
+    def handle(self, payload: dict) -> dict:
+        """Handle a payload by dispatching to Claude.
+
+        Args:
+            payload: Input data dict
+
+        Returns:
+            Result dict from Claude's response
+        """
+        # Build user message from template or payload
+        if self.prompt_template:
+            class SafeDict(dict):
+                def __missing__(self, key: str) -> str:
+                    return f"{{{key}}}"
+
+            user_message = self.prompt_template.format_map(SafeDict(payload))
+        else:
+            user_message = f"Process the following input and use a tool to provide the result.\n\nInput: {payload}"
+
+        messages: list[dict] = [{"role": "user", "content": user_message}]
+
+        # Multi-turn loop with retry
+        for attempt in range(self.config.max_retries + 1):
+            result = self._multi_turn_loop(list(messages))
+            if result is not None:
+                return result
+
+            if attempt < self.config.max_retries:
+                messages.append({"role": "assistant", "content": "I wasn't able to use the tool."})
+                messages.append({
+                    "role": "user",
+                    "content": f"Please use a tool to provide the result. (Retry attempt {attempt + 1})",
+                })
+
+        return {}
+
+    def _multi_turn_loop(self, messages: list[dict]) -> dict | None:
+        """Run multi-turn conversation loop.
+
+        Returns:
+            Result dict from first tool_use block, or None if exhausted
+        """
+        for _turn in range(self.config.max_turns):
+            response = self.anthropic_client.messages.create(
+                model=self.config.model,
+                max_tokens=self.config.max_tokens,
+                system=self.config.system_prompt,
+                messages=messages,
+                tools=self.tool_definitions,
+            )
+
+            # Check for tool_use blocks
+            tool_use_blocks = [
+                b for b in response.content
+                if getattr(b, "type", None) == "tool_use"
+            ]
+
+            if tool_use_blocks:
+                # If there are no intermediate tools to handle, return first result
+                first = tool_use_blocks[0]
+
+                # Check if tool registry can handle it (intermediate tool)
+                handler_result = self.tool_registry.handle(first.name, first.input)
+                if handler_result is None:
+                    # No handler — this is the final answer
+                    return first.input
+
+                # Execute intermediate tools and continue
+                assistant_content = []
+                tool_results = []
+                for block in response.content:
+                    if getattr(block, "type", None) == "tool_use":
+                        assistant_content.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+                        result = self.tool_registry.handle(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": str(result if result is not None else block.input),
+                        })
+                    elif getattr(block, "type", None) == "text":
+                        assistant_content.append({
+                            "type": "text",
+                            "text": block.text,
+                        })
+
+                messages.append({"role": "assistant", "content": assistant_content})
+                messages.append({"role": "user", "content": tool_results})
+                continue
+
+            # No tool use — done
+            return None
+
+        return None
+
+    async def handle_async(self, payload: dict) -> dict:
+        """Async wrapper around handle().
+
+        Args:
+            payload: Input data dict
+
+        Returns:
+            Result dict from Claude's response
+        """
+        return self.handle(payload)

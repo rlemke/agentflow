@@ -195,3 +195,12 @@
 - Updated all 18 AFL example files (~45 schemas) across genomics and OSM geocoder examples
 - Updated spec documentation (`10_language.md`, `12_validation.md`)
 - 987 tests passing
+
+## Completed (v0.9.0) - LLM Integration Features
+- **Prompt template evaluation**: `PromptBlock` bodies on EventFacetDecl are interpolated with step params via `_evaluate_prompt_template()`; supports `system`, `template`, and `model` overrides
+- **Multi-turn tool use loop**: `_call_claude()` now loops on `stop_reason="tool_use"`, executing intermediate tool calls and continuing the conversation until the target facet tool is called or `max_turns` is reached
+- **Intelligent retry**: when the multi-turn loop fails to produce a target tool_use, the runner appends a retry message and re-attempts up to `max_retries` times
+- **Script block execution**: `FacetScriptsBeginHandler` now executes `ScriptBlock` bodies via `ScriptExecutor`, writing results to step returns; error handling for syntax and runtime errors
+- **LLMHandler utility class**: standalone `LLMHandler` + `LLMHandlerConfig` for building LLM-backed handlers compatible with `AgentPoller.register()`; supports prompt templates, multi-turn tool use, retry, and async dispatch
+- `ToolDefinition` gains `prompt_block` field; `ClaudeAgentRunner` gains `max_turns` and `max_retries` constructor parameters
+- 1015 tests passing
