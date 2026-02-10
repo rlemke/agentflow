@@ -15,6 +15,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import get_storage_backend
+
+_storage = get_storage_backend()
+
 log = logging.getLogger(__name__)
 
 # Check for pyosmium availability
@@ -379,7 +383,7 @@ def extract_routes(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(geojson, f, indent=2)
 
     return RouteResult(
@@ -420,7 +424,7 @@ def filter_routes_by_type(
         route_type = RouteType.from_string(route_type)
 
     # Load input
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     # Filter features
@@ -451,7 +455,7 @@ def filter_routes_by_type(
         "features": filtered,
     }
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(output_geojson, f, indent=2)
 
     return RouteResult(
@@ -473,7 +477,7 @@ def calculate_route_stats(input_path: str | Path) -> RouteStats:
     Returns:
         RouteStats with counts and total length
     """
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

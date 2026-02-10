@@ -10,7 +10,10 @@ from datetime import UTC, datetime
 
 import requests
 
-CACHE_DIR = os.path.join(tempfile.gettempdir(), "osm-cache")
+from afl.runtime.storage import get_storage_backend
+
+CACHE_DIR = os.environ.get("AFL_CACHE_DIR", os.path.join(tempfile.gettempdir(), "osm-cache"))
+_storage = get_storage_backend(CACHE_DIR)
 GEOFABRIK_BASE = "https://download.geofabrik.de"
 USER_AGENT = "AgentFlow-OSM-Example/1.0"
 
@@ -27,9 +30,9 @@ def geofabrik_url(region_path: str, fmt: str = "pbf") -> str:
 
 
 def cache_path(region_path: str, fmt: str = "pbf") -> str:
-    """Build the local cache file path for a region path."""
+    """Build the cache file path for a region path."""
     ext = FORMAT_EXTENSIONS[fmt]
-    return os.path.join(CACHE_DIR, f"{region_path}-latest.{ext}")
+    return _storage.join(CACHE_DIR, f"{region_path}-latest.{ext}")
 
 
 def download(region_path: str, fmt: str = "pbf") -> dict:
@@ -48,8 +51,8 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
     url = geofabrik_url(region_path, fmt)
     local_path = cache_path(region_path, fmt)
 
-    if os.path.exists(local_path):
-        size = os.path.getsize(local_path)
+    if _storage.exists(local_path):
+        size = _storage.getsize(local_path)
         return {
             "url": url,
             "path": local_path,
@@ -58,16 +61,16 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
             "wasInCache": True,
         }
 
-    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    _storage.makedirs(_storage.dirname(local_path), exist_ok=True)
 
     response = requests.get(url, stream=True, headers={"User-Agent": USER_AGENT}, timeout=300)
     response.raise_for_status()
 
-    with open(local_path, "wb") as f:
+    with _storage.open(local_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
 
-    size = os.path.getsize(local_path)
+    size = _storage.getsize(local_path)
     return {
         "url": url,
         "path": local_path,

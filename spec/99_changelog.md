@@ -204,3 +204,13 @@
 - **LLMHandler utility class**: standalone `LLMHandler` + `LLMHandlerConfig` for building LLM-backed handlers compatible with `AgentPoller.register()`; supports prompt templates, multi-turn tool use, retry, and async dispatch
 - `ToolDefinition` gains `prompt_block` field; `ClaudeAgentRunner` gains `max_turns` and `max_retries` constructor parameters
 - 1015 tests passing
+
+## Completed (v0.9.1) - HDFS Storage Abstraction
+- **StorageBackend protocol**: `afl.runtime.storage` module with `exists`, `open`, `makedirs`, `getsize`, `getmtime`, `isfile`, `isdir`, `listdir`, `walk`, `rmtree`, `join`, `dirname`, `basename`
+- **LocalStorageBackend**: thin wrapper around `os`, `os.path`, `shutil`, `builtins.open`
+- **HDFSStorageBackend**: wraps `pyarrow.fs.HadoopFileSystem` with `hdfs://` URI parsing and caching per host:port
+- **Factory function**: `get_storage_backend(path)` returns HDFS backend for `hdfs://` URIs, local singleton otherwise
+- **Handler updates**: all OSM geocoder handlers (downloader, graphhopper, 6 extractors) and genomics cache handlers use storage abstraction
+- **Configurable cache paths**: `AFL_CACHE_DIR` for OSM cache, `AFL_GENOMICS_CACHE_DIR` for genomics cache (supports `hdfs://` URIs)
+- **Optional dependency**: `pyarrow>=14.0` in `[hdfs]` extra
+- 1049 tests passing

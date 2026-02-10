@@ -16,6 +16,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import get_storage_backend
+
+_storage = get_storage_backend()
+
 log = logging.getLogger(__name__)
 
 # Check for pyosmium availability
@@ -406,7 +410,7 @@ def extract_parks(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(geojson, f, indent=2)
 
     return ParkResult(
@@ -452,7 +456,7 @@ def filter_parks_by_type(
     output_path = Path(output_path)
 
     # Load input GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -484,7 +488,7 @@ def filter_parks_by_type(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(output_geojson, f, indent=2)
 
     return ParkResult(
@@ -509,7 +513,7 @@ def calculate_park_stats(input_path: str | Path) -> ParkStats:
     input_path = Path(input_path)
 
     # Load GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

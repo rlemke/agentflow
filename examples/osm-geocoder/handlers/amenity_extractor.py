@@ -11,6 +11,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
+from afl.runtime.storage import get_storage_backend
+
+_storage = get_storage_backend()
+
 log = logging.getLogger(__name__)
 
 try:
@@ -244,7 +248,7 @@ def extract_amenities(
 
     geojson = {"type": "FeatureCollection", "features": handler.features}
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(geojson, f, indent=2)
 
     types_str = ",".join(sorted(amenity_types)) if amenity_types else category.value
@@ -260,7 +264,7 @@ def extract_amenities(
 
 def calculate_amenity_stats(input_path: str | Path) -> AmenityStats:
     """Calculate statistics for extracted amenities."""
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -314,7 +318,7 @@ def search_amenities(input_path: str | Path, name_pattern: str,
     """Search amenities by name pattern."""
     input_path = Path(input_path)
 
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     pattern = re.compile(name_pattern, re.IGNORECASE)
@@ -330,7 +334,7 @@ def search_amenities(input_path: str | Path, name_pattern: str,
     output_path = Path(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(output_geojson, f, indent=2)
 
     return AmenityResult(

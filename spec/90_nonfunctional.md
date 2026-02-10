@@ -14,6 +14,7 @@
 | Package | Version | Purpose |
 |---------|---------|---------|
 | pymongo | ≥4.0 | MongoDB connectivity |
+| pyarrow | ≥14.0 | HDFS storage backend |
 
 ### Development Dependencies
 | Package | Version | Purpose |

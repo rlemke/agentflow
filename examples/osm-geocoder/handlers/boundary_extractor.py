@@ -11,6 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import get_storage_backend
+
+_storage = get_storage_backend()
+
 try:
     import osmium
     from osmium import osm
@@ -216,7 +220,7 @@ def extract_boundaries(
     geojson = _features_to_geojson(handler.features)
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(geojson, f, ensure_ascii=False, indent=2)
 
     log.info(

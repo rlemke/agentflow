@@ -22,10 +22,11 @@ built graphs to avoid unnecessary rebuilds.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 from datetime import datetime
 from typing import Any
+
+from afl.runtime.storage import get_storage_backend
 
 # GraphHopper version used for builds
 GRAPHHOPPER_VERSION = "8.0"
@@ -44,42 +45,41 @@ GRAPH_BASE_DIR = os.environ.get(
     "GRAPHHOPPER_GRAPH_DIR",
     os.path.expanduser("~/.graphhopper/graphs")
 )
+_storage = get_storage_backend(GRAPH_BASE_DIR)
 
 
 def _get_graph_dir(osm_path: str, profile: str) -> str:
     """Generate the graph directory path for an OSM file and profile."""
     # Use the OSM filename (without extension) plus profile
-    osm_basename = os.path.splitext(os.path.basename(osm_path))[0]
-    return os.path.join(GRAPH_BASE_DIR, f"{osm_basename}-{profile}")
+    osm_basename = os.path.splitext(_storage.basename(osm_path))[0]
+    return _storage.join(GRAPH_BASE_DIR, f"{osm_basename}-{profile}")
 
 
 def _get_dir_size(path: str) -> int:
     """Get the total size of a directory in bytes."""
     total = 0
-    if os.path.exists(path):
-        for dirpath, _dirnames, filenames in os.walk(path):
+    if _storage.exists(path):
+        for dirpath, _dirnames, filenames in _storage.walk(path):
             for f in filenames:
-                fp = os.path.join(dirpath, f)
-                if os.path.isfile(fp):
-                    total += os.path.getsize(fp)
+                fp = _storage.join(dirpath, f)
+                if _storage.isfile(fp):
+                    total += _storage.getsize(fp)
     return total
 
 
 def _get_modification_date(path: str) -> str:
     """Get the modification date of a file or directory."""
-    if os.path.exists(path):
-        mtime = os.path.getmtime(path)
+    if _storage.exists(path):
+        mtime = _storage.getmtime(path)
         return datetime.fromtimestamp(mtime).isoformat()
     return datetime.now().isoformat()
 
 
 def _graph_exists(graph_dir: str) -> bool:
     """Check if a valid GraphHopper graph exists."""
-    # GraphHopper stores graph data in specific files
-    required_files = ["nodes", "edges", "geometry", "properties"]
-    if not os.path.isdir(graph_dir):
+    if not _storage.isdir(graph_dir):
         return False
-    existing_files = os.listdir(graph_dir)
+    existing_files = _storage.listdir(graph_dir)
     # Check if at least some graph files exist
     return any(f.startswith("nodes") or f.startswith("edges") for f in existing_files)
 
@@ -96,10 +96,10 @@ def _get_graph_stats(graph_dir: str) -> dict[str, Any]:
         return stats
 
     # Try to read properties file for stats
-    properties_file = os.path.join(graph_dir, "properties")
-    if os.path.exists(properties_file):
+    properties_file = _storage.join(graph_dir, "properties")
+    if _storage.exists(properties_file):
         try:
-            with open(properties_file, "r") as f:
+            with _storage.open(properties_file, "r") as f:
                 for line in f:
                     if "=" in line:
                         key, value = line.strip().split("=", 1)
@@ -123,7 +123,7 @@ def _run_graphhopper_import(osm_path: str, graph_dir: str, profile: str) -> bool
     Returns True if successful, False otherwise.
     """
     # Ensure graph directory exists
-    os.makedirs(graph_dir, exist_ok=True)
+    _storage.makedirs(graph_dir, exist_ok=True)
 
     # Build GraphHopper command
     # java -jar graphhopper.jar import -c config.yml osmfile.pbf
@@ -192,8 +192,8 @@ def build_graph_handler(payload: dict) -> dict:
         return {"graph": _make_graph_result(osm_path, graph_dir, profile, True)}
 
     # Remove existing graph if recreating
-    if recreate and os.path.exists(graph_dir):
-        shutil.rmtree(graph_dir)
+    if recreate and _storage.exists(graph_dir):
+        _storage.rmtree(graph_dir)
 
     # Build the graph
     success = _run_graphhopper_import(osm_path, graph_dir, profile)
@@ -248,8 +248,8 @@ def clean_graph_handler(payload: dict) -> dict:
     graph = payload.get("graph", {})
     graph_dir = graph.get("graphDir", "")
 
-    if graph_dir and os.path.exists(graph_dir):
-        shutil.rmtree(graph_dir)
+    if graph_dir and _storage.exists(graph_dir):
+        _storage.rmtree(graph_dir)
         return {"deleted": True}
 
     return {"deleted": False}

@@ -38,6 +38,9 @@ dashboard = [
 mcp = [
     "mcp>=1.0",
 ]
+hdfs = [
+    "pyarrow>=14.0",
+]
 
 [project.scripts]
 afl = "afl.cli:main"

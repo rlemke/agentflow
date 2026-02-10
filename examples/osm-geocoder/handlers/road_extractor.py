@@ -14,6 +14,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
+from afl.runtime.storage import get_storage_backend
+
+_storage = get_storage_backend()
+
 log = logging.getLogger(__name__)
 
 try:
@@ -348,7 +352,7 @@ def extract_roads(
 
     geojson = {"type": "FeatureCollection", "features": handler.features}
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(geojson, f, indent=2)
 
     return RoadResult(
@@ -363,7 +367,7 @@ def extract_roads(
 
 def calculate_road_stats(input_path: str | Path) -> RoadStats:
     """Calculate statistics for extracted roads."""
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -424,7 +428,7 @@ def filter_roads_by_class(
     """Filter roads by classification."""
     input_path = Path(input_path)
 
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     filtered = [
@@ -437,7 +441,7 @@ def filter_roads_by_class(
     output_path = Path(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(output_geojson, f, indent=2)
 
     total_length = sum(f["properties"].get("length_km", 0) for f in filtered)
@@ -462,7 +466,7 @@ def filter_by_speed_limit(
     """Filter roads by speed limit range."""
     input_path = Path(input_path)
 
-    with open(input_path, encoding="utf-8") as f:
+    with _storage.open(str(input_path), "r") as f:
         geojson = json.load(f)
 
     filtered = []
@@ -476,7 +480,7 @@ def filter_by_speed_limit(
     output_path = Path(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with open(output_path, "w", encoding="utf-8") as f:
+    with _storage.open(str(output_path), "w") as f:
         json.dump(output_geojson, f, indent=2)
 
     total_length = sum(f["properties"].get("length_km", 0) for f in filtered)
