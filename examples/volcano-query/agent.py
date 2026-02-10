@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Volcano Query Agent — handles volcano data query and formatting events.
+"""Volcano Query Agent — handles atomic volcano data pipeline events.
 
 This agent polls for event tasks in the volcano namespace:
-- volcano.QueryVolcanoes: filter volcanoes by state and elevation
+- volcano.LoadVolcanoData: load the full volcano dataset
+- volcano.FilterByRegion: filter volcanoes by state
+- volcano.FilterByElevation: filter volcanoes by minimum elevation
 - volcano.FormatVolcanoes: format volcano data for display
+- volcano.RenderMap: generate HTML map of volcanoes
 
 Uses a built-in dataset of ~30 notable US volcanoes (no external API required).
 
@@ -59,7 +62,8 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown)
 
     print("Volcano Query agent started. Press Ctrl+C to stop.")
-    print("Listening for volcano.QueryVolcanoes and volcano.FormatVolcanoes events...")
+    print("Listening for volcano.LoadVolcanoData, volcano.FilterByRegion,")
+    print("  volcano.FilterByElevation, volcano.FormatVolcanoes, volcano.RenderMap events...")
     poller.start()
 
 

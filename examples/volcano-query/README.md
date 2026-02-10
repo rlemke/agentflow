@@ -2,13 +2,35 @@
 
 A volcano data agent that finds US volcanoes by state and elevation using a built-in dataset of ~30 notable volcanoes (sourced from USGS data). No external API calls required.
 
-## What it does
+## Design principle: atomic event facets
 
-This example demonstrates:
-- **Schema declarations** for typed data structures (`Volcano`, `VolcanoList`, `FormattedResult`)
-- **Event facets** for external agent dispatch (`QueryVolcanoes`, `FormatVolcanoes`)
-- **Multi-step workflows** chaining query → format in a single `andThen` block
-- **Foreach iteration** for querying multiple states in parallel (`FindVolcanoesMultiState`)
+Each event facet does **one thing**. Workflows compose atomic facets into pipelines. An LLM agent sees the facet catalog (signatures) and can compose new workflows from the same building blocks — rather than creating monolithic "do everything" handlers.
+
+**5 atomic event facets:**
+
+| Facet | Input | Output | Purpose |
+|-------|-------|--------|---------|
+| `LoadVolcanoData()` | — | `VolcanoDataset` | Load the raw dataset |
+| `FilterByRegion(volcanoes, state)` | JSON + state name | `VolcanoList` | Filter by US state |
+| `FilterByElevation(volcanoes, min_elevation_ft)` | JSON + threshold | `VolcanoList` | Filter by min height |
+| `FormatVolcanoes(volcanoes, count)` | JSON + count | `FormattedResult` | Format as text |
+| `RenderMap(volcanoes, title)` | JSON + title | `MapResult` | Generate HTML map |
+
+**3 composed workflows:**
+
+| Workflow | Pipeline | Description |
+|----------|----------|-------------|
+| `FindVolcanoes` | Load → Region → Elevation → Format | Basic query pipeline |
+| `FindVolcanoesWithMap` | Load → Region → Elevation → Format + Map | Adds map visualization |
+| `FindVolcanoesMultiState` | foreach state: Load → Region → Elevation → Format | Parallel multi-state query |
+
+## What it demonstrates
+
+- **Atomic event facets** — each handler does one operation on the data
+- **Pipeline composition** — workflows chain facets via `andThen` blocks
+- **Parallel steps** — `FindVolcanoesWithMap` runs Format and RenderMap concurrently
+- **Foreach iteration** — `FindVolcanoesMultiState` iterates over states in parallel
+- **Schema typing** — `VolcanoDataset`, `VolcanoList`, `FormattedResult`, `MapResult`
 - **Built-in dataset** — self-contained with no external API calls
 
 ### AFL Workflow
@@ -16,33 +38,35 @@ This example demonstrates:
 ```afl
 namespace volcano {
 
-    schema Volcano {
-        name: String, state: String, elevation_ft: Long,
-        type: String, latitude: String, longitude: String
-    }
-
+    schema VolcanoDataset { volcanoes: Json }
     schema VolcanoList { volcanoes: Json, count: Long }
     schema FormattedResult { text: String, count: Long }
+    schema MapResult { html: String, title: String }
 
-    event facet QueryVolcanoes(state: String, min_elevation_ft: Long) => (result: VolcanoList)
+    event facet LoadVolcanoData() => (result: VolcanoDataset)
+    event facet FilterByRegion(volcanoes: Json, state: String) => (result: VolcanoList)
+    event facet FilterByElevation(volcanoes: Json, min_elevation_ft: Long) => (result: VolcanoList)
     event facet FormatVolcanoes(volcanoes: Json, count: Long) => (result: FormattedResult)
+    event facet RenderMap(volcanoes: Json, title: String) => (result: MapResult)
 
     workflow FindVolcanoes(state: String, min_elevation_ft: Long) => (text: String, count: Long) andThen {
-        query = QueryVolcanoes(state = $.state, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = query.result.volcanoes, count = query.result.count)
+        data = LoadVolcanoData()
+        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = $.state)
+        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
+        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
         yield FindVolcanoes(text = fmt.result.text, count = fmt.result.count)
     }
 }
 ```
 
-### Execution flow
+### Execution flow (FindVolcanoes)
 
-1. `FindVolcanoes` workflow receives a state name and minimum elevation
-2. The `QueryVolcanoes` event step pauses execution and creates a task
-3. The agent picks up the task, filters the built-in dataset, writes the result
-4. The workflow resumes and hits the `FormatVolcanoes` event step, pausing again
-5. The agent formats the results into human-readable text
-6. The workflow resumes and yields the formatted text and count as output
+1. Workflow receives `state` and `min_elevation_ft` inputs
+2. `LoadVolcanoData` event pauses → agent returns the full dataset
+3. `FilterByRegion` event pauses → agent filters by state
+4. `FilterByElevation` event pauses → agent filters by min elevation
+5. `FormatVolcanoes` event pauses → agent formats results as text
+6. Workflow yields formatted text and count as output
 
 ## Prerequisites
 
@@ -65,7 +89,15 @@ Expected output:
 ```
 Executing FindVolcanoes workflow...
   Status: ExecutionStatus.PAUSED
-Agent processing QueryVolcanoes event...
+Agent processing LoadVolcanoData event...
+  Dispatched: 1 task(s)
+Resuming workflow (should pause at FilterByRegion)...
+  Status: ExecutionStatus.PAUSED
+Agent processing FilterByRegion event...
+  Dispatched: 1 task(s)
+Resuming workflow (should pause at FilterByElevation)...
+  Status: ExecutionStatus.PAUSED
+Agent processing FilterByElevation event...
   Dispatched: 1 task(s)
 Resuming workflow (should pause at FormatVolcanoes)...
   Status: ExecutionStatus.PAUSED
@@ -84,7 +116,7 @@ All assertions passed.
 PYTHONPATH=. python examples/volcano-query/agent.py
 ```
 
-This starts a long-running agent that polls for `volcano.QueryVolcanoes` and `volcano.FormatVolcanoes` tasks. In production, pair it with a runner service that executes workflows.
+This starts a long-running agent that polls for all 5 volcano event facet tasks. In production, pair it with a runner service that executes workflows.
 
 ### Compile check
 
@@ -96,7 +128,7 @@ afl examples/volcano-query/afl/volcano.afl --check
 
 | Module | Event facets | Description |
 |--------|-------------|-------------|
-| `volcano_handlers.py` | 2 | Query and format volcano data from built-in dataset |
+| `volcano_handlers.py` | 5 | Load, filter, format, and map volcano data from built-in dataset |
 | `__init__.py` | — | `register_all_handlers(poller)` convenience function |
 
 ## Built-in dataset

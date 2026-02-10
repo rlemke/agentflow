@@ -2,6 +2,13 @@
 
 Provides ~30 notable US volcanoes with real name, state, elevation,
 type, and coordinate data. No external API calls needed.
+
+Each handler implements ONE atomic operation:
+- LoadVolcanoData: return the full dataset
+- FilterByRegion: filter by state name
+- FilterByElevation: filter by minimum elevation
+- FormatVolcanoes: format as human-readable text
+- RenderMap: generate simple HTML map
 """
 
 import json
@@ -52,21 +59,55 @@ US_VOLCANOES = [
 ]
 
 
-def query_volcanoes_handler(payload: dict) -> dict:
-    """Filter built-in volcano data by state and minimum elevation."""
+def load_volcano_data_handler(payload: dict) -> dict:
+    """Return the full volcano dataset as JSON."""
+    log.info("LoadVolcanoData: returning %d volcanoes", len(US_VOLCANOES))
+    return {
+        "result": {
+            "volcanoes": json.dumps(US_VOLCANOES),
+        }
+    }
+
+
+def filter_by_region_handler(payload: dict) -> dict:
+    """Filter volcanoes by state name."""
+    volcanoes_raw = payload.get("volcanoes", "[]")
     state = payload.get("state", "")
+
+    if isinstance(volcanoes_raw, str):
+        volcanoes = json.loads(volcanoes_raw)
+    else:
+        volcanoes = volcanoes_raw
+
+    matches = [v for v in volcanoes if v["state"].lower() == state.lower()]
+    matches.sort(key=lambda v: v["elevation_ft"], reverse=True)
+
+    log.info("FilterByRegion: %d matches for state=%s", len(matches), state)
+
+    return {
+        "result": {
+            "volcanoes": json.dumps(matches),
+            "count": len(matches),
+        }
+    }
+
+
+def filter_by_elevation_handler(payload: dict) -> dict:
+    """Filter volcanoes by minimum elevation."""
+    volcanoes_raw = payload.get("volcanoes", "[]")
     min_elevation = payload.get("min_elevation_ft", 0)
 
-    matches = [
-        v for v in US_VOLCANOES
-        if v["state"].lower() == state.lower()
-        and v["elevation_ft"] >= min_elevation
-    ]
+    if isinstance(volcanoes_raw, str):
+        volcanoes = json.loads(volcanoes_raw)
+    else:
+        volcanoes = volcanoes_raw
+
+    matches = [v for v in volcanoes if v["elevation_ft"] >= min_elevation]
     matches.sort(key=lambda v: v["elevation_ft"], reverse=True)
 
     log.info(
-        "QueryVolcanoes: %d matches for state=%s, min_elevation=%d",
-        len(matches), state, min_elevation,
+        "FilterByElevation: %d matches for min_elevation=%d",
+        len(matches), min_elevation,
     )
 
     return {
@@ -109,7 +150,50 @@ def format_volcanoes_handler(payload: dict) -> dict:
     }
 
 
+def render_map_handler(payload: dict) -> dict:
+    """Generate a simple HTML page with volcano markers."""
+    volcanoes_raw = payload.get("volcanoes", "[]")
+    title = payload.get("title", "Volcano Map")
+
+    if isinstance(volcanoes_raw, str):
+        volcanoes = json.loads(volcanoes_raw)
+    else:
+        volcanoes = volcanoes_raw
+
+    rows = []
+    for v in volcanoes:
+        rows.append(
+            f"<tr><td>{v['name']}</td><td>{v['elevation_ft']:,} ft</td>"
+            f"<td>{v['latitude']}, {v['longitude']}</td></tr>"
+        )
+    table_body = "\n".join(rows)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><title>{title}</title></head>
+<body>
+<h1>{title}</h1>
+<table border="1">
+<tr><th>Name</th><th>Elevation</th><th>Coordinates</th></tr>
+{table_body}
+</table>
+</body>
+</html>"""
+
+    log.info("RenderMap: generated map for %d volcanoes", len(volcanoes))
+
+    return {
+        "result": {
+            "html": html,
+            "title": title,
+        }
+    }
+
+
 def register_volcano_handlers(poller) -> None:
     """Register all volcano event facet handlers with the given poller."""
-    poller.register(f"{NAMESPACE}.QueryVolcanoes", query_volcanoes_handler)
+    poller.register(f"{NAMESPACE}.LoadVolcanoData", load_volcano_data_handler)
+    poller.register(f"{NAMESPACE}.FilterByRegion", filter_by_region_handler)
+    poller.register(f"{NAMESPACE}.FilterByElevation", filter_by_elevation_handler)
     poller.register(f"{NAMESPACE}.FormatVolcanoes", format_volcanoes_handler)
+    poller.register(f"{NAMESPACE}.RenderMap", render_map_handler)

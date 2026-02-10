@@ -1,17 +1,16 @@
-// Volcano Query — find volcanoes by state and elevation
+// Volcano Query — composable pipeline for querying US volcano data
 //
-// Demonstrates a multi-step workflow: query a volcano data source,
-// filter by elevation, and format results for display.
+// Demonstrates atomic event facets composed into multi-step workflows:
+//   LoadVolcanoData → FilterByRegion → FilterByElevation → FormatVolcanoes
+//
+// Each event facet does ONE thing. The workflow composes them into a pipeline.
+// An LLM agent sees the facet catalog (signatures) and can compose new
+// workflows from the same building blocks.
 
 namespace volcano {
 
-    schema Volcano {
-        name: String,
-        state: String,
-        elevation_ft: Long,
-        type: String,
-        latitude: String,
-        longitude: String
+    schema VolcanoDataset {
+        volcanoes: Json
     }
 
     schema VolcanoList {
@@ -24,21 +23,50 @@ namespace volcano {
         count: Long
     }
 
-    event facet QueryVolcanoes(state: String, min_elevation_ft: Long) => (result: VolcanoList)
+    schema MapResult {
+        html: String,
+        title: String
+    }
+
+    // ── Atomic event facets (each does ONE thing) ──────────────────────
+
+    event facet LoadVolcanoData() => (result: VolcanoDataset)
+
+    event facet FilterByRegion(volcanoes: Json, state: String) => (result: VolcanoList)
+
+    event facet FilterByElevation(volcanoes: Json, min_elevation_ft: Long) => (result: VolcanoList)
 
     event facet FormatVolcanoes(volcanoes: Json, count: Long) => (result: FormattedResult)
 
-    // Single-state query: find volcanoes, then format results
+    event facet RenderMap(volcanoes: Json, title: String) => (result: MapResult)
+
+    // ── Composed workflows ─────────────────────────────────────────────
+
+    // Pipeline: Load → FilterByRegion → FilterByElevation → Format
     workflow FindVolcanoes(state: String, min_elevation_ft: Long) => (text: String, count: Long) andThen {
-        query = QueryVolcanoes(state = $.state, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = query.result.volcanoes, count = query.result.count)
+        data = LoadVolcanoData()
+        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = $.state)
+        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
+        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
         yield FindVolcanoes(text = fmt.result.text, count = fmt.result.count)
     }
 
-    // Multi-state query: iterate over a list of states in parallel
+    // Pipeline + map visualization (Format and RenderMap can run in parallel)
+    workflow FindVolcanoesWithMap(state: String, min_elevation_ft: Long) => (text: String, count: Long, map_html: String) andThen {
+        data = LoadVolcanoData()
+        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = $.state)
+        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
+        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
+        map = RenderMap(volcanoes = elevated.result.volcanoes, title = $.state ++ " Volcanoes")
+        yield FindVolcanoesWithMap(text = fmt.result.text, count = fmt.result.count, map_html = map.result.html)
+    }
+
+    // Foreach over multiple states
     workflow FindVolcanoesMultiState(states: Json, min_elevation_ft: Long) => (results: Json) andThen foreach st in $.states {
-        query = QueryVolcanoes(state = st.value, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = query.result.volcanoes, count = query.result.count)
+        data = LoadVolcanoData()
+        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = st.value)
+        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
+        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
         yield FindVolcanoesMultiState(results = fmt.result)
     }
 
