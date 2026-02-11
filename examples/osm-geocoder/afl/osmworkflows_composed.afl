@@ -18,7 +18,7 @@ namespace examples.composed {
 
     workflow VisualizeBicycleRoutes(region: String = "Liechtenstein") => (map_path: String, route_count: Long) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract bicycle routes
         routes = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = true)
@@ -40,7 +40,7 @@ namespace examples.composed {
 
     workflow AnalyzeParks(region: String = "Liechtenstein") => (total_parks: Long, total_area: Double, national: Long, state: Long) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract all parks
         parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
@@ -63,7 +63,7 @@ namespace examples.composed {
 
     workflow LargeCitiesMap(region: String = "Liechtenstein", min_pop: Long = 10000) => (map_path: String, city_count: Long) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract all cities
         cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 0)
@@ -93,7 +93,7 @@ namespace examples.composed {
 
     workflow TransportOverview(region: String = "Liechtenstein") => (bicycle_km: Double, hiking_km: Double, train_km: Double, bus_routes: Long) andThen {
         // Stage 1: Get cached region data (shared)
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract multiple route types (could run in parallel)
         bicycle = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
@@ -122,7 +122,7 @@ namespace examples.composed {
 
     workflow NationalParksAnalysis(region: String = "Liechtenstein") => (map_path: String, park_count: Long, total_area: Double, avg_area: Double) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract all parks
         all_parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
@@ -217,7 +217,7 @@ namespace examples.composed {
 
     workflow TransportMap(region: String = "Liechtenstein") => (map_path: String) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract different transport types
         bicycle = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
@@ -240,7 +240,7 @@ namespace examples.composed {
 
     workflow StateBoundariesWithStats(region: String = "Liechtenstein") => (map_path: String, state_count: Long) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract state-level boundaries
         boundaries = osm.geo.Boundaries.StateBoundaries(cache = cache.cache)
@@ -265,7 +265,7 @@ namespace examples.composed {
 
     workflow DiscoverCitiesAndTowns(region: String = "Liechtenstein") => (map_path: String, cities: Long, towns: Long, villages: Long) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract settlements at different levels
         city_data = osm.geo.POIs.Cities(cache = cache.cache)
@@ -294,7 +294,7 @@ namespace examples.composed {
 
     workflow RegionalAnalysis(region: String = "Liechtenstein") => (parks_count: Long, parks_area: Double, routes_km: Double, cities_count: Long, map_path: String) andThen {
         // Stage 1: Get cached region data (shared across all extractions)
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Extract multiple feature types
         parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
@@ -332,7 +332,7 @@ namespace examples.composed {
 
     workflow ValidateAndSummarize(region: String = "Liechtenstein", output_dir: String = "/tmp") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Run full validation on the cache
         validation = osm.geo.Operations.Validation.ValidateCache(
@@ -371,7 +371,7 @@ namespace examples.composed {
         output_path: String
     ) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Run full local verification on the PBF
         verify = osm.geo.Operations.OSMOSE.VerifyAll(
@@ -448,7 +448,7 @@ namespace examples.composed {
         coverage_path: String
     ) andThen {
         // Stage 1: Get OSM cache and download GTFS feed in parallel
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
         dl = osm.geo.Transit.GTFS.DownloadFeed(url = $.gtfs_url)
 
         // Stage 2: Extract buildings from OSM and stops from GTFS in parallel
@@ -496,7 +496,7 @@ namespace examples.composed {
         metrics_path: String
     ) andThen {
         // Stage 1: Get cached region data
-        cache = osm.geo.cache.Europe.Liechtenstein()
+        cache = osm.geo.Operations.Cache(region = $.region)
 
         // Stage 2: Build GraphHopper graph for routing
         graph = osm.geo.Operations.GraphHopper.BuildGraph(cache = cache.cache)
