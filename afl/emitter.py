@@ -50,6 +50,7 @@ from .ast import (
     SourceLocation,
     StepStmt,
     TypeRef,
+    UnaryExpr,
     UsesDecl,
     WorkflowDecl,
     YieldStmt,
@@ -168,6 +169,8 @@ class JSONEmitter:
             return self._concat_expr(node)
         if isinstance(node, BinaryExpr):
             return self._binary_expr(node)
+        if isinstance(node, UnaryExpr):
+            return self._unary_expr(node)
         if isinstance(node, ArrayLiteral):
             return self._array_literal(node)
         if isinstance(node, MapLiteral):
@@ -598,6 +601,14 @@ class JSONEmitter:
             "operator": node.operator,
             "left": self._convert(node.left),
             "right": self._convert(node.right),
+        }
+
+    def _unary_expr(self, node: UnaryExpr) -> dict:
+        """Convert UnaryExpr node."""
+        return {
+            "type": "UnaryExpr",
+            "operator": node.operator,
+            "operand": self._convert(node.operand),
         }
 
     def _array_literal(self, node: ArrayLiteral) -> dict:

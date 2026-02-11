@@ -43,9 +43,9 @@ namespace osm.geo.Operations.Validation {
 
     // Checks coordinate bounds, useful for regional bounding-box constraints
     event facet ValidateBounds(cache: OSMCache,
-        min_lat: Double = (0.0 - 90.0),
+        min_lat: Double = -90.0,
         max_lat: Double = 90.0,
-        min_lon: Double = (0.0 - 180.0),
+        min_lon: Double = -180.0,
         max_lon: Double = 180.0) => (stats: ValidationStats, result: ValidationResult)
 
     // Read a validation result file and compute summary statistics

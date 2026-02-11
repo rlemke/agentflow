@@ -101,6 +101,14 @@ class BinaryExpr(ASTNode):
 
 
 @dataclass
+class UnaryExpr(ASTNode):
+    """Unary expression: -expr"""
+
+    operator: str  # "-"
+    operand: "Literal | Reference | BinaryExpr | UnaryExpr | ConcatExpr"
+
+
+@dataclass
 class ArrayLiteral(ASTNode):
     """Array literal: [elem1, elem2, ...]"""
 

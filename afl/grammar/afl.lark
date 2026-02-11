@@ -80,7 +80,8 @@ named_arg: IDENT "=" _NL* expr
 expr: concat_expr
 concat_expr: additive_expr ("++" _NL* additive_expr)*
 additive_expr: multiplicative_expr (ADD_OP _NL* multiplicative_expr)*
-multiplicative_expr: postfix_expr (MUL_OP _NL* postfix_expr)*
+multiplicative_expr: unary_expr (MUL_OP _NL* unary_expr)*
+unary_expr: ADD_OP unary_expr | postfix_expr
 postfix_expr: atom_expr ("[" expr "]")*
 atom_expr: literal | reference | array_literal | map_literal | "(" expr ")"
 

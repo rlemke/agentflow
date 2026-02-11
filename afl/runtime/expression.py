@@ -107,6 +107,8 @@ class ExpressionEvaluator:
             return self._eval_array_literal(expr, ctx)
         elif expr_type == "MapLiteral":
             return self._eval_map_literal(expr, ctx)
+        elif expr_type == "UnaryExpr":
+            return self._eval_unary(expr, ctx)
         elif expr_type == "IndexExpr":
             return self._eval_index(expr, ctx)
         else:
@@ -303,6 +305,35 @@ class ExpressionEvaluator:
                 ctx.step_id,
             ) from e
 
+
+    def _eval_unary(self, expr: dict, ctx: EvaluationContext) -> Any:
+        """Evaluate a unary expression (negation).
+
+        Args:
+            expr: The UnaryExpr expression
+            ctx: Evaluation context
+
+        Returns:
+            The negated value
+        """
+        operand = self.evaluate(expr.get("operand"), ctx)
+        operator = expr.get("operator", "-")
+
+        try:
+            if operator == "-":
+                return -operand
+            else:
+                raise EvaluationError(
+                    str(expr),
+                    f"Unknown unary operator: {operator}",
+                    ctx.step_id,
+                )
+        except TypeError as e:
+            raise EvaluationError(
+                str(expr),
+                f"Type error in unary {operator} operation: {e}",
+                ctx.step_id,
+            ) from e
 
     def _eval_array_literal(self, expr: dict, ctx: EvaluationContext) -> list:
         """Evaluate an array literal."""

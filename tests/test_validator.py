@@ -1431,3 +1431,86 @@ class TestExpressionTypeChecking:
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) for e in result.errors)
+
+
+class TestUnaryExprValidation:
+    """Test unary expression type checking in the validator."""
+
+    def test_negate_int_valid(self, validator):
+        """Negating Int should be valid."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = -5)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_negate_float_valid(self, validator):
+        """Negating Double should be valid."""
+        ast = parse("""
+        facet V(x: Double)
+        workflow Test() andThen {
+            s = V(x = -3.14)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_negate_ref_valid(self, validator):
+        """Negating a reference should be valid (Unknown type passes)."""
+        ast = parse("""
+        facet V(x: Long) => (output: Long)
+        workflow Test(a: Long) andThen {
+            s = V(x = -$.a)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_negate_string_error(self, validator):
+        """Negating a String should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = -"hello")
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("negate" in str(e) and "String" in str(e) for e in result.errors)
+
+    def test_negate_boolean_error(self, validator):
+        """Negating a Boolean should produce type error."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = -true)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("negate" in str(e) and "Boolean" in str(e) for e in result.errors)
+
+    def test_double_negation_valid(self, validator):
+        """Double negation of Int should be valid."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = --5)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_negate_in_binary_valid(self, validator):
+        """Negation inside binary expression should be valid."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test() andThen {
+            s = V(x = 10 + -5)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

@@ -1034,3 +1034,88 @@ class TestCollectionLiteralEmission:
         assert arg_value["type"] == "ArrayLiteral"
         assert arg_value["elements"][0]["type"] == "InputRef"
         assert arg_value["elements"][1]["type"] == "StepRef"
+
+
+class TestUnaryExprEmission:
+    """Test UnaryExpr JSON emission."""
+
+    def test_simple_negation(self):
+        """UnaryExpr emits correct JSON structure."""
+        ast = parse("""
+        facet V(input: Long)
+        workflow Test() andThen {
+            s = V(input = -5)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "UnaryExpr"
+        assert arg_value["operator"] == "-"
+        assert arg_value["operand"] == {"type": "Int", "value": 5}
+
+    def test_negation_of_float(self):
+        """UnaryExpr with float emits correctly."""
+        ast = parse("""
+        facet V(input: Double)
+        workflow Test() andThen {
+            s = V(input = -3.14)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "UnaryExpr"
+        assert arg_value["operator"] == "-"
+        assert arg_value["operand"] == {"type": "Double", "value": 3.14}
+
+    def test_negation_of_ref(self):
+        """UnaryExpr with input reference emits correctly."""
+        ast = parse("""
+        facet V(input: Long)
+        workflow Test(x: Long) andThen {
+            s = V(input = -$.x)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "UnaryExpr"
+        assert arg_value["operator"] == "-"
+        assert arg_value["operand"] == {"type": "InputRef", "path": ["x"]}
+
+    def test_double_negation(self):
+        """Double negation emits nested UnaryExpr."""
+        ast = parse("""
+        facet V(input: Long)
+        workflow Test() andThen {
+            s = V(input = --5)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "UnaryExpr"
+        assert arg_value["operand"]["type"] == "UnaryExpr"
+        assert arg_value["operand"]["operand"] == {"type": "Int", "value": 5}
+
+    def test_negation_in_binary(self):
+        """UnaryExpr nested in BinaryExpr emits correctly."""
+        ast = parse("""
+        facet V(input: Long)
+        workflow Test(a: Long) andThen {
+            s = V(input = $.a + -1)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        step = data["workflows"][0]["body"]["steps"][0]
+        arg_value = step["call"]["args"][0]["value"]
+        assert arg_value["type"] == "BinaryExpr"
+        assert arg_value["operator"] == "+"
+        assert arg_value["right"]["type"] == "UnaryExpr"
+        assert arg_value["right"]["operand"] == {"type": "Int", "value": 1}

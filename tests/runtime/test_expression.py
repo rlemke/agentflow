@@ -618,3 +618,107 @@ class TestCollectionEvaluation:
         }
         with pytest.raises(EvaluationError, match="Index error"):
             evaluator.evaluate(expr, ctx)
+
+
+class TestUnaryExprEvaluation:
+    """Tests for UnaryExpr evaluation."""
+
+    @pytest.fixture
+    def evaluator(self):
+        return ExpressionEvaluator()
+
+    @pytest.fixture
+    def ctx(self):
+        def get_step_output(step_name, attr_name):
+            outputs = {"s1": {"value": 42}}
+            if step_name in outputs and attr_name in outputs[step_name]:
+                return outputs[step_name][attr_name]
+            raise ValueError(f"Not found: {step_name}.{attr_name}")
+
+        return EvaluationContext(
+            inputs={"x": 10, "neg": -3},
+            get_step_output=get_step_output,
+        )
+
+    def test_negate_int(self, evaluator, ctx):
+        """Negating an integer literal."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "Int", "value": 5},
+        }
+        assert evaluator.evaluate(expr, ctx) == -5
+
+    def test_negate_float(self, evaluator, ctx):
+        """Negating a float literal."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "Double", "value": 3.14},
+        }
+        result = evaluator.evaluate(expr, ctx)
+        assert result == pytest.approx(-3.14)
+
+    def test_negate_input_ref(self, evaluator, ctx):
+        """Negating a positive input reference."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "InputRef", "path": ["x"]},
+        }
+        assert evaluator.evaluate(expr, ctx) == -10
+
+    def test_negate_negative_input(self, evaluator, ctx):
+        """Negating a negative input reference gives positive."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "InputRef", "path": ["neg"]},
+        }
+        assert evaluator.evaluate(expr, ctx) == 3
+
+    def test_double_negation(self, evaluator, ctx):
+        """Double negation returns original value."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {
+                "type": "UnaryExpr",
+                "operator": "-",
+                "operand": {"type": "Int", "value": 7},
+            },
+        }
+        assert evaluator.evaluate(expr, ctx) == 7
+
+    def test_negate_in_binary(self, evaluator, ctx):
+        """Negation used as operand in binary expression."""
+        expr = {
+            "type": "BinaryExpr",
+            "operator": "+",
+            "left": {"type": "Int", "value": 10},
+            "right": {
+                "type": "UnaryExpr",
+                "operator": "-",
+                "operand": {"type": "Int", "value": 3},
+            },
+        }
+        assert evaluator.evaluate(expr, ctx) == 7
+
+    def test_negate_step_ref(self, evaluator, ctx):
+        """Negating a step reference."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "StepRef", "path": ["s1", "value"]},
+        }
+        assert evaluator.evaluate(expr, ctx) == -42
+
+    def test_negate_string_raises(self, evaluator, ctx):
+        """Negating a string should raise EvaluationError."""
+        expr = {
+            "type": "UnaryExpr",
+            "operator": "-",
+            "operand": {"type": "String", "value": "hello"},
+        }
+        with pytest.raises(EvaluationError, match="Type error"):
+            evaluator.evaluate(expr, ctx)

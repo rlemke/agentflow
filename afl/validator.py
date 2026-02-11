@@ -49,6 +49,7 @@ from .ast import (
     ScriptBlock,
     SourceLocation,
     TypeRef,
+    UnaryExpr,
     WorkflowDecl,
     YieldStmt,
 )
@@ -747,6 +748,8 @@ class AFLValidator:
             return refs
         if isinstance(expr, IndexExpr):
             return self._extract_references(expr.target) + self._extract_references(expr.index)
+        if isinstance(expr, UnaryExpr):
+            return self._extract_references(expr.operand)
         return []
 
     _NUMERIC_TYPES = {"Int", "Long", "Double"}
@@ -799,6 +802,24 @@ class AFLValidator:
                 if "Long" in (left_type, right_type):
                     return "Long"
                 return "Int"
+            return "Unknown"
+        if isinstance(expr, UnaryExpr):
+            operand_type = self._infer_type(expr.operand)
+            if operand_type != "Unknown":
+                if operand_type == "String":
+                    self._result.add_error(
+                        f"Type error: cannot negate String operand",
+                        getattr(expr, "location", None),
+                    )
+                    return "Unknown"
+                if operand_type == "Boolean":
+                    self._result.add_error(
+                        f"Type error: cannot negate Boolean operand",
+                        getattr(expr, "location", None),
+                    )
+                    return "Unknown"
+            if operand_type in self._NUMERIC_TYPES:
+                return operand_type
             return "Unknown"
         if isinstance(expr, ArrayLiteral):
             return "Array"

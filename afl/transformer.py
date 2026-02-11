@@ -48,6 +48,7 @@ from .ast import (
     SourceLocation,
     StepStmt,
     TypeRef,
+    UnaryExpr,
     UsesDecl,
     WorkflowDecl,
     YieldStmt,
@@ -205,6 +206,16 @@ class AFLTransformer(Transformer):
             result = BinaryExpr(operator=op, left=result, right=right, location=self._loc(meta))
             i += 2
         return result
+
+    @v_args(meta=True)
+    def unary_expr(self, meta, items: list):
+        if len(items) == 1:
+            return items[0]  # no operator, pass through
+        # items = [operator_str, operand]
+        op = str(items[0])
+        if op == "+":
+            return items[1]  # unary + is a no-op
+        return UnaryExpr(operator=op, operand=items[1], location=self._loc(meta))
 
     def ADD_OP(self, token: Token) -> str:
         return str(token)

@@ -26,6 +26,7 @@ from afl import (
     Reference,
     SchemaDecl,
     TypeRef,
+    UnaryExpr,
     parse,
 )
 
@@ -1376,3 +1377,119 @@ class TestCollectionLiterals:
         assert expr.operator == "*"
         assert isinstance(expr.left, BinaryExpr)
         assert expr.left.operator == "+"
+
+
+class TestUnaryNegation:
+    """Test unary negation expression parsing."""
+
+    def test_negate_integer(self, parser):
+        """Parse unary negation of integer literal."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test() andThen {
+            s = V(input = -5)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, UnaryExpr)
+        assert expr.operator == "-"
+        assert isinstance(expr.operand, Literal)
+        assert expr.operand.value == 5
+
+    def test_negate_float(self, parser):
+        """Parse unary negation of float literal."""
+        ast = parser.parse("""
+        facet V(input: Double)
+        workflow Test() andThen {
+            s = V(input = -3.14)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, UnaryExpr)
+        assert expr.operator == "-"
+        assert isinstance(expr.operand, Literal)
+        assert expr.operand.value == 3.14
+
+    def test_negate_input_ref(self, parser):
+        """Parse unary negation of input reference."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test(x: Long) andThen {
+            s = V(input = -$.x)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, UnaryExpr)
+        assert expr.operator == "-"
+        assert isinstance(expr.operand, Reference)
+
+    def test_negate_grouped_expr(self, parser):
+        """Parse unary negation of grouped expression."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test(a: Long, b: Long) andThen {
+            s = V(input = -($.a + $.b))
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, UnaryExpr)
+        assert expr.operator == "-"
+        assert isinstance(expr.operand, BinaryExpr)
+        assert expr.operand.operator == "+"
+
+    def test_double_negation(self, parser):
+        """Parse double negation (--5)."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test() andThen {
+            s = V(input = --5)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, UnaryExpr)
+        assert expr.operator == "-"
+        assert isinstance(expr.operand, UnaryExpr)
+        assert expr.operand.operator == "-"
+        assert isinstance(expr.operand.operand, Literal)
+        assert expr.operand.operand.value == 5
+
+    def test_negation_in_arithmetic(self, parser):
+        """Parse negation within arithmetic expression."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test(a: Long) andThen {
+            s = V(input = $.a + -1)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        assert isinstance(expr, BinaryExpr)
+        assert expr.operator == "+"
+        assert isinstance(expr.right, UnaryExpr)
+        assert expr.right.operator == "-"
+
+    def test_negation_precedence_over_multiply(self, parser):
+        """Unary negation binds tighter than multiplication."""
+        ast = parser.parse("""
+        facet V(input: Long)
+        workflow Test() andThen {
+            s = V(input = -2 * 3)
+        }
+        """)
+        expr = ast.workflows[0].body.block.steps[0].call.args[0].value
+        # Should be: (-2) * 3
+        assert isinstance(expr, BinaryExpr)
+        assert expr.operator == "*"
+        assert isinstance(expr.left, UnaryExpr)
+        assert isinstance(expr.right, Literal)
+        assert expr.right.value == 3
+
+    def test_negate_default_param(self, parser):
+        """Parse negation as default parameter value."""
+        ast = parser.parse("""
+        facet V(input: Double = -90.0)
+        """)
+        param = ast.facets[0].sig.params[0]
+        assert isinstance(param.default, UnaryExpr)
+        assert param.default.operator == "-"
+        assert isinstance(param.default.operand, Literal)
+        assert param.default.operand.value == 90.0
