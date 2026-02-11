@@ -324,4 +324,33 @@ namespace examples.composed {
             map_path = map.result.output_path
         )
     }
+
+    // ==========================================================================
+    // PATTERN 11: Cache → Validate → Summary
+    // Data quality validation pipeline
+    // ==========================================================================
+
+    workflow ValidateAndSummarize(region: String = "Liechtenstein", output_dir: String = "/tmp") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Run full validation on the cache
+        validation = osm.geo.Operations.Validation.ValidateCache(
+            cache = cache.cache,
+            output_dir = $.output_dir,
+            use_hdfs = false
+        )
+
+        // Stage 3: Compute summary statistics from validation output
+        summary = osm.geo.Operations.Validation.ValidationSummary(
+            input_path = validation.result.output_path
+        )
+
+        yield ValidateAndSummarize(
+            total = summary.stats.total_entries,
+            valid = summary.stats.valid_entries,
+            invalid = summary.stats.invalid_entries,
+            output_path = validation.result.output_path
+        )
+    }
 }

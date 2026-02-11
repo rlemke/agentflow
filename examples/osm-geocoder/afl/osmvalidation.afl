@@ -1,0 +1,53 @@
+// OSM Cache Validation
+//
+// Validates OSM cache entries for data quality:
+// - Missing required tags (name, type)
+// - Invalid or degenerate geometry
+// - Coordinates outside valid ranges
+// - Duplicate node/way IDs
+//
+// Produces good/bad statistics and writes invalid entries to output file.
+
+namespace osm.geo.Operations.Validation {
+    use osm.types
+
+    schema ValidationStats {
+        total_entries: Long,
+        valid_entries: Long,
+        invalid_entries: Long,
+        missing_tags: Long,
+        invalid_geometry: Long,
+        out_of_bounds: Long,
+        duplicate_entries: Long,
+        validation_date: String
+    }
+
+    schema ValidationResult {
+        output_path: String,
+        feature_count: Long,
+        format: String,
+        validation_date: String
+    }
+
+    // Full validation: checks tags, geometry, bounds, and duplicates
+    event facet ValidateCache(cache: OSMCache,
+        output_dir: String = "/tmp",
+        use_hdfs: Boolean = false) => (stats: ValidationStats, result: ValidationResult)
+
+    // Focused validation: only geometry correctness checks
+    event facet ValidateGeometry(cache: OSMCache) => (stats: ValidationStats, result: ValidationResult)
+
+    // Focused validation: checks for missing or malformed tags
+    event facet ValidateTags(cache: OSMCache,
+        required_tags: String = "name") => (stats: ValidationStats, result: ValidationResult)
+
+    // Checks coordinate bounds, useful for regional bounding-box constraints
+    event facet ValidateBounds(cache: OSMCache,
+        min_lat: Double = (0.0 - 90.0),
+        max_lat: Double = 90.0,
+        min_lon: Double = (0.0 - 180.0),
+        max_lon: Double = 180.0) => (stats: ValidationStats, result: ValidationResult)
+
+    // Read a validation result file and compute summary statistics
+    event facet ValidationSummary(input_path: String) => (stats: ValidationStats)
+}
