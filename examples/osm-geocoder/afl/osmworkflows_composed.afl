@@ -393,4 +393,89 @@ namespace examples.composed {
             output_path = verify.result.output_path
         )
     }
+
+    // ==========================================================================
+    // PATTERN 13: GTFS Transit Analysis
+    // Download feed → parallel extract stops + routes → statistics
+    // ==========================================================================
+
+    workflow TransitAnalysis(
+        gtfs_url: String
+    ) => (
+        agency_name: String,
+        stop_count: Long,
+        route_count: Long,
+        trip_count: Long,
+        has_shapes: Boolean,
+        stops_path: String,
+        routes_path: String
+    ) andThen {
+        // Stage 1: Download and cache the GTFS feed
+        dl = osm.geo.Transit.GTFS.DownloadFeed(url = $.gtfs_url)
+
+        // Stage 2: Extract stops and routes in parallel
+        stops = osm.geo.Transit.GTFS.ExtractStops(feed = dl.feed)
+        routes = osm.geo.Transit.GTFS.ExtractRoutes(feed = dl.feed)
+
+        // Stage 3: Compute aggregate statistics
+        stats = osm.geo.Transit.GTFS.TransitStatistics(feed = dl.feed)
+
+        yield TransitAnalysis(
+            agency_name = stats.stats.agency_name,
+            stop_count = stats.stats.stop_count,
+            route_count = stats.stats.route_count,
+            trip_count = stats.stats.trip_count,
+            has_shapes = stats.stats.has_shapes,
+            stops_path = stops.result.output_path,
+            routes_path = routes.result.output_path
+        )
+    }
+
+    // ==========================================================================
+    // PATTERN 14: GTFS Transit Accessibility
+    // OSM cache + GTFS feed → extract buildings + stops → accessibility → gaps
+    // ==========================================================================
+
+    workflow TransitAccessibility(
+        gtfs_url: String,
+        region: String = "Liechtenstein"
+    ) => (
+        pct_within_400m: Double,
+        pct_within_800m: Double,
+        coverage_pct: Double,
+        gap_cells: Long,
+        accessibility_path: String,
+        coverage_path: String
+    ) andThen {
+        // Stage 1: Get OSM cache and download GTFS feed in parallel
+        cache = osm.geo.cache.Europe.Liechtenstein()
+        dl = osm.geo.Transit.GTFS.DownloadFeed(url = $.gtfs_url)
+
+        // Stage 2: Extract buildings from OSM and stops from GTFS in parallel
+        buildings = osm.geo.Buildings.ExtractBuildings(cache = cache.cache)
+        stops = osm.geo.Transit.GTFS.ExtractStops(feed = dl.feed)
+
+        // Stage 3: Compute walk-distance accessibility bands
+        access = osm.geo.Transit.GTFS.StopAccessibility(
+            osm_geojson_path = buildings.result.output_path,
+            stops_geojson_path = stops.result.output_path,
+            walk_threshold_m = 400
+        )
+
+        // Stage 4: Detect coverage gaps
+        gaps = osm.geo.Transit.GTFS.CoverageGaps(
+            stops_geojson_path = stops.result.output_path,
+            osm_geojson_path = buildings.result.output_path,
+            cell_size_m = 500
+        )
+
+        yield TransitAccessibility(
+            pct_within_400m = access.result.pct_within_400m,
+            pct_within_800m = access.result.pct_within_800m,
+            coverage_pct = gaps.result.coverage_pct,
+            gap_cells = gaps.result.gap_cells,
+            accessibility_path = access.result.output_path,
+            coverage_path = gaps.result.output_path
+        )
+    }
 }

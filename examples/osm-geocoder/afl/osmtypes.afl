@@ -18,4 +18,14 @@ namespace osm.types {
       nodeCount: Long,
       edgeCount: Long
    }
+
+   schema GTFSFeed {
+      url: String,
+      path: String,
+      date: String,
+      size: Long,
+      wasInCache: Boolean,
+      agency_name: String,
+      has_shapes: Boolean
+   }
 }

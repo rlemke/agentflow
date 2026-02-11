@@ -12,6 +12,7 @@ from .downloader import download as download_region  # noqa: F401
 from .elevation_handlers import register_elevation_handlers
 from .filter_handlers import register_filter_handlers
 from .graphhopper_handlers import register_graphhopper_handlers
+from .gtfs_handlers import register_gtfs_handlers
 from .operations_handlers import register_operations_handlers
 from .osmose_handlers import register_osmose_handlers
 from .park_handlers import register_park_handlers
@@ -34,6 +35,7 @@ __all__ = [
     "register_elevation_handlers",
     "register_filter_handlers",
     "register_graphhopper_handlers",
+    "register_gtfs_handlers",
     "register_operations_handlers",
     "register_osmose_handlers",
     "register_park_handlers",
@@ -59,6 +61,7 @@ def register_all_handlers(poller) -> None:
     register_elevation_handlers(poller)
     register_filter_handlers(poller)
     register_graphhopper_handlers(poller)
+    register_gtfs_handlers(poller)
     register_operations_handlers(poller)
     register_osmose_handlers(poller)
     register_park_handlers(poller)
