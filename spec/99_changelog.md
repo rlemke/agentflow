@@ -244,3 +244,13 @@
 - **Cross-example disambiguation**: qualified `Download` as `osm.geo.Operations.Download` in volcano.afl; added `use genomics.cache.Operations` to genomics_cache_workflows.afl to resolve ambiguous facet references when compiling all examples together
 - **All examples compile together**: 47 AFL sources (volcano-query + osm-geocoder + genomics), 0 errors
 - 1056 tests passing
+
+## Completed (v0.9.5) - Standalone Local PBF/GeoJSON Verifier
+- **OSMOSE API removed**: replaced external OSMOSE REST API integration (`osmose.openstreetmap.fr`) with a standalone local verifier — no network dependency
+- **osmose_verifier.py**: new core module with `VerificationHandler(osmium.SimpleHandler)` for single-pass PBF processing (nodes → ways → relations); checks reference integrity, coordinate ranges (including null island), degenerate geometry, unclosed polygons, tag completeness, duplicate IDs; also validates GeoJSON files for structure, geometry, and property completeness
+- **Severity levels**: level 1 (error) for reference integrity failures, out-of-bounds coords, degenerate geometry, duplicates; level 2 (warning) for missing name on named features, unclosed polygons; level 3 (info) for empty tag values
+- **New event facets**: `VerifyAll(cache, output_dir, check_*)`, `VerifyGeometry(cache)`, `VerifyTags(cache, required_tags)`, `VerifyGeoJSON(input_path)`, `ComputeVerifySummary(input_path)`
+- **New schemas**: `VerifyResult` (output_path, issue_count, node/way/relation counts, format, verify_date), `VerifySummary` (issue counts by type and severity, tag_coverage_pct, avg_tags_per_element)
+- **osmose_handlers.py**: thin wrappers delegating to `osmose_verifier`; `register_osmose_handlers(poller)` signature preserved — `__init__.py` unchanged
+- **Pattern 12 rewrite**: `OsmoseQualityCheck` workflow now uses cache-based local verification (Cache → VerifyAll → ComputeVerifySummary) instead of bbox-based API queries
+- 1092 tests passing
