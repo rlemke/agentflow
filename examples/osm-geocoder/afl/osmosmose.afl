@@ -1,70 +1,75 @@
-// OSMOSE QA Integration
+// OSMOSE Local Verifier
 //
-// Queries the OSMOSE external QA service (osmose.openstreetmap.fr) for
-// data quality issues within a bounding box. OSMOSE detects broken
-// geometries, missing tags, routing problems, and other OSM data issues.
+// Standalone local PBF/GeoJSON quality analysis — no network dependency.
+// Runs deep verification directly on .osm.pbf files (from GeoFabrik, via
+// OSMCache) and GeoJSON files.  Single-pass processing checks reference
+// integrity, coordinate ranges, geometry validity, tag completeness, and
+// duplicate IDs.
 //
-// The public REST API requires no authentication and returns up to 500
-// issues per request with lat/lon, severity, category, and affected
-// OSM elements.
+// Severity levels:
+//   1 (error)   — reference integrity failures, out-of-bounds coords,
+//                  degenerate geometry, duplicate IDs
+//   2 (warning) — missing name on named features, unclosed polygons
+//   3 (info)    — empty tag values
 
 namespace osm.geo.Operations.OSMOSE {
 
-    schema OsmoseIssue {
-        issue_id: String,
-        item: Long,
-        item_class: Long,
-        level: Long,
-        title: String,
-        subtitle: String,
-        lat: Double,
-        lon: Double,
-        osm_elements: String,
-        date: String
-    }
+    use osm.types
 
-    schema OsmoseResult {
+    schema VerifyResult {
         output_path: String,
         issue_count: Long,
+        node_count: Long,
+        way_count: Long,
+        relation_count: Long,
         format: String,
-        query_date: String
+        verify_date: String
     }
 
-    schema OsmoseSummary {
+    schema VerifySummary {
         total_issues: Long,
         geometry_issues: Long,
         tag_issues: Long,
+        reference_issues: Long,
+        coordinate_issues: Long,
+        duplicate_issues: Long,
         level_1: Long,
         level_2: Long,
         level_3: Long,
-        query_date: String
+        tag_coverage_pct: Double,
+        avg_tags_per_element: Double,
+        verify_date: String
     }
 
-    // Query all OSMOSE issues for a bounding box, returns GeoJSON output
-    event facet QueryIssues(
-        bbox: String,
-        item: String = "",
-        level: String = "1,2,3",
-        limit: Long = 500,
-        status: String = "open"
-    ) => (result: OsmoseResult)
+    // Full verification of a PBF cache with all check categories enabled
+    event facet VerifyAll(
+        cache: OSMCache,
+        output_dir: String = "/tmp",
+        check_geometry: Boolean = true,
+        check_tags: Boolean = true,
+        check_references: Boolean = true,
+        check_coordinates: Boolean = true,
+        check_duplicates: Boolean = true
+    ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Preset query for geometry issues (item 1xxx)
-    event facet QueryGeometryIssues(
-        bbox: String,
-        level: String = "1,2,3",
-        limit: Long = 500
-    ) => (result: OsmoseResult)
+    // Geometry-only verification (degenerate ways, unclosed polygons)
+    event facet VerifyGeometry(
+        cache: OSMCache
+    ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Preset query for tagging issues (item 2xxx-4xxx)
-    event facet QueryTagIssues(
-        bbox: String,
-        level: String = "1,2,3",
-        limit: Long = 500
-    ) => (result: OsmoseResult)
+    // Tag-only verification with optional required-tag list
+    event facet VerifyTags(
+        cache: OSMCache,
+        required_tags: String = "name"
+    ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Read GeoJSON output from a query and compute aggregate statistics
-    event facet IssueSummary(
+    // Verify an existing GeoJSON file for structure, geometry, coordinates
+    event facet VerifyGeoJSON(
         input_path: String
-    ) => (summary: OsmoseSummary)
+    ) => (result: VerifyResult, summary: VerifySummary)
+
+    // Read verification GeoJSON and compute aggregate statistics
+    event facet ComputeVerifySummary(
+        input_path: String
+    ) => (summary: VerifySummary)
 }
