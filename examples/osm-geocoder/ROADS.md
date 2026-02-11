@@ -102,7 +102,7 @@ workflow AnalyzeRoadNetwork(region: String = "Liechtenstein")
     => (total_km: Double, motorway_km: Double, primary_km: Double, with_speed: Long) andThen {
 
     // Stage 1: Get cached region data
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
 
     // Stage 2: Extract all roads
     roads = osm.geo.Roads.ExtractRoads(cache = cache.cache, road_class = "all")
@@ -125,7 +125,7 @@ workflow AnalyzeRoadNetwork(region: String = "Liechtenstein")
 workflow HighSpeedRoads(region: String = "Liechtenstein")
     => (map_path: String, road_count: Long) andThen {
 
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
     roads = osm.geo.Roads.RoadsWithSpeedLimit(cache = cache.cache)
 
     // Filter to roads with speed > 80 km/h

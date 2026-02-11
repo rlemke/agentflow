@@ -13,7 +13,7 @@ workflow VisualizeBicycleRoutes(region: String = "Liechtenstein")
     => (map_path: String, route_count: Long) andThen {
 
     // Stage 1: Get cached region data
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
 
     // Stage 2: Extract bicycle routes
     routes = osm.geo.Routes.BicycleRoutes(
@@ -43,7 +43,7 @@ Analysis pipeline without visualization.
 workflow AnalyzeParks(region: String = "Liechtenstein")
     => (total_parks: Long, total_area: Double, national: Long, state: Long) andThen {
 
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
     parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
     stats = osm.geo.Parks.ParkStatistics(input_path = parks.result.output_path)
 
@@ -64,7 +64,7 @@ Four-stage pipeline with filtering.
 workflow LargeCitiesMap(region: String = "Liechtenstein", min_pop: Long = 10000)
     => (map_path: String, city_count: Long) andThen {
 
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
     cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 0)
 
     // Filter by population
@@ -97,7 +97,7 @@ workflow TransportOverview(region: String = "Liechtenstein")
     => (bicycle_km: Double, hiking_km: Double, train_km: Double, bus_routes: Long) andThen {
 
     // Shared cache
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
 
     // Parallel extraction (conceptually)
     bicycle = osm.geo.Routes.BicycleRoutes(cache = cache.cache, include_infrastructure = false)
@@ -128,7 +128,7 @@ Cache → Extract → Filter → Statistics → Visualize
 workflow NationalParksAnalysis(region: String = "Liechtenstein")
     => (map_path: String, park_count: Long, total_area: Double, avg_area: Double) andThen {
 
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
     all_parks = osm.geo.Parks.ExtractParks(cache = cache.cache, park_type = "all")
 
     // Filter to national parks only

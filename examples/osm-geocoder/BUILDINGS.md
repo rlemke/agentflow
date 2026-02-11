@@ -77,7 +77,7 @@ workflow AnalyzeResidentialBuildings(region: String = "Liechtenstein")
     => (building_count: Long, total_area: Double, with_height: Long) andThen {
 
     // Stage 1: Get cached region data
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
 
     // Stage 2: Extract residential buildings
     buildings = osm.geo.Buildings.ResidentialBuildings(cache = cache.cache)

@@ -106,7 +106,7 @@ workflow FindRestaurants(region: String = "Liechtenstein")
     => (map_path: String, restaurant_count: Long) andThen {
 
     // Stage 1: Get cached region data
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
 
     // Stage 2: Extract restaurants
     restaurants = osm.geo.Amenities.Restaurants(cache = cache.cache)
@@ -131,7 +131,7 @@ workflow FindRestaurants(region: String = "Liechtenstein")
 workflow FindCoffeeShops(region: String = "Liechtenstein")
     => (result_path: String, count: Long) andThen {
 
-    cache = osm.geo.cache.Europe.Liechtenstein()
+    cache = osm.geo.Operations.Cache(region = $.region)
     cafes = osm.geo.Amenities.Cafes(cache = cache.cache)
 
     // Search by name pattern (regex)
