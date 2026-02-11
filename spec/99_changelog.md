@@ -277,3 +277,9 @@
 - **zoom_handlers.py**: 9 thin factory-pattern wrappers following `park_handlers.py` convention; `ZOOM_FACETS` list + `register_zoom_handlers(poller)`
 - **Pattern 15 — RoadZoomBuilder**: `Cache → BuildGraph → BuildZoomLayers(cache, graph)` composed workflow
 - 1092 tests passing
+
+## Completed (v0.9.8) - Fix Hardcoded Cache Calls in Composed Workflows
+- **osmworkflows_composed.afl**: 13 workflows accepted a `region: String` parameter but hardcoded the cache call to `osm.geo.cache.Europe.Liechtenstein()`, ignoring the parameter entirely; replaced all 13 with `osm.geo.Operations.Cache(region = $.region)` so the region parameter is actually respected
+- **Affected workflows**: `VisualizeBicycleRoutes`, `AnalyzeParks`, `LargeCitiesMap`, `TransportOverview`, `NationalParksAnalysis`, `TransportMap`, `StateBoundariesWithStats`, `DiscoverCitiesAndTowns`, `RegionalAnalysis`, `ValidateAndSummarize`, `OsmoseQualityCheck`, `TransitAccessibility`, `RoadZoomBuilder`
+- **Unchanged** (correctly hardcoded — no `region` parameter): `GermanyCityAnalysis` (`Europe.Germany()`), `FranceCityAnalysis` (`Europe.France()`), `TransitAnalysis` (no cache, takes `gtfs_url` only)
+- 1174 tests passing
