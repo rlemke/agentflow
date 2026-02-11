@@ -353,4 +353,37 @@ namespace examples.composed {
             output_path = validation.result.output_path
         )
     }
+
+    // ==========================================================================
+    // PATTERN 12: Cache → OSMOSE Query → Summary
+    // External QA validation via OSMOSE
+    // ==========================================================================
+
+    workflow OsmoseQualityCheck(
+        bbox: String = "5.9,47.3,10.5,47.8",
+        level: String = "1,2,3",
+        limit: Long = 500
+    ) => (
+        total_issues: Long,
+        geometry_issues: Long,
+        tag_issues: Long,
+        output_path: String
+    ) andThen {
+        // Stage 1: Query all OSMOSE issues for the region
+        issues = osm.geo.Operations.OSMOSE.QueryIssues(
+            bbox = $.bbox, level = $.level, limit = $.limit
+        )
+
+        // Stage 2: Compute summary statistics
+        summary = osm.geo.Operations.OSMOSE.IssueSummary(
+            input_path = issues.result.output_path
+        )
+
+        yield OsmoseQualityCheck(
+            total_issues = summary.summary.total_issues,
+            geometry_issues = summary.summary.geometry_issues,
+            tag_issues = summary.summary.tag_issues,
+            output_path = issues.result.output_path
+        )
+    }
 }

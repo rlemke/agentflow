@@ -1,0 +1,70 @@
+// OSMOSE QA Integration
+//
+// Queries the OSMOSE external QA service (osmose.openstreetmap.fr) for
+// data quality issues within a bounding box. OSMOSE detects broken
+// geometries, missing tags, routing problems, and other OSM data issues.
+//
+// The public REST API requires no authentication and returns up to 500
+// issues per request with lat/lon, severity, category, and affected
+// OSM elements.
+
+namespace osm.geo.Operations.OSMOSE {
+
+    schema OsmoseIssue {
+        issue_id: String,
+        item: Long,
+        item_class: Long,
+        level: Long,
+        title: String,
+        subtitle: String,
+        lat: Double,
+        lon: Double,
+        osm_elements: String,
+        date: String
+    }
+
+    schema OsmoseResult {
+        output_path: String,
+        issue_count: Long,
+        format: String,
+        query_date: String
+    }
+
+    schema OsmoseSummary {
+        total_issues: Long,
+        geometry_issues: Long,
+        tag_issues: Long,
+        level_1: Long,
+        level_2: Long,
+        level_3: Long,
+        query_date: String
+    }
+
+    // Query all OSMOSE issues for a bounding box, returns GeoJSON output
+    event facet QueryIssues(
+        bbox: String,
+        item: String = "",
+        level: String = "1,2,3",
+        limit: Long = 500,
+        status: String = "open"
+    ) => (result: OsmoseResult)
+
+    // Preset query for geometry issues (item 1xxx)
+    event facet QueryGeometryIssues(
+        bbox: String,
+        level: String = "1,2,3",
+        limit: Long = 500
+    ) => (result: OsmoseResult)
+
+    // Preset query for tagging issues (item 2xxx-4xxx)
+    event facet QueryTagIssues(
+        bbox: String,
+        level: String = "1,2,3",
+        limit: Long = 500
+    ) => (result: OsmoseResult)
+
+    // Read GeoJSON output from a query and compute aggregate statistics
+    event facet IssueSummary(
+        input_path: String
+    ) => (summary: OsmoseSummary)
+}

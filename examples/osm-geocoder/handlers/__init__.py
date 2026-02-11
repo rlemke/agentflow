@@ -13,6 +13,7 @@ from .elevation_handlers import register_elevation_handlers
 from .filter_handlers import register_filter_handlers
 from .graphhopper_handlers import register_graphhopper_handlers
 from .operations_handlers import register_operations_handlers
+from .osmose_handlers import register_osmose_handlers
 from .park_handlers import register_park_handlers
 from .poi_handlers import register_poi_handlers
 from .population_handlers import register_population_handlers
@@ -34,6 +35,7 @@ __all__ = [
     "register_filter_handlers",
     "register_graphhopper_handlers",
     "register_operations_handlers",
+    "register_osmose_handlers",
     "register_park_handlers",
     "register_poi_handlers",
     "register_population_handlers",
@@ -58,6 +60,7 @@ def register_all_handlers(poller) -> None:
     register_filter_handlers(poller)
     register_graphhopper_handlers(poller)
     register_operations_handlers(poller)
+    register_osmose_handlers(poller)
     register_park_handlers(poller)
     register_poi_handlers(poller)
     register_population_handlers(poller)
