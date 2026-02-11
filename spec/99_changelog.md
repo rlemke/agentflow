@@ -254,3 +254,15 @@
 - **osmose_handlers.py**: thin wrappers delegating to `osmose_verifier`; `register_osmose_handlers(poller)` signature preserved — `__init__.py` unchanged
 - **Pattern 12 rewrite**: `OsmoseQualityCheck` workflow now uses cache-based local verification (Cache → VerifyAll → ComputeVerifySummary) instead of bbox-based API queries
 - 1092 tests passing
+
+## Completed (v0.9.6) - GTFS Transit Feed Support
+- **osmgtfs.afl**: new `osm.geo.Transit.GTFS` namespace with `use osm.types`; 9 schemas (`StopResult`, `RouteResult`, `FrequencyResult`, `TransitStats`, `NearestStopResult`, `AccessibilityResult`, `CoverageResult`, `DensityResult`, `TransitReport`) and 10 event facets
+- **GTFSFeed schema**: added to `osm.types` namespace (url, path, date, size, wasInCache, agency_name, has_shapes) — analogous to `OSMCache` and `GraphHopperCache`
+- **Core event facets**: `DownloadFeed` (ZIP download with URL-hash caching), `ExtractStops` (stops.txt → GeoJSON points, location_type=0 filter), `ExtractRoutes` (shapes.txt linestrings with stop-sequence fallback), `ServiceFrequency` (trips-per-stop-per-day from stop_times.txt + calendar.txt), `TransitStatistics` (aggregate counts by route type)
+- **OSM integration facets**: `NearestStops` (brute-force haversine nearest-neighbor lookup), `StopAccessibility` (400m/800m/beyond walk-distance bands)
+- **Coverage facets**: `CoverageGaps` (grid overlay detecting cells with OSM features but no stops), `RouteDensity` (routes per grid cell), `GenerateReport` (consolidated analysis)
+- **gtfs_extractor.py**: pure-stdlib implementation (`csv`, `zipfile`, `json`, `math`) — no new dependencies; `GTFSRouteType(IntEnum)` with `from_string()` and `label()` classmethods; safety cap of 10,000 grid cells; handles GTFS ZIPs with nested subdirectories; streams stop_times.txt for large feeds
+- **gtfs_handlers.py**: thin factory-pattern wrappers (10 factories + `GTFS_FACETS` list + `register_gtfs_handlers(poller)`); follows `park_handlers.py` pattern with `_*_to_dict()` converters and `_empty_*()` helpers
+- **Pattern 13 — TransitAnalysis**: `DownloadFeed → ExtractStops + ExtractRoutes → TransitStatistics` composed workflow
+- **Pattern 14 — TransitAccessibility**: `OSM Cache + DownloadFeed → ExtractBuildings + ExtractStops → StopAccessibility → CoverageGaps` composed workflow
+- 1092 tests passing
