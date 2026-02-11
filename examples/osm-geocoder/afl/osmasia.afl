@@ -83,44 +83,44 @@ namespace osm.geo.Asia.cache {
     dl_vietnam =  Download(cache = vietnam.cache)
     dl_yemen =  Download(cache = yemen.cache)
 
-    yield AsiaIndividually(cache = dl_afghanistan.cache ++
-                                   dl_armenia.cache ++
-                                   dl_azerbaijan.cache ++
-                                   dl_bangladesh.cache ++
-                                   dl_bhutan.cache ++
-                                   dl_brunei.cache ++
-                                   dl_cambodia.cache ++
-                                   dl_china.cache ++
-                                   dl_eastTimor.cache ++
-                                   dl_gCCStates.cache ++
-                                   dl_india.cache ++
-                                   dl_indonesia.cache ++
-                                   dl_iran.cache ++
-                                   dl_iraq.cache ++
-                                   dl_japan.cache ++
-                                   dl_jordan.cache ++
-                                   dl_kazakhstan.cache ++
-                                   dl_kyrgyzstan.cache ++
-                                   dl_laos.cache ++
-                                   dl_lebanon.cache ++
-                                   dl_malaysia.cache ++
-                                   dl_maldives.cache ++
-                                   dl_mongolia.cache ++
-                                   dl_myanmar.cache ++
-                                   dl_nepal.cache ++
-                                   dl_northKorea.cache ++
-                                   dl_pakistan.cache ++
-                                   dl_israelAndPalestine.cache ++
-                                   dl_philippines.cache ++
-                                   dl_southKorea.cache ++
-                                   dl_sriLanka.cache ++
-                                   dl_syria.cache ++
-                                   dl_tajikistan.cache ++
-                                   dl_thailand.cache ++
-                                   dl_turkmenistan.cache ++
-                                   dl_uzbekistan.cache ++
-                                   dl_vietnam.cache ++
-                                   dl_yemen.cache)
+    yield AsiaIndividually(cache = dl_afghanistan.downloadCache ++
+                                   dl_armenia.downloadCache ++
+                                   dl_azerbaijan.downloadCache ++
+                                   dl_bangladesh.downloadCache ++
+                                   dl_bhutan.downloadCache ++
+                                   dl_brunei.downloadCache ++
+                                   dl_cambodia.downloadCache ++
+                                   dl_china.downloadCache ++
+                                   dl_eastTimor.downloadCache ++
+                                   dl_gCCStates.downloadCache ++
+                                   dl_india.downloadCache ++
+                                   dl_indonesia.downloadCache ++
+                                   dl_iran.downloadCache ++
+                                   dl_iraq.downloadCache ++
+                                   dl_japan.downloadCache ++
+                                   dl_jordan.downloadCache ++
+                                   dl_kazakhstan.downloadCache ++
+                                   dl_kyrgyzstan.downloadCache ++
+                                   dl_laos.downloadCache ++
+                                   dl_lebanon.downloadCache ++
+                                   dl_malaysia.downloadCache ++
+                                   dl_maldives.downloadCache ++
+                                   dl_mongolia.downloadCache ++
+                                   dl_myanmar.downloadCache ++
+                                   dl_nepal.downloadCache ++
+                                   dl_northKorea.downloadCache ++
+                                   dl_pakistan.downloadCache ++
+                                   dl_israelAndPalestine.downloadCache ++
+                                   dl_philippines.downloadCache ++
+                                   dl_southKorea.downloadCache ++
+                                   dl_sriLanka.downloadCache ++
+                                   dl_syria.downloadCache ++
+                                   dl_tajikistan.downloadCache ++
+                                   dl_thailand.downloadCache ++
+                                   dl_turkmenistan.downloadCache ++
+                                   dl_uzbekistan.downloadCache ++
+                                   dl_vietnam.downloadCache ++
+                                   dl_yemen.downloadCache)
 
   }
 

@@ -3,28 +3,31 @@
 // Downloads and processes electoral boundary data from the US Census Bureau.
 // Supports Congressional Districts, State Legislative Districts, and Voting Precincts.
 
-schema TIGERCache {
-    url: String,
-    path: String,
-    date: String,
-    size: Long,
-    wasInCache: Boolean,
-    year: Long,
-    district_type: String,
-    state_fips: String
-}
+namespace census.types {
+    schema TIGERCache {
+        url: String,
+        path: String,
+        date: String,
+        size: Long,
+        wasInCache: Boolean,
+        year: Long,
+        district_type: String,
+        state_fips: String
+    }
 
-schema VotingDistrictResult {
-    output_path: String,
-    feature_count: Long,
-    district_type: String,
-    state: String,
-    year: Long,
-    format: String,
-    extraction_date: String
+    schema VotingDistrictResult {
+        output_path: String,
+        feature_count: Long,
+        district_type: String,
+        state: String,
+        year: Long,
+        format: String,
+        extraction_date: String
+    }
 }
 
 namespace census.tiger.Districts {
+    use census.types
     // Download Congressional District boundaries (nationwide)
     // congress_number: e.g., 118 for 118th Congress (2023-2025)
     event facet CongressionalDistricts(year: Long = 2023,
@@ -50,6 +53,8 @@ namespace census.tiger.Districts {
 }
 
 namespace census.tiger.Processing {
+    use census.types
+
     // Convert TIGER shapefile to GeoJSON
     event facet ShapefileToGeoJSON(cache: TIGERCache) => (result: VotingDistrictResult)
 
@@ -66,6 +71,8 @@ namespace census.tiger.Processing {
 // Convenience workflows for common use cases
 
 namespace census.tiger.Workflows {
+    use census.types
+
     // State FIPS code reference facet
     facet StateFIPS(state: String) => (fips: String)
 

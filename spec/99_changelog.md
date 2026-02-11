@@ -230,3 +230,17 @@
 - **New schema**: `VolcanoCache { region, path, cached }` for cache check results
 - **Volcano-query example**: 7 event facets + 1 composed facet, 6 pause/resume cycles (was 4 event facets, 4 cycles)
 - 1056 tests passing
+
+## Completed (v0.9.4) - Cross-Namespace Composition & Generic Cache Delegation
+- **osmoperations.afl fixes**: removed double `=>` on `Cache` event facet, fixed `OsmCache` → `OSMCache` typo on `Download`
+- **FormatGeoJSON**: new event facet in `osm.geo.Visualization` with `FormatResult` schema (`output_path`, `text`, `feature_count`, `format`, `title`)
+- **osmcache.afl refactor**: 280 event facets across 11 namespaces (`Africa`, `Asia`, `Australia`, `Europe`, `NorthAmerica`, `Canada`, `CentralAmerica`, `SouthAmerica`, `UnitedStates`, `Antarctica`, `Continents`) converted from `event facet` to composed `facet` with `andThen` body delegating to generic `Cache(region = "<Name>")`
+- **osmgraphhoppercache.afl refactor**: 262 event facets across 8 namespaces converted from `event facet` to composed `facet` with `andThen` body delegating to generic `BuildGraph(cache, profile, recreate)`
+- **volcano-query rewrite**: replaced all custom schemas and 7 event facets with cross-namespace composition using `osm.geo.Operations` (Cache, Download), `osm.geo.Filters` (FilterByOSMTag), `osm.geo.Elevation` (FilterByMaxElevation), `osm.geo.Visualization` (RenderMap, FormatGeoJSON)
+- **AFL-only example**: removed volcano-query handlers, test runner, and agent — now relies entirely on existing OSM geocoder infrastructure
+- **dl_*.downloadCache fix**: 254 attribute references across 10 continent workflow files corrected from `dl_*.cache` to `dl_*.downloadCache` (latent bug exposed by `OsmCache` → `OSMCache` type fix)
+- **osmvoting.afl fix**: moved `TIGERCache` and `VotingDistrictResult` schemas into `census.types` namespace (schemas cannot be top-level); added `use census.types` to `Districts`, `Processing`, and `Workflows` namespaces
+- **osmworkflows_composed.afl fix**: corrected `osm.geo.POI` → `osm.geo.POIs` namespace reference; fixed return attribute names (`pois` → `cities`/`towns`/`villages`)
+- **Cross-example disambiguation**: qualified `Download` as `osm.geo.Operations.Download` in volcano.afl; added `use genomics.cache.Operations` to genomics_cache_workflows.afl to resolve ambiguous facet references when compiling all examples together
+- **All examples compile together**: 47 AFL sources (volcano-query + osm-geocoder + genomics), 0 errors
+- 1056 tests passing

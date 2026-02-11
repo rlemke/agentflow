@@ -34,17 +34,17 @@ namespace osm.geo.CentralAmerica.cache {
     dl_panama = Download(cache = panama.cache)
 
     yield CentralAmericaIndividually( cache =
-      dl_bahamas.cache ++
-      dl_belize.cache ++
-      dl_costaRica.cache ++
-      dl_cuba.cache ++
-      dl_elSalvador.cache ++
-      dl_dominicanRepublic.cache ++
-      dl_guatemala.cache ++
-      dl_haiti.cache ++
-      dl_honduras.cache ++
-      dl_jamaica.cache ++
-      dl_nicaragua.cache ++
-      dl_panama.cache)
+      dl_bahamas.downloadCache ++
+      dl_belize.downloadCache ++
+      dl_costaRica.downloadCache ++
+      dl_cuba.downloadCache ++
+      dl_elSalvador.downloadCache ++
+      dl_dominicanRepublic.downloadCache ++
+      dl_guatemala.downloadCache ++
+      dl_haiti.downloadCache ++
+      dl_honduras.downloadCache ++
+      dl_jamaica.downloadCache ++
+      dl_nicaragua.downloadCache ++
+      dl_panama.downloadCache)
    }
 }

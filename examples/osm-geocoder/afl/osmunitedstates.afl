@@ -113,57 +113,57 @@ namespace osm.geo.UnitedStates.cache {
     dl_wyoming = Download(cache = wyoming.cache)
 
 
-    yield UnitedStatesIndividually(cache = dl_alabama.cache ++
-                                   dl_alaska.cache ++
-                                   dl_arizona.cache ++
-                                   dl_arkansas.cache ++
-                                   dl_california.cache ++
-                                   dl_colorado.cache ++
-                                   dl_connecticut.cache ++
-                                   dl_delaware.cache ++
-                                   dl_districtOfColumbia.cache ++
-                                   dl_florida.cache ++
-                                   dl_georgia.cache ++
-                                   dl_hawaii.cache ++
-                                   dl_idaho.cache ++
-                                   dl_illinois.cache ++
-                                   dl_indiana.cache ++
-                                   dl_iowa.cache ++
-                                   dl_kansas.cache ++
-                                   dl_kentucky.cache ++
-                                   dl_louisiana.cache ++
-                                   dl_maine.cache ++
-                                   dl_maryland.cache ++
-                                   dl_massachusetts.cache ++
-                                   dl_michigan.cache ++
-                                   dl_minnesota.cache ++
-                                   dl_mississippi.cache ++
-                                   dl_missouri.cache ++
-                                   dl_montana.cache ++
-                                   dl_nebraska.cache ++
-                                   dl_nevada.cache ++
-                                   dl_newHampshire.cache ++
-                                   dl_newJersey.cache ++
-                                   dl_newMexico.cache ++
-                                   dl_newYork.cache ++
-                                   dl_northCarolina.cache ++
-                                   dl_northDakota.cache ++
-                                   dl_ohio.cache ++
-                                   dl_oklahoma.cache ++
-                                   dl_oregon.cache ++
-                                   dl_pennsylvania.cache ++
-                                   dl_rhodeIsland.cache ++
-                                   dl_southCarolina.cache ++
-                                   dl_southDakota.cache ++
-                                   dl_tennessee.cache ++
-                                   dl_texas.cache ++
-                                   dl_utah.cache ++
-                                   dl_vermont.cache ++
-                                   dl_virginia.cache ++
-                                   dl_washington.cache ++
-                                   dl_westVirginia.cache ++
-                                   dl_wisconsin.cache ++
-                                   dl_wyoming.cache)
+    yield UnitedStatesIndividually(cache = dl_alabama.downloadCache ++
+                                   dl_alaska.downloadCache ++
+                                   dl_arizona.downloadCache ++
+                                   dl_arkansas.downloadCache ++
+                                   dl_california.downloadCache ++
+                                   dl_colorado.downloadCache ++
+                                   dl_connecticut.downloadCache ++
+                                   dl_delaware.downloadCache ++
+                                   dl_districtOfColumbia.downloadCache ++
+                                   dl_florida.downloadCache ++
+                                   dl_georgia.downloadCache ++
+                                   dl_hawaii.downloadCache ++
+                                   dl_idaho.downloadCache ++
+                                   dl_illinois.downloadCache ++
+                                   dl_indiana.downloadCache ++
+                                   dl_iowa.downloadCache ++
+                                   dl_kansas.downloadCache ++
+                                   dl_kentucky.downloadCache ++
+                                   dl_louisiana.downloadCache ++
+                                   dl_maine.downloadCache ++
+                                   dl_maryland.downloadCache ++
+                                   dl_massachusetts.downloadCache ++
+                                   dl_michigan.downloadCache ++
+                                   dl_minnesota.downloadCache ++
+                                   dl_mississippi.downloadCache ++
+                                   dl_missouri.downloadCache ++
+                                   dl_montana.downloadCache ++
+                                   dl_nebraska.downloadCache ++
+                                   dl_nevada.downloadCache ++
+                                   dl_newHampshire.downloadCache ++
+                                   dl_newJersey.downloadCache ++
+                                   dl_newMexico.downloadCache ++
+                                   dl_newYork.downloadCache ++
+                                   dl_northCarolina.downloadCache ++
+                                   dl_northDakota.downloadCache ++
+                                   dl_ohio.downloadCache ++
+                                   dl_oklahoma.downloadCache ++
+                                   dl_oregon.downloadCache ++
+                                   dl_pennsylvania.downloadCache ++
+                                   dl_rhodeIsland.downloadCache ++
+                                   dl_southCarolina.downloadCache ++
+                                   dl_southDakota.downloadCache ++
+                                   dl_tennessee.downloadCache ++
+                                   dl_texas.downloadCache ++
+                                   dl_utah.downloadCache ++
+                                   dl_vermont.downloadCache ++
+                                   dl_virginia.downloadCache ++
+                                   dl_washington.downloadCache ++
+                                   dl_westVirginia.downloadCache ++
+                                   dl_wisconsin.downloadCache ++
+                                   dl_wyoming.downloadCache)
 
 
 

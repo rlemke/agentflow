@@ -268,22 +268,22 @@ namespace examples.composed {
         cache = osm.geo.cache.Europe.Liechtenstein()
 
         // Stage 2: Extract settlements at different levels
-        city_data = osm.geo.POI.Cities(cache = cache.cache)
-        town_data = osm.geo.POI.Towns(cache = cache.cache)
-        village_data = osm.geo.POI.Villages(cache = cache.cache)
+        city_data = osm.geo.POIs.Cities(cache = cache.cache)
+        town_data = osm.geo.POIs.Towns(cache = cache.cache)
+        village_data = osm.geo.POIs.Villages(cache = cache.cache)
 
         // Stage 3: Visualize cities (largest settlements)
         map = osm.geo.Visualization.RenderMap(
-            geojson_path = city_data.pois.path,
+            geojson_path = city_data.cities.path,
             title = "Cities",
             color = "#e74c3c"
         )
 
         yield DiscoverCitiesAndTowns(
             map_path = map.result.output_path,
-            cities = city_data.pois.count,
-            towns = town_data.pois.count,
-            villages = village_data.pois.count
+            cities = city_data.cities.size,
+            towns = town_data.towns.size,
+            villages = village_data.villages.size
         )
     }
 

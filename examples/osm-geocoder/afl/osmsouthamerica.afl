@@ -34,17 +34,17 @@ namespace osm.geo.SouthAmerica.cache {
     dl_venezuela = Download(cache = venezuela.cache)
 
 
-    yield SouthAmericaIndividually(cache = dl_argentina.cache ++
-                                   dl_bolivia.cache ++
-                                   dl_brazil.cache ++
-                                   dl_chile.cache ++
-                                   dl_colombia.cache ++
-                                   dl_ecuador.cache ++
-                                   dl_guyana.cache ++
-                                   dl_paraguay.cache ++
-                                   dl_peru.cache ++
-                                   dl_suriname.cache ++
-                                   dl_uruguay.cache ++
-                                   dl_venezuela.cache)
+    yield SouthAmericaIndividually(cache = dl_argentina.downloadCache ++
+                                   dl_bolivia.downloadCache ++
+                                   dl_brazil.downloadCache ++
+                                   dl_chile.downloadCache ++
+                                   dl_colombia.downloadCache ++
+                                   dl_ecuador.downloadCache ++
+                                   dl_guyana.downloadCache ++
+                                   dl_paraguay.downloadCache ++
+                                   dl_peru.downloadCache ++
+                                   dl_suriname.downloadCache ++
+                                   dl_uruguay.downloadCache ++
+                                   dl_venezuela.downloadCache)
   }
 }

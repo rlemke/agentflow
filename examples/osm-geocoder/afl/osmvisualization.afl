@@ -41,4 +41,16 @@ namespace osm.geo.Visualization {
 
     // Quick preview - auto-opens in browser
     event facet PreviewMap(geojson_path: String) => (result: MapResult)
+
+    schema FormatResult {
+        output_path: String,
+        text: String,
+        feature_count: Long,
+        format: String,
+        title: String
+    }
+
+    // Format GeoJSON features as text or other output formats
+    event facet FormatGeoJSON(input_path: String, title: String = "Features",
+        format: String = "text") => (result: FormatResult)
 }

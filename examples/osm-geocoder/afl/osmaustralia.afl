@@ -47,25 +47,25 @@ namespace osm.geo.Australia.cache {
     dl_wallisAndFutuna = Download(cache = wallisAndFutuna.cache)
 
 
-    yield AustraliaIndividually(cache = dl_americanOceania.cache ++
-            dl_cookIslands.cache ++
-            dl_fiji.cache ++
-            dl_kiribati.cache ++
-            dl_ileDeClipperton.cache ++
-            dl_marshallIslands.cache ++
-            dl_micronesia.cache ++
-            dl_nauru.cache ++
-            dl_newCaledonia.cache ++
-            dl_newZealand.cache ++
-            dl_palau.cache ++
-            dl_papuaNewGuinea.cache ++
-            dl_samoa.cache ++
-            dl_solomonIslands.cache ++
-            dl_tokelau.cache ++
-            dl_tonga.cache ++
-            dl_tuvalu.cache ++
-            dl_vanuatu.cache ++
-            dl_wallisAndFutuna.cache)
+    yield AustraliaIndividually(cache = dl_americanOceania.downloadCache ++
+            dl_cookIslands.downloadCache ++
+            dl_fiji.downloadCache ++
+            dl_kiribati.downloadCache ++
+            dl_ileDeClipperton.downloadCache ++
+            dl_marshallIslands.downloadCache ++
+            dl_micronesia.downloadCache ++
+            dl_nauru.downloadCache ++
+            dl_newCaledonia.downloadCache ++
+            dl_newZealand.downloadCache ++
+            dl_palau.downloadCache ++
+            dl_papuaNewGuinea.downloadCache ++
+            dl_samoa.downloadCache ++
+            dl_solomonIslands.downloadCache ++
+            dl_tokelau.downloadCache ++
+            dl_tonga.downloadCache ++
+            dl_tuvalu.downloadCache ++
+            dl_vanuatu.downloadCache ++
+            dl_wallisAndFutuna.downloadCache)
   }
 
 }

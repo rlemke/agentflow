@@ -1,93 +1,34 @@
-// Volcano Query — composable pipeline for querying US volcano data
+// Volcano Query — cross-namespace composition using OSM event facets
 //
-// Demonstrates atomic event facets composed into multi-step workflows:
-//   LoadVolcanoData (Cache → Download → FilterByType) → FilterByRegion → FilterByElevation → FormatVolcanoes
-//
-// LoadVolcanoData is a composed facet whose andThen body chains three event
-// facets: CheckRegionCache, DownloadVolcanoData, FilterByType.
-// The remaining event facets (FilterByRegion, FilterByElevation, FormatVolcanoes,
-// RenderMap) are atomic. Workflows compose all of them into pipelines.
+// No custom event facets. Composes operations from:
+//   osm.geo.Operations (Cache, Download)
+//   osm.geo.Filters (FilterByOSMTag)
+//   osm.geo.Elevation (FilterByMaxElevation)
+//   osm.geo.Visualization (RenderMap, FormatGeoJSON)
 
 namespace volcano {
+    use osm.types
+    use osm.geo.Operations
+    use osm.geo.Filters
+    use osm.geo.Elevation
+    use osm.geo.Visualization
 
-    schema VolcanoDataset {
-        volcanoes: Json
+    facet LoadVolcanoData(region: String = "US") => (cache: OSMCache) andThen {
+        c = Cache(region = $.region)
+        d = osm.geo.Operations.Download(cache = c.cache)
+        yield LoadVolcanoData(cache = d.downloadCache)
     }
 
-    schema VolcanoList {
-        volcanoes: Json,
-        count: Long
+    workflow FindVolcanoes(state: String, min_elevation_ft: Long) => (map: MapResult, text: FormatResult) andThen {
+        data = LoadVolcanoData(region = $.state)
+        filtered = FilterByOSMTag(input_path = data.cache.path,
+            tag_key = "natural", tag_value = "volcano")
+        elevated = FilterByMaxElevation(input_path = filtered.result.output_path,
+            min_max_elevation_ft = $.min_elevation_ft)
+        fmt = FormatGeoJSON(input_path = elevated.result.output_path,
+            title = $.state ++ " Volcanoes")
+        map = RenderMap(geojson_path = elevated.result.output_path,
+            title = $.state ++ " Volcanoes")
+        yield FindVolcanoes(map = map.result, text = fmt.result)
     }
-
-    schema FormattedResult {
-        text: String,
-        count: Long
-    }
-
-    schema MapResult {
-        html: String,
-        title: String
-    }
-
-    schema VolcanoCache {
-        region: String,
-        path: String,
-        cached: Boolean
-    }
-
-    // ── Atomic event facets (each does ONE thing) ──────────────────────
-
-    event facet CheckRegionCache(region: String) => (result: VolcanoCache)
-
-    event facet DownloadVolcanoData(region: String, cache_path: String) => (result: VolcanoDataset)
-
-    event facet FilterByType(volcanoes: Json, volcano_type: String) => (result: VolcanoDataset)
-
-    event facet FilterByRegion(volcanoes: Json, state: String) => (result: VolcanoList)
-
-    event facet FilterByElevation(volcanoes: Json, min_elevation_ft: Long) => (result: VolcanoList)
-
-    event facet FormatVolcanoes(volcanoes: Json, count: Long) => (result: FormattedResult)
-
-    event facet RenderMap(volcanoes: Json, title: String) => (result: MapResult)
-
-    // ── Composed facet (Cache → Download → FilterByType) ────────────────
-
-    facet LoadVolcanoData(region: String = "US", volcano_type: String = "all") => (result: VolcanoDataset) andThen {
-        cache = CheckRegionCache(region = $.region)
-        raw = DownloadVolcanoData(region = $.region, cache_path = cache.result.path)
-        typed = FilterByType(volcanoes = raw.result.volcanoes, volcano_type = $.volcano_type)
-        yield LoadVolcanoData(result = typed.result)
-    }
-
-    // ── Composed workflows ─────────────────────────────────────────────
-
-    // Pipeline: Load → FilterByRegion → FilterByElevation → Format
-    workflow FindVolcanoes(state: String, min_elevation_ft: Long) => (text: String, count: Long) andThen {
-        data = LoadVolcanoData()
-        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = $.state)
-        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
-        yield FindVolcanoes(text = fmt.result.text, count = fmt.result.count)
-    }
-
-    // Pipeline + map visualization (Format and RenderMap can run in parallel)
-    workflow FindVolcanoesWithMap(state: String, min_elevation_ft: Long) => (text: String, count: Long, map_html: String) andThen {
-        data = LoadVolcanoData()
-        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = $.state)
-        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
-        map = RenderMap(volcanoes = elevated.result.volcanoes, title = $.state ++ " Volcanoes")
-        yield FindVolcanoesWithMap(text = fmt.result.text, count = fmt.result.count, map_html = map.result.html)
-    }
-
-    // Foreach over multiple states
-    workflow FindVolcanoesMultiState(states: Json, min_elevation_ft: Long) => (results: Json) andThen foreach st in $.states {
-        data = LoadVolcanoData()
-        regional = FilterByRegion(volcanoes = data.result.volcanoes, state = st.value)
-        elevated = FilterByElevation(volcanoes = regional.result.volcanoes, min_elevation_ft = $.min_elevation_ft)
-        fmt = FormatVolcanoes(volcanoes = elevated.result.volcanoes, count = elevated.result.count)
-        yield FindVolcanoesMultiState(results = fmt.result)
-    }
-
 }

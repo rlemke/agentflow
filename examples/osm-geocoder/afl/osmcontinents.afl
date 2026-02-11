@@ -28,15 +28,15 @@ namespace osm.geo.Continents.cache {
     dl_russia = Download(cache = russia.cache)
 
     yield ContinentsIndividually(cache =
-      dl_planet.cache ++
-      dl_africa.cache ++
-      dl_antarctica.cache ++
-      //dl_asia.cache ++
-      dl_australia.cache ++
-      dl_centralAmerica.cache ++
-      dl_europe.cache ++
-      dl_southAmerica.cache ++
-      dl_russia.cache)
+      dl_planet.downloadCache ++
+      dl_africa.downloadCache ++
+      dl_antarctica.downloadCache ++
+      //dl_asia.downloadCache ++
+      dl_australia.downloadCache ++
+      dl_centralAmerica.downloadCache ++
+      dl_europe.downloadCache ++
+      dl_southAmerica.downloadCache ++
+      dl_russia.downloadCache)
       */
   }
 }

@@ -6,6 +6,7 @@
 namespace genomics.cache.workflows {
 
     use genomics.cache.types
+    use genomics.cache.Operations
 
     // Resolve a reference genome by name, then build an aligner index
     workflow PrepareReference(

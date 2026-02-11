@@ -3,307 +3,1102 @@
 
 namespace osm.geo.cache.GraphHopper.Africa {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Africa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Algeria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Angola(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Benin(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Botswana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet BurkinaFaso(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Burundi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet CapeVerde(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Cameroon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet CentralAfricanRepublic(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Chad(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Comores(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Congo_Brazzaville(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Congo_Kinshasa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Djibouti(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Egypt(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet EquatorialGuinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Eritrea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Eswatini(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ethiopia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Gabon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Gambia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ghana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Guinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet GuineaBissau(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kenya(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Lesotho(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Liberia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Libya(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Madagascar(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Malawi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mali(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mauritania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mauritius(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Morocco(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mozambique(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Namibia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Niger(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nigeria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Rwanda(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SaoTomeAndPrincipe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Senegal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Seychelles(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SierraLeone(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Somalia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthSudan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Sudan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tanzania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Togo(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tunisia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Uganda(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Zambia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Zimbabwe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllAfrica(graph = g.graph)
+    }
+    facet Africa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Africa(graph = g.graph)
+    }
+    facet Algeria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Algeria(graph = g.graph)
+    }
+    facet Angola(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Angola(graph = g.graph)
+    }
+    facet Benin(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Benin(graph = g.graph)
+    }
+    facet Botswana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Botswana(graph = g.graph)
+    }
+    facet BurkinaFaso(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield BurkinaFaso(graph = g.graph)
+    }
+    facet Burundi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Burundi(graph = g.graph)
+    }
+    facet CapeVerde(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield CapeVerde(graph = g.graph)
+    }
+    facet Cameroon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Cameroon(graph = g.graph)
+    }
+    facet CentralAfricanRepublic(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield CentralAfricanRepublic(graph = g.graph)
+    }
+    facet Chad(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Chad(graph = g.graph)
+    }
+    facet Comores(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Comores(graph = g.graph)
+    }
+    facet Congo_Brazzaville(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Congo_Brazzaville(graph = g.graph)
+    }
+    facet Congo_Kinshasa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Congo_Kinshasa(graph = g.graph)
+    }
+    facet Djibouti(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Djibouti(graph = g.graph)
+    }
+    facet Egypt(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Egypt(graph = g.graph)
+    }
+    facet EquatorialGuinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield EquatorialGuinea(graph = g.graph)
+    }
+    facet Eritrea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Eritrea(graph = g.graph)
+    }
+    facet Eswatini(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Eswatini(graph = g.graph)
+    }
+    facet Ethiopia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ethiopia(graph = g.graph)
+    }
+    facet Gabon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Gabon(graph = g.graph)
+    }
+    facet Gambia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Gambia(graph = g.graph)
+    }
+    facet Ghana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ghana(graph = g.graph)
+    }
+    facet Guinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Guinea(graph = g.graph)
+    }
+    facet GuineaBissau(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield GuineaBissau(graph = g.graph)
+    }
+    facet Kenya(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kenya(graph = g.graph)
+    }
+    facet Lesotho(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Lesotho(graph = g.graph)
+    }
+    facet Liberia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Liberia(graph = g.graph)
+    }
+    facet Libya(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Libya(graph = g.graph)
+    }
+    facet Madagascar(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Madagascar(graph = g.graph)
+    }
+    facet Malawi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Malawi(graph = g.graph)
+    }
+    facet Mali(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mali(graph = g.graph)
+    }
+    facet Mauritania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mauritania(graph = g.graph)
+    }
+    facet Mauritius(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mauritius(graph = g.graph)
+    }
+    facet Morocco(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Morocco(graph = g.graph)
+    }
+    facet Mozambique(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mozambique(graph = g.graph)
+    }
+    facet Namibia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Namibia(graph = g.graph)
+    }
+    facet Niger(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Niger(graph = g.graph)
+    }
+    facet Nigeria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nigeria(graph = g.graph)
+    }
+    facet Rwanda(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Rwanda(graph = g.graph)
+    }
+    facet SaoTomeAndPrincipe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SaoTomeAndPrincipe(graph = g.graph)
+    }
+    facet Senegal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Senegal(graph = g.graph)
+    }
+    facet Seychelles(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Seychelles(graph = g.graph)
+    }
+    facet SierraLeone(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SierraLeone(graph = g.graph)
+    }
+    facet Somalia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Somalia(graph = g.graph)
+    }
+    facet SouthAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthAfrica(graph = g.graph)
+    }
+    facet SouthSudan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthSudan(graph = g.graph)
+    }
+    facet Sudan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Sudan(graph = g.graph)
+    }
+    facet Tanzania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tanzania(graph = g.graph)
+    }
+    facet Togo(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Togo(graph = g.graph)
+    }
+    facet Tunisia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tunisia(graph = g.graph)
+    }
+    facet Uganda(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Uganda(graph = g.graph)
+    }
+    facet Zambia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Zambia(graph = g.graph)
+    }
+    facet Zimbabwe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Zimbabwe(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.Asia {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllAsia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Asia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Afghanistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Armenia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Azerbaijan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Bangladesh(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Bhutan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Brunei(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Cambodia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet China(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet EastTimor(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet GCCStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet India(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Indonesia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Iran(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Iraq(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Japan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Jordan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kazakhstan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kyrgyzstan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Laos(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Lebanon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Malaysia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Maldives(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mongolia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Myanmar(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nepal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthKorea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Pakistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet IsraelAndPalestine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Philippines(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SaudiArabia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Singapore(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthKorea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SriLanka(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Syria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tajikistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Taiwan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Thailand(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Turkmenistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Uzbekistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Vietnam(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Yemen(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllAsia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllAsia(graph = g.graph)
+    }
+    facet Asia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Asia(graph = g.graph)
+    }
+    facet Afghanistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Afghanistan(graph = g.graph)
+    }
+    facet Armenia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Armenia(graph = g.graph)
+    }
+    facet Azerbaijan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Azerbaijan(graph = g.graph)
+    }
+    facet Bangladesh(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Bangladesh(graph = g.graph)
+    }
+    facet Bhutan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Bhutan(graph = g.graph)
+    }
+    facet Brunei(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Brunei(graph = g.graph)
+    }
+    facet Cambodia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Cambodia(graph = g.graph)
+    }
+    facet China(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield China(graph = g.graph)
+    }
+    facet EastTimor(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield EastTimor(graph = g.graph)
+    }
+    facet GCCStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield GCCStates(graph = g.graph)
+    }
+    facet India(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield India(graph = g.graph)
+    }
+    facet Indonesia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Indonesia(graph = g.graph)
+    }
+    facet Iran(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Iran(graph = g.graph)
+    }
+    facet Iraq(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Iraq(graph = g.graph)
+    }
+    facet Japan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Japan(graph = g.graph)
+    }
+    facet Jordan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Jordan(graph = g.graph)
+    }
+    facet Kazakhstan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kazakhstan(graph = g.graph)
+    }
+    facet Kyrgyzstan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kyrgyzstan(graph = g.graph)
+    }
+    facet Laos(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Laos(graph = g.graph)
+    }
+    facet Lebanon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Lebanon(graph = g.graph)
+    }
+    facet Malaysia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Malaysia(graph = g.graph)
+    }
+    facet Maldives(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Maldives(graph = g.graph)
+    }
+    facet Mongolia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mongolia(graph = g.graph)
+    }
+    facet Myanmar(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Myanmar(graph = g.graph)
+    }
+    facet Nepal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nepal(graph = g.graph)
+    }
+    facet NorthKorea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthKorea(graph = g.graph)
+    }
+    facet Pakistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Pakistan(graph = g.graph)
+    }
+    facet IsraelAndPalestine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield IsraelAndPalestine(graph = g.graph)
+    }
+    facet Philippines(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Philippines(graph = g.graph)
+    }
+    facet SaudiArabia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SaudiArabia(graph = g.graph)
+    }
+    facet Singapore(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Singapore(graph = g.graph)
+    }
+    facet SouthKorea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthKorea(graph = g.graph)
+    }
+    facet SriLanka(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SriLanka(graph = g.graph)
+    }
+    facet Syria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Syria(graph = g.graph)
+    }
+    facet Tajikistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tajikistan(graph = g.graph)
+    }
+    facet Taiwan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Taiwan(graph = g.graph)
+    }
+    facet Thailand(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Thailand(graph = g.graph)
+    }
+    facet Turkmenistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Turkmenistan(graph = g.graph)
+    }
+    facet Uzbekistan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Uzbekistan(graph = g.graph)
+    }
+    facet Vietnam(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Vietnam(graph = g.graph)
+    }
+    facet Yemen(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Yemen(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.Australia {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllAustralia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Australia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Fiji(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kiribati(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet MarshallIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Micronesia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nauru(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewCaledonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewZealand(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Palau(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet PapuaNewGuinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Samoa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SolomonIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tonga(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tuvalu(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Vanuatu(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllAustralia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllAustralia(graph = g.graph)
+    }
+    facet Australia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Australia(graph = g.graph)
+    }
+    facet Fiji(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Fiji(graph = g.graph)
+    }
+    facet Kiribati(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kiribati(graph = g.graph)
+    }
+    facet MarshallIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield MarshallIslands(graph = g.graph)
+    }
+    facet Micronesia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Micronesia(graph = g.graph)
+    }
+    facet Nauru(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nauru(graph = g.graph)
+    }
+    facet NewCaledonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewCaledonia(graph = g.graph)
+    }
+    facet NewZealand(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewZealand(graph = g.graph)
+    }
+    facet Palau(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Palau(graph = g.graph)
+    }
+    facet PapuaNewGuinea(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield PapuaNewGuinea(graph = g.graph)
+    }
+    facet Samoa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Samoa(graph = g.graph)
+    }
+    facet SolomonIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SolomonIslands(graph = g.graph)
+    }
+    facet Tonga(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tonga(graph = g.graph)
+    }
+    facet Tuvalu(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tuvalu(graph = g.graph)
+    }
+    facet Vanuatu(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Vanuatu(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.Europe {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllEurope(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Europe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Albania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Andorra(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Austria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Belarus(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Belgium(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet BosniaHerzegovina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Bulgaria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Croatia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Cyprus(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet CzechRepublic(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Denmark(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Estonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet FaroeIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Finland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet France(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Georgia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Germany(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Greece(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Hungary(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Iceland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ireland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet IsleOfMan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Italy(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kosovo(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Latvia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Liechtenstein(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Lithuania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Luxembourg(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Malta(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Moldova(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Monaco(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Montenegro(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Netherlands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthMacedonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Norway(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Poland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Portugal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Romania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Russia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Serbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Slovakia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Slovenia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Spain(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Sweden(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Switzerland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Turkey(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ukraine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet UnitedKingdom(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllEurope(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllEurope(graph = g.graph)
+    }
+    facet Europe(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Europe(graph = g.graph)
+    }
+    facet Albania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Albania(graph = g.graph)
+    }
+    facet Andorra(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Andorra(graph = g.graph)
+    }
+    facet Austria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Austria(graph = g.graph)
+    }
+    facet Belarus(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Belarus(graph = g.graph)
+    }
+    facet Belgium(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Belgium(graph = g.graph)
+    }
+    facet BosniaHerzegovina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield BosniaHerzegovina(graph = g.graph)
+    }
+    facet Bulgaria(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Bulgaria(graph = g.graph)
+    }
+    facet Croatia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Croatia(graph = g.graph)
+    }
+    facet Cyprus(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Cyprus(graph = g.graph)
+    }
+    facet CzechRepublic(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield CzechRepublic(graph = g.graph)
+    }
+    facet Denmark(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Denmark(graph = g.graph)
+    }
+    facet Estonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Estonia(graph = g.graph)
+    }
+    facet FaroeIslands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield FaroeIslands(graph = g.graph)
+    }
+    facet Finland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Finland(graph = g.graph)
+    }
+    facet France(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield France(graph = g.graph)
+    }
+    facet Georgia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Georgia(graph = g.graph)
+    }
+    facet Germany(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Germany(graph = g.graph)
+    }
+    facet Greece(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Greece(graph = g.graph)
+    }
+    facet Hungary(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Hungary(graph = g.graph)
+    }
+    facet Iceland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Iceland(graph = g.graph)
+    }
+    facet Ireland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ireland(graph = g.graph)
+    }
+    facet IsleOfMan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield IsleOfMan(graph = g.graph)
+    }
+    facet Italy(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Italy(graph = g.graph)
+    }
+    facet Kosovo(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kosovo(graph = g.graph)
+    }
+    facet Latvia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Latvia(graph = g.graph)
+    }
+    facet Liechtenstein(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Liechtenstein(graph = g.graph)
+    }
+    facet Lithuania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Lithuania(graph = g.graph)
+    }
+    facet Luxembourg(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Luxembourg(graph = g.graph)
+    }
+    facet Malta(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Malta(graph = g.graph)
+    }
+    facet Moldova(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Moldova(graph = g.graph)
+    }
+    facet Monaco(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Monaco(graph = g.graph)
+    }
+    facet Montenegro(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Montenegro(graph = g.graph)
+    }
+    facet Netherlands(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Netherlands(graph = g.graph)
+    }
+    facet NorthMacedonia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthMacedonia(graph = g.graph)
+    }
+    facet Norway(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Norway(graph = g.graph)
+    }
+    facet Poland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Poland(graph = g.graph)
+    }
+    facet Portugal(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Portugal(graph = g.graph)
+    }
+    facet Romania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Romania(graph = g.graph)
+    }
+    facet Russia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Russia(graph = g.graph)
+    }
+    facet Serbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Serbia(graph = g.graph)
+    }
+    facet Slovakia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Slovakia(graph = g.graph)
+    }
+    facet Slovenia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Slovenia(graph = g.graph)
+    }
+    facet Spain(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Spain(graph = g.graph)
+    }
+    facet Sweden(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Sweden(graph = g.graph)
+    }
+    facet Switzerland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Switzerland(graph = g.graph)
+    }
+    facet Turkey(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Turkey(graph = g.graph)
+    }
+    facet Ukraine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ukraine(graph = g.graph)
+    }
+    facet UnitedKingdom(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield UnitedKingdom(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.NorthAmerica {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllNorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Canada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Greenland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mexico(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet UnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllNorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllNorthAmerica(graph = g.graph)
+    }
+    facet NorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthAmerica(graph = g.graph)
+    }
+    facet Canada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Canada(graph = g.graph)
+    }
+    facet Greenland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Greenland(graph = g.graph)
+    }
+    facet Mexico(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mexico(graph = g.graph)
+    }
+    facet UnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield UnitedStates(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.SouthAmerica {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllSouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Argentina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Bolivia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Brazil(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Chile(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Colombia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ecuador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Guyana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Paraguay(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Peru(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Suriname(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Uruguay(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Venezuela(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllSouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllSouthAmerica(graph = g.graph)
+    }
+    facet SouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthAmerica(graph = g.graph)
+    }
+    facet Argentina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Argentina(graph = g.graph)
+    }
+    facet Bolivia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Bolivia(graph = g.graph)
+    }
+    facet Brazil(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Brazil(graph = g.graph)
+    }
+    facet Chile(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Chile(graph = g.graph)
+    }
+    facet Colombia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Colombia(graph = g.graph)
+    }
+    facet Ecuador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ecuador(graph = g.graph)
+    }
+    facet Guyana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Guyana(graph = g.graph)
+    }
+    facet Paraguay(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Paraguay(graph = g.graph)
+    }
+    facet Peru(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Peru(graph = g.graph)
+    }
+    facet Suriname(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Suriname(graph = g.graph)
+    }
+    facet Uruguay(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Uruguay(graph = g.graph)
+    }
+    facet Venezuela(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Venezuela(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.CentralAmerica {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllCentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet CentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Belize(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet CostaRica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Cuba(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet ElSalvador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Guatemala(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Haiti(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Honduras(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Jamaica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nicaragua(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Panama(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllCentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllCentralAmerica(graph = g.graph)
+    }
+    facet CentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield CentralAmerica(graph = g.graph)
+    }
+    facet Belize(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Belize(graph = g.graph)
+    }
+    facet CostaRica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield CostaRica(graph = g.graph)
+    }
+    facet Cuba(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Cuba(graph = g.graph)
+    }
+    facet ElSalvador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield ElSalvador(graph = g.graph)
+    }
+    facet Guatemala(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Guatemala(graph = g.graph)
+    }
+    facet Haiti(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Haiti(graph = g.graph)
+    }
+    facet Honduras(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Honduras(graph = g.graph)
+    }
+    facet Jamaica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Jamaica(graph = g.graph)
+    }
+    facet Nicaragua(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nicaragua(graph = g.graph)
+    }
+    facet Panama(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Panama(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.UnitedStates {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllUnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Alabama(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Alaska(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Arizona(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Arkansas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet California(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Colorado(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Connecticut(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Delaware(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet DistrictOfColumbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Florida(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Georgia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Hawaii(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Idaho(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Illinois(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Indiana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Iowa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kansas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Kentucky(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Louisiana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Maine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Maryland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Massachusetts(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Michigan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Minnesota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Mississippi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Missouri(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Montana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nebraska(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nevada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewHampshire(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewJersey(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewMexico(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewYork(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthCarolina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthDakota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ohio(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Oklahoma(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Oregon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Pennsylvania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet RhodeIsland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthCarolina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet SouthDakota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Tennessee(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Texas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Utah(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Vermont(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Virginia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Washington(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet WestVirginia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Wisconsin(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Wyoming(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllUnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllUnitedStates(graph = g.graph)
+    }
+    facet Alabama(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Alabama(graph = g.graph)
+    }
+    facet Alaska(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Alaska(graph = g.graph)
+    }
+    facet Arizona(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Arizona(graph = g.graph)
+    }
+    facet Arkansas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Arkansas(graph = g.graph)
+    }
+    facet California(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield California(graph = g.graph)
+    }
+    facet Colorado(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Colorado(graph = g.graph)
+    }
+    facet Connecticut(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Connecticut(graph = g.graph)
+    }
+    facet Delaware(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Delaware(graph = g.graph)
+    }
+    facet DistrictOfColumbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield DistrictOfColumbia(graph = g.graph)
+    }
+    facet Florida(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Florida(graph = g.graph)
+    }
+    facet Georgia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Georgia(graph = g.graph)
+    }
+    facet Hawaii(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Hawaii(graph = g.graph)
+    }
+    facet Idaho(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Idaho(graph = g.graph)
+    }
+    facet Illinois(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Illinois(graph = g.graph)
+    }
+    facet Indiana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Indiana(graph = g.graph)
+    }
+    facet Iowa(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Iowa(graph = g.graph)
+    }
+    facet Kansas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kansas(graph = g.graph)
+    }
+    facet Kentucky(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Kentucky(graph = g.graph)
+    }
+    facet Louisiana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Louisiana(graph = g.graph)
+    }
+    facet Maine(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Maine(graph = g.graph)
+    }
+    facet Maryland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Maryland(graph = g.graph)
+    }
+    facet Massachusetts(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Massachusetts(graph = g.graph)
+    }
+    facet Michigan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Michigan(graph = g.graph)
+    }
+    facet Minnesota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Minnesota(graph = g.graph)
+    }
+    facet Mississippi(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Mississippi(graph = g.graph)
+    }
+    facet Missouri(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Missouri(graph = g.graph)
+    }
+    facet Montana(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Montana(graph = g.graph)
+    }
+    facet Nebraska(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nebraska(graph = g.graph)
+    }
+    facet Nevada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nevada(graph = g.graph)
+    }
+    facet NewHampshire(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewHampshire(graph = g.graph)
+    }
+    facet NewJersey(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewJersey(graph = g.graph)
+    }
+    facet NewMexico(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewMexico(graph = g.graph)
+    }
+    facet NewYork(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewYork(graph = g.graph)
+    }
+    facet NorthCarolina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthCarolina(graph = g.graph)
+    }
+    facet NorthDakota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthDakota(graph = g.graph)
+    }
+    facet Ohio(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ohio(graph = g.graph)
+    }
+    facet Oklahoma(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Oklahoma(graph = g.graph)
+    }
+    facet Oregon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Oregon(graph = g.graph)
+    }
+    facet Pennsylvania(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Pennsylvania(graph = g.graph)
+    }
+    facet RhodeIsland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield RhodeIsland(graph = g.graph)
+    }
+    facet SouthCarolina(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthCarolina(graph = g.graph)
+    }
+    facet SouthDakota(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield SouthDakota(graph = g.graph)
+    }
+    facet Tennessee(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Tennessee(graph = g.graph)
+    }
+    facet Texas(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Texas(graph = g.graph)
+    }
+    facet Utah(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Utah(graph = g.graph)
+    }
+    facet Vermont(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Vermont(graph = g.graph)
+    }
+    facet Virginia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Virginia(graph = g.graph)
+    }
+    facet Washington(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Washington(graph = g.graph)
+    }
+    facet WestVirginia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield WestVirginia(graph = g.graph)
+    }
+    facet Wisconsin(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Wisconsin(graph = g.graph)
+    }
+    facet Wyoming(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Wyoming(graph = g.graph)
+    }
 }
 
 namespace osm.geo.cache.GraphHopper.Canada {
     use osm.types
+    use osm.geo.Operations.GraphHopper
 
-    event facet AllCanada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Alberta(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet BritishColumbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Manitoba(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewBrunswick(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NewfoundlandAndLabrador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NorthwestTerritories(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet NovaScotia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Nunavut(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Ontario(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet PrinceEdwardIsland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Quebec(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Saskatchewan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
-    event facet Yukon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache)
+    facet AllCanada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield AllCanada(graph = g.graph)
+    }
+    facet Alberta(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Alberta(graph = g.graph)
+    }
+    facet BritishColumbia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield BritishColumbia(graph = g.graph)
+    }
+    facet Manitoba(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Manitoba(graph = g.graph)
+    }
+    facet NewBrunswick(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewBrunswick(graph = g.graph)
+    }
+    facet NewfoundlandAndLabrador(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NewfoundlandAndLabrador(graph = g.graph)
+    }
+    facet NorthwestTerritories(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NorthwestTerritories(graph = g.graph)
+    }
+    facet NovaScotia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield NovaScotia(graph = g.graph)
+    }
+    facet Nunavut(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Nunavut(graph = g.graph)
+    }
+    facet Ontario(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Ontario(graph = g.graph)
+    }
+    facet PrinceEdwardIsland(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield PrinceEdwardIsland(graph = g.graph)
+    }
+    facet Quebec(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Quebec(graph = g.graph)
+    }
+    facet Saskatchewan(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Saskatchewan(graph = g.graph)
+    }
+    facet Yukon(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
+        g = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
+        yield Yukon(graph = g.graph)
+    }
 }

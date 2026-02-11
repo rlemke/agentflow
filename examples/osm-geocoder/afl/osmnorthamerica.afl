@@ -17,10 +17,10 @@ namespace osm.geo.NorthAmerica.cache {
     dl_unitedStates = Download(cache = unitedStates.cache)
     dl_greenland = Download(cache = greenland.cache)
 
-    yield NorthAmericaIndividually(cache = dl_canada.cache ++
-                                   dl_mexico.cache ++
-                                   dl_unitedStates.cache ++
-                                   dl_greenland.cache)
+    yield NorthAmericaIndividually(cache = dl_canada.downloadCache ++
+                                   dl_mexico.downloadCache ++
+                                   dl_unitedStates.downloadCache ++
+                                   dl_greenland.downloadCache)
 
   }
 
