@@ -478,4 +478,43 @@ namespace examples.composed {
             coverage_path = gaps.result.output_path
         )
     }
+
+    // ==========================================================================
+    // PATTERN 15: Low-Zoom Road Infrastructure Builder
+    // Cache → Build GraphHopper → Build Zoom Layers (minZoom per edge z2–z7)
+    // ==========================================================================
+
+    workflow RoadZoomBuilder(
+        region: String = "Liechtenstein",
+        output_dir: String = "/tmp/zoom-builder",
+        max_concurrent: Long = 16
+    ) => (
+        total_edges: Long,
+        selected_edges: Long,
+        zoom_distribution: String,
+        csv_path: String,
+        metrics_path: String
+    ) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.cache.Europe.Liechtenstein()
+
+        // Stage 2: Build GraphHopper graph for routing
+        graph = osm.geo.Operations.GraphHopper.BuildGraph(cache = cache.cache)
+
+        // Stage 3: Run full zoom builder pipeline
+        zoom = osm.geo.Roads.ZoomBuilder.BuildZoomLayers(
+            cache = cache.cache,
+            graph = graph.graph,
+            output_dir = $.output_dir,
+            max_concurrent = $.max_concurrent
+        )
+
+        yield RoadZoomBuilder(
+            total_edges = zoom.result.total_logical_edges,
+            selected_edges = zoom.result.selected_edges,
+            zoom_distribution = zoom.result.zoom_distribution,
+            csv_path = zoom.result.csv_path,
+            metrics_path = zoom.result.metrics_path
+        )
+    }
 }
