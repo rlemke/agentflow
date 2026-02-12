@@ -153,7 +153,11 @@ All scripts are in `scripts/` and are self-contained:
 scripts/setup                                  # bootstrap Docker stack
 scripts/setup --runners 3 --agents 2           # start with scaling
 scripts/compile input.afl -o output.json       # compile AFL
-scripts/server --workflow MyWorkflow           # execute workflow
+scripts/publish input.afl                      # compile + publish to MongoDB
+scripts/publish input.afl --auto-resolve       # with dependency resolution
+scripts/run-workflow                           # interactive workflow execution
+scripts/run-workflow --workflow Name            # run specific workflow
+scripts/server --workflow MyWorkflow           # execute workflow (server mode)
 scripts/runner                                 # start runner
 scripts/dashboard                              # start dashboard
 scripts/mcp-server                             # start MCP server

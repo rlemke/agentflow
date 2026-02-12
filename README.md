@@ -930,7 +930,18 @@ scripts/compile input.afl -o output.json
 scripts/compile input.afl --check            # syntax check only
 echo 'facet Foo()' | scripts/compile         # pipe from stdin
 
-# Execute a workflow from MongoDB
+# Compile + publish to MongoDB
+scripts/publish input.afl                    # compile and publish
+scripts/publish input.afl --version 1.0.0    # with version tag
+scripts/publish input.afl --auto-resolve --source-path ./libs
+
+# Run a workflow from MongoDB (interactive)
+scripts/run-workflow                         # list → pick → prompt → run
+scripts/run-workflow --list                  # list available workflows
+scripts/run-workflow --workflow MyWorkflow    # prompt for params
+scripts/run-workflow --workflow MyWorkflow --input '{"x": 1}'
+
+# Execute a workflow from MongoDB (server mode)
 scripts/server --workflow MyWorkflow
 scripts/server --flow-id ID --input '{"x": 1}'
 
@@ -1236,6 +1247,8 @@ agentflow/
 │       └── test_geocoder.py # Offline end-to-end test
 ├── scripts/                 # Convenience scripts
 │   ├── compile              # Compile AFL to JSON
+│   ├── publish              # Compile + publish to MongoDB
+│   ├── run-workflow         # Interactive workflow execution
 │   ├── server               # Execute a workflow from MongoDB
 │   ├── runner               # Start the distributed runner
 │   ├── dashboard            # Start the web dashboard
