@@ -283,3 +283,12 @@
 - **Affected workflows**: `VisualizeBicycleRoutes`, `AnalyzeParks`, `LargeCitiesMap`, `TransportOverview`, `NationalParksAnalysis`, `TransportMap`, `StateBoundariesWithStats`, `DiscoverCitiesAndTowns`, `RegionalAnalysis`, `ValidateAndSummarize`, `OsmoseQualityCheck`, `TransitAccessibility`, `RoadZoomBuilder`
 - **Unchanged** (correctly hardcoded — no `region` parameter): `GermanyCityAnalysis` (`Europe.Germany()`), `FranceCityAnalysis` (`Europe.France()`), `TransitAnalysis` (no cache, takes `gtfs_url` only)
 - 1174 tests passing
+
+## Completed (v0.9.9) - Fix AgentPoller Resume & Add Missing Handlers
+- **AgentPoller program_ast propagation**: `_resume_workflow()` was calling `evaluator.resume(workflow_id, workflow_ast)` without `program_ast`, causing `get_facet_definition()` to return `None` for all facets; `EventTransmitHandler` then passed through without blocking, so event facet steps completed immediately with empty outputs
+- **New `_program_ast_cache`**: `AgentPoller` now maintains a separate `_program_ast_cache` dict alongside `_ast_cache`; `cache_workflow_ast()` accepts optional `program_ast` parameter; `_resume_workflow()` looks up and passes cached `program_ast` to `evaluator.resume()`
+- **`run_to_completion()` fix**: integration test helper now passes `program_ast` when calling `poller.cache_workflow_ast()`
+- **`osm.geo.Operations.Cache` handler**: new `_cache_handler()` in `operations_handlers.py` resolves region names to Geofabrik paths via flat lookup built from `cache_handlers.REGION_REGISTRY`, with case-insensitive fallback; downloads PBF and returns `cache: OSMCache`
+- **`osm.geo.Operations.Validation.*` handlers**: new `validation_handlers.py` with 5 handlers (`ValidateCache`, `ValidateGeometry`, `ValidateTags`, `ValidateBounds`, `ValidationSummary`) delegating to `osmose_verifier`; registered in `handlers/__init__.py` via `register_validation_handlers(poller)`
+- **Unit test updates**: `test_agent_poller_extended.py` updated for `program_ast=None` keyword argument; new `test_resume_with_cached_program_ast` test
+- 1121 unit tests, 29 integration tests passing
