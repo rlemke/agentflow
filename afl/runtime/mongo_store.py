@@ -388,6 +388,15 @@ class MongoStore(PersistenceAPI):
         return [self._doc_to_runner(doc) for doc in docs]
 
     # =========================================================================
+    # Workflow Operations (query helpers)
+    # =========================================================================
+
+    def get_all_workflows(self, limit: int = 100) -> Sequence[WorkflowDefinition]:
+        """Get all workflows, most recently created first."""
+        docs = self._db.workflows.find().sort("date", -1).limit(limit)
+        return [self._doc_to_workflow(doc) for doc in docs]
+
+    # =========================================================================
     # Task Operations
     # =========================================================================
 
