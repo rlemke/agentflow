@@ -24,7 +24,18 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .ast import Program
+from .ast import (
+    AndThenBlock,
+    CallExpr,
+    EventFacetDecl,
+    FacetDecl,
+    MixinCall,
+    MixinSig,
+    Program,
+    StepStmt,
+    WorkflowDecl,
+    YieldStmt,
+)
 from .source import CompilerInput, FileOrigin, SourceEntry, SourceRegistry
 
 if TYPE_CHECKING:
@@ -33,6 +44,92 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_RESOLVE_ITERATIONS = 100
+
+
+def _namespace_candidates_from_qualified(name: str) -> list[str]:
+    """Extract candidate namespace names from a qualified call expression.
+
+    For ``"a.b.c.Facet"``, returns ``["a.b.c", "a.b", "a"]`` — longest
+    prefix first.  Simple unqualified names (no dots) return an empty list.
+    """
+    parts = name.split(".")
+    if len(parts) <= 1:
+        return []
+    # The last component is the facet name; everything before is a potential
+    # namespace prefix (progressively shorter).
+    candidates: list[str] = []
+    for i in range(len(parts) - 1, 0, -1):
+        candidates.append(".".join(parts[:i]))
+    return candidates
+
+
+def _collect_calls_from_block(block: AndThenBlock) -> list[CallExpr]:
+    """Recursively collect all CallExpr nodes from an andThen block."""
+    calls: list[CallExpr] = []
+    for step in block.block.steps:
+        calls.append(step.call)
+        for mixin in step.call.mixins:
+            calls.append(CallExpr(name=mixin.name, args=mixin.args))
+        if step.body is not None:
+            calls.extend(_collect_calls_from_block(step.body))
+    for ys in block.block.yield_stmts:
+        calls.append(ys.call)
+        for mixin in ys.call.mixins:
+            calls.append(CallExpr(name=mixin.name, args=mixin.args))
+    return calls
+
+
+def _collect_qualified_namespace_refs(program: Program) -> set[str]:
+    """Scan all call expressions in *program* for qualified namespace references.
+
+    Returns a set of candidate namespace names extracted from dotted call names
+    (e.g., ``osm.geo.Operations.Cache`` → ``osm.geo.Operations``).
+    """
+    candidates: set[str] = set()
+
+    def _process_calls(calls: list[CallExpr]) -> None:
+        for call in calls:
+            for cand in _namespace_candidates_from_qualified(call.name):
+                candidates.add(cand)
+
+    def _process_body(body: list[AndThenBlock] | AndThenBlock | None) -> None:
+        if body is None:
+            return
+        blocks = body if isinstance(body, list) else [body]
+        for block in blocks:
+            _process_calls(_collect_calls_from_block(block))
+
+    def _process_mixins(mixins: list[MixinSig]) -> None:
+        for m in mixins:
+            for cand in _namespace_candidates_from_qualified(m.name):
+                candidates.add(cand)
+
+    for ns in program.namespaces:
+        for facet in ns.facets:
+            _process_body(facet.body)
+            _process_mixins(facet.sig.mixins)
+        for ef in ns.event_facets:
+            _process_body(ef.body)
+            _process_mixins(ef.sig.mixins)
+        for wf in ns.workflows:
+            _process_body(wf.body)
+            _process_mixins(wf.sig.mixins)
+        for imp in ns.implicits:
+            for cand in _namespace_candidates_from_qualified(imp.call.name):
+                candidates.add(cand)
+
+    # Also check top-level declarations (outside namespaces)
+    for facet in program.facets:
+        _process_body(facet.body)
+        _process_mixins(facet.sig.mixins)
+    for ef in program.event_facets:
+        _process_body(ef.body)
+        _process_mixins(ef.sig.mixins)
+    for wf in program.workflows:
+        _process_body(wf.body)
+        _process_mixins(wf.sig.mixins)
+
+    return candidates
 
 
 class NamespaceIndex:
@@ -180,10 +277,25 @@ class DependencyResolver:
 
         for iteration in range(_MAX_RESOLVE_ITERATIONS):
             defined = {ns.name for ns in program.namespaces}
+
+            # Collect needed namespaces from both `use` statements AND
+            # qualified call expressions (e.g. osm.geo.Operations.Cache).
             needed: set[str] = set()
             for ns in program.namespaces:
                 for use in ns.uses:
                     needed.add(use.name)
+
+            # Extract namespace candidates from qualified call names
+            qualified_refs = _collect_qualified_namespace_refs(program)
+            # Only keep candidates that exist in the filesystem/mongo index
+            # (otherwise we'd try to resolve every possible prefix).
+            if self._fs_index is not None:
+                all_known = set(self._fs_index.all_namespaces().keys())
+                needed.update(qualified_refs & all_known)
+            else:
+                # Without a filesystem index, add all candidates — the
+                # MongoDB resolver will filter non-existent ones.
+                needed.update(qualified_refs)
 
             missing = needed - defined
             if not missing:

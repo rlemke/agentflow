@@ -299,6 +299,57 @@ class TestDependencyResolver:
         assert ns_names == {"app", "lib.types"}
 
 
+    def test_qualified_call_resolution(self, tmp_path):
+        """Resolve namespaces referenced by qualified call names (no use statement)."""
+        (tmp_path / "ops.afl").write_text(
+            "namespace osm.geo.Operations {\n"
+            "    event facet Cache(region: String) => (cache: String)\n"
+            "}\n"
+        )
+
+        program, registry, ci = self._make_input(
+            "namespace app {\n"
+            "    workflow Run() andThen {\n"
+            "        c = osm.geo.Operations.Cache(region = $.region)\n"
+            "    }\n"
+            "}\n"
+        )
+        fs_index = NamespaceIndex([tmp_path])
+        resolver = DependencyResolver(filesystem_index=fs_index)
+        result_prog, _, _ = resolver.resolve(program, registry, ci)
+
+        ns_names = {ns.name for ns in result_prog.namespaces}
+        assert "osm.geo.Operations" in ns_names
+
+    def test_qualified_call_transitive(self, tmp_path):
+        """Qualified call triggers loading, which may bring in use-based transitive deps."""
+        (tmp_path / "ops.afl").write_text(
+            "namespace osm.ops {\n"
+            "    use osm.types\n"
+            "    event facet DoStuff() => (result: String)\n"
+            "}\n"
+        )
+        (tmp_path / "types.afl").write_text(
+            "namespace osm.types {\n"
+            "    schema Coord { lat: Float, lon: Float }\n"
+            "}\n"
+        )
+
+        program, registry, ci = self._make_input(
+            "namespace app {\n"
+            "    workflow Run() andThen {\n"
+            "        s = osm.ops.DoStuff()\n"
+            "    }\n"
+            "}\n"
+        )
+        fs_index = NamespaceIndex([tmp_path])
+        resolver = DependencyResolver(filesystem_index=fs_index)
+        result_prog, _, _ = resolver.resolve(program, registry, ci)
+
+        ns_names = {ns.name for ns in result_prog.namespaces}
+        assert ns_names == {"app", "osm.ops", "osm.types"}
+
+
 class TestParseAndResolve:
     """Tests for AFLParser.parse_and_resolve integration."""
 
