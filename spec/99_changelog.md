@@ -307,4 +307,7 @@
 - **`PublishedSource` entity**: new dataclass in `afl/runtime/entities.py` with `uuid`, `namespace_name`, `source_text`, `namespaces_defined`, `version`, `published_at`, `origin`, `checksum`
 - **MongoStore extensions**: `afl_sources` collection with `(namespace_name, version)` unique compound index and `namespaces_defined` multikey index; new methods `save_published_source()`, `get_source_by_namespace()`, `get_sources_by_namespaces()` (batch `$in`), `delete_published_source()`, `list_published_sources()`
 - **CLI subcommands**: `afl compile` (default, backward-compatible) with new `--auto-resolve`, `--source-path PATH`, `--mongo-resolve` flags; `afl publish` subcommand with `--version`, `--force`, `--list`, `--unpublish` options
+- **Qualified call resolution**: resolver scans `CallExpr` names (e.g. `osm.geo.Operations.Cache`) to extract candidate namespace prefixes, not just `use` statements; candidates are matched against the filesystem index so only real namespaces are loaded; enables `--auto-resolve` for files like `osmworkflows_composed.afl` that reference facets by fully-qualified names without `use` imports
+- **OSM geocoder verified**: `afl compile --primary osmworkflows_composed.afl --auto-resolve` resolves 29 namespaces in 3 iterations from a single primary file
 - **Backward compatibility**: bare `afl input.afl -o out.json` still works unchanged; subcommand routing treats non-subcommand first arguments as compile input
+- 1159 tests passing
