@@ -859,20 +859,29 @@ class RunnerService:
             short_name = parts[-1]
             ns_parts = parts[:-1]
 
-            # Navigate through namespaces
-            declarations = program_dict.get("declarations", [])
+            # Navigate through namespaces (emitter uses "namespaces" key,
+            # but also check "declarations" for alternative AST formats)
+            current = program_dict
             for ns_name in ns_parts:
-                found = False
-                for decl in declarations:
-                    if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
-                        declarations = decl.get("declarations", [])
-                        found = True
+                found_ns = None
+                for ns in current.get("namespaces", []):
+                    if ns.get("name") == ns_name:
+                        found_ns = ns
                         break
-                if not found:
+                if not found_ns:
+                    for decl in current.get("declarations", []):
+                        if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
+                            found_ns = decl
+                            break
+                if not found_ns:
                     return None
+                current = found_ns
 
-            # Search for workflow at final level
-            for decl in declarations:
+            # Search for workflow at final namespace level
+            for w in current.get("workflows", []):
+                if w.get("name") == short_name:
+                    return w
+            for decl in current.get("declarations", []):
                 if decl.get("type") == "WorkflowDecl" and decl.get("name") == short_name:
                     return decl
         else:
@@ -881,7 +890,11 @@ class RunnerService:
                 if w.get("name") == workflow_name:
                     return w
 
-            # Then search inside namespaces
+            # Then search inside namespaces (both "namespaces" and "declarations" keys)
+            for ns in program_dict.get("namespaces", []):
+                result = self._search_namespace_workflows(ns, workflow_name)
+                if result:
+                    return result
             for decl in program_dict.get("declarations", []):
                 if decl.get("type") == "Namespace":
                     result = self._search_namespace_workflows(decl, workflow_name)
@@ -900,6 +913,11 @@ class RunnerService:
         Returns:
             The workflow AST dict, or None if not found
         """
+        # Check "workflows" key (emitter format)
+        for w in namespace.get("workflows", []):
+            if w.get("name") == workflow_name:
+                return w
+        # Check "declarations" key (alternative AST format)
         for decl in namespace.get("declarations", []):
             if decl.get("type") == "WorkflowDecl" and decl.get("name") == workflow_name:
                 return decl
@@ -907,6 +925,11 @@ class RunnerService:
                 result = self._search_namespace_workflows(decl, workflow_name)
                 if result:
                     return result
+        # Recurse into nested namespaces under "namespaces" key
+        for ns in namespace.get("namespaces", []):
+            result = self._search_namespace_workflows(ns, workflow_name)
+            if result:
+                return result
         return None
 
     # =========================================================================
