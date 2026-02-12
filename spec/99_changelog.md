@@ -292,3 +292,9 @@
 - **`osm.geo.Operations.Validation.*` handlers**: new `validation_handlers.py` with 5 handlers (`ValidateCache`, `ValidateGeometry`, `ValidateTags`, `ValidateBounds`, `ValidationSummary`) delegating to `osmose_verifier`; registered in `handlers/__init__.py` via `register_validation_handlers(poller)`
 - **Unit test updates**: `test_agent_poller_extended.py` updated for `program_ast=None` keyword argument; new `test_resume_with_cached_program_ast` test
 - 1121 unit tests, 29 integration tests passing
+
+## Completed (v0.9.10) - GraphHopper 8.0 Config-File CLI
+- **`_run_graphhopper_import()` rewrite**: GraphHopper 8.0 replaced `--datareader.file=` command-line flags with a YAML config file passed as a positional argument to the `import` subcommand; updated handler to generate a temporary config file with `datareader.file`, `graph.location`, `import.osm.ignored_highways`, and profile with `custom_model_files: []`
+- **Profile-aware ignored highways**: motorized profiles (`car`, `motorcycle`, `truck`) ignore `footway,cycleway,path,pedestrian,steps`; non-motorized profiles (`bike`, `mtb`, `racingbike`) ignore `motorway,trunk`; other profiles (e.g. `foot`, `hike`) ignore nothing
+- **`test_liechtenstein_city_routes` now passes**: full 9-step CityRouteMap pipeline (ResolveRegion → Cache → BuildGraph → ExtractPlaces → FindCities → BicycleRoutes → RenderMap → FormatGeoJSON → Visualization) completes end-to-end
+- 1121 unit tests, 30 integration tests passing
