@@ -80,11 +80,11 @@ class TestAddOneIntegration:
         assert result.outputs["result"] == 6
 
         # Verify steps exist in the MongoDB-backed store
-        steps = mongo_store.get_workflow_steps(result.workflow_id)
+        steps = list(mongo_store.get_steps_by_workflow(result.workflow_id))
         assert len(steps) > 0
 
-        # Find the AddOne step and verify its attributes
-        addone_steps = [s for s in steps if s.facet_name and "AddOne" in s.facet_name]
+        # Find the AddOne event facet step and verify its attributes
+        addone_steps = [s for s in steps if s.facet_name == "handlers.AddOne"]
         assert len(addone_steps) == 1
         assert addone_steps[0].attributes.get_param("input") == 5
         assert addone_steps[0].attributes.get_param("output") == 6

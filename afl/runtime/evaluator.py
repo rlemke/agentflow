@@ -400,10 +400,10 @@ class ExecutionContext:
     def _search_declarations_qualified(
         self, declarations: list, qualified_name: str
     ) -> dict | None:
-        """Search declarations using a qualified name (e.g. 'ns.FacetName').
+        """Search declarations using a qualified name (e.g. 'ns.Sub.FacetName').
 
-        Splits the qualified name into namespace parts and a final facet name,
-        then navigates the declaration tree accordingly.
+        Handles both nested namespace structures (ns > Sub > FacetName) and
+        flat namespace names ('ns.Sub') as emitted by the AFL compiler.
 
         Args:
             declarations: List of declaration dicts
@@ -414,9 +414,28 @@ class ExecutionContext:
         """
         parts = qualified_name.split(".")
         facet_short = parts[-1]
-        ns_parts = parts[:-1]
 
-        # Navigate through namespace levels
+        # Strategy 1: flat namespace match — try every possible split point.
+        # e.g. "osm.geo.Region.ResolveRegion" tries namespace "osm.geo.Region"
+        for i in range(len(parts) - 1, 0, -1):
+            ns_name = ".".join(parts[:i])
+            for decl in declarations:
+                if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
+                    inner = decl.get("declarations", []) + decl.get("eventFacets", [])
+                    target = parts[i]
+                    for inner_decl in inner:
+                        if inner_decl.get("type") in ("FacetDecl", "EventFacetDecl"):
+                            if inner_decl.get("name") == target:
+                                return inner_decl
+                    # Also check nested namespaces within this namespace
+                    result = self._search_declarations(
+                        decl.get("declarations", []), facet_short
+                    )
+                    if result:
+                        return result
+
+        # Strategy 2: nested namespace navigation (ns > Sub > FacetName).
+        ns_parts = parts[:-1]
         current_decls = declarations
         for ns_name in ns_parts:
             found = False
@@ -428,7 +447,6 @@ class ExecutionContext:
             if not found:
                 return None
 
-        # Search for the facet at the final level
         for decl in current_decls:
             if decl.get("type") in ("FacetDecl", "EventFacetDecl"):
                 if decl.get("name") == facet_short:
@@ -630,7 +648,12 @@ class Evaluator:
             # The default would be in the param dict if present
             # For now, we check if there's a literal default
             if "default" in param:
-                defaults[name] = param["default"]
+                default_val = param["default"]
+                # AST default values may be literal dicts with "type"/"value"
+                if isinstance(default_val, dict) and "value" in default_val:
+                    defaults[name] = default_val["value"]
+                else:
+                    defaults[name] = default_val
 
         # Override with provided inputs
         defaults.update(inputs)

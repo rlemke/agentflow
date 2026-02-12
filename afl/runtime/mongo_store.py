@@ -618,6 +618,12 @@ class MongoStore(PersistenceAPI):
                 },
             }
 
+        # Persist transition flags so round-tripped steps retain their
+        # state-machine control signals (e.g. continue_step setting
+        # request_transition=True for an EventTransmit-blocked step).
+        if hasattr(step, "transition"):
+            doc["request_transition"] = step.transition.request_transition
+
         error = getattr(step, "error", None)
         if error is None and hasattr(step, "transition"):
             error = getattr(step.transition, "error", None)
@@ -636,6 +642,14 @@ class MongoStore(PersistenceAPI):
             object_type=doc["object_type"],
             state=doc["state"],
         )
+
+        # Restore the persisted request_transition flag.  Old documents
+        # without the field default to False — the safe choice that lets
+        # each handler decide when to advance.  StepTransition.initial()
+        # sets request_transition=True which would cause the state changer
+        # to skip the current state's handler and advance immediately,
+        # bypassing EventTransmit blocking and block completion checks.
+        step.transition.request_transition = doc.get("request_transition", False)
 
         step.statement_id = doc.get("statement_id")
         step.container_id = StepId(doc["container_id"]) if doc.get("container_id") else None

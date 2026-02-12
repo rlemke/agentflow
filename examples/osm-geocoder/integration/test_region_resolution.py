@@ -145,16 +145,17 @@ class TestRegionResolutionIntegration:
 
         poller.register("osm.geo.Region.ResolveRegion", _resolve_region_handler)
 
-        # Georgia (US state) with NorthAmerica preference
+        # Georgia (US state) with UnitedStates preference
+        # (the resolver uses "UnitedStates" as the continent for US states)
         result = run_to_completion(
             evaluator, poller, workflow, program,
-            inputs={"name": "Georgia", "prefer_continent": "NorthAmerica"},
+            inputs={"name": "Georgia", "prefer_continent": "UnitedStates"},
         )
 
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
         assert result.outputs["matched_name"] == "Georgia"
-        # With NorthAmerica preference, should resolve to the US state
+        # With UnitedStates preference, should resolve to the US state
         assert "north-america" in result.outputs["geofabrik_path"]
 
     def test_resolve_unknown_region(self, mongo_store, evaluator, poller):

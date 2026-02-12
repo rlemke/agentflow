@@ -1594,7 +1594,7 @@ class TestEvaluatorEdgeCases:
         assert defaults["x"] == 99
 
     def test_extract_defaults_with_literal_dict(self, evaluator):
-        """_extract_defaults handles default as a literal dict from the emitter."""
+        """_extract_defaults unwraps emitter literal dicts to plain values."""
         workflow_ast = {
             "name": "Test",
             "params": [
@@ -1603,8 +1603,8 @@ class TestEvaluatorEdgeCases:
             ],
         }
         defaults = evaluator._extract_defaults(workflow_ast, {})
-        assert defaults["x"] == {"type": "Int", "value": 42}
-        assert defaults["y"] == {"type": "String", "value": "hello"}
+        assert defaults["x"] == 42
+        assert defaults["y"] == "hello"
 
     def test_compiled_defaults_flow_through_execution(self, evaluator):
         """Test that compiler-emitted defaults are used when no input is provided."""
