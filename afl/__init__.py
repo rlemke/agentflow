@@ -50,10 +50,12 @@ from .ast import (
     WorkflowDecl,
     YieldStmt,
 )
-from .config import AFLConfig, MongoDBConfig, load_config
+from .config import AFLConfig, MongoDBConfig, ResolverConfig, load_config
 from .emitter import JSONEmitter, emit_dict, emit_json
 from .loader import SourceLoader
 from .parser import AFLParser, ParseError, parse
+from .publisher import PublishError, SourcePublisher
+from .resolver import DependencyResolver, MongoDBNamespaceResolver, NamespaceIndex
 from .source import (
     CompilerInput,
     FileOrigin,
@@ -93,7 +95,15 @@ __all__ = [
     # Configuration
     "AFLConfig",
     "MongoDBConfig",
+    "ResolverConfig",
     "load_config",
+    # Resolver
+    "DependencyResolver",
+    "NamespaceIndex",
+    "MongoDBNamespaceResolver",
+    # Publisher
+    "SourcePublisher",
+    "PublishError",
     # AST nodes
     "Program",
     "Namespace",

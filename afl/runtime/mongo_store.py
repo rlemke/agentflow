@@ -44,6 +44,7 @@ from .entities import (
     LockMetaData,
     LogDefinition,
     Parameter,
+    PublishedSource,
     RunnerDefinition,
     ServerDefinition,
     TaskDefinition,
@@ -205,6 +206,16 @@ class MongoStore(PersistenceAPI):
         locks = self._db.locks
         locks.create_index("key", unique=True, name="lock_key_index")
         locks.create_index("expires_at", name="lock_expires_at_index")
+
+        # Published sources collection
+        sources = self._db.afl_sources
+        sources.create_index("uuid", unique=True, name="source_uuid_index")
+        sources.create_index(
+            [("namespace_name", ASCENDING), ("version", ASCENDING)],
+            unique=True,
+            name="source_namespace_version_index",
+        )
+        sources.create_index("namespaces_defined", name="source_namespaces_defined_index")
 
     # =========================================================================
     # Step Operations (PersistenceAPI)
@@ -578,6 +589,81 @@ class MongoStore(PersistenceAPI):
     def update_server_ping(self, server_id: str, ping_time: int) -> None:
         """Update server ping time."""
         self._db.servers.update_one({"uuid": server_id}, {"$set": {"ping_time": ping_time}})
+
+    # =========================================================================
+    # Published Source Operations
+    # =========================================================================
+
+    def save_published_source(self, source: PublishedSource) -> None:
+        """Save or update a published source.
+
+        Upserts by (namespace_name, version).
+        """
+        doc = {
+            "uuid": source.uuid,
+            "namespace_name": source.namespace_name,
+            "source_text": source.source_text,
+            "namespaces_defined": source.namespaces_defined,
+            "version": source.version,
+            "published_at": source.published_at,
+            "origin": source.origin,
+            "checksum": source.checksum,
+        }
+        self._db.afl_sources.replace_one(
+            {"namespace_name": source.namespace_name, "version": source.version},
+            doc,
+            upsert=True,
+        )
+
+    def get_source_by_namespace(
+        self, name: str, version: str = "latest"
+    ) -> PublishedSource | None:
+        """Get a published source by namespace name and version."""
+        doc = self._db.afl_sources.find_one(
+            {"namespace_name": name, "version": version}
+        )
+        return self._doc_to_published_source(doc) if doc else None
+
+    def get_sources_by_namespaces(
+        self, names: set[str], version: str = "latest"
+    ) -> dict[str, PublishedSource]:
+        """Batch-fetch published sources by namespace names.
+
+        Returns a dict mapping namespace_name → PublishedSource.
+        """
+        docs = self._db.afl_sources.find(
+            {"namespace_name": {"$in": list(names)}, "version": version}
+        )
+        result: dict[str, PublishedSource] = {}
+        for doc in docs:
+            ps = self._doc_to_published_source(doc)
+            result[ps.namespace_name] = ps
+        return result
+
+    def delete_published_source(self, name: str, version: str = "latest") -> bool:
+        """Delete a published source by namespace name and version."""
+        result = self._db.afl_sources.delete_one(
+            {"namespace_name": name, "version": version}
+        )
+        return result.deleted_count > 0
+
+    def list_published_sources(self) -> list[PublishedSource]:
+        """List all published sources."""
+        docs = self._db.afl_sources.find()
+        return [self._doc_to_published_source(doc) for doc in docs]
+
+    def _doc_to_published_source(self, doc: dict) -> PublishedSource:
+        """Convert MongoDB document to PublishedSource."""
+        return PublishedSource(
+            uuid=doc["uuid"],
+            namespace_name=doc["namespace_name"],
+            source_text=doc["source_text"],
+            namespaces_defined=doc.get("namespaces_defined", []),
+            version=doc.get("version", "latest"),
+            published_at=doc.get("published_at", 0),
+            origin=doc.get("origin", ""),
+            checksum=doc.get("checksum", ""),
+        )
 
     # =========================================================================
     # Serialization Helpers

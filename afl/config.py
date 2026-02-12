@@ -98,29 +98,91 @@ class MongoDBConfig:
 
 
 @dataclass
+class ResolverConfig:
+    """Dependency resolver configuration.
+
+    Attributes:
+        source_paths: Additional directories to scan for AFL sources
+        auto_resolve: Enable automatic dependency resolution
+        mongodb_resolve: Enable MongoDB namespace lookup during resolution
+    """
+
+    source_paths: list[str] = field(default_factory=list)
+    auto_resolve: bool = False
+    mongodb_resolve: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a plain dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ResolverConfig:
+        """Create from a dictionary."""
+        return cls(
+            source_paths=data.get("source_paths", []),
+            auto_resolve=data.get("auto_resolve", False),
+            mongodb_resolve=data.get("mongodb_resolve", False),
+        )
+
+    @classmethod
+    def from_env(cls) -> ResolverConfig:
+        """Create from environment variables.
+
+        Recognised variables (all optional):
+            AFL_RESOLVER_SOURCE_PATHS  (colon-separated list of paths)
+            AFL_RESOLVER_AUTO_RESOLVE  ("true"/"1" to enable)
+            AFL_RESOLVER_MONGODB_RESOLVE  ("true"/"1" to enable)
+        """
+        paths_str = os.environ.get("AFL_RESOLVER_SOURCE_PATHS", "")
+        source_paths = [p for p in paths_str.split(":") if p] if paths_str else []
+        auto_resolve = os.environ.get("AFL_RESOLVER_AUTO_RESOLVE", "").lower() in ("true", "1")
+        mongodb_resolve = os.environ.get("AFL_RESOLVER_MONGODB_RESOLVE", "").lower() in (
+            "true",
+            "1",
+        )
+        return cls(
+            source_paths=source_paths,
+            auto_resolve=auto_resolve,
+            mongodb_resolve=mongodb_resolve,
+        )
+
+
+@dataclass
 class AFLConfig:
     """Top-level AFL configuration.
 
     Attributes:
         mongodb: MongoDB connection settings
+        resolver: Dependency resolver settings
     """
 
     mongodb: MongoDBConfig = field(default_factory=MongoDBConfig)
+    resolver: ResolverConfig = field(default_factory=ResolverConfig)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dictionary."""
-        return {"mongodb": self.mongodb.to_dict()}
+        return {
+            "mongodb": self.mongodb.to_dict(),
+            "resolver": self.resolver.to_dict(),
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AFLConfig:
         """Create from a dictionary (e.g. parsed JSON)."""
         mongodb_data = data.get("mongodb", {})
-        return cls(mongodb=MongoDBConfig.from_dict(mongodb_data))
+        resolver_data = data.get("resolver", {})
+        return cls(
+            mongodb=MongoDBConfig.from_dict(mongodb_data),
+            resolver=ResolverConfig.from_dict(resolver_data),
+        )
 
     @classmethod
     def from_env(cls) -> AFLConfig:
         """Create from environment variables."""
-        return cls(mongodb=MongoDBConfig.from_env())
+        return cls(
+            mongodb=MongoDBConfig.from_env(),
+            resolver=ResolverConfig.from_env(),
+        )
 
 
 # -- Config file loading -----------------------------------------------------

@@ -445,6 +445,23 @@ class ServerDefinition:
 
 
 @dataclass
+class PublishedSource:
+    """Published AFL source for namespace-based lookup.
+
+    Stored in the ``afl_sources`` collection.
+    """
+
+    uuid: str
+    namespace_name: str
+    source_text: str
+    namespaces_defined: list[str] = field(default_factory=list)
+    version: str = "latest"
+    published_at: int = 0
+    origin: str = ""
+    checksum: str = ""
+
+
+@dataclass
 class LockMetaData:
     """Lock metadata."""
 

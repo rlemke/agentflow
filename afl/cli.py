@@ -31,20 +31,12 @@ from .source import (
 )
 from .validator import validate
 
+# Known subcommands for routing
+_SUBCOMMANDS = {"compile", "publish"}
 
-def main(args: list[str] | None = None) -> int:
-    """Main entry point for AFL compiler CLI.
 
-    Args:
-        args: Command-line arguments (defaults to sys.argv[1:])
-
-    Returns:
-        Exit code (0 for success, non-zero for errors)
-    """
-    parser = argparse.ArgumentParser(
-        prog="afl",
-        description="AFL (Agent Flow Language) compiler",
-    )
+def _build_compile_parser(parser: argparse.ArgumentParser) -> None:
+    """Add compile-specific arguments to *parser*."""
 
     # Legacy single-file input (backward compatible)
     parser.add_argument(
@@ -124,6 +116,81 @@ def main(args: list[str] | None = None) -> int:
         help="Skip semantic validation",
     )
 
+    # Auto-resolve options
+    parser.add_argument(
+        "--auto-resolve",
+        action="store_true",
+        help="Automatically resolve missing namespace dependencies",
+    )
+
+    parser.add_argument(
+        "--source-path",
+        action="append",
+        dest="source_paths",
+        metavar="PATH",
+        help="Additional directory to scan for AFL sources (repeatable)",
+    )
+
+    parser.add_argument(
+        "--mongo-resolve",
+        action="store_true",
+        help="Enable MongoDB namespace lookup during auto-resolution",
+    )
+
+
+def _build_publish_parser(parser: argparse.ArgumentParser) -> None:
+    """Add publish-specific arguments to *parser*."""
+
+    parser.add_argument(
+        "input",
+        nargs="?",
+        help="AFL source file to publish",
+    )
+
+    parser.add_argument(
+        "--primary",
+        action="append",
+        dest="primary_files",
+        metavar="FILE",
+        help="Primary AFL source file (repeatable)",
+    )
+
+    parser.add_argument(
+        "--library",
+        action="append",
+        dest="library_files",
+        metavar="FILE",
+        help="Library AFL source file (repeatable)",
+    )
+
+    parser.add_argument(
+        "--version",
+        default="latest",
+        help="Version tag for published sources (default: latest)",
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing published sources",
+    )
+
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_sources",
+        help="List all published sources",
+    )
+
+    parser.add_argument(
+        "--unpublish",
+        metavar="NAMESPACE",
+        help="Remove a published namespace",
+    )
+
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add arguments shared by all subcommands."""
     parser.add_argument(
         "--config",
         metavar="FILE",
@@ -145,9 +212,9 @@ def main(args: list[str] | None = None) -> int:
         help="Log to file instead of stderr",
     )
 
-    parsed = parser.parse_args(args)
 
-    # Configure logging
+def _configure_logging(parsed: argparse.Namespace) -> None:
+    """Set up logging from parsed CLI args."""
     log_handlers: list[logging.Handler] = []
     if parsed.log_file:
         log_handlers.append(logging.FileHandler(parsed.log_file))
@@ -160,12 +227,18 @@ def main(args: list[str] | None = None) -> int:
         handlers=log_handlers,
     )
 
-    # Load configuration
-    load_config(parsed.config)
+
+# =========================================================================
+# Compile handler
+# =========================================================================
+
+
+def _handle_compile(parsed: argparse.Namespace) -> int:
+    """Execute the compile subcommand."""
+    config = load_config(parsed.config)
 
     # Build compiler input
     compiler_input = CompilerInput()
-    source_registry: SourceRegistry | None = None
 
     # Check for conflicting input modes
     has_multi_source = (
@@ -263,10 +336,22 @@ def main(args: list[str] | None = None) -> int:
             print(f"Error: {e}", file=sys.stderr)
             return 1
 
-    # Parse
+    # Parse (with optional auto-resolve)
     afl_parser = AFLParser()
+    use_auto_resolve = parsed.auto_resolve or config.resolver.auto_resolve
+
     try:
-        ast, source_registry = afl_parser.parse_sources(compiler_input)
+        if use_auto_resolve:
+            # Merge CLI flags into config
+            if parsed.source_paths:
+                config.resolver.source_paths.extend(parsed.source_paths)
+            if parsed.mongo_resolve:
+                config.resolver.mongodb_resolve = True
+            config.resolver.auto_resolve = True
+
+            ast, source_registry = afl_parser.parse_and_resolve(compiler_input, config)
+        else:
+            ast, source_registry = afl_parser.parse_sources(compiler_input)
     except ParseError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -309,6 +394,168 @@ def main(args: list[str] | None = None) -> int:
         return 1
 
     return 0
+
+
+# =========================================================================
+# Publish handler
+# =========================================================================
+
+
+def _handle_publish(parsed: argparse.Namespace) -> int:
+    """Execute the publish subcommand."""
+    from .publisher import PublishError, SourcePublisher
+    from .runtime.mongo_store import MongoStore
+
+    config = load_config(parsed.config)
+
+    # Handle --list
+    if parsed.list_sources:
+        try:
+            store = MongoStore.from_config(config.mongodb)
+            publisher = SourcePublisher(store)
+            sources = publisher.list_published()
+            if not sources:
+                print("No published sources found.", file=sys.stderr)
+            else:
+                for src in sources:
+                    print(
+                        f"  {src.namespace_name}  version={src.version}  "
+                        f"checksum={src.checksum[:12]}...  origin={src.origin}"
+                    )
+            store.close()
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    # Handle --unpublish
+    if parsed.unpublish:
+        try:
+            store = MongoStore.from_config(config.mongodb)
+            publisher = SourcePublisher(store)
+            deleted = publisher.unpublish(parsed.unpublish, parsed.version)
+            if deleted:
+                print(
+                    f"Unpublished '{parsed.unpublish}' version={parsed.version}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"Not found: '{parsed.unpublish}' version={parsed.version}",
+                    file=sys.stderr,
+                )
+            store.close()
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    # Collect source files to publish
+    files_to_publish: list[Path] = []
+
+    if parsed.input:
+        files_to_publish.append(Path(parsed.input))
+
+    for fp in parsed.primary_files or []:
+        files_to_publish.append(Path(fp))
+
+    for fp in parsed.library_files or []:
+        files_to_publish.append(Path(fp))
+
+    if not files_to_publish:
+        print("Error: No source files specified for publishing.", file=sys.stderr)
+        return 1
+
+    try:
+        store = MongoStore.from_config(config.mongodb)
+        publisher = SourcePublisher(store)
+
+        total_published = 0
+        for file_path in files_to_publish:
+            if not file_path.exists():
+                print(f"Error: File not found: {file_path}", file=sys.stderr)
+                store.close()
+                return 1
+
+            source_text = file_path.read_text()
+            published = publisher.publish(
+                source_text,
+                version=parsed.version,
+                origin=f"cli:{file_path}",
+                force=parsed.force,
+            )
+            for ps in published:
+                print(
+                    f"Published '{ps.namespace_name}' version={ps.version}",
+                    file=sys.stderr,
+                )
+            total_published += len(published)
+
+        print(f"OK: {total_published} namespace(s) published", file=sys.stderr)
+        store.close()
+    except PublishError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+# =========================================================================
+# Main entry point
+# =========================================================================
+
+
+def main(args: list[str] | None = None) -> int:
+    """Main entry point for AFL compiler CLI.
+
+    Supports subcommands ``compile`` (default) and ``publish``.
+    For backward compatibility, if the first argument is not a known
+    subcommand, ``compile`` is assumed.
+
+    Args:
+        args: Command-line arguments (defaults to sys.argv[1:])
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    argv = args if args is not None else sys.argv[1:]
+
+    # Determine subcommand: if first arg is a known subcommand, use it;
+    # otherwise assume "compile" for backward compatibility.
+    subcommand = "compile"
+    remaining = list(argv)
+    if remaining and remaining[0] in _SUBCOMMANDS:
+        subcommand = remaining[0]
+        remaining = remaining[1:]
+
+    if subcommand == "compile":
+        parser = argparse.ArgumentParser(
+            prog="afl compile",
+            description="AFL (Agent Flow Language) compiler",
+        )
+        _build_compile_parser(parser)
+        _add_common_args(parser)
+        parsed = parser.parse_args(remaining)
+        _configure_logging(parsed)
+        return _handle_compile(parsed)
+
+    elif subcommand == "publish":
+        parser = argparse.ArgumentParser(
+            prog="afl publish",
+            description="Publish AFL sources to MongoDB for namespace sharing",
+        )
+        _build_publish_parser(parser)
+        _add_common_args(parser)
+        parsed = parser.parse_args(remaining)
+        _configure_logging(parsed)
+        return _handle_publish(parsed)
+
+    # Should not reach here
+    print(f"Unknown subcommand: {subcommand}", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":

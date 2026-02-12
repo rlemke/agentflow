@@ -14,7 +14,10 @@
 
 """AFL Parser using Lark."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from lark import Lark
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
@@ -22,6 +25,9 @@ from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedTok
 from .ast import Program
 from .source import CompilerInput, SourceRegistry
 from .transformer import AFLTransformer
+
+if TYPE_CHECKING:
+    from .config import AFLConfig
 
 
 class ParseError(Exception):
@@ -175,6 +181,73 @@ class AFLParser:
                 ) from e
 
         return Program.merge(programs), registry
+
+    def parse_and_resolve(
+        self,
+        compiler_input: CompilerInput,
+        config: AFLConfig | None = None,
+    ) -> tuple[Program, SourceRegistry]:
+        """Parse sources and automatically resolve missing namespace dependencies.
+
+        Calls :meth:`parse_sources` first, then runs the
+        :class:`~afl.resolver.DependencyResolver` to discover and load
+        any namespaces referenced via ``use`` statements but not provided
+        in *compiler_input*.
+
+        The resolver scans sibling directories of primary source files
+        plus any additional paths from *config.resolver.source_paths*.
+        If *config.resolver.mongodb_resolve* is true, it also queries
+        the ``afl_sources`` MongoDB collection.
+
+        Args:
+            compiler_input: CompilerInput with primary and library sources
+            config: AFL configuration (uses default if not provided)
+
+        Returns:
+            Tuple of (merged Program AST, SourceRegistry with metadata)
+        """
+        from .resolver import DependencyResolver, MongoDBNamespaceResolver, NamespaceIndex
+
+        program, registry = self.parse_sources(compiler_input)
+
+        if config is None:
+            from .config import load_config
+
+            config = load_config()
+
+        if not config.resolver.auto_resolve:
+            return program, registry
+
+        # Build search paths: sibling directories of primary files + configured paths
+        search_paths: list[Path] = []
+        for entry in compiler_input.primary_sources:
+            from .source import FileOrigin
+
+            if isinstance(entry.origin, FileOrigin):
+                parent = Path(entry.origin.path).resolve().parent
+                if parent not in search_paths:
+                    search_paths.append(parent)
+
+        for extra in config.resolver.source_paths:
+            p = Path(extra).resolve()
+            if p not in search_paths:
+                search_paths.append(p)
+
+        fs_index = NamespaceIndex(search_paths) if search_paths else None
+
+        mongo_resolver = None
+        if config.resolver.mongodb_resolve:
+            mongo_resolver = MongoDBNamespaceResolver(config.mongodb)
+
+        resolver = DependencyResolver(
+            filesystem_index=fs_index,
+            mongodb_resolver=mongo_resolver,
+        )
+        program, registry, compiler_input = resolver.resolve(
+            program, registry, compiler_input
+        )
+
+        return program, registry
 
 
 # Module-level cached parser for the convenience function

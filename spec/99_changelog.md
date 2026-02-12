@@ -298,3 +298,13 @@
 - **Profile-aware ignored highways**: motorized profiles (`car`, `motorcycle`, `truck`) ignore `footway,cycleway,path,pedestrian,steps`; non-motorized profiles (`bike`, `mtb`, `racingbike`) ignore `motorway,trunk`; other profiles (e.g. `foot`, `hike`) ignore nothing
 - **`test_liechtenstein_city_routes` now passes**: full 9-step CityRouteMap pipeline (ResolveRegion → Cache → BuildGraph → ExtractPlaces → FindCities → BicycleRoutes → RenderMap → FormatGeoJSON → Visualization) completes end-to-end
 - 1121 unit tests, 30 integration tests passing
+
+## Completed (v0.10.0) - Automatic Dependency Resolution & Source Publishing
+- **`afl/resolver.py`**: new module with `NamespaceIndex` (filesystem scanner mapping namespace names to `.afl` files), `MongoDBNamespaceResolver` (queries `afl_sources` collection), and `DependencyResolver` (iterative fixpoint loop: parse → find missing `use` namespaces → load from filesystem/MongoDB → merge → repeat until stable; max 100 iterations safety bound)
+- **`afl/publisher.py`**: new module with `SourcePublisher` — publishes AFL source files to MongoDB `afl_sources` collection indexed by namespace name; parses source to extract namespace names, creates one `PublishedSource` document per namespace with SHA-256 checksum; supports versioning, force-overwrite, unpublish, and list operations
+- **`AFLParser.parse_and_resolve()`**: new method that calls `parse_sources()` then runs `DependencyResolver`; automatically scans primary file's sibling directory plus configured `source_paths`; optionally queries MongoDB when `mongodb_resolve=True`
+- **`ResolverConfig` dataclass**: added to `AFLConfig` with `source_paths` (colon-separated `AFL_RESOLVER_SOURCE_PATHS`), `auto_resolve` (`AFL_RESOLVER_AUTO_RESOLVE`), `mongodb_resolve` (`AFL_RESOLVER_MONGODB_RESOLVE`)
+- **`PublishedSource` entity**: new dataclass in `afl/runtime/entities.py` with `uuid`, `namespace_name`, `source_text`, `namespaces_defined`, `version`, `published_at`, `origin`, `checksum`
+- **MongoStore extensions**: `afl_sources` collection with `(namespace_name, version)` unique compound index and `namespaces_defined` multikey index; new methods `save_published_source()`, `get_source_by_namespace()`, `get_sources_by_namespaces()` (batch `$in`), `delete_published_source()`, `list_published_sources()`
+- **CLI subcommands**: `afl compile` (default, backward-compatible) with new `--auto-resolve`, `--source-path PATH`, `--mongo-resolve` flags; `afl publish` subcommand with `--version`, `--force`, `--list`, `--unpublish` options
+- **Backward compatibility**: bare `afl input.afl -o out.json` still works unchanged; subcommand routing treats non-subcommand first arguments as compile input
