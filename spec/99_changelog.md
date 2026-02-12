@@ -311,3 +311,9 @@
 - **OSM geocoder verified**: `afl compile --primary osmworkflows_composed.afl --auto-resolve` resolves 29 namespaces in 3 iterations from a single primary file
 - **Backward compatibility**: bare `afl input.afl -o out.json` still works unchanged; subcommand routing treats non-subcommand first arguments as compile input
 - 1159 tests passing
+
+## Completed (v0.10.1) - Publish & Run-Workflow Scripts
+- **`scripts/publish`**: bash script with inline Python that compiles AFL source and publishes to MongoDB; creates `FlowDefinition` (with AFL source in `compiled_sources`), `WorkflowDefinition` entries for each workflow found, and publishes namespaces to `afl_sources` via `SourcePublisher`; supports `--auto-resolve`, `--source-path` (repeatable), `--primary`/`--library` (repeatable), `--version`, `--config`
+- **`scripts/run-workflow`**: bash script with inline Python for interactive or non-interactive workflow execution from MongoDB; `--list` prints a table of all workflows; interactive mode lists workflows with numbers and prompts for selection; extracts parameters with types and compile-time defaults from the workflow AST; prompts for each parameter showing type and default; smart value parsing (bool, int, float, JSON objects/arrays, string fallback); `--workflow NAME` and `--input JSON` flags for non-interactive use; `--flow-id` to select by flow; executes via `Evaluator.execute()` with full `program_ast`
+- **`MongoStore.get_all_workflows()`**: new method returning workflows sorted by `date` descending with configurable limit, following existing `get_all_runners()` pattern
+- 1159 tests passing
