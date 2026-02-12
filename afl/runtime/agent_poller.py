@@ -125,6 +125,7 @@ class AgentPoller:
         self._active_futures: list[Future] = []
         self._active_lock = threading.Lock()
         self._ast_cache: dict[str, dict] = {}
+        self._program_ast_cache: dict[str, dict] = {}
 
     @property
     def server_id(self) -> str:
@@ -297,14 +298,19 @@ class AgentPoller:
     # AST Caching
     # =========================================================================
 
-    def cache_workflow_ast(self, workflow_id: str, ast: dict) -> None:
+    def cache_workflow_ast(
+        self, workflow_id: str, ast: dict, program_ast: dict | None = None
+    ) -> None:
         """Pre-cache a workflow AST for use during processing.
 
         Args:
             workflow_id: The workflow ID
             ast: The compiled workflow AST dict
+            program_ast: Optional full program AST for facet lookups
         """
         self._ast_cache[workflow_id] = ast
+        if program_ast is not None:
+            self._program_ast_cache[workflow_id] = program_ast
 
     def _load_workflow_ast(self, workflow_id: str) -> dict | None:
         """Load a workflow AST from persistence if available.
@@ -556,7 +562,8 @@ class AgentPoller:
             )
             return
 
-        self._evaluator.resume(workflow_id, workflow_ast)
+        program_ast = self._program_ast_cache.get(workflow_id)
+        self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
 
     # =========================================================================
     # Shutdown

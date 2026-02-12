@@ -141,7 +141,7 @@ def run_to_completion(
     if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):
         return result
 
-    poller.cache_workflow_ast(result.workflow_id, workflow_ast)
+    poller.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast=program_ast)
 
     for _ in range(max_rounds):
         dispatched = poller.poll_once()
