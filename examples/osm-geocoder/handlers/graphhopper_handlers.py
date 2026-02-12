@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -117,25 +118,58 @@ def _get_graph_stats(graph_dir: str) -> dict[str, Any]:
     return stats
 
 
+_MOTORIZED_PROFILES = {"car", "motorcycle", "truck"}
+_NON_MOTORIZED_PROFILES = {"bike", "mtb", "racingbike"}
+
+
+def _build_config_yaml(osm_path: str, graph_dir: str, profile: str) -> str:
+    """Build a GraphHopper 8.0 config YAML string."""
+    # Choose ignored highways based on profile type
+    if profile in _MOTORIZED_PROFILES:
+        ignored = "footway,cycleway,path,pedestrian,steps"
+    elif profile in _NON_MOTORIZED_PROFILES:
+        ignored = "motorway,trunk"
+    else:
+        ignored = ""
+
+    lines = [
+        "graphhopper:",
+        f"  datareader.file: {osm_path}",
+        f"  graph.location: {graph_dir}",
+        f"  import.osm.ignored_highways: {ignored}",
+        "  profiles:",
+        f"    - name: {profile}",
+        f"      vehicle: {profile}",
+        "      custom_model_files: []",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def _run_graphhopper_import(osm_path: str, graph_dir: str, profile: str) -> bool:
     """Run GraphHopper import to build a routing graph.
+
+    GraphHopper 8.0 requires a YAML config file passed as a positional
+    argument to the ``import`` subcommand.
 
     Returns True if successful, False otherwise.
     """
     # Ensure graph directory exists
     _storage.makedirs(graph_dir, exist_ok=True)
 
-    # Build GraphHopper command
-    # java -jar graphhopper.jar import -c config.yml osmfile.pbf
-    cmd = [
-        "java", "-Xmx4g", "-jar", GRAPHHOPPER_JAR,
-        "import",
-        f"--datareader.file={osm_path}",
-        f"--graph.location={graph_dir}",
-        f"--graph.flag_encoders={profile}",
-    ]
-
+    # Write a temporary config file for this build
+    config_yaml = _build_config_yaml(osm_path, graph_dir, profile)
     try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yml", prefix="gh-config-", delete=False
+        ) as tmp:
+            tmp.write(config_yaml)
+            config_path = tmp.name
+
+        cmd = [
+            "java", "-Xmx4g", "-jar", GRAPHHOPPER_JAR,
+            "import", config_path,
+        ]
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -146,9 +180,13 @@ def _run_graphhopper_import(osm_path: str, graph_dir: str, profile: str) -> bool
     except subprocess.TimeoutExpired:
         return False
     except FileNotFoundError:
-        # GraphHopper JAR not found - return simulated success for testing
-        # In production, this would be an error
-        return True
+        # java or GraphHopper JAR not found
+        return False
+    finally:
+        try:
+            os.unlink(config_path)
+        except (OSError, UnboundLocalError):
+            pass
 
 
 def _make_graph_result(
