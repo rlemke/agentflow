@@ -143,8 +143,8 @@ services:
       - "8020:8020"   # RPC (hdfs://namenode:8020)
     environment:
       - CLUSTER_NAME=agentflow
-      - CORE_CONF_fs___defaultFS=hdfs://namenode:8020
-      - HDFS_CONF_dfs___replication=1
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
     healthcheck:
@@ -161,8 +161,10 @@ services:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: afl-datanode
     hostname: datanode
+    ports:
+      - "9864:9864"   # WebHDFS data transfer
     environment:
-      - CORE_CONF_fs___defaultFS=hdfs://namenode:8020
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
       - SERVICE_PRECONDITION=namenode:8020
     volumes:
       - hadoop_datanode:/hadoop/dfs/data

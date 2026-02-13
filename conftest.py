@@ -23,3 +23,9 @@ def pytest_addoption(parser):
         default=False,
         help="Run MongoDB tests against a real server (uses AFL config for connection)",
     )
+    parser.addoption(
+        "--hdfs",
+        action="store_true",
+        default=False,
+        help="Run HDFS integration tests against live containers (namenode on localhost:8020)",
+    )
