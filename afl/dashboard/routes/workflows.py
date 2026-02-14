@@ -37,6 +37,61 @@ def workflow_new(request: Request):
     )
 
 
+@router.post("/validate")
+def workflow_validate(request: Request, source: str = Form(...)):
+    """Validate AFL source without compiling."""
+    errors: list[dict] = []
+    namespaces: list[str] = []
+    facets: list[str] = []
+    workflows: list[str] = []
+
+    try:
+        from afl.parser import AFLParser
+        from afl.validator import AFLValidator
+
+        parser = AFLParser()
+        ast = parser.parse(source)
+
+        # Validate
+        validator = AFLValidator()
+        validation_result = validator.validate(ast)
+        for err in validation_result.errors:
+            errors.append(
+                {
+                    "message": err.message,
+                    "line": getattr(err, "line", None),
+                    "column": getattr(err, "column", None),
+                }
+            )
+
+        # Extract AST summary
+        for ns in ast.namespaces:
+            namespaces.append(ns.name)
+            for f in ns.facets:
+                facets.append(f"{ns.name}.{f.name}")
+            for w in ns.workflows:
+                workflows.append(f"{ns.name}.{w.name}")
+        for node in ast.facets:
+            facets.append(node.name)
+        for node in ast.workflows:
+            workflows.append(node.name)
+
+    except Exception as exc:
+        errors.append({"message": str(exc), "line": None, "column": None})
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "workflows/validate.html",
+        {
+            "source": source,
+            "errors": errors,
+            "namespaces": namespaces,
+            "facets": facets,
+            "workflows": workflows,
+        },
+    )
+
+
 @router.post("/compile")
 def workflow_compile(request: Request, source: str = Form(...)):
     """Compile AFL source and show available workflows."""

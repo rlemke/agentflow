@@ -12,5 +12,6 @@ workflow MyWorkflow(x: Long) => (result: Long) andThen {
     yield MyWorkflow(result = s1.input)
 }</textarea>
     <button type="submit">Compile</button>
+    <button type="submit" formaction="/workflows/validate" class="outline">Validate Only</button>
 </form>
 {% endblock %}

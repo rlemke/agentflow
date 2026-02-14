@@ -994,3 +994,32 @@ class TestSourceRoutes:
         resp = tc.get("/")
         assert resp.status_code == 200
         assert "Sources" in resp.text
+
+
+class TestWorkflowValidation:
+    def test_validate_valid_source(self, client):
+        tc, store = client
+        source = "namespace test {\nfacet MyFacet(input: Long)\n}"
+        resp = tc.post("/workflows/validate", data={"source": source})
+        assert resp.status_code == 200
+        assert "Valid" in resp.text
+
+    def test_validate_invalid_source(self, client):
+        tc, store = client
+        source = "this is not valid afl {{{{"
+        resp = tc.post("/workflows/validate", data={"source": source})
+        assert resp.status_code == 200
+        assert "Invalid" in resp.text or "Error" in resp.text
+
+    def test_validate_shows_namespaces(self, client):
+        tc, store = client
+        source = "namespace myns {\nfacet Foo(x: String)\nworkflow Bar(y: Long) andThen {\n  s = Foo(x = $.y)\n}\n}"
+        resp = tc.post("/workflows/validate", data={"source": source})
+        assert resp.status_code == 200
+        assert "myns" in resp.text
+
+    def test_validate_button_exists(self, client):
+        tc, store = client
+        resp = tc.get("/workflows/new")
+        assert resp.status_code == 200
+        assert "Validate Only" in resp.text
