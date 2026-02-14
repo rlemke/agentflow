@@ -42,5 +42,66 @@
     </tbody>
 </table>
 </figure>
+
+{% if flow.namespaces %}
+<h2>Namespaces</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Name</th><th>UUID</th></tr>
+    </thead>
+    <tbody>
+        {% for ns in flow.namespaces %}
+        <tr>
+            <td><a href="/namespaces/{{ ns.name }}">{{ ns.name }}</a></td>
+            <td class="mono">{{ ns.uuid }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+
+{% if flow.facets %}
+<h2>Facets</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Namespace ID</th><th>UUID</th></tr>
+    </thead>
+    <tbody>
+        {% for facet in flow.facets %}
+        <tr>
+            <td>{{ facet.name }}</td>
+            <td class="mono">{{ facet.namespace_id }}</td>
+            <td class="mono">{{ facet.uuid }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+
+{% if runners %}
+<h2>Execution History</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Runner ID</th><th>Workflow</th><th>State</th><th>Started</th><th>Duration</th></tr>
+    </thead>
+    <tbody>
+        {% for runner in runners %}
+        <tr>
+            <td><a href="/runners/{{ runner.uuid }}" class="mono">{{ runner.uuid|truncate_uuid }}</a></td>
+            <td>{{ runner.workflow.name }}</td>
+            <td><span class="badge badge-{{ runner.state|state_color }}">{{ runner.state }}</span></td>
+            <td>{{ runner.start_time|timestamp }}</td>
+            <td>{{ runner.duration }}ms</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
 {% endif %}
 {% endblock %}

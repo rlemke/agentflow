@@ -3,6 +3,19 @@
 {% block content %}
 <h1>Events</h1>
 
+<nav>
+    <a href="/events">All</a> |
+    <a href="/events?state=event.Created">Created</a> |
+    <a href="/events?state=event.Dispatched">Dispatched</a> |
+    <a href="/events?state=event.Processing">Processing</a> |
+    <a href="/events?state=event.Completed">Completed</a> |
+    <a href="/events?state=event.Error">Error</a>
+</nav>
+
+{% if filter_state %}
+<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+{% endif %}
+
 <figure>
 <table>
     <thead>

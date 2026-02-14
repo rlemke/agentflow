@@ -25,13 +25,15 @@ router = APIRouter(prefix="/sources")
 
 
 @router.get("")
-def source_list(request: Request, store=Depends(get_store)):
-    """List all published sources."""
+def source_list(request: Request, q: str | None = None, store=Depends(get_store)):
+    """List all published sources, optionally filtered by namespace name search."""
     sources = store.list_published_sources()
+    if q:
+        sources = [s for s in sources if q.lower() in s.namespace_name.lower()]
     return request.app.state.templates.TemplateResponse(
         request,
         "sources/list.html",
-        {"sources": sources},
+        {"sources": sources, "search_query": q},
     )
 
 

@@ -25,13 +25,15 @@ router = APIRouter(prefix="/handlers")
 
 
 @router.get("")
-def handler_list(request: Request, store=Depends(get_store)):
-    """List all handler registrations."""
+def handler_list(request: Request, q: str | None = None, store=Depends(get_store)):
+    """List all handler registrations, optionally filtered by facet name search."""
     handlers = store.list_handler_registrations()
+    if q:
+        handlers = [h for h in handlers if q.lower() in h.facet_name.lower()]
     return request.app.state.templates.TemplateResponse(
         request,
         "handlers/list.html",
-        {"handlers": handlers},
+        {"handlers": handlers, "search_query": q},
     )
 
 

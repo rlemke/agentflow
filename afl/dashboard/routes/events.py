@@ -24,13 +24,16 @@ router = APIRouter(prefix="/events")
 
 
 @router.get("")
-def event_list(request: Request, store=Depends(get_store)):
-    """List all events."""
-    events = store.get_all_events()
+def event_list(request: Request, state: str | None = None, store=Depends(get_store)):
+    """List all events, optionally filtered by state."""
+    if state:
+        events = store.get_events_by_state(state)
+    else:
+        events = store.get_all_events()
     return request.app.state.templates.TemplateResponse(
         request,
         "events/list.html",
-        {"events": events},
+        {"events": events, "filter_state": state},
     )
 
 

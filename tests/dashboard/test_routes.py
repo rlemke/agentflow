@@ -1247,3 +1247,300 @@ class TestLockRoutes:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["key"] == "step:wf-1:s-1"
+
+
+# =============================================================================
+# v0.10.13 — Task Detail, Filtering, Search, API Expansion
+# =============================================================================
+
+
+def _make_task(uuid="task-1", name="SendEmail", state="pending", error=None, data=None):
+    from afl.runtime.entities import TaskDefinition
+
+    return TaskDefinition(
+        uuid=uuid,
+        name=name,
+        runner_id="r-1",
+        workflow_id="wf-1",
+        flow_id="flow-1",
+        step_id="step-1",
+        task_list_name="default",
+        state=state,
+        data_type="email",
+        error=error,
+        data=data,
+    )
+
+
+class TestTaskDetailAndFiltering:
+    def test_task_list_filter_by_state(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", state="pending"))
+        store.save_task(_make_task("t-2", state="running"))
+
+        resp = tc.get("/tasks?state=pending")
+        assert resp.status_code == 200
+        assert "t-1" in resp.text
+        assert "t-2" not in resp.text
+
+    def test_task_detail(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", name="ProcessOrder"))
+
+        resp = tc.get("/tasks/t-1")
+        assert resp.status_code == 200
+        assert "ProcessOrder" in resp.text
+
+    def test_task_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/tasks/nonexistent")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_task_detail_shows_error(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", error={"message": "Connection failed"}))
+
+        resp = tc.get("/tasks/t-1")
+        assert resp.status_code == 200
+        assert "Connection failed" in resp.text
+
+    def test_task_detail_shows_data(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", data={"recipient": "test@example.com"}))
+
+        resp = tc.get("/tasks/t-1")
+        assert resp.status_code == 200
+        assert "test@example.com" in resp.text
+
+    def test_task_detail_links(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1"))
+
+        resp = tc.get("/tasks/t-1")
+        assert resp.status_code == 200
+        assert "/runners/r-1" in resp.text
+        assert "/flows/flow-1" in resp.text
+        assert "/steps/step-1" in resp.text
+
+
+class TestFlowDetailImprovements:
+    def test_flow_detail_shows_namespaces(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+
+        resp = tc.get("/flows/flow-1")
+        assert resp.status_code == 200
+        assert "Namespaces" in resp.text
+        assert "test.ns" in resp.text
+
+    def test_flow_detail_shows_facets(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+
+        resp = tc.get("/flows/flow-1")
+        assert resp.status_code == 200
+        assert "Facets" in resp.text
+        assert "MyFacet" in resp.text
+
+    def test_flow_detail_shows_execution_history(self, client):
+        tc, store = client
+        flow = _make_flow_with_ns()
+        store.save_flow(flow)
+        runner = _make_runner("r-1", workflow=flow.workflows[0], state="completed")
+        store.save_runner(runner)
+
+        resp = tc.get("/flows/flow-1")
+        assert resp.status_code == 200
+        assert "Execution History" in resp.text
+
+
+class TestListFiltering:
+    def test_event_list_filter_by_state(self, client):
+        tc, store = client
+        store.save_event(_make_event("evt-1", state="event.Created"))
+        store.save_event(_make_event("evt-2", step_id="step-2", state="event.Completed"))
+
+        resp = tc.get("/events?state=event.Created")
+        assert resp.status_code == 200
+        assert "evt-1" in resp.text
+
+    def test_server_list_filter_by_state(self, client):
+        tc, store = client
+        from afl.runtime.entities import ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+        )
+        store.save_server(server)
+
+        resp = tc.get("/servers?state=running")
+        assert resp.status_code == 200
+        assert "worker-01" in resp.text
+
+    def test_flow_list_search(self, client):
+        tc, store = client
+        from afl.runtime.entities import FlowDefinition, FlowIdentity
+
+        store.save_flow(FlowDefinition(
+            uuid="flow-1",
+            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
+        ))
+        store.save_flow(FlowDefinition(
+            uuid="flow-2",
+            name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
+        ))
+
+        resp = tc.get("/flows?q=Test")
+        assert resp.status_code == 200
+        assert "TestFlow" in resp.text
+        assert "OtherFlow" not in resp.text
+
+    def test_handler_list_search(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler("ns.TestFacet"))
+        store.save_handler_registration(_make_handler("other.Handler", module_uri="other.mod"))
+
+        resp = tc.get("/handlers?q=ns.Test")
+        assert resp.status_code == 200
+        assert "ns.TestFacet" in resp.text
+        assert "other.Handler" not in resp.text
+
+    def test_source_list_search(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source(
+            uuid="src-1", namespace_name="geo.cache"
+        ))
+        store.save_published_source(_make_published_source(
+            uuid="src-2", namespace_name="auth.login"
+        ))
+
+        resp = tc.get("/sources?q=geo")
+        assert resp.status_code == 200
+        assert "geo.cache" in resp.text
+        assert "auth.login" not in resp.text
+
+
+class TestApiExpansion:
+    def test_api_tasks(self, client):
+        tc, store = client
+        resp = tc.get("/api/tasks")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+        store.save_task(_make_task("t-1"))
+        resp = tc.get("/api/tasks")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+
+    def test_api_tasks_filter_by_state(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", state="pending"))
+        store.save_task(_make_task("t-2", state="running"))
+
+        resp = tc.get("/api/tasks?state=pending")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["uuid"] == "t-1"
+
+    def test_api_task_detail(self, client):
+        tc, store = client
+        store.save_task(_make_task("t-1", name="ProcessOrder"))
+
+        resp = tc.get("/api/tasks/t-1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["uuid"] == "t-1"
+        assert data["name"] == "ProcessOrder"
+
+    def test_api_task_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/api/tasks/nonexistent")
+        assert resp.status_code == 404
+
+    def test_api_flow_detail(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+
+        resp = tc.get("/api/flows/flow-1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["uuid"] == "flow-1"
+        assert len(data["namespaces"]) == 1
+        assert data["namespaces"][0]["name"] == "test.ns"
+
+    def test_api_flow_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/api/flows/nonexistent")
+        assert resp.status_code == 404
+
+    def test_api_namespaces(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+
+        resp = tc.get("/api/namespaces")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "test.ns"
+        assert data[0]["flow_id"] == "flow-1"
+
+    def test_api_events_filter(self, client):
+        tc, store = client
+        store.save_event(_make_event("evt-1", state="event.Created"))
+        store.save_event(_make_event("evt-2", step_id="step-2", state="event.Completed"))
+
+        resp = tc.get("/api/events?state=event.Created")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == "evt-1"
+
+    def test_api_servers_filter(self, client):
+        tc, store = client
+        from afl.runtime.entities import ServerDefinition, ServerState
+
+        store.save_server(ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+        ))
+        store.save_server(ServerDefinition(
+            uuid="s-2",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-02",
+            state=ServerState.ERROR,
+        ))
+
+        resp = tc.get("/api/servers?state=running")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["uuid"] == "s-1"
+
+    def test_api_flows_search(self, client):
+        tc, store = client
+        from afl.runtime.entities import FlowDefinition, FlowIdentity
+
+        store.save_flow(FlowDefinition(
+            uuid="flow-1",
+            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
+        ))
+        store.save_flow(FlowDefinition(
+            uuid="flow-2",
+            name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
+        ))
+
+        resp = tc.get("/api/flows?q=Test")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "TestFlow"

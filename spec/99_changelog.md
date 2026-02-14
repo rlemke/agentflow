@@ -416,3 +416,17 @@
 - **JSON API**: `GET /api/locks` endpoint returns all locks as JSON array with metadata
 - 8 new tests: `TestLockRoutes` (list empty/with data, detail, detail not found, detail shows meta, release, API empty/with data)
 - 1334 tests passing
+
+## Completed (v0.10.13) - Dashboard Enhancements
+- **Task detail page** (`GET /tasks/{task_id}`): new route and template with grid layout showing task details (UUID, name, state, task list, data type, created, updated), related entities (runner, workflow, flow, step links), error display, and data display; not-found handling
+- **Task list filtering** (`GET /tasks?state=`): state filter nav (All, Pending, Running, Completed, Failed, Ignored, Canceled) with badge display; task UUIDs now link to detail page
+- **Event list filtering** (`GET /events?state=`): state filter nav (All, Created, Dispatched, Processing, Completed, Error) with badge display
+- **Server list filtering** (`GET /servers?state=`): state filter nav (All, Startup, Running, Shutdown, Error) with badge display
+- **Flow list search** (`GET /flows?q=`): text search input filtering flows by name (case-insensitive)
+- **Handler list search** (`GET /handlers?q=`): text search input filtering handlers by facet name (case-insensitive)
+- **Source list search** (`GET /sources?q=`): text search input filtering sources by namespace name (case-insensitive)
+- **Flow detail improvements**: namespaces table (linked to namespace browser), facets table, execution history table (runners sorted by start_time, limit 20)
+- **Store additions**: `get_tasks_by_state()` and `get_events_by_state()` on `MongoStore`
+- **API expansion**: `GET /api/tasks` (with `?state=` filter), `GET /api/tasks/{task_id}` (404 handling), `GET /api/flows/{flow_id}` (namespaces, facets, counts), `GET /api/namespaces` (aggregated across flows); `?state=` filter on `GET /api/events` and `GET /api/servers`; `?q=` text search on `GET /api/flows`, `GET /api/handlers`, `GET /api/sources`
+- 24 new tests across 4 test classes: `TestTaskDetailAndFiltering` (6), `TestFlowDetailImprovements` (3), `TestListFiltering` (5), `TestApiExpansion` (10)
+- 1358 tests passing

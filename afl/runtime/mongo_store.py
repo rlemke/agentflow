@@ -308,6 +308,11 @@ class MongoStore(PersistenceAPI):
         docs = self._db.events.find().sort("_id", -1).limit(limit)
         return [self._doc_to_event(doc) for doc in docs]
 
+    def get_events_by_state(self, state: str) -> Sequence[EventDefinition]:
+        """Get events by state."""
+        docs = self._db.events.find({"state": state})
+        return [self._doc_to_event(doc) for doc in docs]
+
     # =========================================================================
     # Atomic Commit (PersistenceAPI)
     # =========================================================================
@@ -458,6 +463,11 @@ class MongoStore(PersistenceAPI):
     def get_all_tasks(self, limit: int = 100) -> Sequence[TaskDefinition]:
         """Get all tasks, most recently created first."""
         docs = self._db.tasks.find().sort("created", -1).limit(limit)
+        return [self._doc_to_task(doc) for doc in docs]
+
+    def get_tasks_by_state(self, state: str) -> Sequence[TaskDefinition]:
+        """Get tasks by state."""
+        docs = self._db.tasks.find({"state": state}).sort("created", -1)
         return [self._doc_to_task(doc) for doc in docs]
 
     def get_tasks_by_runner(self, runner_id: str) -> Sequence[TaskDefinition]:

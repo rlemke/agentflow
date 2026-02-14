@@ -24,11 +24,25 @@ router = APIRouter(prefix="/tasks")
 
 
 @router.get("")
-def task_list(request: Request, store=Depends(get_store)):
-    """List all tasks."""
-    tasks = store.get_all_tasks()
+def task_list(request: Request, state: str | None = None, store=Depends(get_store)):
+    """List all tasks, optionally filtered by state."""
+    if state:
+        tasks = store.get_tasks_by_state(state)
+    else:
+        tasks = store.get_all_tasks()
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/list.html",
-        {"tasks": tasks},
+        {"tasks": tasks, "filter_state": state},
+    )
+
+
+@router.get("/{task_id}")
+def task_detail(task_id: str, request: Request, store=Depends(get_store)):
+    """Show task detail."""
+    task = store.get_task(task_id)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "tasks/detail.html",
+        {"task": task},
     )

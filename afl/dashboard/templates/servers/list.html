@@ -3,6 +3,18 @@
 {% block content %}
 <h1>Servers</h1>
 
+<nav>
+    <a href="/servers">All</a> |
+    <a href="/servers?state=startup">Startup</a> |
+    <a href="/servers?state=running">Running</a> |
+    <a href="/servers?state=shutdown">Shutdown</a> |
+    <a href="/servers?state=error">Error</a>
+</nav>
+
+{% if filter_state %}
+<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+{% endif %}
+
 <figure>
 <table>
     <thead>

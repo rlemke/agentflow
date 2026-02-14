@@ -99,13 +99,37 @@ def api_step_detail(step_id: str, store=Depends(get_store)):
     return JSONResponse(_step_dict(step))
 
 
+# -- Tasks -------------------------------------------------------------------
+
+
+@router.get("/tasks")
+def api_tasks(state: str | None = None, store=Depends(get_store)):
+    """Return all tasks as JSON, optionally filtered by state."""
+    if state:
+        tasks = store.get_tasks_by_state(state)
+    else:
+        tasks = store.get_all_tasks()
+    return JSONResponse([_task_dict(t) for t in tasks])
+
+
+@router.get("/tasks/{task_id}")
+def api_task_detail(task_id: str, store=Depends(get_store)):
+    """Return a single task as JSON."""
+    task = store.get_task(task_id)
+    if not task:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(_task_dict(task))
+
+
 # -- Flows -------------------------------------------------------------------
 
 
 @router.get("/flows")
-def api_flows(store=Depends(get_store)):
-    """Return all flows as JSON."""
+def api_flows(q: str | None = None, store=Depends(get_store)):
+    """Return all flows as JSON, optionally filtered by name search."""
     flows = store.get_all_flows()
+    if q:
+        flows = [f for f in flows if q.lower() in f.name.name.lower()]
     return JSONResponse(
         [
             {
@@ -120,13 +144,59 @@ def api_flows(store=Depends(get_store)):
     )
 
 
+@router.get("/flows/{flow_id}")
+def api_flow_detail(flow_id: str, store=Depends(get_store)):
+    """Return a single flow as JSON."""
+    flow = store.get_flow(flow_id)
+    if not flow:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(
+        {
+            "uuid": flow.uuid,
+            "name": flow.name.name,
+            "path": flow.name.path,
+            "namespaces": [{"uuid": n.uuid, "name": n.name} for n in flow.namespaces],
+            "facets": [
+                {"uuid": f.uuid, "name": f.name, "namespace_id": f.namespace_id}
+                for f in flow.facets
+            ],
+            "workflows": len(flow.workflows),
+            "sources": len(flow.compiled_sources),
+        }
+    )
+
+
+# -- Namespaces --------------------------------------------------------------
+
+
+@router.get("/namespaces")
+def api_namespaces(store=Depends(get_store)):
+    """Return namespaces aggregated across all flows."""
+    flows = store.get_all_flows()
+    namespaces = []
+    for flow in flows:
+        for ns in flow.namespaces:
+            namespaces.append(
+                {
+                    "uuid": ns.uuid,
+                    "name": ns.name,
+                    "flow_id": flow.uuid,
+                    "flow_name": flow.name.name,
+                }
+            )
+    return JSONResponse(namespaces)
+
+
 # -- Servers -----------------------------------------------------------------
 
 
 @router.get("/servers")
-def api_servers(store=Depends(get_store)):
-    """Return all servers as JSON."""
-    servers = store.get_all_servers()
+def api_servers(state: str | None = None, store=Depends(get_store)):
+    """Return all servers as JSON, optionally filtered by state."""
+    if state:
+        servers = store.get_servers_by_state(state)
+    else:
+        servers = store.get_all_servers()
     return JSONResponse(
         [
             {
@@ -147,9 +217,11 @@ def api_servers(store=Depends(get_store)):
 
 
 @router.get("/handlers")
-def api_handlers(store=Depends(get_store)):
-    """Return all handler registrations as JSON."""
+def api_handlers(q: str | None = None, store=Depends(get_store)):
+    """Return all handler registrations as JSON, optionally filtered by facet name."""
     handlers = store.list_handler_registrations()
+    if q:
+        handlers = [h for h in handlers if q.lower() in h.facet_name.lower()]
     return JSONResponse(
         [
             {
@@ -217,9 +289,11 @@ def api_locks(store=Depends(get_store)):
 
 
 @router.get("/sources")
-def api_sources(store=Depends(get_store)):
-    """Return all published sources as JSON."""
+def api_sources(q: str | None = None, store=Depends(get_store)):
+    """Return all published sources as JSON, optionally filtered by namespace."""
     sources = store.list_published_sources()
+    if q:
+        sources = [s for s in sources if q.lower() in s.namespace_name.lower()]
     return JSONResponse(
         [
             {
@@ -240,9 +314,12 @@ def api_sources(store=Depends(get_store)):
 
 
 @router.get("/events")
-def api_events(store=Depends(get_store)):
-    """Return all events as JSON."""
-    events = store.get_all_events()
+def api_events(state: str | None = None, store=Depends(get_store)):
+    """Return all events as JSON, optionally filtered by state."""
+    if state:
+        events = store.get_events_by_state(state)
+    else:
+        events = store.get_all_events()
     return JSONResponse(
         [
             {
@@ -282,4 +359,20 @@ def _step_dict(step) -> dict:
         "statement_id": step.statement_id,
         "container_id": step.container_id,
         "block_id": step.block_id,
+    }
+
+
+def _task_dict(task) -> dict:
+    return {
+        "uuid": task.uuid,
+        "name": task.name,
+        "state": task.state,
+        "runner_id": task.runner_id,
+        "workflow_id": task.workflow_id,
+        "flow_id": task.flow_id,
+        "step_id": task.step_id,
+        "task_list_name": task.task_list_name,
+        "data_type": task.data_type,
+        "created": task.created,
+        "updated": task.updated,
     }

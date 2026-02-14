@@ -3,6 +3,10 @@
 {% block content %}
 <h1>Flows</h1>
 
+<form method="get" action="/flows">
+    <input type="search" name="q" placeholder="Search by name..." value="{{ search_query or '' }}">
+</form>
+
 <figure>
 <table>
     <thead>

@@ -24,13 +24,15 @@ router = APIRouter(prefix="/flows")
 
 
 @router.get("")
-def flow_list(request: Request, store=Depends(get_store)):
-    """List all flows."""
+def flow_list(request: Request, q: str | None = None, store=Depends(get_store)):
+    """List all flows, optionally filtered by name search."""
     flows = store.get_all_flows()
+    if q:
+        flows = [f for f in flows if q.lower() in f.name.name.lower()]
     return request.app.state.templates.TemplateResponse(
         request,
         "flows/list.html",
-        {"flows": flows},
+        {"flows": flows, "search_query": q},
     )
 
 
@@ -39,10 +41,16 @@ def flow_detail(flow_id: str, request: Request, store=Depends(get_store)):
     """Show flow detail with workflows."""
     flow = store.get_flow(flow_id)
     workflows = store.get_workflows_by_flow(flow_id) if flow else []
+    runners = []
+    if flow:
+        for wf in flow.workflows:
+            runners.extend(store.get_runners_by_workflow(wf.uuid))
+        runners.sort(key=lambda r: r.start_time, reverse=True)
+        runners = runners[:20]
     return request.app.state.templates.TemplateResponse(
         request,
         "flows/detail.html",
-        {"flow": flow, "workflows": workflows},
+        {"flow": flow, "workflows": workflows, "runners": runners},
     )
 
 

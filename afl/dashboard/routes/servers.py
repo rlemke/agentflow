@@ -24,13 +24,16 @@ router = APIRouter(prefix="/servers")
 
 
 @router.get("")
-def server_list(request: Request, store=Depends(get_store)):
-    """List all servers."""
-    servers = store.get_all_servers()
+def server_list(request: Request, state: str | None = None, store=Depends(get_store)):
+    """List all servers, optionally filtered by state."""
+    if state:
+        servers = store.get_servers_by_state(state)
+    else:
+        servers = store.get_all_servers()
     return request.app.state.templates.TemplateResponse(
         request,
         "servers/list.html",
-        {"servers": servers},
+        {"servers": servers, "filter_state": state},
     )
 
 

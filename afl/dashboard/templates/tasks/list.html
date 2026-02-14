@@ -3,6 +3,20 @@
 {% block content %}
 <h1>Task Queue</h1>
 
+<nav>
+    <a href="/tasks">All</a> |
+    <a href="/tasks?state=pending">Pending</a> |
+    <a href="/tasks?state=running">Running</a> |
+    <a href="/tasks?state=completed">Completed</a> |
+    <a href="/tasks?state=failed">Failed</a> |
+    <a href="/tasks?state=ignored">Ignored</a> |
+    <a href="/tasks?state=canceled">Canceled</a>
+</nav>
+
+{% if filter_state %}
+<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+{% endif %}
+
 <figure>
 <table>
     <thead>
@@ -19,7 +33,7 @@
     <tbody>
         {% for task in tasks %}
         <tr>
-            <td class="mono">{{ task.uuid|truncate_uuid }}</td>
+            <td class="mono"><a href="/tasks/{{ task.uuid }}">{{ task.uuid|truncate_uuid }}</a></td>
             <td>{{ task.name }}</td>
             <td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td>
             <td>{{ task.task_list_name }}</td>

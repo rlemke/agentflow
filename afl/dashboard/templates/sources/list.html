@@ -3,6 +3,10 @@
 {% block content %}
 <h1>Published Sources</h1>
 
+<form method="get" action="/sources">
+    <input type="search" name="q" placeholder="Search by namespace..." value="{{ search_query or '' }}">
+</form>
+
 <figure>
 <table>
     <thead>
