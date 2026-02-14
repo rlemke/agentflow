@@ -5,6 +5,7 @@ Handles event facets from the genomics.cache.Operations namespace:
 """
 
 import logging
+import os
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -62,16 +63,37 @@ def checksum(payload: dict) -> dict[str, Any]:
     }
 
 
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.Download": download,
+    f"{NAMESPACE}.Index": index,
+    f"{NAMESPACE}.Validate": validate,
+    f"{NAMESPACE}.Status": status,
+    f"{NAMESPACE}.Checksum": checksum,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
 def register_operations_handlers(poller) -> None:
     """Register all cache operations handlers."""
-    handlers = {
-        "Download": download,
-        "Index": index,
-        "Validate": validate,
-        "Status": status,
-        "Checksum": checksum,
-    }
-    for name, func in handlers.items():
-        fqn = f"{NAMESPACE}.{name}"
+    for fqn, func in _DISPATCH.items():
         poller.register(fqn, func)
         log.debug("Registered operations handler: %s", fqn)

@@ -6,6 +6,7 @@ under osm.geo.Roads.ZoomBuilder.
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -401,6 +402,37 @@ ZOOM_FACETS = [
     ("ExportZoomLayers", _make_export_zoom_layers_handler),
     ("BuildZoomLayers", _make_build_zoom_layers_handler),
 ]
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, callable] = {}
+
+
+def _build_dispatch() -> None:
+    for facet_name, handler_factory in ZOOM_FACETS:
+        _DISPATCH[f"{NAMESPACE}.{facet_name}"] = handler_factory(facet_name)
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
 
 
 def register_zoom_handlers(poller) -> None:

@@ -29,6 +29,7 @@ from .zoom_handlers import register_zoom_handlers
 
 __all__ = [
     "register_all_handlers",
+    "register_all_registry_handlers",
     "register_airquality_handlers",
     "register_amenity_handlers",
     "register_boundary_handlers",
@@ -79,3 +80,52 @@ def register_all_handlers(poller) -> None:
     register_validation_handlers(poller)
     register_visualization_handlers(poller)
     register_zoom_handlers(poller)
+
+
+def register_all_registry_handlers(runner) -> None:
+    """Register all event facet handlers with a RegistryRunner."""
+    from .airquality_handlers import register_handlers as reg_airquality
+    from .amenity_handlers import register_handlers as reg_amenity
+    from .boundary_handlers import register_handlers as reg_boundary
+    from .building_handlers import register_handlers as reg_building
+    from .cache_handlers import register_handlers as reg_cache
+    from .elevation_handlers import register_handlers as reg_elevation
+    from .filter_handlers import register_handlers as reg_filter
+    from .graphhopper_handlers import register_handlers as reg_graphhopper
+    from .gtfs_handlers import register_handlers as reg_gtfs
+    from .operations_handlers import register_handlers as reg_operations
+    from .osmose_handlers import register_handlers as reg_osmose
+    from .park_handlers import register_handlers as reg_park
+    from .poi_handlers import register_handlers as reg_poi
+    from .population_handlers import register_handlers as reg_population
+    from .region_handlers import register_handlers as reg_region
+    from .road_handlers import register_handlers as reg_road
+    from .route_handlers import register_handlers as reg_route
+    from .routing_handlers import register_handlers as reg_routing
+    from .tiger_handlers import register_handlers as reg_tiger
+    from .validation_handlers import register_handlers as reg_validation
+    from .visualization_handlers import register_handlers as reg_visualization
+    from .zoom_handlers import register_handlers as reg_zoom
+
+    reg_airquality(runner)
+    reg_amenity(runner)
+    reg_boundary(runner)
+    reg_building(runner)
+    reg_cache(runner)
+    reg_elevation(runner)
+    reg_filter(runner)
+    reg_graphhopper(runner)
+    reg_gtfs(runner)
+    reg_operations(runner)
+    reg_osmose(runner)
+    reg_park(runner)
+    reg_poi(runner)
+    reg_population(runner)
+    reg_region(runner)
+    reg_road(runner)
+    reg_route(runner)
+    reg_routing(runner)
+    reg_tiger(runner)
+    reg_validation(runner)
+    reg_visualization(runner)
+    reg_zoom(runner)

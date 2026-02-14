@@ -6,6 +6,7 @@ dict simulating a pre-built aligner index.
 """
 
 import logging
+import os
 from typing import Any, Callable
 
 log = logging.getLogger(__name__)
@@ -72,14 +73,42 @@ def _make_index_handler(aligner: str, reference: str) -> Callable:
     return handler
 
 
-def register_index_handlers(poller) -> None:
-    """Register all derived aligner index handlers."""
-    count = 0
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, Callable] = {}
+
+
+def _build_dispatch() -> None:
     for namespace, facets in INDEX_REGISTRY.items():
         aligner = namespace.rsplit(".", 1)[-1]
         for facet_name in facets:
-            fqn = f"{namespace}.{facet_name}"
-            poller.register(fqn, _make_index_handler(aligner, facet_name))
-            count += 1
-            log.debug("Registered index handler: %s", fqn)
-    log.debug("Registered %d index handlers", count)
+            _DISPATCH[f"{namespace}.{facet_name}"] = _make_index_handler(aligner, facet_name)
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
+def register_index_handlers(poller) -> None:
+    """Register all derived aligner index handlers."""
+    for fqn, handler in _DISPATCH.items():
+        poller.register(fqn, handler)
+        log.debug("Registered index handler: %s", fqn)
+    log.debug("Registered %d index handlers", len(_DISPATCH))

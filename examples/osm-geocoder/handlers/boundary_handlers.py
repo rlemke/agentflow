@@ -5,6 +5,7 @@ in osmboundaries.afl under osm.geo.Boundaries.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from .boundary_extractor import (
@@ -263,3 +264,38 @@ def register_boundary_handlers(poller) -> None:
         f"{NAMESPACE}.NaturalBoundary",
         _make_configurable_natural_handler("NaturalBoundary"),
     )
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, callable] = {}
+
+
+def _build_dispatch() -> None:
+    for facet_name, admin_levels in ADMIN_FACETS.items():
+        _DISPATCH[f"{NAMESPACE}.{facet_name}"] = _make_admin_handler(facet_name, admin_levels)
+    _DISPATCH[f"{NAMESPACE}.AdminBoundary"] = _make_configurable_admin_handler("AdminBoundary")
+    for facet_name, natural_types in NATURAL_FACETS.items():
+        _DISPATCH[f"{NAMESPACE}.{facet_name}"] = _make_natural_handler(facet_name, natural_types)
+    _DISPATCH[f"{NAMESPACE}.NaturalBoundary"] = _make_configurable_natural_handler("NaturalBoundary")
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )

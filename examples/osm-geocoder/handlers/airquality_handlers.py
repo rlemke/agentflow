@@ -367,6 +367,33 @@ def _empty_stats() -> dict:
     }
 
 
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.FetchAirQuality": handle_fetch_air_quality,
+    f"{NAMESPACE}.CorrelateSchoolAirQuality": handle_correlate,
+    f"{NAMESPACE}.ExposureStatistics": handle_exposure_stats,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
 def register_airquality_handlers(poller) -> None:
     """Register air quality handlers with the poller."""
     poller.register(

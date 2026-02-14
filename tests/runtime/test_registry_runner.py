@@ -579,6 +579,232 @@ class TestRegistryRunnerPollOnce:
         assert updated_task.state == TaskState.FAILED
         assert "Failed to load handler" in updated_task.error["message"]
 
+    def test_facet_name_injected_in_payload(
+        self, store, evaluator, workflow_ast, program_ast, tmp_path
+    ):
+        """_facet_name is injected into the payload before the handler is called."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        task = pending_tasks[0]
+
+        # Handler that writes the payload to a file for inspection
+        capture_file = tmp_path / "captured_payload.json"
+        f = tmp_path / "capture_handler.py"
+        f.write_text(
+            "import json\n"
+            f"CAPTURE_PATH = {str(capture_file)!r}\n"
+            "def handle(payload):\n"
+            "    with open(CAPTURE_PATH, 'w') as fp:\n"
+            "        json.dump(payload, fp)\n"
+            "    return {'output': payload.get('input', 0) * 2}\n"
+        )
+
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        import json
+
+        captured = json.loads(capture_file.read_text())
+        assert "_facet_name" in captured
+        assert captured["_facet_name"] == task.name
+
+    def test_original_task_data_not_mutated(
+        self, store, evaluator, workflow_ast, program_ast, handler_file
+    ):
+        """Original task.data dict is not mutated by _facet_name injection."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        task = pending_tasks[0]
+
+        # Save a reference to the original data
+        original_data = task.data
+        original_keys = set(original_data.keys()) if original_data else set()
+
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+        runner.poll_once()
+
+        # Original data should not contain _facet_name
+        if original_data is not None:
+            assert "_facet_name" not in original_data
+            assert set(original_data.keys()) == original_keys
+
+    def test_handler_metadata_injected(
+        self, store, evaluator, tmp_path
+    ):
+        """_handler_metadata is injected when registration has metadata."""
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+        from afl.runtime.types import workflow_id as make_wf_id
+
+        wf_id = make_wf_id()
+        step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="ns.MetadataFacet",
+        )
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
+        step.transition.request_transition = False
+        store.save_step(step)
+
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="ns.MetadataFacet",
+            runner_id="",
+            workflow_id=wf_id,
+            flow_id="",
+            step_id=step.id,
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={"input": 5},
+        )
+        store.save_task(task)
+
+        # Handler that captures payload to file
+        capture_file = tmp_path / "captured_meta.json"
+        f = tmp_path / "meta_handler.py"
+        f.write_text(
+            "import json\n"
+            f"CAPTURE_PATH = {str(capture_file)!r}\n"
+            "def handle(payload):\n"
+            "    with open(CAPTURE_PATH, 'w') as fp:\n"
+            "        json.dump(payload, fp)\n"
+            "    return {'output': 42}\n"
+        )
+
+        reg = HandlerRegistration(
+            facet_name="ns.MetadataFacet",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+            metadata={"region": "europe", "priority": "high"},
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        import json
+
+        captured = json.loads(capture_file.read_text())
+        assert "_handler_metadata" in captured
+        assert captured["_handler_metadata"] == {"region": "europe", "priority": "high"}
+
+    def test_no_handler_metadata_when_empty(
+        self, store, evaluator, tmp_path
+    ):
+        """_handler_metadata is NOT injected when registration has no metadata."""
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+        from afl.runtime.types import workflow_id as make_wf_id
+
+        wf_id = make_wf_id()
+        step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="ns.NoMeta",
+        )
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
+        step.transition.request_transition = False
+        store.save_step(step)
+
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="ns.NoMeta",
+            runner_id="",
+            workflow_id=wf_id,
+            flow_id="",
+            step_id=step.id,
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={"input": 5},
+        )
+        store.save_task(task)
+
+        capture_file = tmp_path / "captured_nometa.json"
+        f = tmp_path / "nometa_handler.py"
+        f.write_text(
+            "import json\n"
+            f"CAPTURE_PATH = {str(capture_file)!r}\n"
+            "def handle(payload):\n"
+            "    with open(CAPTURE_PATH, 'w') as fp:\n"
+            "        json.dump(payload, fp)\n"
+            "    return {'output': 42}\n"
+        )
+
+        reg = HandlerRegistration(
+            facet_name="ns.NoMeta",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+            # No metadata (defaults to empty dict)
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        import json
+
+        captured = json.loads(capture_file.read_text())
+        assert "_handler_metadata" not in captured
+        assert "_facet_name" in captured
+
     def test_poll_short_name_fallback(self, store, evaluator, handler_file):
         """Registration under short name is found when task has qualified name."""
         from afl.runtime.step import StepDefinition

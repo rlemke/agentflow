@@ -4,6 +4,8 @@ Each handler downloads the .osm.pbf file from Geofabrik (with local
 filesystem caching) and returns an OSMCache dict.
 """
 
+import os
+
 from .downloader import download
 
 
@@ -333,3 +335,35 @@ def register_cache_handlers(poller) -> None:
         for facet_name, region_path in facets.items():
             qualified_name = f"{namespace}.{facet_name}"
             poller.register(qualified_name, _make_handler(region_path))
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, callable] = {}
+
+
+def _build_dispatch() -> None:
+    for namespace, facets in REGION_REGISTRY.items():
+        for facet_name, region_path in facets.items():
+            _DISPATCH[f"{namespace}.{facet_name}"] = _make_handler(region_path)
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )

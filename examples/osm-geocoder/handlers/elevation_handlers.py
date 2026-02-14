@@ -547,6 +547,39 @@ def handle_climbing_routes(params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    "osm.geo.Elevation.EnrichWithElevation": handle_enrich_with_elevation,
+    "osm.geo.Elevation.FilterByMaxElevation": handle_filter_by_max_elevation,
+    "osm.geo.Elevation.FilterByMinElevation": handle_filter_by_min_elevation,
+    "osm.geo.Elevation.FilterByElevationGain": handle_filter_by_elevation_gain,
+    "osm.geo.Elevation.FilterByElevationRange": handle_filter_by_elevation_range,
+    "osm.geo.Elevation.HighElevationHikingTrails": handle_high_elevation_hiking_trails,
+    "osm.geo.Elevation.HighElevationCyclingRoutes": handle_high_elevation_cycling_routes,
+    "osm.geo.Elevation.HighElevationRoutes": handle_high_elevation_routes,
+    "osm.geo.Elevation.ClimbingRoutes": handle_climbing_routes,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
 def register_elevation_handlers(poller) -> None:
     """Register all elevation-related handlers with the poller."""
     handlers = {

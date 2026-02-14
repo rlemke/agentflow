@@ -9,6 +9,7 @@ no network dependency.
 """
 
 import logging
+import os
 from dataclasses import asdict
 from typing import Any
 
@@ -170,6 +171,35 @@ def handle_verify_summary(payload: dict) -> dict:
     summary = compute_verify_summary(input_path)
 
     return {"summary": _summary_dict(summary)}
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.VerifyAll": handle_verify_all,
+    f"{NAMESPACE}.VerifyGeometry": handle_verify_geometry,
+    f"{NAMESPACE}.VerifyTags": handle_verify_tags,
+    f"{NAMESPACE}.VerifyGeoJSON": handle_verify_geojson,
+    f"{NAMESPACE}.ComputeVerifySummary": handle_verify_summary,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
 
 
 def register_osmose_handlers(poller) -> None:

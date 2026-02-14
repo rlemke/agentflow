@@ -8,6 +8,7 @@ Handles event facets from the genomics.cache.Resolve namespace:
 """
 
 import logging
+import os
 from typing import Any
 
 from .cache_handlers import RESOURCE_REGISTRY
@@ -230,14 +231,36 @@ def list_resources(payload: dict) -> dict[str, Any]:
     }
 
 
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.ResolveReference": resolve_reference,
+    f"{NAMESPACE}.ResolveAnnotation": resolve_annotation,
+    f"{NAMESPACE}.ResolveSample": resolve_sample,
+    f"{NAMESPACE}.ListResources": list_resources,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
 def register_resolve_handlers(poller) -> None:
     """Register all resource resolution handlers."""
-    handlers = {
-        "ResolveReference": resolve_reference,
-        "ResolveAnnotation": resolve_annotation,
-        "ResolveSample": resolve_sample,
-        "ListResources": list_resources,
-    }
-    for name, func in handlers.items():
-        poller.register(f"{NAMESPACE}.{name}", func)
-        log.debug("Registered resolve handler: %s.%s", NAMESPACE, name)
+    for fqn, func in _DISPATCH.items():
+        poller.register(fqn, func)
+        log.debug("Registered resolve handler: %s", fqn)

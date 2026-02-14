@@ -576,7 +576,7 @@ class RegistryRunner:
         7. On exception -> fail_step, mark task FAILED
         """
         try:
-            payload = task.data or {}
+            payload = dict(task.data or {})  # shallow copy to avoid mutating task.data
 
             # Look up registration (try exact name, then short name)
             reg = self._persistence.get_handler_registration(task.name)
@@ -597,6 +597,11 @@ class RegistryRunner:
                     task.step_id,
                 )
                 return
+
+            # Inject dispatch metadata into payload
+            payload["_facet_name"] = task.name
+            if reg.metadata:
+                payload["_handler_metadata"] = reg.metadata
 
             # Load handler (cached)
             try:

@@ -5,6 +5,7 @@ defined in osmoperations.afl under the osm.geo.Operations namespace.
 """
 
 import logging
+import os
 import re
 
 from .cache_handlers import REGION_REGISTRY
@@ -133,3 +134,40 @@ def register_operations_handlers(poller) -> None:
             poller.register(qualified_name, _make_shapefile_handler(facet_name))
         else:
             poller.register(qualified_name, _make_operation_handler(facet_name, return_param))
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, callable] = {}
+
+
+def _build_dispatch() -> None:
+    _DISPATCH[f"{NAMESPACE}.Cache"] = _cache_handler
+    shapefile_facets = {"DownloadShapefile", "DownloadShapefileAll"}
+    for facet_name, return_param in OPERATIONS_FACETS.items():
+        qualified_name = f"{NAMESPACE}.{facet_name}"
+        if facet_name in shapefile_facets:
+            _DISPATCH[qualified_name] = _make_shapefile_handler(facet_name)
+        else:
+            _DISPATCH[qualified_name] = _make_operation_handler(facet_name, return_param)
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )

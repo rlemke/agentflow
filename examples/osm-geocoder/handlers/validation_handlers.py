@@ -8,6 +8,7 @@ Delegates to the OSMOSE verifier for actual PBF analysis.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from .osmose_verifier import VerifyResult, VerifySummaryData, compute_verify_summary, verify_pbf
@@ -132,6 +133,35 @@ def handle_validation_summary(payload: dict) -> dict:
 
     summary = compute_verify_summary(input_path)
     return {"stats": _stats_dict(summary)}
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.ValidateCache": handle_validate_cache,
+    f"{NAMESPACE}.ValidateGeometry": handle_validate_geometry,
+    f"{NAMESPACE}.ValidateTags": handle_validate_tags,
+    f"{NAMESPACE}.ValidateBounds": handle_validate_bounds,
+    f"{NAMESPACE}.ValidationSummary": handle_validation_summary,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
 
 
 def register_validation_handlers(poller) -> None:

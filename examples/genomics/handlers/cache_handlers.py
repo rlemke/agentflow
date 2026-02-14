@@ -145,13 +145,41 @@ def _make_handler(url: str, path: str, size: int, resource_type: str) -> Callabl
     return handler
 
 
-def register_cache_handlers(poller) -> None:
-    """Register all per-entity genomics cache download handlers."""
-    count = 0
+# RegistryRunner dispatch adapter
+_DISPATCH: dict[str, Callable] = {}
+
+
+def _build_dispatch() -> None:
     for namespace, facets in RESOURCE_REGISTRY.items():
         for facet_name, (url, path, size, rtype) in facets.items():
-            fqn = f"{namespace}.{facet_name}"
-            poller.register(fqn, _make_handler(url, path, size, rtype))
-            count += 1
-            log.debug("Registered cache handler: %s", fqn)
-    log.debug("Registered %d genomics cache handlers", count)
+            _DISPATCH[f"{namespace}.{facet_name}"] = _make_handler(url, path, size, rtype)
+
+
+_build_dispatch()
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
+def register_cache_handlers(poller) -> None:
+    """Register all per-entity genomics cache download handlers."""
+    for fqn, handler in _DISPATCH.items():
+        poller.register(fqn, handler)
+        log.debug("Registered cache handler: %s", fqn)
+    log.debug("Registered %d genomics cache handlers", len(_DISPATCH))

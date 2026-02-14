@@ -27,6 +27,8 @@ from handlers import register_all_handlers
 from afl.runtime import Evaluator, MemoryStore, Telemetry
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
+USE_REGISTRY = os.environ.get("AFL_USE_REGISTRY", "").strip() == "1"
+
 # Nominatim API (free, no API key required — please respect usage policy)
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "AgentFlow-OSM-Example/1.0"
@@ -70,9 +72,8 @@ def geocode_handler(payload: dict) -> dict:
     }
 
 
-def main() -> None:
-    """Start the geocoder agent."""
-    # Use MongoStore if MongoDB URL is configured, otherwise use MemoryStore
+def _make_store():
+    """Create a persistence store from environment configuration."""
     mongodb_url = os.environ.get("AFL_MONGODB_URL")
     mongodb_database = os.environ.get("AFL_MONGODB_DATABASE", "afl")
 
@@ -80,39 +81,75 @@ def main() -> None:
         from afl.runtime.mongo_store import MongoStore
 
         print(f"Using MongoDB: {mongodb_url}/{mongodb_database}")
-        store = MongoStore(connection_string=mongodb_url, database_name=mongodb_database)
-    else:
-        print("Using in-memory store (set AFL_MONGODB_URL for MongoDB)")
-        store = MemoryStore()
+        return MongoStore(connection_string=mongodb_url, database_name=mongodb_database)
 
+    print("Using in-memory store (set AFL_MONGODB_URL for MongoDB)")
+    return MemoryStore()
+
+
+def main() -> None:
+    """Start the geocoder agent."""
+    store = _make_store()
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
 
-    config = AgentPollerConfig(
-        service_name="osm-geocoder",
-        server_group="osm",
-        poll_interval_ms=2000,
-        max_concurrent=3,  # respect Nominatim rate limits
-    )
+    if USE_REGISTRY:
+        from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
+        from handlers import register_all_registry_handlers
 
-    poller = AgentPoller(persistence=store, evaluator=evaluator, config=config)
+        config = RegistryRunnerConfig(
+            service_name="osm-geocoder",
+            server_group="osm",
+            poll_interval_ms=2000,
+            max_concurrent=3,
+        )
 
-    # Register geocoding handler
-    poller.register("osm.geo.Geocode", geocode_handler)
+        runner = RegistryRunner(persistence=store, evaluator=evaluator, config=config)
 
-    # Register all OSM cache, operations, and POI handlers
-    register_all_handlers(poller)
+        # Register geocoding handler via dispatch adapter
+        runner.register_handler(
+            facet_name="osm.geo.Geocode",
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="geocode_handler",
+        )
 
-    # Graceful shutdown on SIGTERM/SIGINT
-    def shutdown(signum, frame):
-        print("\nShutting down...")
-        poller.stop()
+        # Register all OSM handlers
+        register_all_registry_handlers(runner)
 
-    signal.signal(signal.SIGTERM, shutdown)
-    signal.signal(signal.SIGINT, shutdown)
+        def shutdown(signum, frame):
+            print("\nShutting down...")
+            runner.stop()
 
-    print("OSM Geocoder agent started. Press Ctrl+C to stop.")
-    print("Listening for osm.geo.Geocode and ~270 OSM data events...")
-    poller.start()
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+
+        print("OSM Geocoder agent started (RegistryRunner mode). Press Ctrl+C to stop.")
+        runner.start()
+    else:
+        config = AgentPollerConfig(
+            service_name="osm-geocoder",
+            server_group="osm",
+            poll_interval_ms=2000,
+            max_concurrent=3,  # respect Nominatim rate limits
+        )
+
+        poller = AgentPoller(persistence=store, evaluator=evaluator, config=config)
+
+        # Register geocoding handler
+        poller.register("osm.geo.Geocode", geocode_handler)
+
+        # Register all OSM cache, operations, and POI handlers
+        register_all_handlers(poller)
+
+        def shutdown(signum, frame):
+            print("\nShutting down...")
+            poller.stop()
+
+        signal.signal(signal.SIGTERM, shutdown)
+        signal.signal(signal.SIGINT, shutdown)
+
+        print("OSM Geocoder agent started. Press Ctrl+C to stop.")
+        print("Listening for osm.geo.Geocode and ~270 OSM data events...")
+        poller.start()
 
 
 if __name__ == "__main__":

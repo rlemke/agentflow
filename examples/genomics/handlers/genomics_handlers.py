@@ -6,6 +6,7 @@ realistic output structure (no external dependencies required).
 """
 
 import logging
+import os
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -140,19 +141,41 @@ def publish(payload: dict) -> dict[str, Any]:
     }
 
 
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    f"{NAMESPACE}.IngestReference": ingest_reference,
+    f"{NAMESPACE}.QcReads": qc_reads,
+    f"{NAMESPACE}.AlignReads": align_reads,
+    f"{NAMESPACE}.CallVariants": call_variants,
+    f"{NAMESPACE}.JointGenotype": joint_genotype,
+    f"{NAMESPACE}.NormalizeFilter": normalize_filter,
+    f"{NAMESPACE}.Annotate": annotate,
+    f"{NAMESPACE}.CohortAnalytics": cohort_analytics,
+    f"{NAMESPACE}.Publish": publish,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
+
+
 def register_genomics_handlers(poller) -> None:
     """Register all genomics event facet handlers with the poller."""
-    handlers = {
-        "IngestReference": ingest_reference,
-        "QcReads": qc_reads,
-        "AlignReads": align_reads,
-        "CallVariants": call_variants,
-        "JointGenotype": joint_genotype,
-        "NormalizeFilter": normalize_filter,
-        "Annotate": annotate,
-        "CohortAnalytics": cohort_analytics,
-        "Publish": publish,
-    }
-    for name, func in handlers.items():
-        poller.register(f"{NAMESPACE}.{name}", func)
-        log.debug("Registered genomics handler: %s.%s", NAMESPACE, name)
+    for fqn, func in _DISPATCH.items():
+        poller.register(fqn, func)
+        log.debug("Registered genomics handler: %s", fqn)

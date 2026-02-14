@@ -4,6 +4,7 @@ Handles ResolveRegion, ResolveRegions, and ListRegions event facets by
 delegating to the region_resolver module.
 """
 
+import os
 from typing import Any
 
 from .downloader import download
@@ -129,6 +130,33 @@ def handle_list_regions(params: dict[str, Any]) -> dict[str, Any]:
             },
         },
     }
+
+
+# RegistryRunner dispatch adapter
+_DISPATCH = {
+    "osm.geo.Region.ResolveRegion": handle_resolve_region,
+    "osm.geo.Region.ResolveRegions": handle_resolve_regions,
+    "osm.geo.Region.ListRegions": handle_list_regions,
+}
+
+
+def handle(payload: dict) -> dict:
+    """RegistryRunner dispatch entrypoint."""
+    facet_name = payload["_facet_name"]
+    handler = _DISPATCH.get(facet_name)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet_name}")
+    return handler(payload)
+
+
+def register_handlers(runner) -> None:
+    """Register all facets with a RegistryRunner."""
+    for facet_name in _DISPATCH:
+        runner.register_handler(
+            facet_name=facet_name,
+            module_uri=f"file://{os.path.abspath(__file__)}",
+            entrypoint="handle",
+        )
 
 
 def register_region_handlers(poller) -> None:
