@@ -346,3 +346,11 @@
 - **Agent entry points**: `examples/osm-geocoder/agent.py` updated with dual-mode support — `AFL_USE_REGISTRY=1` uses `RegistryRunner`, default uses `AgentPoller`; new `examples/genomics/agent.py` with same dual-mode pattern
 - **New tests**: `test_handler_dispatch_osm.py` (58 tests) and `test_handler_dispatch_genomics.py` (18 tests) verify `_DISPATCH` key counts, `handle()` dispatch, unknown-facet errors, and `register_handlers()` call counts; use `sys.modules` cleanup for cross-file isolation
 - 1264 tests passing
+
+## Completed (v0.10.4) - Topic-Based Filtering for RegistryRunner
+- **`RegistryRunnerConfig.topics`**: new `list[str]` field (default empty) accepting glob patterns to filter which registered facets a runner will handle; when empty, all registrations are polled (backward-compatible default)
+- **`RegistryRunner._matches_topics()`**: new helper using `fnmatch.fnmatch()` to match facet names against configured topic patterns; supports exact names (`ns.A`), glob wildcards (`osm.geo.cache.*`), prefix patterns (`genomics.*`), and `?`/`[seq]` syntax
+- **`_refresh_registry()` filtering**: when `topics` is non-empty, filters `_registered_names` to only include facet names matching at least one pattern; downstream methods (`poll_once`, `_poll_cycle`, `_register_server`, `claim_task`) automatically use the filtered list
+- **`AFL_RUNNER_TOPICS` env var**: both `examples/osm-geocoder/agent.py` and `examples/genomics/agent.py` read comma-separated topic patterns from `AFL_RUNNER_TOPICS` and pass to `RegistryRunnerConfig(topics=...)`; prints active filter when set
+- **5 new tests** in `TestRegistryRunnerTopics`: exact match filtering, glob pattern filtering, empty-means-all default, poll_once topic-scoped claiming, server definition topics reflection
+- 1269 tests passing
