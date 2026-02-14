@@ -428,5 +428,6 @@
 - **Flow detail improvements**: namespaces table (linked to namespace browser), facets table, execution history table (runners sorted by start_time, limit 20)
 - **Store additions**: `get_tasks_by_state()` and `get_events_by_state()` on `MongoStore`
 - **API expansion**: `GET /api/tasks` (with `?state=` filter), `GET /api/tasks/{task_id}` (404 handling), `GET /api/flows/{flow_id}` (namespaces, facets, counts), `GET /api/namespaces` (aggregated across flows); `?state=` filter on `GET /api/events` and `GET /api/servers`; `?q=` text search on `GET /api/flows`, `GET /api/handlers`, `GET /api/sources`
-- 24 new tests across 4 test classes: `TestTaskDetailAndFiltering` (6), `TestFlowDetailImprovements` (3), `TestListFiltering` (5), `TestApiExpansion` (10)
-- 1358 tests passing
+- 24 new dashboard tests across 4 test classes: `TestTaskDetailAndFiltering` (6), `TestFlowDetailImprovements` (3), `TestListFiltering` (5), `TestApiExpansion` (10)
+- **RegistryRunner integration tests** (`tests/runtime/test_registry_runner_integration.py`): 24 end-to-end tests across 5 classes — `TestRegistryRunnerAddOne` (7, mirrors test_addone_agent.py), `TestRegistryRunnerMultiStep` (4, Double→Square pipeline with data flow), `TestRegistryRunnerAsync` (6, async handlers, partial updates, type hints), `TestRegistryRunnerComplexResume` (3, three-step A→B→C pipeline), `TestRegistryRunnerForeach` (4, foreach iteration with event facets)
+- 1382 tests passing
