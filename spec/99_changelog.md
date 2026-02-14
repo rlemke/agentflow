@@ -354,3 +354,11 @@
 - **`AFL_RUNNER_TOPICS` env var**: both `examples/osm-geocoder/agent.py` and `examples/genomics/agent.py` read comma-separated topic patterns from `AFL_RUNNER_TOPICS` and pass to `RegistryRunnerConfig(topics=...)`; prints active filter when set
 - **5 new tests** in `TestRegistryRunnerTopics`: exact match filtering, glob pattern filtering, empty-means-all default, poll_once topic-scoped claiming, server definition topics reflection
 - 1269 tests passing
+
+## Completed (v0.10.5) - MCP Handler Registration Tools & Resources
+- **`afl_manage_handlers` tool**: new MCP tool (7th) with action-based dispatch for managing handler registrations; actions: `list` (all registrations), `get` (by facet_name), `register` (create/upsert with `created` timestamp preservation), `delete` (by facet_name); validation for required fields per action; error pattern matches existing tools (`{"success": false, "error": "..."}`)
+- **`serialize_handler_registration()`**: new serializer in `afl/mcp/serializers.py` converting `HandlerRegistration` to dict with all fields (facet_name, module_uri, entrypoint, version, checksum, timeout_ms, requirements, metadata, created, updated)
+- **Handler resources**: two new MCP resources — `afl://handlers` (list all registrations) and `afl://handlers/{facet_name}` (detail by facet name); routed in `_handle_resource()` with not-found error handling
+- **Tool count**: 6 → 7; **Resource count**: 10 → 12
+- 17 new tests: `TestManageHandlersTool` (13 tests covering list/get/register/delete with validation and edge cases) and 4 handler resource tests in `TestResources`
+- 1286 tests passing

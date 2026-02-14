@@ -30,6 +30,7 @@ from .serializers import (
     serialize_execution_result,
     serialize_flow,
     serialize_flow_source,
+    serialize_handler_registration,
     serialize_log,
     serialize_runner,
     serialize_server,
@@ -183,6 +184,50 @@ def create_server(
                     "required": ["runner_id", "action"],
                 },
             ),
+            Tool(
+                name="afl_manage_handlers",
+                description="List, get, register, or delete handler registrations.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["list", "get", "register", "delete"],
+                            "description": "Action to perform",
+                        },
+                        "facet_name": {
+                            "type": "string",
+                            "description": "Qualified facet name (required for get/register/delete)",
+                        },
+                        "module_uri": {
+                            "type": "string",
+                            "description": "Python module path (required for register)",
+                        },
+                        "entrypoint": {
+                            "type": "string",
+                            "description": "Function name within module (default: handle)",
+                        },
+                        "version": {
+                            "type": "string",
+                            "description": "Handler version (default: 1.0.0)",
+                        },
+                        "timeout_ms": {
+                            "type": "integer",
+                            "description": "Timeout in milliseconds (default: 30000)",
+                        },
+                        "requirements": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Python package requirements",
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "description": "Arbitrary metadata dict",
+                        },
+                    },
+                    "required": ["action"],
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -199,6 +244,8 @@ def create_server(
             return _tool_resume_workflow(arguments, _get_store)
         elif name == "afl_manage_runner":
             return _tool_manage_runner(arguments, _get_store)
+        elif name == "afl_manage_handlers":
+            return _tool_manage_handlers(arguments, _get_store)
         else:
             return [
                 TextContent(
@@ -256,6 +303,16 @@ def create_server(
                 uri="afl://servers", name="List servers", description="List all registered servers"
             ),
             Resource(uri="afl://tasks", name="List tasks", description="List pending/active tasks"),
+            Resource(
+                uri="afl://handlers",
+                name="List handler registrations",
+                description="List all handler registrations",
+            ),
+            Resource(
+                uri="afl://handlers/{facet_name}",
+                name="Handler registration detail",
+                description="Handler registration detail by facet name",
+            ),
         ]
 
     @server.read_resource()
@@ -463,6 +520,155 @@ def _tool_manage_runner(
     return [TextContent(type="text", text=json.dumps(result, default=str))]
 
 
+def _tool_manage_handlers(
+    arguments: dict[str, Any],
+    get_store: Any,
+) -> list[TextContent]:
+    """Manage handler registrations (list/get/register/delete)."""
+    import time
+
+    from afl.runtime.entities import HandlerRegistration
+
+    action = arguments.get("action", "")
+
+    if action == "list":
+        try:
+            store = get_store()
+            handlers = store.list_handler_registrations()
+            result = {
+                "success": True,
+                "handlers": [serialize_handler_registration(h) for h in handlers],
+            }
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+    elif action == "get":
+        facet_name = arguments.get("facet_name", "")
+        if not facet_name:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"success": False, "error": "facet_name is required for get"}
+                    ),
+                )
+            ]
+        try:
+            store = get_store()
+            handler = store.get_handler_registration(facet_name)
+            if not handler:
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {
+                                "success": False,
+                                "error": f"Handler '{facet_name}' not found",
+                            }
+                        ),
+                    )
+                ]
+            result = {
+                "success": True,
+                "handler": serialize_handler_registration(handler),
+            }
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+    elif action == "register":
+        facet_name = arguments.get("facet_name", "")
+        module_uri = arguments.get("module_uri", "")
+        if not facet_name:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"success": False, "error": "facet_name is required for register"}
+                    ),
+                )
+            ]
+        if not module_uri:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"success": False, "error": "module_uri is required for register"}
+                    ),
+                )
+            ]
+        try:
+            store = get_store()
+            now = int(time.time() * 1000)
+            # Preserve original created timestamp on upsert
+            existing = store.get_handler_registration(facet_name)
+            created = existing.created if existing else now
+            reg = HandlerRegistration(
+                facet_name=facet_name,
+                module_uri=module_uri,
+                entrypoint=arguments.get("entrypoint", "handle"),
+                version=arguments.get("version", "1.0.0"),
+                timeout_ms=arguments.get("timeout_ms", 30000),
+                requirements=arguments.get("requirements", []),
+                metadata=arguments.get("metadata", {}),
+                created=created,
+                updated=now,
+            )
+            store.save_handler_registration(reg)
+            result = {
+                "success": True,
+                "handler": serialize_handler_registration(reg),
+            }
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+    elif action == "delete":
+        facet_name = arguments.get("facet_name", "")
+        if not facet_name:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {"success": False, "error": "facet_name is required for delete"}
+                    ),
+                )
+            ]
+        try:
+            store = get_store()
+            deleted = store.delete_handler_registration(facet_name)
+            if not deleted:
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {
+                                "success": False,
+                                "error": f"Handler '{facet_name}' not found",
+                            }
+                        ),
+                    )
+                ]
+            result = {"success": True}
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+        return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+    else:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Invalid action: {action}. Must be list, get, register, or delete.",
+                    }
+                ),
+            )
+        ]
+
+
 # =============================================================================
 # Resource handler
 # =============================================================================
@@ -523,6 +729,18 @@ def _handle_resource(uri: str, get_store: Any) -> str:
     elif parts[0] == "tasks":
         tasks = store.get_all_tasks()
         return json.dumps([serialize_task(t) for t in tasks], default=str)
+
+    elif parts[0] == "handlers":
+        if len(parts) == 1:
+            handlers = store.list_handler_registrations()
+            return json.dumps(
+                [serialize_handler_registration(h) for h in handlers], default=str
+            )
+        facet_name = parts[1]
+        handler = store.get_handler_registration(facet_name)
+        if not handler:
+            return json.dumps({"error": f"Handler '{facet_name}' not found"})
+        return json.dumps(serialize_handler_registration(handler), default=str)
 
     return json.dumps({"error": f"Unknown resource: {uri}"})
 

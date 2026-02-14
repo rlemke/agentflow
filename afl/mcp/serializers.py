@@ -20,6 +20,7 @@ from typing import Any
 
 from afl.runtime.entities import (
     FlowDefinition,
+    HandlerRegistration,
     LogDefinition,
     RunnerDefinition,
     ServerDefinition,
@@ -159,6 +160,22 @@ def serialize_server(server: ServerDefinition) -> dict[str, Any]:
             {"handler": h.handler, "handled": h.handled, "not_handled": h.not_handled}
             for h in server.handled
         ],
+    }
+
+
+def serialize_handler_registration(registration: HandlerRegistration) -> dict[str, Any]:
+    """Serialize a HandlerRegistration to a dict."""
+    return {
+        "facet_name": registration.facet_name,
+        "module_uri": registration.module_uri,
+        "entrypoint": registration.entrypoint,
+        "version": registration.version,
+        "checksum": registration.checksum,
+        "timeout_ms": registration.timeout_ms,
+        "requirements": registration.requirements,
+        "metadata": registration.metadata,
+        "created": registration.created,
+        "updated": registration.updated,
     }
 
 

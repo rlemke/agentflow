@@ -34,6 +34,7 @@ from afl.mcp.server import (
     _handle_resource,
     _tool_compile,
     _tool_execute_workflow,
+    _tool_manage_handlers,
     _tool_manage_runner,
     _tool_validate,
     create_server,
@@ -41,6 +42,7 @@ from afl.mcp.server import (
 from afl.runtime.entities import (
     FlowDefinition,
     FlowIdentity,
+    HandlerRegistration,
     LogDefinition,
     Parameter,
     RunnerDefinition,
@@ -257,6 +259,164 @@ class TestManageRunnerTool:
         assert "Invalid action" in data["error"]
 
 
+def _make_handler_registration(
+    facet_name="ns.TestFacet",
+    module_uri="my.handlers",
+    entrypoint="handle",
+    version="1.0.0",
+    timeout_ms=30000,
+    created=1000,
+    updated=2000,
+):
+    return HandlerRegistration(
+        facet_name=facet_name,
+        module_uri=module_uri,
+        entrypoint=entrypoint,
+        version=version,
+        timeout_ms=timeout_ms,
+        created=created,
+        updated=updated,
+    )
+
+
+# ============================================================================
+# Tool tests: afl_manage_handlers
+# ============================================================================
+
+
+@pytest.mark.skipif(not MONGOMOCK_AVAILABLE, reason="mongomock not installed")
+class TestManageHandlersTool:
+    def test_list_empty(self, store):
+        result = _tool_manage_handlers({"action": "list"}, lambda: store)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["handlers"] == []
+
+    def test_list_with_registrations(self, store):
+        reg = _make_handler_registration()
+        store.save_handler_registration(reg)
+        result = _tool_manage_handlers({"action": "list"}, lambda: store)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert len(data["handlers"]) == 1
+        assert data["handlers"][0]["facet_name"] == "ns.TestFacet"
+
+    def test_get_existing(self, store):
+        reg = _make_handler_registration()
+        store.save_handler_registration(reg)
+        result = _tool_manage_handlers(
+            {"action": "get", "facet_name": "ns.TestFacet"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["handler"]["facet_name"] == "ns.TestFacet"
+        assert data["handler"]["module_uri"] == "my.handlers"
+
+    def test_get_not_found(self, store):
+        result = _tool_manage_handlers(
+            {"action": "get", "facet_name": "ns.Missing"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "not found" in data["error"]
+
+    def test_get_missing_facet_name(self, store):
+        result = _tool_manage_handlers({"action": "get"}, lambda: store)
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "facet_name is required" in data["error"]
+
+    def test_register_new(self, store):
+        result = _tool_manage_handlers(
+            {
+                "action": "register",
+                "facet_name": "ns.NewFacet",
+                "module_uri": "new.module",
+                "entrypoint": "run",
+                "version": "2.0.0",
+            },
+            lambda: store,
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["handler"]["facet_name"] == "ns.NewFacet"
+        assert data["handler"]["module_uri"] == "new.module"
+        assert data["handler"]["entrypoint"] == "run"
+        assert data["handler"]["version"] == "2.0.0"
+        # Verify persisted
+        saved = store.get_handler_registration("ns.NewFacet")
+        assert saved is not None
+        assert saved.module_uri == "new.module"
+
+    def test_register_upsert(self, store):
+        reg = _make_handler_registration(created=1000, updated=1000)
+        store.save_handler_registration(reg)
+        result = _tool_manage_handlers(
+            {
+                "action": "register",
+                "facet_name": "ns.TestFacet",
+                "module_uri": "updated.module",
+            },
+            lambda: store,
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["handler"]["module_uri"] == "updated.module"
+        # Original created timestamp should be preserved
+        assert data["handler"]["created"] == 1000
+        # Updated should be newer
+        assert data["handler"]["updated"] > 1000
+
+    def test_register_missing_facet_name(self, store):
+        result = _tool_manage_handlers(
+            {"action": "register", "module_uri": "m"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "facet_name is required" in data["error"]
+
+    def test_register_missing_module_uri(self, store):
+        result = _tool_manage_handlers(
+            {"action": "register", "facet_name": "ns.X"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "module_uri is required" in data["error"]
+
+    def test_delete_existing(self, store):
+        reg = _make_handler_registration()
+        store.save_handler_registration(reg)
+        result = _tool_manage_handlers(
+            {"action": "delete", "facet_name": "ns.TestFacet"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        # Verify deleted
+        assert store.get_handler_registration("ns.TestFacet") is None
+
+    def test_delete_not_found(self, store):
+        result = _tool_manage_handlers(
+            {"action": "delete", "facet_name": "ns.Missing"}, lambda: store
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "not found" in data["error"]
+
+    def test_delete_missing_facet_name(self, store):
+        result = _tool_manage_handlers({"action": "delete"}, lambda: store)
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "facet_name is required" in data["error"]
+
+    def test_invalid_action(self):
+        result = _tool_manage_handlers(
+            {"action": "destroy"}, lambda: None
+        )
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "Invalid action" in data["error"]
+
+
 # ============================================================================
 # Resource tests
 # ============================================================================
@@ -390,6 +550,29 @@ class TestResources:
     def test_unknown_resource(self, store):
         data = json.loads(_handle_resource("afl://unknown", lambda: store))
         assert "error" in data
+
+    def test_handlers_list_empty(self, store):
+        data = json.loads(_handle_resource("afl://handlers", lambda: store))
+        assert data == []
+
+    def test_handlers_list_with_data(self, store):
+        reg = _make_handler_registration()
+        store.save_handler_registration(reg)
+        data = json.loads(_handle_resource("afl://handlers", lambda: store))
+        assert len(data) == 1
+        assert data[0]["facet_name"] == "ns.TestFacet"
+
+    def test_handler_detail(self, store):
+        reg = _make_handler_registration()
+        store.save_handler_registration(reg)
+        data = json.loads(_handle_resource("afl://handlers/ns.TestFacet", lambda: store))
+        assert data["facet_name"] == "ns.TestFacet"
+        assert data["module_uri"] == "my.handlers"
+
+    def test_handler_detail_not_found(self, store):
+        data = json.loads(_handle_resource("afl://handlers/ns.Missing", lambda: store))
+        assert "error" in data
+        assert "not found" in data["error"]
 
 
 # ============================================================================
