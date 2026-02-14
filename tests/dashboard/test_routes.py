@@ -996,6 +996,63 @@ class TestSourceRoutes:
         assert "Sources" in resp.text
 
 
+def _make_flow_with_ns(flow_id="flow-1", ns_name="test.ns", ns_uuid="ns-1"):
+    from afl.runtime.entities import (
+        FacetDefinition,
+        FlowDefinition,
+        FlowIdentity,
+        NamespaceDefinition,
+        WorkflowDefinition,
+    )
+
+    return FlowDefinition(
+        uuid=flow_id,
+        name=FlowIdentity(name="TestFlow", path="/test", uuid=flow_id),
+        namespaces=[NamespaceDefinition(uuid=ns_uuid, name=ns_name)],
+        facets=[FacetDefinition(uuid="f-1", name="MyFacet", namespace_id=ns_uuid)],
+        workflows=[
+            WorkflowDefinition(
+                uuid="wf-1",
+                name="MyWorkflow",
+                namespace_id=ns_uuid,
+                facet_id="f-1",
+                flow_id=flow_id,
+                starting_step="s-1",
+                version="1.0",
+            )
+        ],
+    )
+
+
+class TestNamespaceRoutes:
+    def test_namespace_list_empty(self, client):
+        tc, store = client
+        resp = tc.get("/namespaces")
+        assert resp.status_code == 200
+        assert "Namespaces" in resp.text
+
+    def test_namespace_list_with_data(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+        resp = tc.get("/namespaces")
+        assert resp.status_code == 200
+        assert "test.ns" in resp.text
+
+    def test_namespace_detail(self, client):
+        tc, store = client
+        store.save_flow(_make_flow_with_ns())
+        resp = tc.get("/namespaces/test.ns")
+        assert resp.status_code == 200
+        assert "test.ns" in resp.text
+        assert "MyFacet" in resp.text
+
+    def test_namespace_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/namespaces/nonexistent")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+
 class TestWorkflowValidation:
     def test_validate_valid_source(self, client):
         tc, store = client
