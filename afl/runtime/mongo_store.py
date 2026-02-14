@@ -40,6 +40,7 @@ from .entities import (
     FlowDefinition,
     FlowIdentity,
     HandledCount,
+    HandlerRegistration,
     LockDefinition,
     LockMetaData,
     LogDefinition,
@@ -216,6 +217,12 @@ class MongoStore(PersistenceAPI):
             name="source_namespace_version_index",
         )
         sources.create_index("namespaces_defined", name="source_namespaces_defined_index")
+
+        # Handler registrations collection
+        handler_regs = self._db.handler_registrations
+        handler_regs.create_index(
+            "facet_name", unique=True, name="handler_reg_facet_name_index"
+        )
 
     # =========================================================================
     # Step Operations (PersistenceAPI)
@@ -512,6 +519,62 @@ class MongoStore(PersistenceAPI):
             {"key": key, "expires_at": {"$gt": now}}, {"$set": {"expires_at": new_expires}}
         )
         return result.modified_count > 0
+
+    # =========================================================================
+    # Handler Registration Operations
+    # =========================================================================
+
+    def save_handler_registration(self, registration: HandlerRegistration) -> None:
+        """Upsert a handler registration by facet_name."""
+        doc = self._handler_reg_to_doc(registration)
+        self._db.handler_registrations.replace_one(
+            {"facet_name": registration.facet_name}, doc, upsert=True
+        )
+
+    def get_handler_registration(self, facet_name: str) -> HandlerRegistration | None:
+        """Get a handler registration by facet name."""
+        doc = self._db.handler_registrations.find_one({"facet_name": facet_name})
+        return self._doc_to_handler_reg(doc) if doc else None
+
+    def list_handler_registrations(self) -> list[HandlerRegistration]:
+        """List all handler registrations."""
+        docs = self._db.handler_registrations.find()
+        return [self._doc_to_handler_reg(doc) for doc in docs]
+
+    def delete_handler_registration(self, facet_name: str) -> bool:
+        """Delete a handler registration by facet name."""
+        result = self._db.handler_registrations.delete_one({"facet_name": facet_name})
+        return result.deleted_count > 0
+
+    def _handler_reg_to_doc(self, reg: HandlerRegistration) -> dict:
+        """Convert HandlerRegistration to MongoDB document."""
+        return {
+            "facet_name": reg.facet_name,
+            "module_uri": reg.module_uri,
+            "entrypoint": reg.entrypoint,
+            "version": reg.version,
+            "checksum": reg.checksum,
+            "timeout_ms": reg.timeout_ms,
+            "requirements": reg.requirements,
+            "metadata": reg.metadata,
+            "created": reg.created,
+            "updated": reg.updated,
+        }
+
+    def _doc_to_handler_reg(self, doc: dict) -> HandlerRegistration:
+        """Convert MongoDB document to HandlerRegistration."""
+        return HandlerRegistration(
+            facet_name=doc["facet_name"],
+            module_uri=doc["module_uri"],
+            entrypoint=doc.get("entrypoint", "handle"),
+            version=doc.get("version", "1.0.0"),
+            checksum=doc.get("checksum", ""),
+            timeout_ms=doc.get("timeout_ms", 30000),
+            requirements=doc.get("requirements", []),
+            metadata=doc.get("metadata", {}),
+            created=doc.get("created", 0),
+            updated=doc.get("updated", 0),
+        )
 
     # =========================================================================
     # Flow Operations

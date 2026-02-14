@@ -440,6 +440,31 @@ class ServerDefinition:
 
 
 # =============================================================================
+# Handler Registration
+# =============================================================================
+
+
+@dataclass
+class HandlerRegistration:
+    """Handler registration for the RegistryRunner.
+
+    Maps a qualified facet name to a Python module + entrypoint
+    so the RegistryRunner can dynamically load and dispatch handlers.
+    """
+
+    facet_name: str  # Qualified name: "ns.FacetName" (primary key)
+    module_uri: str  # Python module path ("my.handlers") or "file:///path/to.py"
+    entrypoint: str = "handle"  # Function name within module
+    version: str = "1.0.0"
+    checksum: str = ""  # For cache invalidation
+    timeout_ms: int = 30000
+    requirements: list[str] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+    created: int = 0  # Timestamp (ms)
+    updated: int = 0  # Timestamp (ms)
+
+
+# =============================================================================
 # Lock Definition
 # =============================================================================
 

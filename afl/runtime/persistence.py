@@ -28,6 +28,7 @@ from .types import BlockId, EventId, StepId, WorkflowId
 
 if TYPE_CHECKING:
     from .entities import (
+        HandlerRegistration,
         LockDefinition,
         LockMetaData,
         LogDefinition,
@@ -429,5 +430,49 @@ class PersistenceAPI(Protocol):
 
         Returns:
             True if lock was extended, False if not held
+        """
+        ...
+
+    # Handler registration operations
+
+    @abstractmethod
+    def save_handler_registration(self, registration: "HandlerRegistration") -> None:
+        """Upsert a handler registration by facet_name.
+
+        Args:
+            registration: The handler registration to save
+        """
+        ...
+
+    @abstractmethod
+    def get_handler_registration(self, facet_name: str) -> Optional["HandlerRegistration"]:
+        """Get a handler registration by facet name.
+
+        Args:
+            facet_name: The qualified facet name
+
+        Returns:
+            The registration if found, None otherwise
+        """
+        ...
+
+    @abstractmethod
+    def list_handler_registrations(self) -> Sequence["HandlerRegistration"]:
+        """List all handler registrations.
+
+        Returns:
+            All registered handlers
+        """
+        ...
+
+    @abstractmethod
+    def delete_handler_registration(self, facet_name: str) -> bool:
+        """Delete a handler registration by facet name.
+
+        Args:
+            facet_name: The qualified facet name
+
+        Returns:
+            True if deleted, False if not found
         """
         ...

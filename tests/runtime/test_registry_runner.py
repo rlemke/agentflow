@@ -1,0 +1,791 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for the AFL RegistryRunner.
+
+Tests cover:
+- HandlerRegistration CRUD via persistence
+- Dynamic module loading (file:// URI, dotted module, errors)
+- Module caching and cache invalidation
+- RegistryRunner poll_once (end-to-end, no tasks, failure, handler not found, load failure, short-name fallback)
+- RegistryRunner lifecycle (server registration, AST caching, stop)
+- Registry refresh behaviour
+"""
+
+import threading
+import time
+
+import pytest
+
+from afl.runtime import (
+    Evaluator,
+    ExecutionStatus,
+    HandlerRegistration,
+    MemoryStore,
+    StepState,
+    Telemetry,
+)
+from afl.runtime.entities import (
+    ServerState,
+    TaskDefinition,
+    TaskState,
+)
+from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig, _current_time_ms
+from afl.runtime.types import generate_id
+
+# =========================================================================
+# Fixtures
+# =========================================================================
+
+
+@pytest.fixture
+def store():
+    """Fresh in-memory store."""
+    return MemoryStore()
+
+
+@pytest.fixture
+def evaluator(store):
+    """Evaluator with in-memory store."""
+    return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+
+@pytest.fixture
+def config():
+    """Default runner config."""
+    return RegistryRunnerConfig()
+
+
+@pytest.fixture
+def runner(store, evaluator, config):
+    """RegistryRunner with defaults."""
+    return RegistryRunner(
+        persistence=store,
+        evaluator=evaluator,
+        config=config,
+    )
+
+
+@pytest.fixture
+def handler_file(tmp_path):
+    """Temp Python file with a handle() function."""
+    f = tmp_path / "test_handler.py"
+    f.write_text("def handle(payload):\n    return {'output': payload.get('input', 0) * 2}\n")
+    return str(f)
+
+
+@pytest.fixture
+def handler_module(tmp_path, monkeypatch):
+    """Test module on sys.path."""
+    d = tmp_path / "test_handlers"
+    d.mkdir()
+    (d / "__init__.py").write_text("def handle(payload):\n    return {'result': 42}\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    return "test_handlers"
+
+
+# ---- Workflow AST fixtures ----
+
+
+@pytest.fixture
+def program_ast():
+    """Program AST with Value (facet), CountDocuments (event facet)."""
+    return {
+        "type": "Program",
+        "declarations": [
+            {
+                "type": "FacetDecl",
+                "name": "Value",
+                "params": [{"name": "input", "type": "Long"}],
+            },
+            {
+                "type": "EventFacetDecl",
+                "name": "CountDocuments",
+                "params": [{"name": "input", "type": "Long"}],
+                "returns": [{"name": "output", "type": "Long"}],
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def workflow_ast():
+    """Simple workflow that calls an event facet."""
+    return {
+        "type": "WorkflowDecl",
+        "name": "TestWorkflow",
+        "params": [{"name": "x", "type": "Long"}],
+        "returns": [{"name": "result", "type": "Long"}],
+        "body": {
+            "type": "AndThenBlock",
+            "steps": [
+                {
+                    "type": "StepStmt",
+                    "id": "step-s1",
+                    "name": "s1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Value",
+                        "args": [
+                            {
+                                "name": "input",
+                                "value": {
+                                    "type": "BinaryExpr",
+                                    "operator": "+",
+                                    "left": {"type": "InputRef", "path": ["x"]},
+                                    "right": {"type": "Int", "value": 1},
+                                },
+                            }
+                        ],
+                    },
+                },
+                {
+                    "type": "StepStmt",
+                    "id": "step-s2",
+                    "name": "s2",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "CountDocuments",
+                        "args": [
+                            {
+                                "name": "input",
+                                "value": {"type": "StepRef", "path": ["s1", "input"]},
+                            }
+                        ],
+                    },
+                },
+            ],
+            "yield": {
+                "type": "YieldStmt",
+                "id": "yield-TW",
+                "call": {
+                    "type": "CallExpr",
+                    "target": "TestWorkflow",
+                    "args": [
+                        {
+                            "name": "result",
+                            "value": {
+                                "type": "BinaryExpr",
+                                "operator": "+",
+                                "left": {"type": "StepRef", "path": ["s2", "output"]},
+                                "right": {"type": "StepRef", "path": ["s1", "input"]},
+                            },
+                        }
+                    ],
+                },
+            },
+        },
+    }
+
+
+def _execute_until_paused(evaluator, workflow_ast, inputs=None, program_ast=None):
+    """Execute a workflow until it pauses at EVENT_TRANSMIT."""
+    return evaluator.execute(workflow_ast, inputs=inputs, program_ast=program_ast)
+
+
+# =========================================================================
+# TestHandlerRegistrationCRUD
+# =========================================================================
+
+
+class TestHandlerRegistrationCRUD:
+    """Tests for handler registration persistence operations."""
+
+    def test_save_and_get(self, store):
+        """Round-trip a registration through persistence."""
+        reg = HandlerRegistration(
+            facet_name="ns.MyHandler",
+            module_uri="my.module",
+            entrypoint="handle",
+            version="1.0.0",
+        )
+        store.save_handler_registration(reg)
+
+        loaded = store.get_handler_registration("ns.MyHandler")
+        assert loaded is not None
+        assert loaded.facet_name == "ns.MyHandler"
+        assert loaded.module_uri == "my.module"
+        assert loaded.entrypoint == "handle"
+
+    def test_list(self, store):
+        """List returns all registrations."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.A", module_uri="a")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.B", module_uri="b")
+        )
+        regs = store.list_handler_registrations()
+        names = {r.facet_name for r in regs}
+        assert names == {"ns.A", "ns.B"}
+
+    def test_delete(self, store):
+        """Delete removes a registration."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.X", module_uri="x")
+        )
+        assert store.delete_handler_registration("ns.X") is True
+        assert store.get_handler_registration("ns.X") is None
+
+    def test_delete_not_found(self, store):
+        """Delete returns False for non-existent facet."""
+        assert store.delete_handler_registration("ns.Missing") is False
+
+    def test_overwrite(self, store):
+        """Saving with same facet_name overwrites."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.A", module_uri="old")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.A", module_uri="new")
+        )
+        loaded = store.get_handler_registration("ns.A")
+        assert loaded.module_uri == "new"
+
+    def test_register_handler_convenience(self, store, evaluator):
+        """register_handler() convenience method creates and saves a registration."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        runner.register_handler(
+            facet_name="ns.MyFacet",
+            module_uri="my.handlers",
+            entrypoint="run",
+            version="2.0.0",
+        )
+
+        loaded = store.get_handler_registration("ns.MyFacet")
+        assert loaded is not None
+        assert loaded.module_uri == "my.handlers"
+        assert loaded.entrypoint == "run"
+        assert loaded.version == "2.0.0"
+        assert loaded.created > 0
+
+        # Should also be in registered_names
+        assert "ns.MyFacet" in runner.registered_names()
+
+
+# =========================================================================
+# TestDynamicModuleLoading
+# =========================================================================
+
+
+class TestDynamicModuleLoading:
+    """Tests for dynamic handler loading."""
+
+    def test_load_file_uri(self, store, evaluator, handler_file):
+        """Load a handler from a file:// URI."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.FileHandler",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+
+        handler = runner._import_handler(reg)
+        result = handler({"input": 5})
+        assert result == {"output": 10}
+
+    def test_load_dotted_module(self, store, evaluator, handler_module):
+        """Load a handler from a dotted module path."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.DottedHandler",
+            module_uri=handler_module,
+            entrypoint="handle",
+        )
+
+        handler = runner._import_handler(reg)
+        result = handler({})
+        assert result == {"result": 42}
+
+    def test_bad_module_path(self, store, evaluator):
+        """ImportError for non-existent module."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.Bad",
+            module_uri="nonexistent.module.path",
+        )
+
+        with pytest.raises(ImportError):
+            runner._import_handler(reg)
+
+    def test_bad_entrypoint(self, store, evaluator, handler_module):
+        """AttributeError for non-existent entrypoint."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.BadEntry",
+            module_uri=handler_module,
+            entrypoint="nonexistent_function",
+        )
+
+        with pytest.raises(AttributeError):
+            runner._import_handler(reg)
+
+    def test_non_callable_entrypoint(self, tmp_path, store, evaluator, monkeypatch):
+        """TypeError for non-callable entrypoint."""
+        d = tmp_path / "non_callable_mod"
+        d.mkdir()
+        (d / "__init__.py").write_text("handle = 42\n")
+        monkeypatch.syspath_prepend(str(tmp_path))
+
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.NonCallable",
+            module_uri="non_callable_mod",
+            entrypoint="handle",
+        )
+
+        with pytest.raises(TypeError, match="not callable"):
+            runner._import_handler(reg)
+
+
+# =========================================================================
+# TestModuleCaching
+# =========================================================================
+
+
+class TestModuleCaching:
+    """Tests for module caching behaviour."""
+
+    def test_cache_hit(self, store, evaluator, handler_file):
+        """Second load uses cache (does not re-import)."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg = HandlerRegistration(
+            facet_name="ns.Cached",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+            checksum="abc123",
+        )
+
+        handler1 = runner._load_handler(reg)
+        handler2 = runner._load_handler(reg)
+        assert handler1 is handler2
+
+    def test_checksum_change_evicts_cache(self, store, evaluator, handler_file):
+        """Changed checksum forces a fresh import."""
+        runner = RegistryRunner(persistence=store, evaluator=evaluator)
+        reg_v1 = HandlerRegistration(
+            facet_name="ns.Versioned",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+            checksum="v1",
+        )
+        reg_v2 = HandlerRegistration(
+            facet_name="ns.Versioned",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+            checksum="v2",
+        )
+
+        handler_v1 = runner._load_handler(reg_v1)
+        handler_v2 = runner._load_handler(reg_v2)
+        # Different checksum -> different cache entry -> different import
+        # (they're functionally equal but are separate function objects)
+        assert (reg_v1.module_uri, reg_v1.checksum) in runner._module_cache
+        assert (reg_v2.module_uri, reg_v2.checksum) in runner._module_cache
+
+
+# =========================================================================
+# TestRegistryRunnerPollOnce
+# =========================================================================
+
+
+class TestRegistryRunnerPollOnce:
+    """Tests for the poll_once() synchronous cycle."""
+
+    def test_poll_claims_and_processes(
+        self, store, evaluator, workflow_ast, program_ast, handler_file
+    ):
+        """End-to-end: register handler, poll_once
+        -> callback invoked, step continued, task completed."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Find the event-blocked step
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        assert len(blocked) >= 1
+        step = blocked[0]
+
+        # Find the auto-created task
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        assert len(pending_tasks) == 1
+        task = pending_tasks[0]
+
+        # Create runner with a file-based handler
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+
+        # Write a handler that returns {output: 42}
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        # Task should be completed
+        updated_task = store._tasks[task.uuid]
+        assert updated_task.state == TaskState.COMPLETED
+
+        # Step should have moved past EVENT_TRANSMIT
+        updated_step = store.get_step(step.id)
+        assert updated_step.state != StepState.EVENT_TRANSMIT
+
+    def test_poll_no_tasks(self, runner):
+        """poll_once returns 0 when no tasks are available."""
+        assert runner.poll_once() == 0
+
+    def test_poll_no_registrations(self, runner):
+        """poll_once returns 0 when no handlers are registered."""
+        assert runner.poll_once() == 0
+
+    def test_poll_handler_exception(
+        self, store, evaluator, workflow_ast, program_ast, tmp_path
+    ):
+        """Exception in handler -> step error, task failed."""
+        _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        task = pending_tasks[0]
+
+        # Write a failing handler
+        f = tmp_path / "failing_handler.py"
+        f.write_text("def handle(payload):\n    raise ValueError('handler exploded')\n")
+
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        updated_task = store._tasks[task.uuid]
+        assert updated_task.state == TaskState.FAILED
+        assert "handler exploded" in updated_task.error["message"]
+
+        updated_step = store.get_step(step.id)
+        assert updated_step.state == StepState.STATEMENT_ERROR
+
+    def test_poll_handler_not_found(self, store, evaluator, workflow_ast, program_ast):
+        """No registration for task name -> step error, task failed."""
+        _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        task = pending_tasks[0]
+
+        # Register a handler for a DIFFERENT facet, not CountDocuments
+        reg = HandlerRegistration(
+            facet_name="SomeOtherFacet",
+            module_uri="dummy",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        # We need the task name in the name list so claim_task matches,
+        # but get_handler_registration should return None for that name.
+        # Set names manually and prevent refresh from overwriting them.
+        runner._registered_names = [task.name]
+        runner._last_refresh = _current_time_ms()
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        updated_task = store._tasks[task.uuid]
+        assert updated_task.state == TaskState.FAILED
+        assert "No handler registration" in updated_task.error["message"]
+
+    def test_poll_handler_load_failure(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Handler with bad module_uri -> step error, task failed."""
+        _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        pending_tasks = [
+            t
+            for t in store._tasks.values()
+            if t.state == TaskState.PENDING and t.step_id == step.id
+        ]
+        task = pending_tasks[0]
+
+        # Register with a bad module path
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri="totally.nonexistent.module",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        updated_task = store._tasks[task.uuid]
+        assert updated_task.state == TaskState.FAILED
+        assert "Failed to load handler" in updated_task.error["message"]
+
+    def test_poll_short_name_fallback(self, store, evaluator, handler_file):
+        """Registration under short name is found when task has qualified name."""
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+        from afl.runtime.types import workflow_id as make_wf_id
+
+        # Create a step at EVENT_TRANSMIT with a qualified facet name
+        wf_id = make_wf_id()
+        step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="ns.CountDocuments",
+        )
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
+        step.transition.request_transition = False
+        store.save_step(step)
+
+        # Create task with qualified name
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="ns.CountDocuments",
+            runner_id="",
+            workflow_id=wf_id,
+            flow_id="",
+            step_id=step.id,
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={"input": 2},
+        )
+        store.save_task(task)
+
+        # Register handler under short name
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        # claim_task needs "ns.CountDocuments" in the name list to match
+        # Prevent refresh from overwriting the manually set names
+        runner._registered_names = ["ns.CountDocuments", "CountDocuments"]
+        runner._last_refresh = _current_time_ms()
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        updated_task = store._tasks[task.uuid]
+        assert updated_task.state == TaskState.COMPLETED
+
+
+# =========================================================================
+# TestRegistryRunnerLifecycle
+# =========================================================================
+
+
+class TestRegistryRunnerLifecycle:
+    """Tests for server registration, AST caching, and shutdown."""
+
+    def test_server_registration(self, store, evaluator, handler_file):
+        """start() registers server, stop() deregisters."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(poll_interval_ms=50),
+        )
+
+        # Register a handler so the server has something to report
+        reg = HandlerRegistration(
+            facet_name="ns.TestEvent",
+            module_uri=f"file://{handler_file}",
+        )
+        store.save_handler_registration(reg)
+
+        def run_runner():
+            runner.start()
+
+        t = threading.Thread(target=run_runner, daemon=True)
+        t.start()
+
+        # Wait for server registration
+        time.sleep(0.2)
+
+        server = store.get_server(runner.server_id)
+        assert server is not None
+        assert server.state == ServerState.RUNNING
+        assert server.service_name == "afl-registry-runner"
+
+        runner.stop()
+        t.join(timeout=2)
+
+        server = store.get_server(runner.server_id)
+        assert server.state == ServerState.SHUTDOWN
+
+    def test_ast_caching(self, store, evaluator, workflow_ast, program_ast, handler_file):
+        """Cached AST is used for resume after poll_once."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        # Register handler
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        # Verify cache is populated
+        assert result.workflow_id in runner._ast_cache
+
+        runner.poll_once()
+
+        # Workflow should have completed via resume using cached AST
+        updated_step = store.get_step(step.id)
+        assert updated_step.state != StepState.EVENT_TRANSMIT
+
+    def test_stop(self, store, evaluator):
+        """stop() causes the poll loop to exit."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(poll_interval_ms=50),
+        )
+
+        def run_runner():
+            runner.start()
+
+        t = threading.Thread(target=run_runner, daemon=True)
+        t.start()
+
+        time.sleep(0.2)
+        assert runner.is_running
+
+        runner.stop()
+        t.join(timeout=2)
+
+        assert not runner.is_running
+
+
+# =========================================================================
+# TestRegistryRefresh
+# =========================================================================
+
+
+class TestRegistryRefresh:
+    """Tests for registry refresh behaviour."""
+
+    def test_new_registration_picked_up(self, store, evaluator, handler_file):
+        """A registration added after construction is picked up on refresh."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(registry_refresh_interval_ms=0),
+        )
+
+        assert runner.registered_names() == []
+
+        # Add a registration to the store
+        reg = HandlerRegistration(
+            facet_name="ns.NewHandler",
+            module_uri=f"file://{handler_file}",
+        )
+        store.save_handler_registration(reg)
+
+        # With refresh interval 0, next call refreshes immediately
+        names = runner.registered_names()
+        assert "ns.NewHandler" in names
+
+    def test_refresh_interval_respected(self, store, evaluator, handler_file):
+        """Refresh is skipped when the interval hasn't elapsed."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(registry_refresh_interval_ms=60000),
+        )
+
+        # Force an initial refresh
+        runner._refresh_registry()
+        assert runner._registered_names == []
+
+        # Add a registration — should NOT be seen because interval hasn't elapsed
+        reg = HandlerRegistration(
+            facet_name="ns.Delayed",
+            module_uri=f"file://{handler_file}",
+        )
+        store.save_handler_registration(reg)
+
+        runner._maybe_refresh_registry()
+        assert "ns.Delayed" not in runner._registered_names
+
+        # Force by backdating _last_refresh
+        runner._last_refresh = 0
+        runner._maybe_refresh_registry()
+        assert "ns.Delayed" in runner._registered_names

@@ -45,6 +45,7 @@ from .entities import (
     FlowDefinition,
     FlowIdentity,
     HandledCount,
+    HandlerRegistration,
     InlineSource,
     JarArtifact,
     LockDefinition,
@@ -97,6 +98,7 @@ from .events import EventDispatcher, EventManager, LocalEventHandler
 from .expression import EvaluationContext, ExpressionEvaluator, evaluate_args
 from .memory_store import MemoryStore
 from .persistence import EventDefinition, IterationChanges, PersistenceAPI
+from .registry_runner import RegistryRunner, RegistryRunnerConfig
 from .runner import RunnerConfig, RunnerService
 from .states import (
     BLOCK_TRANSITIONS,
@@ -194,6 +196,10 @@ __all__ = [
     # Agent Poller
     "AgentPoller",
     "AgentPollerConfig",
+    # Registry Runner
+    "RegistryRunner",
+    "RegistryRunnerConfig",
+    "HandlerRegistration",
     # Errors
     "RuntimeError",
     "InvalidStepStateError",

@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional
 
 from .entities import (
+    HandlerRegistration,
     LockDefinition,
     LogDefinition,
     RunnerDefinition,
@@ -65,6 +66,7 @@ class MemoryStore(PersistenceAPI):
         self._logs: list[LogDefinition] = []
         self._locks: dict[str, LockDefinition] = {}
         self._servers: dict[str, ServerDefinition] = {}
+        self._handler_registrations: dict[str, HandlerRegistration] = {}
 
         # Lock for atomic task claiming
         self._claim_lock = threading.Lock()
@@ -223,6 +225,7 @@ class MemoryStore(PersistenceAPI):
         self._logs.clear()
         self._locks.clear()
         self._servers.clear()
+        self._handler_registrations.clear()
 
     def step_count(self) -> int:
         """Get total number of steps."""
@@ -319,6 +322,29 @@ class MemoryStore(PersistenceAPI):
     def get_all_servers(self) -> list["ServerDefinition"]:
         """Get all servers."""
         return list(self._servers.values())
+
+    # =========================================================================
+    # Handler Registration Operations
+    # =========================================================================
+
+    def save_handler_registration(self, registration: HandlerRegistration) -> None:
+        """Upsert a handler registration by facet_name."""
+        self._handler_registrations[registration.facet_name] = registration
+
+    def get_handler_registration(self, facet_name: str) -> HandlerRegistration | None:
+        """Get a handler registration by facet name."""
+        return self._handler_registrations.get(facet_name)
+
+    def list_handler_registrations(self) -> list[HandlerRegistration]:
+        """List all handler registrations."""
+        return list(self._handler_registrations.values())
+
+    def delete_handler_registration(self, facet_name: str) -> bool:
+        """Delete a handler registration by facet name."""
+        if facet_name in self._handler_registrations:
+            del self._handler_registrations[facet_name]
+            return True
+        return False
 
     # =========================================================================
     # Lock Operations
