@@ -550,6 +550,108 @@ class TestServerRoutes:
         assert resp.status_code == 200
         assert "worker-01" in resp.text
 
+    def test_server_list_links_to_detail(self, client):
+        tc, store = client
+        from afl.runtime.entities import ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+        )
+        store.save_server(server)
+
+        resp = tc.get("/servers")
+        assert resp.status_code == 200
+        assert "/servers/s-1" in resp.text
+
+    def test_server_detail(self, client):
+        tc, store = client
+        from afl.runtime.entities import HandledCount, ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+            topics=["osm.*"],
+            handlers=["osm.CacheLookup"],
+            handled=[HandledCount(handler="osm.CacheLookup", handled=10, not_handled=2)],
+        )
+        store.save_server(server)
+
+        resp = tc.get("/servers/s-1")
+        assert resp.status_code == 200
+        assert "worker-01" in resp.text
+        assert "workers" in resp.text
+
+    def test_server_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/servers/nonexistent")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_server_detail_handled_stats(self, client):
+        tc, store = client
+        from afl.runtime.entities import HandledCount, ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+            handled=[HandledCount(handler="osm.CacheLookup", handled=10, not_handled=2)],
+        )
+        store.save_server(server)
+
+        resp = tc.get("/servers/s-1")
+        assert resp.status_code == 200
+        assert "osm.CacheLookup" in resp.text
+
+    def test_server_detail_with_error(self, client):
+        tc, store = client
+        from afl.runtime.entities import ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.ERROR,
+            error={"message": "Connection timeout"},
+        )
+        store.save_server(server)
+
+        resp = tc.get("/servers/s-1")
+        assert resp.status_code == 200
+        assert "Connection timeout" in resp.text
+
+    def test_api_server_detail(self, client):
+        tc, store = client
+        from afl.runtime.entities import ServerDefinition, ServerState
+
+        server = ServerDefinition(
+            uuid="s-1",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-01",
+            state=ServerState.RUNNING,
+        )
+        store.save_server(server)
+
+        resp = tc.get("/api/servers/s-1")
+        assert resp.status_code == 200
+        assert resp.json()["uuid"] == "s-1"
+
+    def test_api_server_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/api/servers/nonexistent")
+        assert resp.status_code == 404
+
 
 class TestTaskRoutes:
     def test_task_list(self, client):

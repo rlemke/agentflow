@@ -19,7 +19,7 @@
     <tbody>
         {% for server in servers %}
         <tr>
-            <td>{{ server.server_name }}</td>
+            <td><a href="/servers/{{ server.uuid }}">{{ server.server_name }}</a></td>
             <td>{{ server.server_group }}</td>
             <td>{{ server.service_name }}</td>
             <td><span class="badge badge-{{ server.state|state_color }}">{{ server.state }}</span></td>

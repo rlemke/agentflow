@@ -166,6 +166,26 @@ def api_handlers(store=Depends(get_store)):
     )
 
 
+@router.get("/servers/{server_id}")
+def api_server_detail(server_id: str, store=Depends(get_store)):
+    """Return a single server as JSON."""
+    server = store.get_server(server_id)
+    if not server:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(
+        {
+            "uuid": server.uuid,
+            "server_name": server.server_name,
+            "server_group": server.server_group,
+            "service_name": server.service_name,
+            "state": server.state,
+            "ping_time": server.ping_time,
+            "handlers": server.handlers,
+            "topics": server.topics,
+        }
+    )
+
+
 # -- Sources -----------------------------------------------------------------
 
 

@@ -32,3 +32,14 @@ def server_list(request: Request, store=Depends(get_store)):
         "servers/list.html",
         {"servers": servers},
     )
+
+
+@router.get("/{server_id}")
+def server_detail(server_id: str, request: Request, store=Depends(get_store)):
+    """Show server detail."""
+    server = store.get_server(server_id)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "servers/detail.html",
+        {"server": server},
+    )
