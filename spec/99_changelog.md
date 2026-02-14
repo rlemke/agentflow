@@ -370,3 +370,49 @@
 - **Home summary**: handler count card added to dashboard index; "Handler Registrations" added to quick links
 - **JSON API**: `GET /api/handlers` endpoint returns all registrations as JSON array
 - 9 new tests: `TestHandlerRoutes` (list empty/with data, detail, detail not found, delete, delete not found, API empty/with data, home handler count)
+
+## Completed (v0.10.7) - Events Dashboard Page
+- **Event routes** (`afl/dashboard/routes/events.py`): new route module with list (`GET /events`) and detail (`GET /events/{event_id}`) endpoints
+- **Event templates**: `events/list.html` table with ID (truncated+linked), step ID, workflow ID, state (badge), event type; `events/detail.html` grid layout with details table and payload as JSON `<pre>` block, not-found handling
+- **Store additions**: `get_all_events(limit=500)` added to `MongoStore` (sorted by `_id` descending) and `MemoryStore`
+- **Navigation**: "Events" link added to `base.html` nav between Handlers and Tasks
+- **Home summary**: event count card added to dashboard index; "All Events" added to quick links
+- **JSON API**: `GET /api/events` endpoint returns all events as JSON array
+- 7 new tests: `TestEventRoutes` (list empty/with data, detail, detail not found, detail shows payload, API empty/with data)
+
+## Completed (v0.10.8) - Published Sources Dashboard Page
+- **Source routes** (`afl/dashboard/routes/sources.py`): new route module with list (`GET /sources`), detail (`GET /sources/{namespace_name}`), and delete (`POST /sources/{namespace_name}/delete`) endpoints; uses `{namespace_name:path}` converter for dotted names
+- **Source templates**: `sources/list.html` table with namespace name (linked), version, origin, published at, checksum (truncated), namespaces defined; `sources/detail.html` grid layout with details table, delete action (htmx POST with confirm), source text with `<pre><code>`, not-found handling
+- **Navigation**: "Sources" link added to `base.html` nav between Events and Tasks
+- **Home summary**: source count card added to dashboard index; "Published Sources" added to quick links
+- **JSON API**: `GET /api/sources` endpoint returns all published sources as JSON array
+- 9 new tests: `TestSourceRoutes` (list empty/with data, detail, detail not found, detail shows source text, delete, API empty/with data, home source count)
+
+## Completed (v0.10.9) - Workflow Validation UI
+- **Validate endpoint** (`POST /workflows/validate`): parses and validates AFL source without compiling, extracts AST summary (namespaces, facets, workflows), renders `workflows/validate.html` with valid/invalid status, error list with line/column, and namespace/facet/workflow summary
+- **Validate template** (`workflows/validate.html`): shows Valid/Invalid status, error list, namespace list, facet list, workflow list, "Back to editor" link
+- **Editor update**: "Validate Only" button added to `workflows/new.html` with `formaction="/workflows/validate"` and `class="outline"`
+- 4 new tests: `TestWorkflowValidation` (valid source, invalid source, shows namespaces, validate button exists)
+
+## Completed (v0.10.10) - Namespace Browser
+- **Namespace routes** (`afl/dashboard/routes/namespaces.py`): new route module with list (`GET /namespaces`) and detail (`GET /namespaces/{namespace_name}`) endpoints; aggregates namespace data across all flows via `_aggregate_namespaces()` helper; resolves namespace IDs to names via `_resolve_ns_name()`
+- **Namespace templates**: `namespaces/list.html` table with namespace name (linked), flow count, facet count, workflow count; `namespaces/detail.html` with facets table, workflows table, not-found handling
+- **Navigation**: "Namespaces" link added to `base.html` nav between Sources and Locks
+- 4 new tests: `TestNamespaceRoutes` (list empty/with data, detail, detail not found)
+
+## Completed (v0.10.11) - Server Detail Page
+- **Server detail endpoint** (`GET /servers/{server_id}`): added to existing `servers.py` route module
+- **Server detail template** (`servers/detail.html`): grid layout with details table (UUID, group, service, name, IPs, state, start/ping times, manager), topics list, handlers list, handled statistics table, error display with JSON formatting, not-found handling
+- **Server list linking**: server names in `servers/list.html` now link to detail page via `<a href="/servers/{{ server.uuid }}">`
+- **JSON API**: `GET /api/servers/{server_id}` endpoint with 404 handling
+- 7 new tests extending `TestServerRoutes` (list links to detail, detail, detail not found, handled stats, error display, API detail, API not found)
+
+## Completed (v0.10.12) - Lock Visibility
+- **Lock routes** (`afl/dashboard/routes/locks.py`): new route module with list (`GET /locks`), detail (`GET /locks/{lock_key}`), and release (`POST /locks/{lock_key}/release`) endpoints; uses `{lock_key:path}` converter for compound keys; annotates locks with expired/active status
+- **Lock templates**: `locks/list.html` table with key (linked+mono), acquired at, expires at, expired badge (active/expired), topic, handler; `locks/detail.html` grid layout with details table, release action (htmx POST with confirm), metadata display (topic, handler, step_name, step_id), not-found handling
+- **Store additions**: `get_all_locks()` added to `MongoStore` and `MemoryStore` returning all locks including expired for dashboard visibility
+- **Navigation**: "Locks" link added to `base.html` nav between Namespaces and Tasks
+- **Home summary**: active lock count card (filtered by `expires_at > now`) added to dashboard index; "Active Locks" added to quick links
+- **JSON API**: `GET /api/locks` endpoint returns all locks as JSON array with metadata
+- 8 new tests: `TestLockRoutes` (list empty/with data, detail, detail not found, detail shows meta, release, API empty/with data)
+- 1334 tests passing
