@@ -25,6 +25,10 @@
         <p>Handlers</p>
     </article>
     <article class="summary-card">
+        <h2>{{ event_count }}</h2>
+        <p>Events</p>
+    </article>
+    <article class="summary-card">
         <h2>{{ task_counts.get("pending", 0) }}</h2>
         <p>Pending Tasks</p>
     </article>
@@ -37,6 +41,7 @@
         <li><a href="/flows">All Flows</a></li>
         <li><a href="/servers">Server Status</a></li>
         <li><a href="/handlers">Handler Registrations</a></li>
+        <li><a href="/events">All Events</a></li>
         <li><a href="/tasks">Task Queue</a></li>
     </ul>
 </section>

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Events — AgentFlow{% endblock %}
+{% block content %}
+<h1>Events</h1>
+
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Step ID</th>
+            <th>Workflow ID</th>
+            <th>State</th>
+            <th>Event Type</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td><a href="/events/{{ event.id }}">{{ event.id[:12] }}...</a></td>
+            <td class="mono">{{ event.step_id[:12] }}...</td>
+            <td class="mono">{{ event.workflow_id[:12] }}...</td>
+            <td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td>
+            <td>{{ event.event_type }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endblock %}

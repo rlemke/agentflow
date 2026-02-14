@@ -843,3 +843,68 @@ class TestHandlerRoutes:
         resp = tc.get("/")
         assert resp.status_code == 200
         assert "Handlers" in resp.text
+
+
+def _make_event(event_id="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", event_type="afl:execute"):
+    from afl.runtime.persistence import EventDefinition
+
+    return EventDefinition(
+        id=event_id,
+        step_id=step_id,
+        workflow_id=workflow_id,
+        state=state,
+        event_type=event_type,
+        payload={"key": "value"},
+    )
+
+
+class TestEventRoutes:
+    def test_event_list_empty(self, client):
+        tc, store = client
+        resp = tc.get("/events")
+        assert resp.status_code == 200
+        assert "Events" in resp.text
+
+    def test_event_list_with_data(self, client):
+        tc, store = client
+        store.save_event(_make_event())
+        resp = tc.get("/events")
+        assert resp.status_code == 200
+        assert "evt-1" in resp.text
+
+    def test_event_detail(self, client):
+        tc, store = client
+        store.save_event(_make_event())
+        resp = tc.get("/events/evt-1")
+        assert resp.status_code == 200
+        assert "evt-1" in resp.text
+        assert "afl:execute" in resp.text
+
+    def test_event_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/events/nonexistent")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_event_detail_shows_payload(self, client):
+        tc, store = client
+        store.save_event(_make_event())
+        resp = tc.get("/events/evt-1")
+        assert resp.status_code == 200
+        assert "key" in resp.text
+
+    def test_api_events_empty(self, client):
+        tc, store = client
+        resp = tc.get("/api/events")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_api_events_with_data(self, client):
+        tc, store = client
+        store.save_event(_make_event())
+        resp = tc.get("/api/events")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == "evt-1"
+        assert data[0]["event_type"] == "afl:execute"

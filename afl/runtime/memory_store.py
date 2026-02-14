@@ -164,6 +164,10 @@ class MemoryStore(PersistenceAPI):
         """Save an event to the store."""
         self._events[event.id] = event
 
+    def get_all_events(self) -> list[EventDefinition]:
+        """Get all events."""
+        return list(self._events.values())
+
     def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
         """Fetch all block steps for a containing step."""
         block_ids = self._blocks_by_step.get(step_id, [])

@@ -303,6 +303,11 @@ class MongoStore(PersistenceAPI):
         docs = self._db.events.find({"workflow_id": workflow_id})
         return [self._doc_to_event(doc) for doc in docs]
 
+    def get_all_events(self, limit: int = 500) -> list[EventDefinition]:
+        """Get all events, most recent first."""
+        docs = self._db.events.find().sort("_id", -1).limit(limit)
+        return [self._doc_to_event(doc) for doc in docs]
+
     # =========================================================================
     # Atomic Commit (PersistenceAPI)
     # =========================================================================

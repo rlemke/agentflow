@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Event {{ event.id if event else "Not Found" }} — AgentFlow{% endblock %}
+{% block content %}
+{% if not event %}
+<h1>Event not found</h1>
+<p><a href="/events">Back to events</a></p>
+{% else %}
+<h1>Event <span class="mono">{{ event.id[:12] }}...</span></h1>
+
+<div class="grid">
+    <div>
+        <article>
+            <header>Details</header>
+            <table>
+                <tr><th>ID</th><td class="mono">{{ event.id }}</td></tr>
+                <tr><th>Step ID</th><td class="mono">{{ event.step_id }}</td></tr>
+                <tr><th>Workflow ID</th><td class="mono">{{ event.workflow_id }}</td></tr>
+                <tr><th>State</th><td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td></tr>
+                <tr><th>Event Type</th><td>{{ event.event_type }}</td></tr>
+            </table>
+        </article>
+    </div>
+    <div>
+        <article>
+            <header>Payload</header>
+            <pre><code class="language-json">{{ event.payload | tojson(indent=2) }}</code></pre>
+        </article>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

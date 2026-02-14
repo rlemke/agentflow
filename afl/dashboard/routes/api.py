@@ -166,6 +166,28 @@ def api_handlers(store=Depends(get_store)):
     )
 
 
+# -- Events ------------------------------------------------------------------
+
+
+@router.get("/events")
+def api_events(store=Depends(get_store)):
+    """Return all events as JSON."""
+    events = store.get_all_events()
+    return JSONResponse(
+        [
+            {
+                "id": e.id,
+                "step_id": e.step_id,
+                "workflow_id": e.workflow_id,
+                "state": e.state,
+                "event_type": e.event_type,
+                "payload": e.payload,
+            }
+            for e in events
+        ]
+    )
+
+
 # -- Helpers -----------------------------------------------------------------
 
 
