@@ -1,0 +1,42 @@
+# Continental LZ Agent
+# Full image with Java/GraphHopper, osmium, and geospatial libs
+FROM python:3.12-slim
+
+# System packages for geospatial libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libexpat1 libgeos-dev libproj-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Java runtime for GraphHopper
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install AFL with MongoDB support
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Install geospatial Python dependencies
+COPY examples/continental-lz/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download GraphHopper JAR
+ENV GRAPHHOPPER_VERSION=8.0
+RUN mkdir -p /opt/graphhopper && \
+    curl -fSL "https://repo1.maven.org/maven2/com/graphhopper/graphhopper-web/${GRAPHHOPPER_VERSION}/graphhopper-web-${GRAPHHOPPER_VERSION}.jar" \
+    -o /opt/graphhopper/graphhopper-web.jar
+ENV GRAPHHOPPER_JAR=/opt/graphhopper/graphhopper-web.jar
+ENV GRAPHHOPPER_GRAPH_DIR=/data/graphhopper/graphs
+
+# Copy application code
+COPY afl/ ./afl/
+COPY examples/osm-geocoder/handlers/ ./handlers/
+COPY examples/continental-lz/agent.py ./agent.py
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "agent.py"]

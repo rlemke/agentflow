@@ -1,0 +1,107 @@
+# Continental LZ Pipeline — Docker Stack
+#
+# Runs the full LZ road infrastructure and GTFS transit analysis
+# across US, Canada, and Europe with MongoDB persistence.
+#
+# Quick start:
+#   docker compose up -d
+#   docker compose --profile seed run --rm seed
+#   open http://localhost:8081
+#
+# Data volumes (~72 GB total for full run):
+#   osm_data:         OSM PBF downloads (~28 GB)
+#   graphhopper_data: Routing graphs (~44 GB)
+#   lz_output:        LZ pipeline results
+#   gtfs_data:        GTFS feed downloads
+
+services:
+  # MongoDB database (isolated from main project)
+  mongodb:
+    image: mongo:7
+    container_name: continental-lz-mongodb
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=afl_continental_lz
+    healthcheck:
+      test: mongosh --eval "db.runCommand('ping').ok" --quiet
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Web dashboard for monitoring
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: continental-lz-dashboard
+    ports:
+      - "8081:8080"
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl_continental_lz
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # Distributed runner service
+  runner:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.runner
+    container_name: continental-lz-runner
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl_continental_lz
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Continental LZ agent (Java + GraphHopper + osmium)
+  agent:
+    build:
+      context: ../..
+      dockerfile: examples/continental-lz/docker/Dockerfile.agent
+    container_name: continental-lz-agent
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl_continental_lz
+    volumes:
+      - osm_data:/data/osm
+      - graphhopper_data:/data/graphhopper
+      - lz_output:/data/lz-output
+      - gtfs_data:/data/gtfs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+    restart: unless-stopped
+
+  # Seed service (compile AFL + populate MongoDB)
+  seed:
+    build:
+      context: ../..
+      dockerfile: examples/continental-lz/docker/Dockerfile.seed
+    container_name: continental-lz-seed
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl_continental_lz
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    profiles:
+      - seed
+
+volumes:
+  mongodb_data:
+  osm_data:
+  graphhopper_data:
+  lz_output:
+  gtfs_data:

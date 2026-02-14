@@ -1,0 +1,22 @@
+# Continental LZ Seed Service
+# Compiles AFL sources and populates MongoDB with workflow definitions
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies (compiler + MongoDB only)
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Copy AFL compiler
+COPY afl/ ./afl/
+
+# Copy all AFL source files (osm-geocoder dependencies + continental)
+COPY examples/osm-geocoder/afl/ ./osm-afl/
+COPY examples/continental-lz/afl/ ./continental-afl/
+COPY examples/continental-lz/scripts/seed.py ./seed.py
+
+ENV PYTHONPATH=/app
+
+CMD ["python", "seed.py"]
