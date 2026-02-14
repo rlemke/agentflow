@@ -335,3 +335,14 @@
 - **Exported** from `afl.runtime`: `HandlerRegistration`, `RegistryRunner`, `RegistryRunnerConfig`
 - 25 new tests across 6 test classes: `TestHandlerRegistrationCRUD`, `TestDynamicModuleLoading`, `TestModuleCaching`, `TestRegistryRunnerPollOnce`, `TestRegistryRunnerLifecycle`, `TestRegistryRefresh`
 - 1184 tests passing
+
+## Completed (v0.10.3) - Dispatch Adapter Migration for RegistryRunner
+- **`RegistryRunner._process_event` payload injection**: shallow-copies `task.data` before handler invocation; injects `payload["_facet_name"] = task.name` so dispatch entrypoints know which facet they are handling; injects `payload["_handler_metadata"]` when registration has non-empty metadata; 4 new tests
+- **Dispatch adapter pattern**: all 27 handler modules (22 OSM + 5 genomics) now expose a `_DISPATCH` dict (mapping qualified facet names to handler callables), a `handle(payload)` entrypoint that routes via `payload["_facet_name"]`, and a `register_handlers(runner)` function that persists `HandlerRegistration` entries
+  - **Factory-based modules** (park, amenity, filter, population, road, route, building, visualization, gtfs, zoom): `_build_dispatch()` iterates `*_FACETS` list at module load time
+  - **Direct dict modules** (region, elevation, routing, osmose, validation, airquality, genomics core, genomics resolve, genomics operations): `_DISPATCH` built as a literal dict
+  - **Complex modules** (cache, operations, poi, graphhopper, tiger, boundary, genomics cache, genomics index): custom `_build_dispatch()` over nested registries
+- **`__init__.py` extensions**: both `examples/osm-geocoder/handlers/__init__.py` and `examples/genomics/handlers/__init__.py` gain `register_all_registry_handlers(runner)` — imports and calls each module's `register_handlers(runner)`; existing `register_all_handlers(poller)` unchanged for backward compatibility
+- **Agent entry points**: `examples/osm-geocoder/agent.py` updated with dual-mode support — `AFL_USE_REGISTRY=1` uses `RegistryRunner`, default uses `AgentPoller`; new `examples/genomics/agent.py` with same dual-mode pattern
+- **New tests**: `test_handler_dispatch_osm.py` (58 tests) and `test_handler_dispatch_genomics.py` (18 tests) verify `_DISPATCH` key counts, `handle()` dispatch, unknown-facet errors, and `register_handlers()` call counts; use `sys.modules` cleanup for cross-file isolation
+- 1264 tests passing
