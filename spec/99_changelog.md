@@ -447,3 +447,21 @@
 - 23 new dispatcher unit tests (`tests/runtime/test_dispatcher.py`): `TestRegistryDispatcher` (10), `TestInMemoryDispatcher` (6), `TestToolRegistryDispatcher` (3), `TestCompositeDispatcher` (4)
 - 14 new inline dispatch integration tests (`tests/runtime/test_inline_dispatch.py`): `TestInlineDispatchAddOne` (4), `TestInlineDispatchMultiStep` (3), `TestInlineDispatchForeach` (2), `TestInlineDispatchFallback` (3), `TestInlineDispatchWithRegistryRunner` (2)
 - 1419 tests passing
+
+## Completed (v0.11.1) - Continental LZ Pipeline Example
+- **New example** (`examples/continental-lz/`): self-contained Docker-based pipeline orchestrating the Low-Zoom (LZ) road infrastructure algorithm and GTFS transit analysis across three continental regions (United States, Canada, 12 European countries)
+- **4 AFL source files** defining 20 workflows across 4 namespaces:
+  - `continental_types.afl`: 4 schemas (`RegionLZResult`, `TransitAgencyResult`, `ContinentalLZSummary`, `ContinentalTransitSummary`) in `continental.types` namespace
+  - `continental_lz_workflows.afl`: 4 LZ workflows (`BuildUSLowZoom`, `BuildCanadaLowZoom`, `BuildEuropeLowZoom` with 12 countries in parallel, `BuildContinentalLZ` orchestrator) in `continental.lz` namespace; each follows cache → GraphHopper build → BuildZoomLayers pattern
+  - `continental_gtfs_workflows.afl`: 15 GTFS workflows (11 per-agency: 4 US, 3 Canada, 4 Europe; plus 4 aggregators) in `continental.transit` namespace; each agency follows DownloadFeed → TransitStatistics → ExtractStops → ExtractRoutes
+  - `continental_full.afl`: `FullContinentalPipeline` combining LZ + Transit in parallel in `continental` namespace
+- **Handler reuse**: symlink `handlers → ../osm-geocoder/handlers` for local dev; `COPY` in Docker; registers 6 handler modules (cache, operations, graphhopper, population, zoom, gtfs) via `register_handlers(runner)`
+- **Docker stack** (`docker-compose.yml`): 5 services — MongoDB (port 27019), dashboard (port 8081), runner, agent (16 GB memory limit for GraphHopper JVM), seed (profile: seed); isolated database `afl_continental_lz`; 5 named volumes (mongodb_data, osm_data, graphhopper_data, lz_output, gtfs_data)
+- **`Dockerfile.agent`**: python:3.12-slim + libgeos + libproj + Java JRE + GraphHopper 8.0 JAR; copies AFL compiler, OSM geocoder handlers, and agent entry point
+- **`Dockerfile.seed`**: lightweight python:3.12-slim + lark + pymongo; compiles all 12 AFL source files and seeds MongoDB
+- **`agent.py`**: RegistryRunner entry point with `max_concurrent=4`, `service_name="continental-lz"`; dual-mode MongoDB/MemoryStore based on `AFL_MONGODB_URL`
+- **`scripts/seed.py`**: reads 12 AFL sources in dependency order, parses + validates + emits, stores compiled flow and sample execution tasks in MongoDB; supports both Docker (`/app/osm-afl/`) and local (`../osm-geocoder/afl/`) layouts
+- **`scripts/run_region.py`**: standalone single-region smoke test using MemoryStore; generates inline AFL for any of 14 regions; `--region Belgium --output-dir /tmp/lz-belgium`
+- **Data scale**: 14 regions totaling ~28 GB PBF downloads, ~44 GB GraphHopper graphs, estimated 12-30 hours for full continental run
+- **GTFS transit agencies** (11): Amtrak, MBTA, CTA, MTA (US); TransLink, TTC, OC Transpo (Canada); Deutsche Bahn, SNCF, Renfe, Trenitalia (Europe)
+- 1419 tests passing
