@@ -318,3 +318,20 @@
 - **`MongoStore.get_all_workflows()`**: new method returning workflows sorted by `date` descending with configurable limit, following existing `get_all_runners()` pattern
 - **Runner workflow lookup fix**: `_find_workflow_in_program` and `_search_namespace_workflows` now search both `namespaces`/`workflows` keys (emitter format) and `declarations` (alternative AST format); previously qualified workflow names like `handlers.AddOneWorkflow` failed in distributed execution because the runner only checked `declarations` while the emitter outputs under `namespaces`
 - 1159 tests passing; 457 OSM geocoder tests passing (including distributed)
+
+## Completed (v0.10.2) - Registry Runner
+- **`HandlerRegistration` dataclass**: new entity in `entities.py` mapping a qualified facet name to a Python module + entrypoint; fields: `facet_name` (primary key), `module_uri` (dotted path or `file://` URI), `entrypoint`, `version`, `checksum` (cache invalidation), `timeout_ms`, `requirements`, `metadata`, `created`, `updated`
+- **`PersistenceAPI` extensions**: 4 new abstract methods — `save_handler_registration()` (upsert by facet_name), `get_handler_registration()`, `list_handler_registrations()`, `delete_handler_registration()`
+- **`MemoryStore` implementation**: dict-backed CRUD with `clear()` support
+- **`MongoStore` implementation**: `handler_registrations` collection with unique index on `facet_name`; `_handler_reg_to_doc()` / `_doc_to_handler_reg()` serialization helpers
+- **`RegistryRunnerConfig` dataclass**: extends `AgentPollerConfig` pattern with `registry_refresh_interval_ms` (default 30s) for periodic re-read of handler registrations from persistence
+- **`RegistryRunner` class**: universal runner that reads handler registrations from persistence, dynamically loads Python modules, caches them by `(module_uri, checksum)`, and dispatches event tasks — eliminates the need for per-facet microservices
+  - `register_handler()`: convenience method to create and persist a `HandlerRegistration`
+  - `_import_handler()`: supports dotted module paths (`importlib.import_module`) and `file://` URIs (`spec_from_file_location`); validates entrypoint is callable
+  - `_load_handler()`: cache lookup by `(module_uri, checksum)`, imports on miss
+  - `_refresh_registry()` / `_maybe_refresh_registry()`: periodic re-read of registered facet names from persistence
+  - `_process_event()`: looks up `HandlerRegistration` → loads handler → dispatches (sync or async) → `continue_step` → `_resume_workflow` → mark task COMPLETED; graceful error handling for missing registrations, import failures, and handler exceptions
+  - Full lifecycle: `start()` / `stop()` / `poll_once()`, server registration, heartbeat, AST caching — mirrors `AgentPoller` patterns
+- **Exported** from `afl.runtime`: `HandlerRegistration`, `RegistryRunner`, `RegistryRunnerConfig`
+- 25 new tests across 6 test classes: `TestHandlerRegistrationCRUD`, `TestDynamicModuleLoading`, `TestModuleCaching`, `TestRegistryRunnerPollOnce`, `TestRegistryRunnerLifecycle`, `TestRegistryRefresh`
+- 1184 tests passing
