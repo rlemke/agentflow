@@ -26,6 +26,7 @@ def register_routes(app: FastAPI) -> None:
     """Include all route modules."""
     from .api import router as api_router
     from .flows import router as flows_router
+    from .handlers import router as handlers_router
     from .health import router as health_router
     from .home import router as home_router
     from .logs import router as logs_router
@@ -41,6 +42,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(steps_router)
     app.include_router(flows_router)
     app.include_router(servers_router)
+    app.include_router(handlers_router)
     app.include_router(logs_router)
     app.include_router(tasks_router)
     app.include_router(api_router)

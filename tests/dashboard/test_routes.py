@@ -767,3 +767,79 @@ class TestApiRoutes:
         resp = tc.get("/api/runners/r-1/steps?partial=true")
         assert resp.status_code == 200
         assert "VariableAssignment" in resp.text
+
+
+def _make_handler(facet_name="ns.TestFacet", module_uri="my.handlers", entrypoint="handle"):
+    from afl.runtime.entities import HandlerRegistration
+
+    return HandlerRegistration(
+        facet_name=facet_name,
+        module_uri=module_uri,
+        entrypoint=entrypoint,
+        version="1.0.0",
+        timeout_ms=30000,
+    )
+
+
+class TestHandlerRoutes:
+    def test_handler_list_empty(self, client):
+        tc, store = client
+        resp = tc.get("/handlers")
+        assert resp.status_code == 200
+        assert "Handlers" in resp.text
+
+    def test_handler_list_with_data(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler())
+        resp = tc.get("/handlers")
+        assert resp.status_code == 200
+        assert "ns.TestFacet" in resp.text
+
+    def test_handler_detail(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler())
+        resp = tc.get("/handlers/ns.TestFacet")
+        assert resp.status_code == 200
+        assert "ns.TestFacet" in resp.text
+        assert "my.handlers" in resp.text
+
+    def test_handler_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/handlers/ns.Missing")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_delete_handler(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler())
+        resp = tc.post("/handlers/ns.TestFacet/delete", follow_redirects=False)
+        assert resp.status_code == 303
+        assert store.get_handler_registration("ns.TestFacet") is None
+
+    def test_delete_handler_not_found(self, client):
+        tc, store = client
+        resp = tc.post("/handlers/ns.Missing/delete", follow_redirects=False)
+        assert resp.status_code == 303
+
+    def test_api_handlers_empty(self, client):
+        tc, store = client
+        resp = tc.get("/api/handlers")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_api_handlers_with_data(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler())
+        resp = tc.get("/api/handlers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["facet_name"] == "ns.TestFacet"
+        assert data[0]["module_uri"] == "my.handlers"
+
+    def test_home_handler_count(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler())
+        resp = tc.get("/")
+        assert resp.status_code == 200
+        assert "Handlers" in resp.text

@@ -362,3 +362,11 @@
 - **Tool count**: 6 → 7; **Resource count**: 10 → 12
 - 17 new tests: `TestManageHandlersTool` (13 tests covering list/get/register/delete with validation and edge cases) and 4 handler resource tests in `TestResources`
 - 1286 tests passing
+
+## Completed (v0.10.6) - Dashboard Handler Registrations Page
+- **Handler routes** (`afl/dashboard/routes/handlers.py`): new route module with list (`GET /handlers`), detail (`GET /handlers/{facet_name}`), and delete (`POST /handlers/{facet_name}/delete`) endpoints; uses `{facet_name:path}` converter for dotted names
+- **Handler templates**: `handlers/list.html` table with facet name (linked), module URI, entrypoint, version, timeout, registered/updated timestamps; `handlers/detail.html` grid layout with details table, delete action (htmx POST with confirm), requirements list, metadata display, not-found handling
+- **Navigation**: "Handlers" link added to `base.html` nav between Servers and Tasks
+- **Home summary**: handler count card added to dashboard index; "Handler Registrations" added to quick links
+- **JSON API**: `GET /api/handlers` endpoint returns all registrations as JSON array
+- 9 new tests: `TestHandlerRoutes` (list empty/with data, detail, detail not found, delete, delete not found, API empty/with data, home handler count)

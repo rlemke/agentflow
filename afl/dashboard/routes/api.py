@@ -143,6 +143,29 @@ def api_servers(store=Depends(get_store)):
     )
 
 
+# -- Handlers ----------------------------------------------------------------
+
+
+@router.get("/handlers")
+def api_handlers(store=Depends(get_store)):
+    """Return all handler registrations as JSON."""
+    handlers = store.list_handler_registrations()
+    return JSONResponse(
+        [
+            {
+                "facet_name": h.facet_name,
+                "module_uri": h.module_uri,
+                "entrypoint": h.entrypoint,
+                "version": h.version,
+                "timeout_ms": h.timeout_ms,
+                "created": h.created,
+                "updated": h.updated,
+            }
+            for h in handlers
+        ]
+    )
+
+
 # -- Helpers -----------------------------------------------------------------
 
 
