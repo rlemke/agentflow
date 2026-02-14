@@ -20,13 +20,19 @@ An **AFL Agent** is a service that:
 3. updates the originating step with a result or error, and
 4. signals the runtime to continue evaluation.
 
-AgentFlow provides three execution models for building agents:
+AgentFlow provides four execution models for building agents:
 
 | Model | Use case | Transport |
 |-------|----------|-----------|
+| **RegistryRunner** | Production (recommended) — auto-loads handlers | Task queue polling + dynamic module loading |
 | **AgentPoller** | Standalone agent services | Task queue polling |
-| **RunnerService** | Distributed orchestration | Task queue + step polling + HTTP |
+| **RunnerService** | Distributed orchestration with locking | Task queue + step polling + HTTP |
 | **ClaudeAgentRunner** | LLM-driven execution | In-process synchronous |
+
+The **recommended approach** for production is `RegistryRunner`. Developers
+register handler implementations (Python modules) in the database. The
+runner automatically discovers, loads, caches, and dispatches them — no
+custom agent service code required.
 
 All three models share the same underlying primitives: `claim_task()`,
 `continue_step()`, `fail_step()`, and `resume()`.
@@ -531,12 +537,325 @@ to `http_max_port_attempts` times if the port is in use.
 
 ---
 
-## 8. ClaudeAgentRunner
+## 8. RegistryRunner (Recommended)
+
+The `RegistryRunner` (`afl/runtime/registry_runner.py`) is a universal,
+handler-agnostic runner that eliminates the need for per-facet
+microservices. Instead of writing custom agent code, developers register
+handler implementations in the database and the RegistryRunner
+dynamically loads and dispatches them.
+
+### 8.1 Why RegistryRunner?
+
+With the `AgentPoller` or `RunnerService`, building an agent requires:
+
+1. Writing a Python service that imports handler modules.
+2. Manually calling `register()` for each facet name.
+3. Deploying and maintaining the service.
+
+With `RegistryRunner`, the workflow is:
+
+1. Write a handler module (a Python file with a callable).
+2. Register it in the database (via API, MCP tool, or dashboard).
+3. Start the RegistryRunner service — it auto-loads everything.
+
+Handler registrations are **persisted** and survive restarts. The
+RegistryRunner re-reads registrations periodically (default: every 30s)
+and picks up new handlers without restarting.
+
+### 8.2 RegistryRunnerConfig
+
+```python
+@dataclass
+class RegistryRunnerConfig:
+    service_name: str = "afl-registry-runner"
+    server_group: str = "default"
+    server_name: str = ""              # Auto-populated with hostname
+    task_list: str = "default"
+    poll_interval_ms: int = 2000
+    max_concurrent: int = 5
+    heartbeat_interval_ms: int = 10000
+    registry_refresh_interval_ms: int = 30000
+    topics: list[str] = field(default_factory=list)
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `service_name` | `str` | `"afl-registry-runner"` | Identifies the runner type in server registry |
+| `server_group` | `str` | `"default"` | Logical grouping of servers |
+| `server_name` | `str` | hostname | Human-readable server name |
+| `task_list` | `str` | `"default"` | Task list to poll |
+| `poll_interval_ms` | `int` | `2000` | Milliseconds between poll cycles |
+| `max_concurrent` | `int` | `5` | Maximum concurrent task processing |
+| `heartbeat_interval_ms` | `int` | `10000` | Milliseconds between heartbeat pings |
+| `registry_refresh_interval_ms` | `int` | `30000` | Milliseconds between registry re-reads |
+| `topics` | `list[str]` | `[]` | Glob patterns to filter which facets to handle (empty = all) |
+
+### 8.3 Constructor
+
+```python
+def __init__(
+    self,
+    persistence: PersistenceAPI,
+    evaluator: Evaluator,
+    config: Optional[RegistryRunnerConfig] = None,
+) -> None
+```
+
+### 8.4 Handler Registration
+
+```python
+def register_handler(
+    self,
+    facet_name: str,
+    module_uri: str,
+    entrypoint: str = "handle",
+    version: str = "1.0.0",
+    checksum: str = "",
+    timeout_ms: int = 30000,
+    requirements: list[str] | None = None,
+    metadata: dict | None = None,
+) -> None
+```
+
+Creates a `HandlerRegistration` and saves it to the persistence store.
+The registration is picked up on the next registry refresh.
+
+**Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `facet_name` | Qualified event facet name (e.g. `"ns.CountDocuments"`) |
+| `module_uri` | Python module path (`"my.handlers"`) or file URI (`"file:///path/to/handler.py"`) |
+| `entrypoint` | Function name within the module (default: `"handle"`) |
+| `version` | Handler version string for tracking |
+| `checksum` | Cache-invalidation checksum; changing this forces module reload |
+| `timeout_ms` | Handler timeout in milliseconds |
+| `requirements` | Optional pip requirements (informational) |
+| `metadata` | Optional metadata dict; injected into payload as `_handler_metadata` |
+
+**Registration methods (in order of preference):**
+
+1. **MCP tool** — `afl_manage_handlers` with `action: "register"` (for
+   LLM agents and automation)
+2. **Dashboard** — via the Handler Registrations page (`/handlers`)
+3. **Python API** — `runner.register_handler(...)` (for scripts and setup)
+4. **Direct persistence** — `store.save_handler_registration(...)` (for
+   migration/seeding)
+
+### 8.5 HandlerRegistration Entity
+
+```python
+@dataclass
+class HandlerRegistration:
+    facet_name: str          # Primary key: "ns.FacetName"
+    module_uri: str          # "my.handlers" or "file:///path/to.py"
+    entrypoint: str = "handle"
+    version: str = "1.0.0"
+    checksum: str = ""
+    timeout_ms: int = 30000
+    requirements: list[str] = field(default_factory=list)
+    metadata: dict = field(default_factory=dict)
+    created: int = 0         # Timestamp (ms)
+    updated: int = 0         # Timestamp (ms)
+```
+
+Stored in the `handler_registrations` collection (MongoDB) or the
+`_handler_registrations` dict (MemoryStore).
+
+### 8.6 Dynamic Module Loading
+
+The RegistryRunner supports two module URI formats:
+
+| Format | Example | Mechanism |
+|--------|---------|-----------|
+| Python module path | `"my.handlers.cache"` | `importlib.import_module()` |
+| File URI | `"file:///opt/handlers/cache.py"` | `importlib.util.spec_from_file_location()` |
+
+Loaded modules are **cached** by `(module_uri, checksum)`. Changing the
+`checksum` field in the registration forces a module reload on the next
+invocation.
+
+### 8.7 Dispatch Flow
+
+When a task is claimed and processed:
+
+1. **Lookup**: Find `HandlerRegistration` by `task.name` (exact match,
+   then short-name fallback).
+2. **Load**: Dynamically import the handler module (cached).
+3. **Inject**: Add `_facet_name` and `_handler_metadata` to payload.
+4. **Invoke**: Call the handler (auto-detects sync vs async via
+   `inspect.iscoroutinefunction()`).
+5. **Continue**: Call `evaluator.continue_step(step_id, result)`.
+6. **Resume**: Call `evaluator.resume(workflow_id, workflow_ast)`.
+7. **Complete**: Mark task `COMPLETED`.
+
+On any exception: call `evaluator.fail_step()`, mark task `FAILED`.
+
+### 8.8 Topic-Based Filtering
+
+When `topics` is set in the config, the RegistryRunner only handles
+facets matching at least one glob pattern:
+
+```python
+config = RegistryRunnerConfig(topics=["osm.geo.*", "validation.*"])
+# Handles: osm.geo.cache.Africa, validation.CheckBounds
+# Ignores: billing.ProcessPayment
+```
+
+Pattern matching uses `fnmatch.fnmatch()` and supports `*`, `?`, and
+`[seq]` syntax.
+
+### 8.9 Streaming Support
+
+The RegistryRunner provides `update_step()` for handlers that produce
+partial/streaming results:
+
+```python
+def update_step(self, step_id: str, partial_result: dict) -> None
+```
+
+This merges `partial_result` into the step's return attributes
+immediately, without completing the step. The handler can call this
+multiple times before returning the final result.
+
+### 8.10 Complete Example: Event Facet with Auto-Loading
+
+**1. Define the event facet in AFL:**
+
+```afl
+namespace billing
+
+event facet ProcessPayment(amount: Double, currency: String) => (transaction_id: String, status: String)
+
+workflow Checkout(total: Double) => (receipt: String) andThen {
+    payment = ProcessPayment(amount = $.total, currency = "USD")
+    yield Checkout(receipt = payment.transaction_id)
+}
+```
+
+**2. Write the handler module** (`handlers/billing.py`):
+
+```python
+def process_payment(payload: dict) -> dict:
+    """Handle the ProcessPayment event facet."""
+    amount = payload.get("amount", 0)
+    currency = payload.get("currency", "USD")
+    # ... call payment gateway ...
+    return {
+        "transaction_id": "txn-12345",
+        "status": "approved",
+    }
+```
+
+**3. Register the handler** (one-time setup):
+
+```python
+# Via Python API:
+runner.register_handler(
+    facet_name="billing.ProcessPayment",
+    module_uri="handlers.billing",
+    entrypoint="process_payment",
+)
+
+# Or via MCP tool:
+# afl_manage_handlers(action="register", facet_name="billing.ProcessPayment",
+#                     module_uri="handlers.billing", entrypoint="process_payment")
+
+# Or via direct persistence:
+# store.save_handler_registration(HandlerRegistration(...))
+```
+
+**4. Start the RegistryRunner** — no custom agent code needed:
+
+```python
+from afl.runtime import MongoStore, Evaluator
+from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
+
+store = MongoStore()
+evaluator = Evaluator(persistence=store)
+runner = RegistryRunner(
+    persistence=store,
+    evaluator=evaluator,
+    config=RegistryRunnerConfig(service_name="billing-runner"),
+)
+runner.start()  # blocks; auto-loads handlers from persistence
+```
+
+The runner automatically discovers `billing.ProcessPayment` from the
+handler registrations table, loads `handlers.billing.process_payment`,
+and dispatches incoming tasks to it.
+
+### 8.11 Handler Module Patterns
+
+#### Simple handler (one facet per module):
+
+```python
+# handlers/count.py
+def handle(payload: dict) -> dict:
+    collection = payload.get("collection", "")
+    return {"count": len(collection)}
+```
+
+Register with `entrypoint="handle"` (the default).
+
+#### Multi-facet dispatch module:
+
+```python
+# handlers/cache.py
+_DISPATCH = {
+    "cache.Africa": lambda p: {"data": download("africa")},
+    "cache.Europe": lambda p: {"data": download("europe")},
+}
+
+def handle(payload: dict) -> dict:
+    facet = payload["_facet_name"]
+    handler = _DISPATCH.get(facet)
+    if handler is None:
+        raise ValueError(f"Unknown facet: {facet}")
+    return handler(payload)
+```
+
+Register all facets with `module_uri="handlers.cache"`,
+`entrypoint="handle"`. The `_facet_name` injected into the payload
+allows the handler to route internally.
+
+#### Factory-based registration:
+
+```python
+# handlers/regions.py
+REGIONS = {"Africa": "africa", "Europe": "europe", "Asia": "asia"}
+
+def register_handlers(runner):
+    for name, path in REGIONS.items():
+        runner.register_handler(
+            facet_name=f"geo.cache.{name}",
+            module_uri="handlers.regions",
+            entrypoint="handle",
+        )
+
+def handle(payload: dict) -> dict:
+    facet = payload["_facet_name"]
+    region = facet.rsplit(".", 1)[-1]
+    path = REGIONS[region]
+    return {"data": download(path)}
+```
+
+### 8.12 Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `server_id` | `str` | Unique identifier for this runner instance |
+| `is_running` | `bool` | Whether the poll loop is currently active |
+
+---
+
+## 9. ClaudeAgentRunner
 
 The `ClaudeAgentRunner` is a synchronous in-process execution model
 designed for LLM-driven workflow processing.
 
-### 8.1 Characteristics
+### 9.1 Characteristics
 
 | Aspect | Behavior |
 |--------|----------|
@@ -547,7 +866,7 @@ designed for LLM-driven workflow processing.
 | Persistence | Required (for step/event storage) |
 | Concurrency | Single-threaded |
 
-### 8.2 Execution Flow
+### 9.2 Execution Flow
 
 1. The `ClaudeAgentRunner` receives a workflow AST and inputs.
 2. The evaluator executes until it reaches `EVENT_TRANSMIT`.
@@ -561,15 +880,15 @@ in a tight loop.
 
 ---
 
-## 9. Concurrency Model
+## 10. Concurrency Model
 
-The `AgentPoller` and `RunnerService` process multiple event tasks
+The `AgentPoller`, `RegistryRunner`, and `RunnerService` process multiple event tasks
 concurrently. This section defines how in-memory state is kept isolated
 between concurrent executions.
 
-### 9.1 Design Principle
+### 10.1 Design Principle
 
-The `Evaluator`, `AgentPoller`, and `RunnerService` are **shared
+The `Evaluator`, `AgentPoller`, `RegistryRunner`, and `RunnerService` are **shared
 instances**, but all mutable execution state is **created per-invocation**.
 The shared `PersistenceAPI` acts as the sole coordination point, with
 atomicity guarantees enforced at the storage layer.
@@ -594,7 +913,7 @@ atomicity guarantees enforced at the storage layer.
 └──────────────────────────────────────────────────────┘
 ```
 
-### 9.2 Per-Invocation ExecutionContext
+### 10.2 Per-Invocation ExecutionContext
 
 Each call to `execute()` or `resume()` MUST create a **fresh
 `ExecutionContext`** with a new `IterationChanges` instance:
@@ -615,7 +934,7 @@ The `ExecutionContext` contains per-invocation caches
 execution. Concurrent threads calling `resume()` for different events
 operate on entirely separate context objects.
 
-### 9.3 Deep-Copy Persistence Pattern
+### 10.3 Deep-Copy Persistence Pattern
 
 The `MemoryStore` MUST return a **deep copy** of every `StepDefinition`
 on read and MUST clone before storing on write:
@@ -635,7 +954,7 @@ threads do not collide in memory.
 The `MongoStore` achieves the same isolation naturally — each read
 deserializes a fresh object from the database document.
 
-### 9.4 Atomic Task Claiming
+### 10.4 Atomic Task Claiming
 
 The `claim_task()` method MUST guarantee that exactly one caller
 receives a given task:
@@ -647,7 +966,7 @@ receives a given task:
 - A partial unique index on `(step_id, state=running)` ensures at most
   one agent processes a given event step at any time.
 
-### 9.5 Distributed Locking (RunnerService)
+### 10.5 Distributed Locking (RunnerService)
 
 The `RunnerService` acquires a distributed lock per work item before
 processing. A background thread extends the lock at
@@ -657,7 +976,7 @@ other runner instances from claiming the same work concurrently.
 The `AgentPoller` does not use distributed locks. It relies on the
 atomic `claim_task()` semantics to prevent duplicate processing.
 
-### 9.6 Isolation Guarantees
+### 10.6 Isolation Guarantees
 
 | Layer | Mechanism | Scope |
 |-------|-----------|-------|
@@ -668,7 +987,7 @@ atomic `claim_task()` semantics to prevent duplicate processing.
 | Task claiming | `threading.Lock` (memory) / `find_one_and_update` (MongoDB) | Global |
 | Work-item locking | `acquire_lock()` / `extend_lock()` (RunnerService only) | Per-work-item |
 
-### 9.7 Known Benign Races
+### 10.7 Known Benign Races
 
 The following shared state is accessed without synchronization. These
 races are benign and do not affect correctness:
@@ -683,14 +1002,15 @@ races are benign and do not affect correctness:
 
 ---
 
-## 10. Key Files Reference
+## 11. Key Files Reference
 
 | File | Description |
 |------|-------------|
+| `afl/runtime/registry_runner.py` | `RegistryRunner` class, `RegistryRunnerConfig`, dynamic handler loading |
 | `afl/runtime/agent_poller.py` | `AgentPoller` class and `AgentPollerConfig` |
 | `afl/runtime/runner/service.py` | `RunnerService` class and `RunnerConfig` |
-| `afl/runtime/entities.py` | `TaskDefinition`, `TaskState`, `ServerDefinition`, `ServerState` |
-| `afl/runtime/persistence.py` | `PersistenceAPI` protocol (including `claim_task()`) |
+| `afl/runtime/entities.py` | `TaskDefinition`, `TaskState`, `ServerDefinition`, `ServerState`, `HandlerRegistration` |
+| `afl/runtime/persistence.py` | `PersistenceAPI` protocol (including `claim_task()`, `register_handler()`) |
 | `afl/runtime/evaluator.py` | `ExecutionContext`, `continue_step()`, `fail_step()`, `resume()` |
 | `afl/runtime/events.py` | `EventManager`, `EventDispatcher`, event lifecycle |
 | `afl/runtime/memory_store.py` | In-memory `PersistenceAPI` with deep-copy isolation |
@@ -700,21 +1020,26 @@ races are benign and do not affect correctness:
 
 ---
 
-## 11. Comparison Matrix
+## 12. Comparison Matrix
 
-| Feature | AgentPoller | RunnerService | ClaudeAgentRunner |
-|---------|-------------|---------------|-------------------|
-| Task queue polling | Yes | Yes | No |
-| Step state polling | No | Yes | No |
-| Distributed locking | No | Yes | No |
-| HTTP status server | No | Yes | No |
-| Server registration | Yes | Yes | No |
-| Heartbeat | Yes | Yes | No |
-| Handler model | `register()` callback | `ToolRegistry` | `ToolRegistry` + Claude API |
-| Concurrency | Sequential (`poll_once`) | `ThreadPoolExecutor` | Single-threaded |
-| Signal handling | No | Yes (SIGTERM/SIGINT) | No |
-| Non-event tasks | No | Yes | No |
-| AST caching | `cache_workflow_ast()` | `cache_workflow_ast()` | In-process |
-| Short-name fallback | Yes | Yes | Yes |
-| Error → `fail_step()` | Yes | Yes | Yes |
-| Intended use | Standalone agent services | Production orchestration | LLM-driven execution |
+| Feature | RegistryRunner | AgentPoller | RunnerService | ClaudeAgentRunner |
+|---------|----------------|-------------|---------------|-------------------|
+| Task queue polling | Yes | Yes | Yes | No |
+| Step state polling | No | No | Yes | No |
+| Distributed locking | No | No | Yes | No |
+| HTTP status server | No | No | Yes | No |
+| Server registration | Yes | Yes | Yes | No |
+| Heartbeat | Yes | Yes | Yes | No |
+| Handler model | `HandlerRegistration` auto-load | `register()` callback | `ToolRegistry` | `ToolRegistry` + Claude API |
+| Concurrency | Sequential (`poll_once`) | Sequential (`poll_once`) | `ThreadPoolExecutor` | Single-threaded |
+| Signal handling | No | No | Yes (SIGTERM/SIGINT) | No |
+| Non-event tasks | No | No | Yes | No |
+| AST caching | `cache_workflow_ast()` | `cache_workflow_ast()` | `cache_workflow_ast()` | In-process |
+| Short-name fallback | Yes | Yes | Yes | Yes |
+| Error → `fail_step()` | Yes | Yes | Yes | Yes |
+| Dynamic handler loading | Yes (from DB) | No | No | No |
+| Module caching | Yes (by checksum) | N/A | N/A | N/A |
+| Topic filtering | Yes | No | Yes | No |
+| Registry refresh | Yes (periodic) | N/A | N/A | N/A |
+| Custom code required | No (handlers only) | Yes (service) | Yes (service) | Yes (service) |
+| Intended use | Production (recommended) | Standalone agent services | Distributed orchestration | LLM-driven execution |

@@ -4,7 +4,7 @@
 
 - **AgentFlow**: The platform for distributed workflow execution (compiler + runtime + agents)
 - **AFL**: Agent Flow Language — the DSL for defining workflows (`.afl` files)
-- **AFL Agent**: A standalone service that polls the task queue for event facet tasks, performs the required action (API call, data processing, etc.), writes the result back to the step, and signals the workflow to continue. Agents are built using the `AgentPoller` library and register callbacks for qualified event facet names (e.g. `osm.geo.Geocode`). Multiple agents can run concurrently, each handling different event facet types.
+- **AFL Agent**: A service that polls the task queue for event facet tasks, performs the required action (API call, data processing, etc.), writes the result back to the step, and signals the workflow to continue. Agents can be built using `AgentPoller` (callback-based), `RegistryRunner` (persistence-based auto-loading), or `RunnerService` (distributed orchestration). The **recommended approach** is `RegistryRunner`: register handler implementations in the database via `register_handler()` or the MCP `afl_manage_handlers` tool, then start the runner service — it dynamically loads and dispatches handlers without requiring custom agent code. Multiple agents can run concurrently, each handling different event facet types.
 
 ### Language Requirements
 
@@ -18,7 +18,7 @@ The language parser SHALL be implemented using **Lark**:
 
 ANTLR, PLY, Parsimonious, regex-based parsers, or handwritten parsers SHALL NOT be used.
 
-### Implementation Status (v0.5.1)
+### Implementation Status (v0.10.12)
 
 All specified runtime features are implemented:
 
@@ -74,6 +74,9 @@ See `spec/70_examples.md` Examples 2–4 for detailed execution traces demonstra
 - **AFL Agent**: A service that accepts events/tasks, performs the required action, updates the step, and signals the step to continue
 - **AgentPoller**: Standalone polling library for building AFL Agent services without the full RunnerService
 - **AgentPollerConfig**: Configuration dataclass for AgentPoller parameters
+- **RegistryRunner**: Universal runner that reads `HandlerRegistration` entries from persistence, dynamically loads Python modules, and dispatches event tasks — eliminates the need for custom agent services. Handlers are registered via `register_handler()` or the MCP `afl_manage_handlers` tool and are auto-loaded at runtime.
+- **RegistryRunnerConfig**: Configuration dataclass for RegistryRunner (service_name, topics, poll_interval_ms, registry_refresh_interval_ms, etc.)
+- **HandlerRegistration**: Persisted mapping of a qualified facet name to a Python module + entrypoint; stored in the `handler_registrations` collection and loaded by RegistryRunner on demand
 - **Foreach execution**: Runtime model for `andThen foreach var in expr { ... }` — creates N sub-block steps (one per array element), each with `foreach_var`/`foreach_value` bound and a cached body AST; sub-block completion tracked directly without DependencyGraph
 - **Lazy yield creation**: Yield steps are created in the iteration when their dependencies become available, not eagerly in iteration 0; this means total step counts grow over iterations
 - **Block AST cache**: `ExecutionContext._block_ast_cache` stores body AST overrides for foreach sub-blocks and multi-block workflows, checked before hierarchy traversal in `get_block_ast()`

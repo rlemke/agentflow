@@ -10,6 +10,8 @@ This repository contains the **AgentFlow** platform:
 ## Terminology
 - **AgentFlow**: The platform for distributed workflow execution (compiler + runtime + agents)
 - **AFL**: Agent Flow Language — the DSL for defining workflows (`.afl` files)
+- **AFL Agent**: A service that processes event facet tasks. The **recommended approach** is `RegistryRunner`: register handler implementations in the database, then start the runner — it dynamically loads and dispatches handlers without requiring custom agent code.
+- **RegistryRunner**: Universal runner that reads `HandlerRegistration` entries from persistence, dynamically loads Python modules, and dispatches event tasks. Handlers are registered via `register_handler()` or the MCP `afl_manage_handlers` tool.
 
 ---
 
@@ -21,6 +23,12 @@ This repository contains the **AgentFlow** platform:
 - **Workflow**: a facet designated as an entry point for execution.
 - **Step**: an assignment of a call expression within an `andThen` block.
 - **Schema**: a named typed structure (`schema Name { field: Type }`) used as a type in parameter signatures. **Schemas must be defined inside a namespace.** When referencing a schema from another namespace, either use a fully-qualified name (`ns.SchemaName`) or import the namespace with `use ns` (if unambiguous).
+
+### Agent execution models
+- **RegistryRunner** (recommended): auto-loads handlers from DB — no custom service code needed. Register handlers via `register_handler()` or MCP tool `afl_manage_handlers`.
+- **AgentPoller**: standalone agent services with `register()` callback.
+- **RunnerService**: distributed orchestration with locking, thread pool, and HTTP status.
+- **ClaudeAgentRunner**: LLM-driven in-process execution via Claude API.
 
 ### Composition features
 - **Mixins**: `with FacetA() with FacetB()` composes normalized facets.
@@ -110,4 +118,4 @@ python -m afl.mcp                   # MCP server (stdio)
 - `spec/70_examples.md` — iteration traces for Examples 2, 3, 4
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.10.6)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.10.12)
