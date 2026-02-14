@@ -908,3 +908,89 @@ class TestEventRoutes:
         assert len(data) == 1
         assert data[0]["id"] == "evt-1"
         assert data[0]["event_type"] == "afl:execute"
+
+
+def _make_published_source(
+    uuid="src-1",
+    namespace_name="geo.cache",
+    source_text="facet CacheLookup(key: String)",
+    version="latest",
+    origin="dashboard",
+):
+    from afl.runtime.entities import PublishedSource
+
+    return PublishedSource(
+        uuid=uuid,
+        namespace_name=namespace_name,
+        source_text=source_text,
+        namespaces_defined=["geo.cache"],
+        version=version,
+        published_at=1000,
+        origin=origin,
+        checksum="abc123def456",
+    )
+
+
+class TestSourceRoutes:
+    def test_source_list_empty(self, client):
+        tc, store = client
+        resp = tc.get("/sources")
+        assert resp.status_code == 200
+        assert "Sources" in resp.text
+
+    def test_source_list_with_data(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.get("/sources")
+        assert resp.status_code == 200
+        assert "geo.cache" in resp.text
+
+    def test_source_detail(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.get("/sources/geo.cache")
+        assert resp.status_code == 200
+        assert "geo.cache" in resp.text
+        assert "CacheLookup" in resp.text
+
+    def test_source_detail_not_found(self, client):
+        tc, store = client
+        resp = tc.get("/sources/nonexistent")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+    def test_source_detail_shows_source_text(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.get("/sources/geo.cache")
+        assert resp.status_code == 200
+        assert "facet CacheLookup" in resp.text
+
+    def test_delete_source(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.post("/sources/geo.cache/delete", follow_redirects=False)
+        assert resp.status_code == 303
+        assert store.get_source_by_namespace("geo.cache") is None
+
+    def test_api_sources_empty(self, client):
+        tc, store = client
+        resp = tc.get("/api/sources")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_api_sources_with_data(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.get("/api/sources")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["namespace_name"] == "geo.cache"
+
+    def test_home_source_count(self, client):
+        tc, store = client
+        store.save_published_source(_make_published_source())
+        resp = tc.get("/")
+        assert resp.status_code == 200
+        assert "Sources" in resp.text

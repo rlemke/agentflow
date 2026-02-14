@@ -31,6 +31,7 @@ def home(request: Request, store=Depends(get_store)):
     tasks = store.get_all_tasks(limit=500)
     handlers = store.list_handler_registrations()
     events = store.get_all_events()
+    sources = store.list_published_sources()
 
     # Count runners by state
     runner_counts: dict[str, int] = {}
@@ -53,5 +54,6 @@ def home(request: Request, store=Depends(get_store)):
             "total_tasks": len(tasks),
             "handler_count": len(handlers),
             "event_count": len(events),
+            "source_count": len(sources),
         },
     )

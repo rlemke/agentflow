@@ -33,6 +33,7 @@ def register_routes(app: FastAPI) -> None:
     from .logs import router as logs_router
     from .runners import router as runners_router
     from .servers import router as servers_router
+    from .sources import router as sources_router
     from .steps import router as steps_router
     from .tasks import router as tasks_router
     from .workflows import router as workflows_router
@@ -47,5 +48,6 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(logs_router)
     app.include_router(tasks_router)
     app.include_router(events_router)
+    app.include_router(sources_router)
     app.include_router(api_router)
     app.include_router(workflows_router)

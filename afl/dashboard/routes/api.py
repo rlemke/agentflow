@@ -166,6 +166,29 @@ def api_handlers(store=Depends(get_store)):
     )
 
 
+# -- Sources -----------------------------------------------------------------
+
+
+@router.get("/sources")
+def api_sources(store=Depends(get_store)):
+    """Return all published sources as JSON."""
+    sources = store.list_published_sources()
+    return JSONResponse(
+        [
+            {
+                "uuid": s.uuid,
+                "namespace_name": s.namespace_name,
+                "version": s.version,
+                "origin": s.origin,
+                "published_at": s.published_at,
+                "checksum": s.checksum,
+                "namespaces_defined": s.namespaces_defined,
+            }
+            for s in sources
+        ]
+    )
+
+
 # -- Events ------------------------------------------------------------------
 
 
