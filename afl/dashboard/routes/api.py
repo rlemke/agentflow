@@ -186,6 +186,33 @@ def api_server_detail(server_id: str, store=Depends(get_store)):
     )
 
 
+# -- Locks -------------------------------------------------------------------
+
+
+@router.get("/locks")
+def api_locks(store=Depends(get_store)):
+    """Return all locks as JSON."""
+    locks = store.get_all_locks()
+    return JSONResponse(
+        [
+            {
+                "key": l.key,
+                "acquired_at": l.acquired_at,
+                "expires_at": l.expires_at,
+                "meta": {
+                    "topic": l.meta.topic,
+                    "handler": l.meta.handler,
+                    "step_name": l.meta.step_name,
+                    "step_id": l.meta.step_id,
+                }
+                if l.meta
+                else None,
+            }
+            for l in locks
+        ]
+    )
+
+
 # -- Sources -----------------------------------------------------------------
 
 

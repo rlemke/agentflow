@@ -525,6 +525,11 @@ class MongoStore(PersistenceAPI):
         )
         return result.modified_count > 0
 
+    def get_all_locks(self) -> list[LockDefinition]:
+        """Get all locks (including expired) for dashboard visibility."""
+        docs = self._db.locks.find()
+        return [self._doc_to_lock(doc) for doc in docs]
+
     # =========================================================================
     # Handler Registration Operations
     # =========================================================================

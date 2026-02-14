@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends, Request
 
 from ..dependencies import get_store
@@ -32,6 +34,7 @@ def home(request: Request, store=Depends(get_store)):
     handlers = store.list_handler_registrations()
     events = store.get_all_events()
     sources = store.list_published_sources()
+    locks = store.get_all_locks()
 
     # Count runners by state
     runner_counts: dict[str, int] = {}
@@ -42,6 +45,10 @@ def home(request: Request, store=Depends(get_store)):
     task_counts: dict[str, int] = {}
     for t in tasks:
         task_counts[t.state] = task_counts.get(t.state, 0) + 1
+
+    # Count active (non-expired) locks
+    now_ms = int(time.time() * 1000)
+    active_lock_count = sum(1 for l in locks if l.expires_at > now_ms)
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -55,5 +62,6 @@ def home(request: Request, store=Depends(get_store)):
             "handler_count": len(handlers),
             "event_count": len(events),
             "source_count": len(sources),
+            "active_lock_count": active_lock_count,
         },
     )

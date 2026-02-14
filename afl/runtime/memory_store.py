@@ -416,3 +416,7 @@ class MemoryStore(PersistenceAPI):
         # Extend the lock
         lock.expires_at = now + duration_ms
         return True
+
+    def get_all_locks(self) -> list[LockDefinition]:
+        """Get all locks (including expired) for dashboard visibility."""
+        return list(self._locks.values())
