@@ -431,3 +431,19 @@
 - 24 new dashboard tests across 4 test classes: `TestTaskDetailAndFiltering` (6), `TestFlowDetailImprovements` (3), `TestListFiltering` (5), `TestApiExpansion` (10)
 - **RegistryRunner integration tests** (`tests/runtime/test_registry_runner_integration.py`): 24 end-to-end tests across 5 classes — `TestRegistryRunnerAddOne` (7, mirrors test_addone_agent.py), `TestRegistryRunnerMultiStep` (4, Double→Square pipeline with data flow), `TestRegistryRunnerAsync` (6, async handlers, partial updates, type hints), `TestRegistryRunnerComplexResume` (3, three-step A→B→C pipeline), `TestRegistryRunnerForeach` (4, foreach iteration with event facets)
 - 1382 tests passing
+
+## Completed (v0.11.0) - Runtime Inline Handler Dispatch
+- **`HandlerDispatcher` protocol** (`afl/runtime/dispatcher.py`): new `@runtime_checkable` protocol with `can_dispatch(facet_name) -> bool` and `dispatch(facet_name, payload) -> dict | None` for inline event execution during evaluation
+- **`RegistryDispatcher`**: persistence-backed dispatcher extracted from RegistryRunner; dynamic module loading with `file://` URI and dotted module path support, `(module_uri, checksum)` cache, sync/async handler detection via `inspect.iscoroutinefunction`
+- **`InMemoryDispatcher`**: wraps `dict[str, Callable]` with `register()` and `register_async()` methods; short-name fallback for qualified facet names (e.g. `ns.Facet` falls back to `Facet`)
+- **`ToolRegistryDispatcher`**: adapter wrapping existing `ToolRegistry` from `afl/runtime/agent.py` as a `HandlerDispatcher`
+- **`CompositeDispatcher`**: chains multiple dispatchers with priority ordering; first dispatcher that `can_dispatch` wins
+- **`ExecutionContext.dispatcher`**: new optional field; when set, `EventTransmitHandler` attempts inline dispatch before creating a task — if the dispatcher handles the facet, the step completes immediately without PAUSED status, no task created, no polling round-trip
+- **`Evaluator.execute()` / `Evaluator.resume()`**: new `dispatcher` parameter (default `None`) passed through to `ExecutionContext`; existing callers unaffected
+- **`EventTransmitHandler.process_state()`**: inline dispatch check before task creation — if `dispatcher.can_dispatch()` returns True and `dispatch()` returns a result, return values are set as return attributes and the step transitions forward; exceptions produce `STATEMENT_ERROR`; when dispatcher is None or cannot dispatch, falls back to existing task+PAUSED behavior
+- **`RegistryRunner` integration**: creates `RegistryDispatcher` internally, passes to `evaluator.resume()` — subsequent event facets in multi-step workflows are dispatched inline during auto-resume instead of creating additional tasks
+- **Module loading extracted**: `_import_handler()`, `_load_handler()`, and `_module_cache` moved from `RegistryRunner` to `RegistryDispatcher`; `RegistryRunner._process_event()` delegates to `self._dispatcher.dispatch()`
+- **Exported** from `afl.runtime`: `HandlerDispatcher`, `RegistryDispatcher`, `InMemoryDispatcher`, `ToolRegistryDispatcher`, `CompositeDispatcher`
+- 23 new dispatcher unit tests (`tests/runtime/test_dispatcher.py`): `TestRegistryDispatcher` (10), `TestInMemoryDispatcher` (6), `TestToolRegistryDispatcher` (3), `TestCompositeDispatcher` (4)
+- 14 new inline dispatch integration tests (`tests/runtime/test_inline_dispatch.py`): `TestInlineDispatchAddOne` (4), `TestInlineDispatchMultiStep` (3), `TestInlineDispatchForeach` (2), `TestInlineDispatchFallback` (3), `TestInlineDispatchWithRegistryRunner` (2)
+- 1419 tests passing

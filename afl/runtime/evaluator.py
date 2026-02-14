@@ -22,7 +22,10 @@ The Evaluator orchestrates workflow execution:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .dispatcher import HandlerDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +76,7 @@ class ExecutionContext:
     workflow_defaults: dict = field(default_factory=dict)
     program_ast: dict | None = None
     runner_id: str = ""
+    dispatcher: "HandlerDispatcher | None" = None
 
     # Cache for block dependency graphs
     _block_graphs: dict[StepId, DependencyGraph] = field(default_factory=dict)
@@ -523,6 +527,7 @@ class Evaluator:
         inputs: dict[str, Any] | None = None,
         program_ast: dict | None = None,
         runner_id: str = "",
+        dispatcher: "HandlerDispatcher | None" = None,
     ) -> ExecutionResult:
         """Execute a workflow.
 
@@ -531,6 +536,7 @@ class Evaluator:
             inputs: Optional input parameter values
             program_ast: Optional program AST for facet lookups
             runner_id: Optional runner ID for task creation context
+            dispatcher: Optional handler dispatcher for inline event execution
 
         Returns:
             ExecutionResult with outputs or error
@@ -560,6 +566,7 @@ class Evaluator:
             workflow_defaults=defaults,
             program_ast=program_ast,
             runner_id=runner_id,
+            dispatcher=dispatcher,
         )
 
         try:
@@ -921,6 +928,7 @@ class Evaluator:
         program_ast: dict | None = None,
         inputs: dict[str, Any] | None = None,
         runner_id: str = "",
+        dispatcher: "HandlerDispatcher | None" = None,
     ) -> ExecutionResult:
         """Resume execution of a paused workflow.
 
@@ -932,6 +940,7 @@ class Evaluator:
             program_ast: Optional program AST for facet lookups
             inputs: Original input values
             runner_id: Optional runner ID for task creation context
+            dispatcher: Optional handler dispatcher for inline event execution
 
         Returns:
             ExecutionResult
@@ -949,6 +958,7 @@ class Evaluator:
             workflow_defaults=defaults,
             program_ast=program_ast,
             runner_id=runner_id,
+            dispatcher=dispatcher,
         )
 
         try:

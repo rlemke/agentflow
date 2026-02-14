@@ -35,6 +35,14 @@ from .dao import (
     WorkflowDefinitionDAO,
 )
 from .dependency import DependencyGraph
+from .dispatcher import (
+    CompositeDispatcher,
+    HandlerDispatcher,
+    InMemoryDispatcher,
+    RegistryDispatcher,
+    ToolRegistryDispatcher,
+)
+
 
 # Entity definitions
 from .entities import (
@@ -200,6 +208,12 @@ __all__ = [
     "RegistryRunner",
     "RegistryRunnerConfig",
     "HandlerRegistration",
+    # Dispatchers
+    "HandlerDispatcher",
+    "RegistryDispatcher",
+    "InMemoryDispatcher",
+    "ToolRegistryDispatcher",
+    "CompositeDispatcher",
     # Errors
     "RuntimeError",
     "InvalidStepStateError",

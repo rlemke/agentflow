@@ -398,9 +398,10 @@ class TestRegistryRunnerMultiStep:
 
         runner.cache_workflow_ast(result.workflow_id, MULTI_STEP_WORKFLOW_AST, program_ast=MULTI_STEP_PROGRAM_AST)
 
-        # poll_once handles full pipeline: Double→auto-resume→Square→auto-resume→complete
+        # poll_once handles full pipeline: Double claimed from queue,
+        # Square dispatched inline during auto-resume (no task created)
         dispatched = runner.poll_once()
-        assert dispatched == 2
+        assert dispatched == 1
 
         # Workflow already completed by auto-resume inside poll_once
         final = evaluator.resume(result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST)
@@ -874,9 +875,9 @@ class TestRegistryRunnerComplexResume:
         assert result.status == ExecutionStatus.PAUSED
         runner.cache_workflow_ast(result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST)
 
-        # poll_once handles full pipeline: A→resume→B→resume→C→resume→complete
+        # poll_once claims StepA from queue; B and C dispatched inline during auto-resume
         dispatched = runner.poll_once()
-        assert dispatched == 3
+        assert dispatched == 1
 
         # Workflow already completed by auto-resume
         final = evaluator.resume(result.workflow_id, PIPELINE_WORKFLOW_AST, PIPELINE_PROGRAM_AST)

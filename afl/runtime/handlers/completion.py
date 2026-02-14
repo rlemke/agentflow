@@ -44,14 +44,30 @@ class EventTransmitHandler(StateHandler):
     def process_state(self) -> StateChangeResult:
         """Transmit event to agent.
 
-        For event facets: creates an event and a task in the task queue,
-        then BLOCKS the step until an external caller invokes continue_step().
+        For event facets: if an inline dispatcher is available and can
+        handle this facet, dispatches immediately and completes the step.
+        Otherwise creates an event and a task in the task queue, then
+        BLOCKS the step until an external caller invokes continue_step().
         For regular facets: passes through to next state.
         """
         facet_def = self.context.get_facet_definition(self.step.facet_name)
 
         if facet_def and facet_def.get("type") == "EventFacetDecl":
-            # Create and dispatch event
+            # Try inline dispatch if a dispatcher is available
+            dispatcher = self.context.dispatcher
+            if dispatcher and dispatcher.can_dispatch(self.step.facet_name):
+                try:
+                    payload = self._build_payload()
+                    result = dispatcher.dispatch(self.step.facet_name, payload)
+                    if result is not None:
+                        for name, value in result.items():
+                            self.step.set_attribute(name, value, is_return=True)
+                        self.step.request_state_change(True)
+                        return StateChangeResult(step=self.step)
+                except Exception as e:
+                    return self.error(e)
+
+            # Fallback: create event + task and block
             from ..persistence import EventDefinition
 
             event = EventDefinition(

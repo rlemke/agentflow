@@ -44,11 +44,7 @@ Example usage::
     runner.start()  # blocks until stopped
 """
 
-import asyncio
 import fnmatch
-import importlib
-import importlib.util
-import inspect
 import logging
 import socket
 import threading
@@ -58,6 +54,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
+from .dispatcher import RegistryDispatcher
 from .entities import (
     HandlerRegistration,
     ServerDefinition,
@@ -123,8 +120,14 @@ class RegistryRunner:
         self._ast_cache: dict[str, dict] = {}
         self._program_ast_cache: dict[str, dict] = {}
 
-        # Registry-specific state
-        self._module_cache: dict[tuple[str, str], Callable] = {}
+        # Shared dispatcher for inline execution and _process_event
+        self._dispatcher = RegistryDispatcher(
+            persistence=persistence,
+            topics=self._config.topics if self._config.topics else None,
+        )
+
+        # Registry-specific state (delegate module cache to dispatcher)
+        self._module_cache = self._dispatcher.module_cache
         self._registered_names: list[str] = []
         self._last_refresh: int = 0
 
@@ -212,69 +215,6 @@ class RegistryRunner:
         now = _current_time_ms()
         if now - self._last_refresh >= self._config.registry_refresh_interval_ms:
             self._refresh_registry()
-
-    # =========================================================================
-    # Dynamic Module Loading
-    # =========================================================================
-
-    def _load_handler(self, reg: HandlerRegistration) -> Callable:
-        """Load a handler callable, using cache when possible.
-
-        Args:
-            reg: The handler registration
-
-        Returns:
-            The callable handler function
-
-        Raises:
-            ImportError: If the module cannot be loaded
-            AttributeError: If the entrypoint is not found
-            TypeError: If the entrypoint is not callable
-        """
-        cache_key = (reg.module_uri, reg.checksum)
-        if cache_key in self._module_cache:
-            return self._module_cache[cache_key]
-
-        handler = self._import_handler(reg)
-        self._module_cache[cache_key] = handler
-        return handler
-
-    def _import_handler(self, reg: HandlerRegistration) -> Callable:
-        """Import and return the handler callable from a registration.
-
-        Supports two URI formats:
-        - ``file:///path/to/module.py`` — loaded via ``spec_from_file_location``
-        - ``my.package.module`` — loaded via ``importlib.import_module``
-
-        Args:
-            reg: The handler registration
-
-        Returns:
-            The callable handler function
-
-        Raises:
-            ImportError: If the module cannot be loaded
-            AttributeError: If the entrypoint is not found
-            TypeError: If the entrypoint is not callable
-        """
-        if reg.module_uri.startswith("file://"):
-            file_path = reg.module_uri[7:]  # strip "file://"
-            spec = importlib.util.spec_from_file_location(
-                f"_afl_handler_{reg.facet_name}", file_path
-            )
-            if spec is None or spec.loader is None:
-                raise ImportError(f"Cannot load module from {file_path}")
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-        else:
-            module = importlib.import_module(reg.module_uri)
-
-        attr = getattr(module, reg.entrypoint)
-        if not callable(attr):
-            raise TypeError(
-                f"Entrypoint '{reg.entrypoint}' in '{reg.module_uri}' is not callable"
-            )
-        return attr
 
     def update_step(self, step_id: str, partial_result: dict) -> None:
         """Update a step with partial results (for streaming handlers).
@@ -576,24 +516,14 @@ class RegistryRunner:
     def _process_event(self, task: Any) -> None:
         """Process an event task via dynamic handler lookup.
 
-        1. Look up HandlerRegistration by task.name (qualified, then short-name fallback)
-        2. If not found -> fail_step + mark task FAILED
-        3. _load_handler(registration) -> cached callable
-        4. If load fails -> fail_step + mark task FAILED
-        5. Dispatch callback(payload) (sync or async)
-        6. On success -> continue_step, resume workflow, mark task COMPLETED
-        7. On exception -> fail_step, mark task FAILED
+        Delegates handler loading and invocation to the shared
+        RegistryDispatcher. On success, continues the step and
+        resumes the workflow; on failure, fails the step.
         """
         try:
             payload = dict(task.data or {})  # shallow copy to avoid mutating task.data
 
-            # Look up registration (try exact name, then short name)
-            reg = self._persistence.get_handler_registration(task.name)
-            if reg is None and "." in task.name:
-                short_name = task.name.rsplit(".", 1)[-1]
-                reg = self._persistence.get_handler_registration(short_name)
-
-            if reg is None:
+            if not self._dispatcher.can_dispatch(task.name):
                 error_msg = f"No handler registration for event task '{task.name}'"
                 self._evaluator.fail_step(task.step_id, error_msg)
                 task.state = TaskState.FAILED
@@ -607,14 +537,9 @@ class RegistryRunner:
                 )
                 return
 
-            # Inject dispatch metadata into payload
-            payload["_facet_name"] = task.name
-            if reg.metadata:
-                payload["_handler_metadata"] = reg.metadata
-
-            # Load handler (cached)
+            # Dispatch via shared dispatcher (handles module loading + async detection)
             try:
-                callback = self._load_handler(reg)
+                result = self._dispatcher.dispatch(task.name, payload)
             except (ImportError, AttributeError, TypeError) as exc:
                 error_msg = f"Failed to load handler for '{task.name}': {exc}"
                 self._evaluator.fail_step(task.step_id, error_msg)
@@ -628,12 +553,6 @@ class RegistryRunner:
                     task.step_id,
                 )
                 return
-
-            # Invoke callback (handle both sync and async)
-            if inspect.iscoroutinefunction(callback):
-                result = asyncio.run(callback(payload))
-            else:
-                result = callback(payload)
 
             # Continue the step with the result
             self._evaluator.continue_step(task.step_id, result)
@@ -689,7 +608,9 @@ class RegistryRunner:
             return
 
         program_ast = self._program_ast_cache.get(workflow_id)
-        self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+        self._evaluator.resume(
+            workflow_id, workflow_ast, program_ast=program_ast, dispatcher=self._dispatcher
+        )
 
     # =========================================================================
     # Shutdown

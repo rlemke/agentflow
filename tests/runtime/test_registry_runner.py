@@ -291,7 +291,7 @@ class TestDynamicModuleLoading:
             entrypoint="handle",
         )
 
-        handler = runner._import_handler(reg)
+        handler = runner._dispatcher._import_handler(reg)
         result = handler({"input": 5})
         assert result == {"output": 10}
 
@@ -304,7 +304,7 @@ class TestDynamicModuleLoading:
             entrypoint="handle",
         )
 
-        handler = runner._import_handler(reg)
+        handler = runner._dispatcher._import_handler(reg)
         result = handler({})
         assert result == {"result": 42}
 
@@ -317,7 +317,7 @@ class TestDynamicModuleLoading:
         )
 
         with pytest.raises(ImportError):
-            runner._import_handler(reg)
+            runner._dispatcher._import_handler(reg)
 
     def test_bad_entrypoint(self, store, evaluator, handler_module):
         """AttributeError for non-existent entrypoint."""
@@ -329,7 +329,7 @@ class TestDynamicModuleLoading:
         )
 
         with pytest.raises(AttributeError):
-            runner._import_handler(reg)
+            runner._dispatcher._import_handler(reg)
 
     def test_non_callable_entrypoint(self, tmp_path, store, evaluator, monkeypatch):
         """TypeError for non-callable entrypoint."""
@@ -346,7 +346,7 @@ class TestDynamicModuleLoading:
         )
 
         with pytest.raises(TypeError, match="not callable"):
-            runner._import_handler(reg)
+            runner._dispatcher._import_handler(reg)
 
 
 # =========================================================================
@@ -367,8 +367,8 @@ class TestModuleCaching:
             checksum="abc123",
         )
 
-        handler1 = runner._load_handler(reg)
-        handler2 = runner._load_handler(reg)
+        handler1 = runner._dispatcher._load_handler(reg)
+        handler2 = runner._dispatcher._load_handler(reg)
         assert handler1 is handler2
 
     def test_checksum_change_evicts_cache(self, store, evaluator, handler_file):
@@ -387,8 +387,8 @@ class TestModuleCaching:
             checksum="v2",
         )
 
-        handler_v1 = runner._load_handler(reg_v1)
-        handler_v2 = runner._load_handler(reg_v2)
+        handler_v1 = runner._dispatcher._load_handler(reg_v1)
+        handler_v2 = runner._dispatcher._load_handler(reg_v2)
         # Different checksum -> different cache entry -> different import
         # (they're functionally equal but are separate function objects)
         assert (reg_v1.module_uri, reg_v1.checksum) in runner._module_cache
