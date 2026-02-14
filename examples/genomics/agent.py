@@ -53,11 +53,15 @@ def main() -> None:
         from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
         from handlers import register_all_registry_handlers
 
+        topics_env = os.environ.get("AFL_RUNNER_TOPICS", "")
+        topics = [t.strip() for t in topics_env.split(",") if t.strip()] if topics_env else []
+
         config = RegistryRunnerConfig(
             service_name="genomics-agent",
             server_group="genomics",
             poll_interval_ms=2000,
             max_concurrent=5,
+            topics=topics,
         )
 
         runner = RegistryRunner(persistence=store, evaluator=evaluator, config=config)
@@ -70,6 +74,8 @@ def main() -> None:
         signal.signal(signal.SIGTERM, shutdown)
         signal.signal(signal.SIGINT, shutdown)
 
+        if topics:
+            print(f"Topic filter: {topics}")
         print("Genomics agent started (RegistryRunner mode). Press Ctrl+C to stop.")
         runner.start()
     else:

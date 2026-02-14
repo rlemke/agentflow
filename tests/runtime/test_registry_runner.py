@@ -1015,3 +1015,183 @@ class TestRegistryRefresh:
         runner._last_refresh = 0
         runner._maybe_refresh_registry()
         assert "ns.Delayed" in runner._registered_names
+
+
+# =========================================================================
+# TestRegistryRunnerTopics
+# =========================================================================
+
+
+class TestRegistryRunnerTopics:
+    """Tests for topic-based filtering of registered names."""
+
+    def test_topics_filter_exact(self, store, evaluator):
+        """Only exact-matching facet names appear when topics are set."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.A", module_uri="a")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.B", module_uri="b")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.C", module_uri="c")
+        )
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(topics=["ns.A", "ns.C"]),
+        )
+        runner._refresh_registry()
+
+        assert sorted(runner.registered_names()) == ["ns.A", "ns.C"]
+
+    def test_topics_filter_glob(self, store, evaluator):
+        """Glob patterns filter registered names."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.X.Foo", module_uri="x")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.Y.Bar", module_uri="y")
+        )
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(topics=["ns.X.*"]),
+        )
+        runner._refresh_registry()
+
+        assert runner.registered_names() == ["ns.X.Foo"]
+
+    def test_topics_empty_means_all(self, store, evaluator):
+        """No topics configured -> all registered names appear (default)."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.A", module_uri="a")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.B", module_uri="b")
+        )
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),  # no topics
+        )
+        runner._refresh_registry()
+
+        assert sorted(runner.registered_names()) == ["ns.A", "ns.B"]
+
+    def test_topics_filter_poll_once(self, store, evaluator, handler_file):
+        """poll_once only claims tasks matching the topic filter."""
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+        from afl.runtime.types import workflow_id as make_wf_id
+
+        wf_id = make_wf_id()
+
+        # Create two steps at EVENT_TRANSMIT
+        step_a = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="ns.A",
+        )
+        step_a.state = StepState.EVENT_TRANSMIT
+        step_a.transition.current_state = StepState.EVENT_TRANSMIT
+        step_a.transition.request_transition = False
+        store.save_step(step_a)
+
+        step_b = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="ns.B",
+        )
+        step_b.state = StepState.EVENT_TRANSMIT
+        step_b.transition.current_state = StepState.EVENT_TRANSMIT
+        step_b.transition.request_transition = False
+        store.save_step(step_b)
+
+        # Create tasks for both
+        task_a = TaskDefinition(
+            uuid=generate_id(),
+            name="ns.A",
+            runner_id="",
+            workflow_id=wf_id,
+            flow_id="",
+            step_id=step_a.id,
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={"input": 1},
+        )
+        store.save_task(task_a)
+
+        task_b = TaskDefinition(
+            uuid=generate_id(),
+            name="ns.B",
+            runner_id="",
+            workflow_id=wf_id,
+            flow_id="",
+            step_id=step_b.id,
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={"input": 2},
+        )
+        store.save_task(task_b)
+
+        # Register handlers for both
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.A",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+            )
+        )
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.B",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+            )
+        )
+
+        # Runner with topics=["ns.A"] — should only claim ns.A
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(topics=["ns.A"]),
+        )
+
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        # ns.A should be completed, ns.B should still be pending
+        updated_a = store._tasks[task_a.uuid]
+        assert updated_a.state == TaskState.COMPLETED
+
+        updated_b = store._tasks[task_b.uuid]
+        assert updated_b.state == TaskState.PENDING
+
+    def test_server_topics_reflect_filter(self, store, evaluator):
+        """Server definition topics match the filtered registered names."""
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.X.Foo", module_uri="x")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.X.Bar", module_uri="x")
+        )
+        store.save_handler_registration(
+            HandlerRegistration(facet_name="ns.Y.Baz", module_uri="y")
+        )
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(topics=["ns.X.*"]),
+        )
+        runner._refresh_registry()
+        runner._register_server()
+
+        server = store.get_server(runner.server_id)
+        assert server is not None
+        assert sorted(server.topics) == ["ns.X.Bar", "ns.X.Foo"]
+        assert sorted(server.handlers) == ["ns.X.Bar", "ns.X.Foo"]

@@ -45,6 +45,7 @@ Example usage::
 """
 
 import asyncio
+import fnmatch
 import importlib
 import importlib.util
 import inspect
@@ -54,7 +55,7 @@ import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .entities import (
@@ -87,6 +88,7 @@ class RegistryRunnerConfig:
     max_concurrent: int = 5
     heartbeat_interval_ms: int = 10000
     registry_refresh_interval_ms: int = 30000
+    topics: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.server_name:
@@ -192,10 +194,17 @@ class RegistryRunner:
     # Registry Refresh
     # =========================================================================
 
+    def _matches_topics(self, facet_name: str) -> bool:
+        """Check if a facet name matches any configured topic pattern."""
+        return any(fnmatch.fnmatch(facet_name, pattern) for pattern in self._config.topics)
+
     def _refresh_registry(self) -> None:
         """Reload handler registrations from persistence."""
         registrations = self._persistence.list_handler_registrations()
-        self._registered_names = [r.facet_name for r in registrations]
+        names = [r.facet_name for r in registrations]
+        if self._config.topics:
+            names = [n for n in names if self._matches_topics(n)]
+        self._registered_names = names
         self._last_refresh = _current_time_ms()
 
     def _maybe_refresh_registry(self) -> None:
