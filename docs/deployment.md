@@ -282,6 +282,83 @@ pytest tests/ --hdfs -v -k hdfs
 
 Without the `--hdfs` flag, all HDFS tests are skipped automatically.
 
+## Jenkins CI/CD
+
+AgentFlow includes an optional Jenkins service for CI/CD pipelines. Jenkins runs with Docker socket access, allowing it to build and test AgentFlow Docker images.
+
+### Starting Jenkins
+
+```bash
+# Start Jenkins
+docker compose --profile jenkins up -d
+
+# Check health
+docker compose --profile jenkins ps
+```
+
+The Jenkins Web UI is available at `http://localhost:9090`.
+
+### Initial Setup
+
+Retrieve the initial admin password:
+
+```bash
+docker compose exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+### Setup Script
+
+```bash
+scripts/setup --jenkins                    # Jenkins only
+scripts/setup --jenkins --build            # Rebuild images first
+```
+
+## PostGIS Integration
+
+AgentFlow supports PostGIS as a spatial database for OSM geocoder agents. The OSM geocoder defines a `PostGisImport` event facet for importing geospatial data into PostGIS.
+
+### Starting PostGIS
+
+```bash
+# Start the PostGIS database
+docker compose --profile postgis up -d
+
+# Verify PostGIS is ready
+docker compose exec postgis pg_isready -U afl
+```
+
+### Connection Details
+
+| Property | Value |
+|----------|-------|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `afl_gis` |
+| User | `afl` |
+| Password | `afl` |
+
+### Building OSM Agents with PostGIS
+
+Use the `docker-compose.postgis.yml` override file to build OSM agent images with `psycopg2-binary` (required for PostGIS):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.postgis.yml --profile postgis build
+```
+
+Or use the setup script:
+
+```bash
+scripts/setup --postgis --osm-agents 2 --build
+```
+
+### Environment Variables
+
+When using the override file, the following environment variable is set automatically on OSM agent containers:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `AFL_POSTGIS_URL` | `postgresql://afl:afl@postgis:5432/afl_gis` | PostGIS connection string |
+
 ## Security
 
 ### MongoDB Authentication

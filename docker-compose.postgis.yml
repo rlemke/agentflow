@@ -1,0 +1,35 @@
+# Docker Compose override for PostGIS-aware OSM agents.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.postgis.yml --profile postgis up -d
+#   docker compose -f docker-compose.yml -f docker-compose.postgis.yml --profile postgis build
+#
+# This override:
+#   - Sets AFL_POSTGIS_URL on OSM agent services
+#   - Adds depends_on: postgis so agents wait for PostGIS
+#   - Sets INSTALL_POSTGIS=true build arg so psycopg2-binary gets installed
+
+services:
+  agent-osm-geocoder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder
+      args:
+        INSTALL_POSTGIS: "true"
+    environment:
+      - AFL_POSTGIS_URL=postgresql://afl:afl@postgis:5432/afl_gis
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  agent-osm-geocoder-lite:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder-lite
+      args:
+        INSTALL_POSTGIS: "true"
+    environment:
+      - AFL_POSTGIS_URL=postgresql://afl:afl@postgis:5432/afl_gis
+    depends_on:
+      postgis:
+        condition: service_healthy

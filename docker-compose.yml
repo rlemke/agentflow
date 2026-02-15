@@ -174,8 +174,50 @@ services:
     profiles:
       - hdfs
 
+  # Jenkins CI/CD — start with: docker compose --profile jenkins up -d
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: afl-jenkins
+    ports:
+      - "9090:8080"   # Web UI
+      - "50000:50000" # Agent
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: curl -f http://localhost:8080/login || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles:
+      - jenkins
+
+  # PostGIS database — start with: docker compose --profile postgis up -d
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: afl-postgis
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=afl_gis
+      - POSTGRES_USER=afl
+      - POSTGRES_PASSWORD=afl
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U afl
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    profiles:
+      - postgis
+
 volumes:
   mongodb_data:
   graphhopper_data:
   hadoop_namenode:
   hadoop_datanode:
+  jenkins_home:
+  postgis_data:

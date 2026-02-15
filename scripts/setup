@@ -21,6 +21,8 @@ AGENTS=1
 OSM_AGENTS=0
 OSM_LITE_AGENTS=0
 HDFS=false
+JENKINS=false
+POSTGIS=false
 CHECK_ONLY=false
 FORCE_BUILD=false
 
@@ -38,6 +40,8 @@ Options:
   --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
                        (default: 0)
   --hdfs               Start HDFS namenode + datanode services
+  --jenkins            Start Jenkins CI/CD server
+  --postgis            Start PostGIS database and wire into OSM agents
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -54,6 +58,8 @@ while [[ $# -gt 0 ]]; do
         --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
         --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
         --hdfs)          HDFS=true;             shift ;;
+        --jenkins)       JENKINS=true;          shift ;;
+        --postgis)       POSTGIS=true;          shift ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -183,9 +189,22 @@ PROFILE_ARGS=""
 COMPOSE_FILES="-f docker-compose.yml"
 if [ "$HDFS" = true ]; then
     SERVICES="$SERVICES namenode datanode"
-    PROFILE_ARGS="--profile hdfs"
+    PROFILE_ARGS="$PROFILE_ARGS --profile hdfs"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.hdfs.yml"
     echo "HDFS support enabled — OSM agents will use hdfs://namenode:8020 for caching"
+    echo ""
+fi
+if [ "$JENKINS" = true ]; then
+    SERVICES="$SERVICES jenkins"
+    PROFILE_ARGS="$PROFILE_ARGS --profile jenkins"
+    echo "Jenkins CI/CD enabled — Web UI at http://localhost:9090"
+    echo ""
+fi
+if [ "$POSTGIS" = true ]; then
+    SERVICES="$SERVICES postgis"
+    PROFILE_ARGS="$PROFILE_ARGS --profile postgis"
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.postgis.yml"
+    echo "PostGIS enabled — OSM agents will use postgresql://afl:afl@postgis:5432/afl_gis"
     echo ""
 fi
 
@@ -214,6 +233,8 @@ echo "  AddOne agents:    $AGENTS"
 echo "  OSM agents:       $OSM_AGENTS"
 echo "  OSM lite agents:  $OSM_LITE_AGENTS"
 echo "  HDFS:             $HDFS"
+echo "  Jenkins:          $JENKINS"
+echo "  PostGIS:          $POSTGIS"
 echo ""
 
 docker compose $COMPOSE_FILES $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
@@ -225,6 +246,12 @@ echo "  MongoDB:   localhost:${MONGODB_PORT:-27018}"
 if [ "$HDFS" = true ]; then
     echo "  HDFS UI:   http://localhost:9870"
     echo "  HDFS RPC:  hdfs://localhost:8020"
+fi
+if [ "$JENKINS" = true ]; then
+    echo "  Jenkins:   http://localhost:9090"
+fi
+if [ "$POSTGIS" = true ]; then
+    echo "  PostGIS:   localhost:5432 (afl_gis)"
 fi
 echo ""
 echo "Useful commands:"
