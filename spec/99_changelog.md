@@ -496,3 +496,12 @@
 - **Setup script** (`scripts/setup`): when `--hdfs` is set, uses `docker compose -f docker-compose.yml -f docker-compose.hdfs.yml` for both build and up commands; prints HDFS support status message
 - **Deployment docs** (`docs/deployment.md`): new "HDFS Integration" section with starting HDFS, building with HDFS support, running OSM agents with HDFS cache (env var table), and running HDFS tests
 - 1586 tests collected (1555 passed, 31 skipped without `--hdfs`/`--mongodb`)
+
+## Completed (v0.12.2) - Docker Profiles for Jenkins & PostGIS
+- **Jenkins service** (`docker-compose.yml`, profile: `jenkins`): `jenkins/jenkins:lts` image as `afl-jenkins`; ports `9090:8080` (Web UI) and `50000:50000` (agent); `jenkins_home` volume for persistence; Docker socket mount (`/var/run/docker.sock`) for Docker-in-Docker builds; healthcheck on `/login` with 60s `start_period`
+- **PostGIS service** (`docker-compose.yml`, profile: `postgis`): `postgis/postgis:16-3.4` image as `afl-postgis`; port `5432:5432`; environment `POSTGRES_DB=afl_gis`, `POSTGRES_USER=afl`, `POSTGRES_PASSWORD=afl`; `postgis_data` volume; healthcheck via `pg_isready -U afl`
+- **PostGIS compose override** (`docker-compose.postgis.yml`): new override file (same pattern as `docker-compose.hdfs.yml`) wiring PostGIS into OSM agents; sets `AFL_POSTGIS_URL=postgresql://afl:afl@postgis:5432/afl_gis`; adds `depends_on: postgis`; sets `INSTALL_POSTGIS=true` build arg for `psycopg2-binary` installation
+- **Dockerfile PostGIS support**: `docker/Dockerfile.osm-geocoder` and `docker/Dockerfile.osm-geocoder-lite` gain `ARG INSTALL_POSTGIS=false` with conditional `pip install psycopg2-binary` when set to `true`
+- **Setup script** (`scripts/setup`): new `--jenkins` and `--postgis` flags with defaults, arg parsing, profile/compose-file handling, and status output lines
+- **Deployment docs** (`docs/deployment.md`): new "Jenkins CI/CD" section (starting Jenkins, initial admin password retrieval, setup script usage) and "PostGIS Integration" section (starting PostGIS, connection details table, building OSM agents with override file, environment variables table)
+- 1555 passed, 31 skipped
