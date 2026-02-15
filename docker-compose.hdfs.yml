@@ -1,0 +1,45 @@
+# Docker Compose override for HDFS-aware OSM agents.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs up -d
+#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs build
+#
+# This override:
+#   - Points AFL_CACHE_DIR, GRAPHHOPPER_GRAPH_DIR, AFL_GTFS_CACHE_DIR at HDFS
+#   - Adds depends_on: namenode so agents wait for HDFS
+#   - Sets INSTALL_HDFS=true build arg so pyarrow gets installed
+
+services:
+  agent-osm-geocoder:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder
+      args:
+        INSTALL_HDFS: "true"
+    environment:
+      - AFL_CACHE_DIR=hdfs://namenode:8020/osm-cache
+      - GRAPHHOPPER_GRAPH_DIR=hdfs://namenode:8020/graphhopper
+      - AFL_GTFS_CACHE_DIR=hdfs://namenode:8020/gtfs-cache
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  agent-osm-geocoder-lite:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.osm-geocoder-lite
+      args:
+        INSTALL_HDFS: "true"
+    environment:
+      - AFL_CACHE_DIR=hdfs://namenode:8020/osm-cache
+      - AFL_GTFS_CACHE_DIR=hdfs://namenode:8020/gtfs-cache
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runner
+      args:
+        INSTALL_HDFS: "true"

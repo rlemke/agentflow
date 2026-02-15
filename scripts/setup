@@ -180,14 +180,18 @@ if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
 fi
 
 PROFILE_ARGS=""
+COMPOSE_FILES="-f docker-compose.yml"
 if [ "$HDFS" = true ]; then
     SERVICES="$SERVICES namenode datanode"
     PROFILE_ARGS="--profile hdfs"
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.hdfs.yml"
+    echo "HDFS support enabled — OSM agents will use hdfs://namenode:8020 for caching"
+    echo ""
 fi
 
 if [ "$FORCE_BUILD" = true ]; then
     echo "Building all images (--build)..."
-    docker compose $PROFILE_ARGS build $SERVICES
+    docker compose $COMPOSE_FILES $PROFILE_ARGS build $SERVICES
     echo ""
 fi
 
@@ -212,7 +216,7 @@ echo "  OSM lite agents:  $OSM_LITE_AGENTS"
 echo "  HDFS:             $HDFS"
 echo ""
 
-docker compose $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
+docker compose $COMPOSE_FILES $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
 
 echo ""
 echo "=== AgentFlow is running ==="

@@ -8,6 +8,10 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[mongodb]" || \
     pip install --no-cache-dir lark pymongo
 
+# Optional HDFS support (pyarrow)
+ARG INSTALL_HDFS=false
+RUN if [ "$INSTALL_HDFS" = "true" ]; then pip install --no-cache-dir "pyarrow>=14.0"; fi
+
 # Copy application code
 COPY afl/ ./afl/
 

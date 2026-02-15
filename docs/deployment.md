@@ -225,6 +225,63 @@ curl http://localhost:8080/api/flows
 - Failed agents are detected via heartbeat timeout
 - Use the `RegistryRunner` model for simpler deployment (handlers in database)
 
+## HDFS Integration
+
+AgentFlow supports HDFS as a storage backend for OSM handler caches. When enabled, OSM agents read and write cache data (PBF files, GraphHopper graphs, GTFS feeds) to HDFS instead of local disk.
+
+### Starting HDFS
+
+```bash
+# Start the HDFS namenode and datanode
+docker compose --profile hdfs up -d
+
+# Verify namenode is healthy
+docker compose --profile hdfs ps
+```
+
+The HDFS Web UI is available at `http://localhost:9870` and the RPC endpoint at `hdfs://localhost:8020`.
+
+### Building with HDFS Support
+
+Use the `docker-compose.hdfs.yml` override file to build OSM agent images with `pyarrow` (required for HDFS):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs build
+```
+
+Or use the setup script:
+
+```bash
+scripts/setup --hdfs --osm-agents 2 --build
+```
+
+### Running OSM Agents with HDFS Cache
+
+When using the override file, the following environment variables are set automatically on OSM agent containers:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `AFL_CACHE_DIR` | `hdfs://namenode:8020/osm-cache` | OSM PBF download cache |
+| `GRAPHHOPPER_GRAPH_DIR` | `hdfs://namenode:8020/graphhopper` | GraphHopper routing graphs |
+| `AFL_GTFS_CACHE_DIR` | `hdfs://namenode:8020/gtfs-cache` | GTFS feed cache |
+
+The `get_storage_backend()` factory detects `hdfs://` URIs and returns an `HDFSStorageBackend` (backed by pyarrow) instead of the default `LocalStorageBackend`.
+
+### Running HDFS Tests
+
+```bash
+# Existing HDFS storage tests
+pytest tests/runtime/test_hdfs_storage.py --hdfs -v
+
+# OSM handler HDFS integration tests
+pytest tests/test_osm_handlers_hdfs.py --hdfs -v
+
+# All HDFS tests
+pytest tests/ --hdfs -v -k hdfs
+```
+
+Without the `--hdfs` flag, all HDFS tests are skipped automatically.
+
 ## Security
 
 ### MongoDB Authentication
