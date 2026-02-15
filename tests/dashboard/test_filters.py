@@ -102,3 +102,61 @@ class TestTruncateUuid:
 
     def test_none(self):
         assert truncate_uuid(None) == "—"
+
+
+# =============================================================================
+# v0.11.2 — Additional edge-case tests for filter functions
+# =============================================================================
+
+
+class TestDurationFmtEdgeCases:
+    def test_negative_value(self):
+        # Negative ms is truthy, so it should not return the dash
+        result = duration_fmt(-5000)
+        # Negative divided by 1000 truncated to int => -5 seconds
+        assert "s" in result
+
+    def test_very_large_value_one_day(self):
+        # 86400000 ms = 1 day = 24h 0m
+        result = duration_fmt(86400000)
+        assert "24h" in result
+        assert "0m" in result
+
+    def test_exact_minute_boundary(self):
+        # 60000 ms = exactly 1 minute 0 seconds
+        result = duration_fmt(60000)
+        assert "1m" in result
+        assert "0s" in result
+
+
+class TestTimestampFmtEdgeCases:
+    def test_negative_timestamp(self):
+        # Negative timestamp is truthy, should not return dash
+        result = timestamp_fmt(-1000)
+        # Should format as a date before epoch
+        assert "1969" in result or "1970" in result
+
+    def test_far_future_timestamp(self):
+        # Year 2100: approx 4102444800000 ms
+        result = timestamp_fmt(4102444800000)
+        assert "2100" in result
+
+
+class TestStateColorEdgeCases:
+    def test_all_known_states_covered(self):
+        known = {
+            "running": "primary",
+            "completed": "success",
+            "failed": "danger",
+            "paused": "warning",
+            "cancelled": "secondary",
+            "error": "danger",
+            "pending": "warning",
+        }
+        for state_val, expected_color in known.items():
+            assert state_color(state_val) == expected_color, (
+                f"state_color('{state_val}') should be '{expected_color}'"
+            )
+
+    def test_empty_string_returns_secondary(self):
+        assert state_color("") == "secondary"

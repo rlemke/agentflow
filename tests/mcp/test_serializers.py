@@ -18,6 +18,7 @@ from afl.mcp.serializers import (
     serialize_execution_result,
     serialize_flow,
     serialize_flow_source,
+    serialize_handler_registration,
     serialize_log,
     serialize_runner,
     serialize_server,
@@ -28,6 +29,7 @@ from afl.runtime.entities import (
     FlowDefinition,
     FlowIdentity,
     HandledCount,
+    HandlerRegistration,
     LogDefinition,
     Parameter,
     RunnerDefinition,
@@ -236,3 +238,195 @@ class TestSerializeExecutionResult:
         d = serialize_execution_result(er)
         assert d["success"] is False
         assert d["error"] == "bad input"
+
+
+# ============================================================================
+# TestSerializeHandlerRegistration
+# ============================================================================
+
+
+class TestSerializeHandlerRegistration:
+    def test_all_fields_populated(self):
+        reg = HandlerRegistration(
+            facet_name="ns.FullHandler",
+            module_uri="full.handler.module",
+            entrypoint="process",
+            version="2.5.0",
+            checksum="abc123",
+            timeout_ms=60000,
+            requirements=["numpy>=1.0", "pandas>=2.0"],
+            metadata={"author": "test", "priority": 1},
+            created=1000,
+            updated=2000,
+        )
+        d = serialize_handler_registration(reg)
+        assert d["facet_name"] == "ns.FullHandler"
+        assert d["module_uri"] == "full.handler.module"
+        assert d["entrypoint"] == "process"
+        assert d["version"] == "2.5.0"
+        assert d["checksum"] == "abc123"
+        assert d["timeout_ms"] == 60000
+        assert d["requirements"] == ["numpy>=1.0", "pandas>=2.0"]
+        assert d["metadata"]["author"] == "test"
+        assert d["metadata"]["priority"] == 1
+        assert d["created"] == 1000
+        assert d["updated"] == 2000
+
+    def test_with_requirements_list(self):
+        reg = HandlerRegistration(
+            facet_name="ns.WithReqs",
+            module_uri="reqs.module",
+            requirements=["flask>=2.0", "requests", "boto3>=1.28"],
+            created=500,
+            updated=600,
+        )
+        d = serialize_handler_registration(reg)
+        assert len(d["requirements"]) == 3
+        assert "flask>=2.0" in d["requirements"]
+        assert "requests" in d["requirements"]
+        assert "boto3>=1.28" in d["requirements"]
+
+    def test_with_metadata_dict(self):
+        reg = HandlerRegistration(
+            facet_name="ns.WithMeta",
+            module_uri="meta.module",
+            metadata={"env": "production", "retries": 3, "tags": ["fast", "critical"]},
+            created=100,
+            updated=200,
+        )
+        d = serialize_handler_registration(reg)
+        assert d["metadata"]["env"] == "production"
+        assert d["metadata"]["retries"] == 3
+        assert d["metadata"]["tags"] == ["fast", "critical"]
+
+    def test_defaults(self):
+        reg = HandlerRegistration(
+            facet_name="ns.Default",
+            module_uri="default.module",
+        )
+        d = serialize_handler_registration(reg)
+        assert d["entrypoint"] == "handle"
+        assert d["version"] == "1.0.0"
+        assert d["checksum"] == ""
+        assert d["timeout_ms"] == 30000
+        assert d["requirements"] == []
+        assert d["metadata"] == {}
+        assert d["created"] == 0
+        assert d["updated"] == 0
+
+
+# ============================================================================
+# TestSerializeEdgeCases
+# ============================================================================
+
+
+class TestSerializeEdgeCases:
+    def test_runner_without_parameters(self):
+        wf = _make_workflow()
+        runner = RunnerDefinition(
+            uuid="r-no-params",
+            workflow_id=wf.uuid,
+            workflow=wf,
+            state="completed",
+            start_time=100,
+            end_time=200,
+            duration=100,
+            parameters=[],
+        )
+        d = serialize_runner(runner)
+        assert d["uuid"] == "r-no-params"
+        assert d["parameters"] == []
+        assert d["state"] == "completed"
+
+    def test_step_with_returns_populated(self):
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.FACET,
+            facet_name="ReturnFacet",
+        )
+        step.set_attribute("input_a", 10)
+        step.set_attribute("output_b", 42, is_return=True)
+        d = serialize_step(step)
+        assert d["params"]["input_a"] == 10
+        assert d["returns"]["output_b"] == 42
+        assert d["facet_name"] == "ReturnFacet"
+
+    def test_flow_without_workflows(self):
+        flow = FlowDefinition(
+            uuid="f-empty",
+            name=FlowIdentity(name="EmptyFlow", path="/flows/empty", uuid="f-empty"),
+            workflows=[],
+            compiled_sources=[],
+        )
+        d = serialize_flow(flow)
+        assert d["uuid"] == "f-empty"
+        assert d["name"] == "EmptyFlow"
+        assert d["workflows"] == []
+        assert d["sources"] == 0
+        assert d["facets"] == 0
+
+    def test_paused_execution_result(self):
+        er = ExecutionResult(
+            success=True,
+            workflow_id="wf-paused",
+            outputs={},
+            iterations=2,
+            status=ExecutionStatus.PAUSED,
+            pending_events=["step-1", "step-2"],
+        )
+        d = serialize_execution_result(er)
+        assert d["success"] is True
+        assert d["status"] == "PAUSED"
+        assert d["workflow_id"] == "wf-paused"
+        assert d["iterations"] == 2
+        assert d["outputs"] == {}
+        assert "error" not in d
+
+    def test_execution_result_timeout(self):
+        er = ExecutionResult(
+            success=False,
+            workflow_id="wf-timeout",
+            error=TimeoutError("max iterations"),
+            status=ExecutionStatus.TIMEOUT,
+            iterations=100,
+        )
+        d = serialize_execution_result(er)
+        assert d["success"] is False
+        assert d["status"] == "TIMEOUT"
+        assert d["error"] == "max iterations"
+        assert d["iterations"] == 100
+
+    def test_flow_with_multiple_sources(self):
+        flow = FlowDefinition(
+            uuid="f-multi",
+            name=FlowIdentity(name="Multi", path="/flows/multi", uuid="f-multi"),
+            compiled_sources=[
+                SourceText(name="main.afl", content="facet A()"),
+                SourceText(name="helpers.afl", content="facet B()"),
+                SourceText(name="types.afl", content="namespace types {}"),
+            ],
+        )
+        d = serialize_flow_source(flow)
+        assert len(d["sources"]) == 3
+        assert d["sources"][0]["name"] == "main.afl"
+        assert d["sources"][1]["name"] == "helpers.afl"
+        assert d["sources"][2]["name"] == "types.afl"
+        # All default to "afl" language
+        for src in d["sources"]:
+            assert src["language"] == "afl"
+
+    def test_server_with_no_handled_counts(self):
+        server = ServerDefinition(
+            uuid="srv-empty",
+            server_group="default",
+            service_name="runner",
+            server_name="host",
+            state="running",
+            topics=[],
+            handlers=[],
+            handled=[],
+        )
+        d = serialize_server(server)
+        assert d["topics"] == []
+        assert d["handlers"] == []
+        assert d["handled"] == []

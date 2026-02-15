@@ -51,7 +51,8 @@ This repository contains the **AgentFlow** platform:
 # Tests
 pytest tests/ -v                    # full suite
 pytest tests/ -v -x                 # stop on first failure
-pytest tests/ --cov=afl             # with coverage
+pytest tests/ --cov=afl --cov-report=term-missing  # with coverage
+pytest tests/ --cov=afl --cov-report=html          # HTML coverage report
 pytest tests/runtime/test_mongo_store.py --mongodb -v  # real MongoDB
 
 # CLI

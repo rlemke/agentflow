@@ -1,0 +1,339 @@
+# AgentFlow Deployment & Operations Guide
+
+This guide covers deploying, configuring, monitoring, and operating AgentFlow in development and production environments.
+
+## Quick Start
+
+The fastest way to run AgentFlow is with Docker Compose:
+
+```bash
+# Clone the repository
+git clone <repo-url>
+cd agentflow
+
+# Start the stack (MongoDB, dashboard, runner, sample agent)
+docker compose up -d
+
+# Open the dashboard
+open http://localhost:8080
+
+# Seed example workflows (optional)
+docker compose --profile seed run --rm seed
+```
+
+Or use the setup script for a guided bootstrap:
+
+```bash
+scripts/setup                              # defaults: 1 runner, 1 agent
+scripts/setup --runners 3 --agents 2       # scaled deployment
+scripts/setup --build                      # rebuild images first
+```
+
+## Architecture
+
+### Single-Node (Development)
+
+All services run on one machine via Docker Compose:
+
+```
+                 +-----------+
+  Browser ------>| Dashboard |
+                 |  (8080)   |
+                 +-----+-----+
+                       |
+    +--------+---------+---------+--------+
+    |        |                   |        |
++---v--+ +---v---+          +---v---+ +--v---+
+|Runner| |Runner |   ...    | Agent | |Agent |
++---+--+ +---+---+          +---+---+ +--+---+
+    |         |                  |        |
+    +---------+------------------+--------+
+                       |
+                +------v------+
+                |   MongoDB   |
+                |   (27018)   |
+                +-----------  +
+```
+
+### Multi-Node (Production)
+
+For production, run MongoDB on dedicated infrastructure and distribute services across nodes:
+
+- **MongoDB**: Dedicated server or managed service (MongoDB Atlas)
+- **Dashboard**: Single instance behind a reverse proxy
+- **Runners**: Multiple instances on worker nodes
+- **Agents**: Multiple instances, scaled per workload
+
+All services connect to the same MongoDB instance and coordinate via distributed locking.
+
+## Configuration Reference
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AFL_MONGODB_URL` | `mongodb://localhost:27017` | MongoDB connection string |
+| `AFL_MONGODB_DATABASE` | `afl` | Database name |
+| `AFL_MONGODB_USERNAME` | | MongoDB authentication username |
+| `AFL_MONGODB_PASSWORD` | | MongoDB authentication password |
+| `AFL_MONGODB_AUTH_SOURCE` | `admin` | MongoDB auth database |
+| `AFL_CONFIG` | | Path to `afl.config.json` file |
+
+### Config File (`afl.config.json`)
+
+```json
+{
+  "mongodb": {
+    "url": "mongodb://localhost:27017",
+    "database": "afl",
+    "username": "",
+    "password": "",
+    "auth_source": "admin"
+  },
+  "resolver": {
+    "auto_resolve": false,
+    "source_paths": [],
+    "mongodb_resolve": false
+  }
+}
+```
+
+The config file is searched in order: `$AFL_CONFIG`, `./afl.config.json`, `~/.afl/afl.config.json`, `/etc/afl/afl.config.json`.
+
+## Service Reference
+
+### Dashboard
+
+Web UI for monitoring and managing workflows.
+
+```bash
+# Docker
+docker compose up -d dashboard
+
+# Direct
+python -m afl.dashboard --host 0.0.0.0 --port 8080
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `0.0.0.0` | Bind address |
+| `--port` | `8080` | Listen port |
+| `--config` | | Path to AFL config file |
+| `--reload` | | Enable auto-reload (development) |
+| `--log-level` | `INFO` | Log level |
+
+**Health check:** `GET /health` returns `200 OK` with JSON body.
+
+### Runner Service
+
+Distributed runner that orchestrates workflow execution with locking and concurrent processing.
+
+```bash
+# Docker (scalable)
+docker compose up -d --scale runner=3
+
+# Direct
+python -m afl.runtime.runner
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--server-group` | `default` | Server group name |
+| `--service-name` | `afl-runner` | Service identifier |
+| `--topics` | (all) | Event facet names to handle |
+| `--task-list` | `default` | Task list to poll |
+| `--poll-interval` | `2000` | Poll interval in ms |
+| `--max-concurrent` | `5` | Max concurrent work items |
+| `--lock-duration` | `60000` | Lock TTL in ms |
+| `--port` | `8080` | HTTP status port (auto-increments) |
+
+### MCP Server
+
+Model Context Protocol server for LLM agent integration.
+
+```bash
+# Docker (stdio transport)
+docker compose --profile mcp run --rm mcp
+
+# Direct
+python -m afl.mcp
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--transport` | `stdio` | MCP transport |
+| `--config` | | Path to AFL config file |
+| `--log-level` | `WARNING` | Log level |
+| `--log-file` | | Log to file (recommended for stdio) |
+
+## Monitoring
+
+### Dashboard Pages
+
+| Page | URL | Content |
+|------|-----|---------|
+| Home | `/` | Counts for runners, tasks, servers, flows, handlers, sources |
+| Runners | `/runners` | Active/completed/failed workflow executions |
+| Flows | `/flows` | Compiled workflow definitions and sources |
+| Tasks | `/tasks` | Event task queue (pending, running, completed, failed) |
+| Servers | `/servers` | Registered agent servers with heartbeat status |
+| Events | `/events` | Event lifecycle tracking |
+| Handlers | `/handlers` | Registered handler modules |
+| Sources | `/sources` | Published AFL source namespaces |
+| Locks | `/locks` | Distributed lock status |
+| Namespaces | `/namespaces` | Namespace definitions across flows |
+
+### API Endpoints
+
+All dashboard pages have corresponding JSON API endpoints at `/api/*`:
+
+```bash
+curl http://localhost:8080/api/runners
+curl http://localhost:8080/api/runners?state=running
+curl http://localhost:8080/api/tasks?state=pending
+curl http://localhost:8080/api/servers
+curl http://localhost:8080/api/flows
+```
+
+### Health Checks
+
+| Service | Endpoint | Method |
+|---------|----------|--------|
+| Dashboard | `/health` | HTTP GET |
+| MongoDB | `mongosh --eval "db.runCommand('ping')"` | CLI |
+
+## Scaling Guidelines
+
+### MongoDB
+
+- Use **replica sets** for high availability
+- Enable **WiredTiger** cache sizing for write-heavy workloads
+- Index the `tasks` collection on `state` and `task_list_name`
+- Monitor `tasks` collection size; completed tasks accumulate
+
+### Runners
+
+- Scale horizontally: each runner coordinates via distributed locks
+- Set `--max-concurrent` based on available CPU/memory (default: 5)
+- Set `--poll-interval` lower (500ms) for latency-sensitive workloads
+- Use `--topics` to partition work across runner groups
+
+### Agents
+
+- Scale by workload type: different agents handle different event facets
+- Each agent instance registers as a server with heartbeat
+- Failed agents are detected via heartbeat timeout
+- Use the `RegistryRunner` model for simpler deployment (handlers in database)
+
+## Security
+
+### MongoDB Authentication
+
+Enable authentication in production:
+
+```json
+{
+  "mongodb": {
+    "url": "mongodb://mongo-host:27017",
+    "database": "afl",
+    "username": "afl_user",
+    "password": "secure_password",
+    "auth_source": "admin"
+  }
+}
+```
+
+### Network Recommendations
+
+- Run MongoDB on a private network, not exposed to the internet
+- Use TLS for MongoDB connections (`mongodb+srv://` or `?tls=true`)
+- Place the dashboard behind a reverse proxy (nginx/caddy) with authentication
+- MCP server uses stdio transport — no network exposure
+
+### Docker Security
+
+- Use non-root users in Docker images (already configured)
+- Pin image versions in production
+- Scan images for vulnerabilities
+- Use Docker secrets for credentials
+
+## Backup & Recovery
+
+### MongoDB Backup
+
+```bash
+# Dump the database
+mongodump --uri="mongodb://localhost:27018" --db=afl --out=/backup/
+
+# Restore
+mongorestore --uri="mongodb://localhost:27018" --db=afl /backup/afl/
+```
+
+### Key Collections
+
+| Collection | Content | Backup Priority |
+|------------|---------|-----------------|
+| `flows` | Compiled workflow definitions | High |
+| `sources` | Published AFL source code | High |
+| `handler_registrations` | Registered handlers | High |
+| `runners` | Execution history | Medium |
+| `steps` | Step state and data | Medium |
+| `tasks` | Task queue | Low (transient) |
+| `servers` | Server registrations | Low (transient) |
+| `locks` | Distributed locks | Low (ephemeral) |
+
+## Troubleshooting
+
+### Common Issues
+
+**Services can't connect to MongoDB:**
+```bash
+docker compose ps                    # Check service health
+docker compose logs mongodb          # Check MongoDB logs
+docker compose exec mongodb mongosh  # Test connection directly
+```
+
+**Workflows stuck in PAUSED state:**
+- Check that agents/runners are running: `GET /api/servers`
+- Verify handler registrations: `GET /api/handlers`
+- Check task queue: `GET /api/tasks?state=pending`
+- Look for failed tasks: `GET /api/tasks?state=failed`
+
+**Steps stuck in EVENT_TRANSMIT:**
+- No agent is registered for the event facet
+- Agent crashed after claiming the task
+- Check locks: `GET /api/locks` (expired locks block progress)
+
+**High memory usage:**
+- Reduce `--max-concurrent` on runners
+- Check for large step attribute payloads
+- Archive old runner/step records
+
+### Diagnostics
+
+```bash
+# Service status
+docker compose ps
+
+# Service logs (follow)
+docker compose logs -f runner
+
+# MongoDB collection stats
+docker compose exec mongodb mongosh afl --eval "db.stats()"
+
+# Task queue depth
+docker compose exec mongodb mongosh afl --eval "db.tasks.countDocuments({state: 'pending'})"
+
+# Active locks
+docker compose exec mongodb mongosh afl --eval "db.locks.find().toArray()"
+```
+
+### Clearing State
+
+```bash
+# Remove all data (development only)
+docker compose down -v
+
+# Reset task queue only
+docker compose exec mongodb mongosh afl --eval "db.tasks.deleteMany({state: {\\$in: ['completed', 'failed']}})"
+```
