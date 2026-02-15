@@ -869,6 +869,14 @@ The `CLAUDE.md` template is self-contained — it documents the complete protoco
 
 > **Note:** For the authoritative specifications, see [The Contract: Specifications](#the-contract-specifications) at the top of this document.
 
+### Guides
+
+| Document | Description |
+|----------|-------------|
+| [docs/architecture.md](docs/architecture.md) | System architecture — compiler, runtime, persistence, agent dispatch, and component interactions |
+| [docs/tutorial.md](docs/tutorial.md) | AFL tutorial — progressive walkthrough of all language constructs with examples |
+| [docs/deployment.md](docs/deployment.md) | Deployment and operations — Docker, configuration, monitoring, HDFS, PostGIS, Jenkins |
+
 ### OSM Geocoder Documentation
 
 The `examples/osm-geocoder/` directory contains detailed documentation for the OSM data processing agent:
