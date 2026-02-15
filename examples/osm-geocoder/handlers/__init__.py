@@ -16,6 +16,7 @@ from .gtfs_handlers import register_gtfs_handlers
 from .operations_handlers import register_operations_handlers
 from .osmose_handlers import register_osmose_handlers
 from .park_handlers import register_park_handlers
+from .postgis_handlers import register_postgis_handlers
 from .poi_handlers import register_poi_handlers
 from .population_handlers import register_population_handlers
 from .region_handlers import register_region_handlers
@@ -42,6 +43,7 @@ __all__ = [
     "register_operations_handlers",
     "register_osmose_handlers",
     "register_park_handlers",
+    "register_postgis_handlers",
     "register_poi_handlers",
     "register_population_handlers",
     "register_region_handlers",
@@ -70,6 +72,7 @@ def register_all_handlers(poller) -> None:
     register_operations_handlers(poller)
     register_osmose_handlers(poller)
     register_park_handlers(poller)
+    register_postgis_handlers(poller)
     register_poi_handlers(poller)
     register_population_handlers(poller)
     register_region_handlers(poller)
@@ -96,6 +99,7 @@ def register_all_registry_handlers(runner) -> None:
     from .operations_handlers import register_handlers as reg_operations
     from .osmose_handlers import register_handlers as reg_osmose
     from .park_handlers import register_handlers as reg_park
+    from .postgis_handlers import register_handlers as reg_postgis
     from .poi_handlers import register_handlers as reg_poi
     from .population_handlers import register_handlers as reg_population
     from .region_handlers import register_handlers as reg_region
@@ -119,6 +123,7 @@ def register_all_registry_handlers(runner) -> None:
     reg_operations(runner)
     reg_osmose(runner)
     reg_park(runner)
+    reg_postgis(runner)
     reg_poi(runner)
     reg_population(runner)
     reg_region(runner)

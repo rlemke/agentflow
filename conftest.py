@@ -29,3 +29,9 @@ def pytest_addoption(parser):
         default=False,
         help="Run HDFS integration tests against live containers (namenode on localhost:8020)",
     )
+    parser.addoption(
+        "--postgis",
+        action="store_true",
+        default=False,
+        help="Run PostGIS integration tests against live containers (localhost:5432)",
+    )

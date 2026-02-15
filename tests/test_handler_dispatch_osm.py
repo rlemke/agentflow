@@ -395,6 +395,32 @@ class TestOsmZoomHandlers:
         assert runner.register_handler.call_count == len(mod._DISPATCH)
 
 
+class TestOsmPostgisHandlers:
+    def test_dispatch_keys(self):
+        mod = _osm_import("postgis_handlers")
+        assert len(mod._DISPATCH) > 0
+        for key in mod._DISPATCH:
+            assert key.startswith("osm.geo.Operations.")
+
+    def test_handle_dispatches(self):
+        mod = _osm_import("postgis_handlers")
+        facet = next(iter(mod._DISPATCH))
+        result = mod.handle({"_facet_name": facet})
+        assert isinstance(result, dict)
+        assert "stats" in result
+
+    def test_handle_unknown_facet(self):
+        mod = _osm_import("postgis_handlers")
+        with pytest.raises(ValueError, match="Unknown facet"):
+            mod.handle({"_facet_name": "osm.geo.Operations.NonExistent"})
+
+    def test_register_handlers(self):
+        mod = _osm_import("postgis_handlers")
+        runner = MagicMock()
+        mod.register_handlers(runner)
+        assert runner.register_handler.call_count == len(mod._DISPATCH)
+
+
 class TestOsmInitRegistryHandlers:
     def test_register_all_registry_handlers(self):
         mod = _osm_import("__init__")

@@ -22,7 +22,6 @@ OPERATIONS_FACETS: dict[str, str | None] = {
     "RoutingGraph": "graph",
     "Status": "stats",
     "GeoOSMCache": "graph",
-    "PostGisImport": "stats",
     "DownloadAll": None,  # => ()
     "TileAll": "tiles",
     "RoutingGraphAll": "graph",
