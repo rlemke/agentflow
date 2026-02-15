@@ -486,3 +486,13 @@
   - `agents/scala/afl-agent/README.md` (80 lines): Scala agent quickstart
   - `agents/java/afl-agent/README.md` (93 lines): Java agent quickstart
 - 1555 tests passing
+
+## Completed (v0.12.1) - Docker HDFS Integration for OSM Agents & Tests
+- **Docker Compose override** (`docker-compose.hdfs.yml`): new override file wiring HDFS into OSM agent services; sets `AFL_CACHE_DIR=hdfs://namenode:8020/osm-cache`, `GRAPHHOPPER_GRAPH_DIR=hdfs://namenode:8020/graphhopper`, `AFL_GTFS_CACHE_DIR=hdfs://namenode:8020/gtfs-cache`; adds `depends_on: namenode` so agents wait for HDFS; sets `INSTALL_HDFS=true` build arg for pyarrow installation
+- **Dockerfile HDFS support**: `docker/Dockerfile.osm-geocoder`, `docker/Dockerfile.osm-geocoder-lite`, and `docker/Dockerfile.runner` gain `ARG INSTALL_HDFS=false` with conditional `pip install pyarrow>=14.0` when set to `true`
+- **Shared WebHDFS test helpers** (`tests/hdfs_helpers.py`): extracted `WebHDFSClient` class (with new `getsize()` method), `hdfs` fixture, and `workdir` fixture from `tests/runtime/test_hdfs_storage.py` into a shared module for reuse across HDFS test files
+- **`tests/runtime/test_hdfs_storage.py` refactored**: imports `WebHDFSClient`, `hdfs`, `workdir` from `tests.hdfs_helpers`; local definitions removed; all 19 existing tests preserved
+- **OSM handler HDFS integration tests** (`tests/test_osm_handlers_hdfs.py`, 12 tests): `TestStorageBackendHDFSSelection` (4 tests — local/None path returns `LocalStorageBackend`, `hdfs://` URI returns `HDFSStorageBackend`, host:port caching), `TestWebHDFSCacheOperations` (5 tests — create/size/listing/overwrite/isdir on cache files), `TestHDFSCachePatterns` (3 tests — OSM PBF nested region cache, GraphHopper graph directory, GTFS feed cache); all guarded by `--hdfs` flag
+- **Setup script** (`scripts/setup`): when `--hdfs` is set, uses `docker compose -f docker-compose.yml -f docker-compose.hdfs.yml` for both build and up commands; prints HDFS support status message
+- **Deployment docs** (`docs/deployment.md`): new "HDFS Integration" section with starting HDFS, building with HDFS support, running OSM agents with HDFS cache (env var table), and running HDFS tests
+- 1586 tests collected (1555 passed, 31 skipped without `--hdfs`/`--mongodb`)
