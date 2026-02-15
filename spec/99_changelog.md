@@ -465,3 +465,24 @@
 - **Data scale**: 14 regions totaling ~28 GB PBF downloads, ~44 GB GraphHopper graphs, estimated 12-30 hours for full continental run
 - **GTFS transit agencies** (11): Amtrak, MBTA, CTA, MTA (US); TransLink, TTC, OC Transpo (Canada); Deutsche Bahn, SNCF, Renfe, Trenitalia (Europe)
 - 1419 tests passing
+
+## Completed (v0.12.0) - Testing & Hardening + Documentation
+- **136 new tests** (1419 → 1555), **87% code coverage** (with `fail_under = 75` enforced)
+- **Coverage configuration**: `pyproject.toml` gains `fail_under`, `show_missing`, exclusion patterns, HTML output directory; `CLAUDE.md` updated with coverage commands
+- **MCP server tests** (`tests/mcp/test_error_handling.py`, 29 tests): tool dispatch errors (missing/empty args for all 7 tools), input validation (None/unicode/large source, handler registration edge cases), resource boundary conditions (malformed URIs, large datasets, dotted facet names)
+- **MCP workflow tests** (`tests/mcp/test_tool_workflows.py`, 14 tests): compile-then-execute patterns, event facet PAUSED verification, resume edge cases (nonexistent workflow, missing workflow name), execute variants (namespaced, andThen body, params, facet-not-workflow)
+- **MCP serializer tests** (`tests/mcp/test_serializers.py`, 11 new): handler registration serialization (all fields, requirements, metadata, defaults), edge cases (runner without params, step with returns, flow without workflows, paused/timeout execution results)
+- **Dashboard edge cases** (`tests/dashboard/test_edge_cases.py`, 39 tests): health route, runner/step/flow/task/server/event/source/lock edge cases, filtering edge cases
+- **Dashboard template rendering** (`tests/dashboard/test_template_rendering.py`, 14 tests): state color CSS classes, navigation links, table column headers, form elements
+- **Dashboard filter edge cases** (`tests/dashboard/test_filters.py`, 7 new): duration/timestamp/state_color boundary values
+- **Entry point tests** (`tests/test_entry_points.py`, 9 tests): module importability and `main()` existence for MCP, Dashboard, Runner; CLI `--check`, `-o`, invalid file
+- **Cross-component integration** (`tests/test_lifecycle_integration.py`, 13 tests): full lifecycle (AFL source → compile → execute → pause → continue → resume → verify outputs), multi-step data flow, RegistryRunner dispatch, MCP tool chaining
+- **Documentation** (7 new files, 1548 lines):
+  - `docs/architecture.md` (239 lines): system overview, ASCII component diagram, compiler pipeline, runtime engine, agent execution models, MCP server, data flow narrative, key abstractions table
+  - `docs/tutorial.md` (634 lines): 7-part progressive AFL tutorial (Hello World, Event Facets, Namespaces & Schemas, Composition, Foreach, Expressions, full pipeline example) with quick-reference table
+  - `docs/deployment.md` (339 lines): Docker quick start, single/multi-node architecture, configuration reference, service reference, monitoring, scaling, security, backup, troubleshooting
+  - `agents/go/afl-agent/README.md` (81 lines): Go agent quickstart
+  - `agents/typescript/afl-agent/README.md` (82 lines): TypeScript agent quickstart
+  - `agents/scala/afl-agent/README.md` (80 lines): Scala agent quickstart
+  - `agents/java/afl-agent/README.md` (93 lines): Java agent quickstart
+- 1555 tests passing
