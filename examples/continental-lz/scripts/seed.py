@@ -21,7 +21,7 @@ import logging
 import os
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Add parent to path for afl imports
@@ -149,7 +149,7 @@ def seed_database() -> None:
         "path": "/continental-lz/",
         "sources": source_docs,
         "compiled": compiled,
-        "created": datetime.utcnow().isoformat(),
+        "created": datetime.now(timezone.utc).isoformat(),
         "seeded": True,
     }
     flow_doc["workflows"] = workflow_names
@@ -178,8 +178,8 @@ def seed_database() -> None:
             "runner_id": "",
             "step_id": "",
             "state": "pending",
-            "created": datetime.utcnow().isoformat(),
-            "updated": datetime.utcnow().isoformat(),
+            "created": datetime.now(timezone.utc).isoformat(),
+            "updated": datetime.now(timezone.utc).isoformat(),
             "data": {"inputs": inputs},
             "data_type": "execute",
             "task_list_name": "afl:execute",
