@@ -1,0 +1,11 @@
+namespace maven.quality {
+    use maven.types
+
+    event facet CheckstyleAnalysis(workspace_path: String,
+        config_file: String = "checkstyle.xml",
+        severity_threshold: String = "warning") => (report: QualityReport)
+
+    event facet DependencyCheck(workspace_path: String,
+        fail_on_cvss: Double = 7.0,
+        suppression_file: String = "") => (report: QualityReport)
+}

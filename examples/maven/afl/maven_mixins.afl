@@ -1,0 +1,26 @@
+namespace maven.mixins {
+
+    // Retry failed operations with configurable backoff
+    facet Retry(maxAttempts: Int = 3, backoffSeconds: Int = 30)
+
+    // Maximum execution time for an operation
+    facet Timeout(minutes: Int = 30)
+
+    // Target Maven repository for publish/deploy
+    facet Repository(url: String, id: String = "central",
+        type: String = "release")
+
+    // Maven build profile activation
+    facet Profile(name: String, active: Boolean = true)
+
+    // JVM arguments for build process
+    facet JvmArgs(args: String = "-Xmx512m")
+
+    // Custom settings.xml path
+    facet Settings(path: String = "~/.m2/settings.xml")
+
+    // Namespace-level defaults
+    implicit defaultRetry = Retry(maxAttempts = 3, backoffSeconds = 30)
+    implicit defaultTimeout = Timeout(minutes = 30)
+    implicit defaultRepository = Repository(url = "https://repo1.maven.org/maven2", id = "central", type = "release")
+}

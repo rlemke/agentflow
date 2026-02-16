@@ -106,7 +106,6 @@ from .events import EventDispatcher, EventManager, LocalEventHandler
 from .expression import EvaluationContext, ExpressionEvaluator, evaluate_args
 from .memory_store import MemoryStore
 from .persistence import EventDefinition, IterationChanges, PersistenceAPI
-from .maven_runner import MavenArtifactRunner, MavenRunnerConfig
 from .registry_runner import RegistryRunner, RegistryRunnerConfig
 from .runner import RunnerConfig, RunnerService
 from .states import (
@@ -209,9 +208,6 @@ __all__ = [
     "RegistryRunner",
     "RegistryRunnerConfig",
     "HandlerRegistration",
-    # Maven Artifact Runner
-    "MavenArtifactRunner",
-    "MavenRunnerConfig",
     # Dispatchers
     "HandlerDispatcher",
     "RegistryDispatcher",

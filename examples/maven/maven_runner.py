@@ -24,7 +24,7 @@ its work, writes returns back to MongoDB, and exits.
 Example usage::
 
     from afl.runtime import MemoryStore, Evaluator, Telemetry
-    from afl.runtime.maven_runner import MavenArtifactRunner, MavenRunnerConfig
+    from examples.maven.maven_runner import MavenArtifactRunner, MavenRunnerConfig
 
     store = MemoryStore()
     evaluator = Evaluator(persistence=store)
@@ -58,15 +58,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .entities import (
+from afl.runtime.entities import (
     HandlerRegistration,
     ServerDefinition,
     ServerState,
     TaskState,
 )
-from .evaluator import Evaluator
-from .persistence import PersistenceAPI
-from .types import generate_id
+from afl.runtime.evaluator import Evaluator
+from afl.runtime.persistence import PersistenceAPI
+from afl.runtime.types import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -302,14 +302,14 @@ class MavenArtifactRunner:
         if classifier:
             jar_name += f"-{classifier}"
 
-        # Build URL (group dots → slashes for URL path)
+        # Build URL (group dots -> slashes for URL path)
         group_url_path = group_id.replace(".", "/")
         url = (
             f"{self._config.repository_url}/{group_url_path}"
             f"/{artifact_id}/{version}/{jar_name}.jar"
         )
 
-        # Build local cache path (group dots → OS path separators)
+        # Build local cache path (group dots -> OS path separators)
         group_fs_path = group_id.replace(".", os.sep)
         jar_path = (
             Path(self._config.cache_dir) / group_fs_path
@@ -493,8 +493,8 @@ class MavenArtifactRunner:
 
             import json
 
-            from ..emitter import JSONEmitter
-            from ..parser import AFLParser
+            from afl.emitter import JSONEmitter
+            from afl.parser import AFLParser
 
             parser = AFLParser()
             ast = parser.parse(flow.compiled_sources[0].content)
@@ -635,7 +635,7 @@ class MavenArtifactRunner:
         """Process an event task by launching a JVM subprocess.
 
         1. Look up HandlerRegistration by task name
-        2. Parse mvn: URI → resolve artifact → get JAR path
+        2. Parse mvn: URI -> resolve artifact -> get JAR path
         3. Build command with optional JVM args and main class
         4. Launch subprocess with environment variables
         5. On success: read returns, continue step, resume workflow

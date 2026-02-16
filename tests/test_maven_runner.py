@@ -25,6 +25,7 @@ Tests cover:
 
 import os
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -45,12 +46,18 @@ from afl.runtime.entities import (
     TaskDefinition,
     TaskState,
 )
-from afl.runtime.maven_runner import (
+from afl.runtime.types import generate_id
+
+# Ensure examples/maven is importable
+_MAVEN_DIR = str(Path(__file__).resolve().parent.parent / "examples" / "maven")
+if _MAVEN_DIR not in sys.path:
+    sys.path.insert(0, _MAVEN_DIR)
+
+from maven_runner import (
     MavenArtifactRunner,
     MavenRunnerConfig,
     _current_time_ms,
 )
-from afl.runtime.types import generate_id
 
 # =========================================================================
 # Fixtures
@@ -468,7 +475,7 @@ class TestProcessEvent:
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
         # Mock subprocess to succeed
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
@@ -503,7 +510,7 @@ class TestProcessEvent:
         store.save_handler_registration(reg)
         runner._refresh_registry()
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout=b"", stderr=b"NullPointerException"
@@ -539,7 +546,7 @@ class TestProcessEvent:
         store.save_handler_registration(reg)
         runner._refresh_registry()
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.side_effect = subprocess.TimeoutExpired(cmd=["java"], timeout=1.0)
             dispatched = runner.poll_once()
@@ -626,7 +633,7 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
@@ -664,7 +671,7 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
@@ -698,7 +705,7 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
@@ -897,7 +904,7 @@ class TestLifecycle:
         runner._refresh_registry()
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("afl.runtime.maven_runner.subprocess.run") as mock_run, \
+        with patch("examples.maven.maven_runner.subprocess.run") as mock_run, \
              patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""

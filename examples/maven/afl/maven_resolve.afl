@@ -1,0 +1,16 @@
+namespace maven.resolve {
+    use maven.types
+
+    event facet ResolveDependencies(group_id: String,
+        artifact_id: String, version: String,
+        scope: String = "compile") => (info: ArtifactInfo)
+
+    event facet DownloadArtifact(group_id: String,
+        artifact_id: String, version: String,
+        classifier: String = "",
+        repository_url: String = "https://repo1.maven.org/maven2") => (info: ArtifactInfo)
+
+    event facet AnalyzeDependencyTree(group_id: String,
+        artifact_id: String, version: String,
+        verbose: Boolean = false) => (tree: DependencyTree)
+}

@@ -1,0 +1,22 @@
+namespace maven.build {
+    use maven.types
+
+    event facet CompileProject(workspace_path: String,
+        goals: String = "clean compile",
+        jdk_version: String = "17",
+        skip_tests: Boolean = true) => (result: BuildResult)
+
+    event facet RunUnitTests(workspace_path: String,
+        test_suite: String = "**/*Test.java",
+        parallel: Boolean = false,
+        fork_count: Int = 1) => (report: TestReport)
+
+    event facet PackageArtifact(workspace_path: String,
+        packaging: String = "jar",
+        classifier: String = "",
+        attach_sources: Boolean = false) => (info: ArtifactInfo)
+
+    event facet GenerateJavadoc(workspace_path: String,
+        output_dir: String = "target/site/apidocs",
+        include_private: Boolean = false) => (result: BuildResult)
+}

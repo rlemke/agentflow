@@ -521,17 +521,15 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
-## Completed (v0.12.11) - Maven Artifact Runner Agent
-- **New agent execution model** (`afl/runtime/maven_runner.py`): `MavenArtifactRunner` class that runs external JVM programs packaged as Maven artifacts — claims event tasks, resolves and downloads Maven artifacts (with local caching), launches JVM subprocesses, and handles step continuation and workflow resumption
-- **`MavenRunnerConfig` dataclass**: extends the standard runner config with Maven-specific fields — `cache_dir` (default `~/.afl/maven-cache`), `repository_url` (default Maven Central), `java_command`, `default_timeout_ms` (5 min)
-- **Maven URI scheme**: `mvn:groupId:artifactId:version[:classifier]` in `HandlerRegistration.module_uri`; `entrypoint` field holds optional main class (empty = executable JAR); JVM args via `metadata["jvm_args"]` list
-- **Artifact caching**: thread-safe per-artifact download locks; cache layout `{cache_dir}/{groupPath}/{artifactId}/{version}/{artifactId}-{version}[-{classifier}].jar`; download via `urllib.request.urlopen()` with 60s timeout
-- **Program contract**: invoked as `java -jar artifact.jar <stepId>` or `java -cp artifact.jar MainClass <stepId>`; environment variables `AFL_STEP_ID`, `AFL_MONGODB_URL`, `AFL_MONGODB_DATABASE`; exit 0 = success, non-zero = failure
-- **Step lifecycle**: agent reads returns from MongoDB after subprocess exit, calls `evaluator.continue_step()` + `evaluator.resume()` on success, `evaluator.fail_step()` on failure/timeout
-- **Registry filtering**: only picks up `mvn:` URI registrations (ignores Python module URIs); topic filtering via fnmatch patterns
-- **Same lifecycle as RegistryRunner**: server registration, heartbeat, poll loop, thread pool, AST caching, graceful shutdown
-- **Runtime exports**: `MavenArtifactRunner` and `MavenRunnerConfig` added to `afl.runtime.__init__`
-- **~30 new tests** (`tests/runtime/test_maven_runner.py`): config defaults, URI parsing (valid/invalid/classifier), artifact resolution (cache hit/miss, URL construction, custom repo, download errors), event processing (success/failure/timeout/missing registration/JVM args/main class/env vars), registry refresh (mvn-only filtering, topic filtering), handler registration validation, lifecycle (start/stop, server state), AST caching, step returns reading
+## Completed (v0.12.11) - Maven Build Lifecycle Example
+- **New example** (`examples/maven/`): Maven build lifecycle agent demonstrating AFL mixin composition and the MavenArtifactRunner JVM subprocess execution model — following the Jenkins/AWS Lambda example pattern
+- **7 AFL files** defining the Maven build lifecycle domain: `maven.types` (7 schemas: ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo), `maven.mixins` (6 mixin facets + 3 implicits: Retry, Timeout, Repository, Profile, JvmArgs, Settings), `maven.resolve` (3 event facets), `maven.build` (4 event facets), `maven.publish` (3 event facets), `maven.quality` (2 event facets), `maven.workflows` (4 workflows: BuildAndTest, ReleaseArtifact, DependencyAudit, MultiModuleBuild)
+- **4 handler modules** (`examples/maven/handlers/`): simulated handlers with `_DISPATCH` dict pattern, `handle()` entrypoint, dual-mode registration (AgentPoller + RegistryRunner) — resolve_handlers (3), build_handlers (4), publish_handlers (3), quality_handlers (2)
+- **MavenArtifactRunner** (`examples/maven/maven_runner.py`): moved from `afl/runtime/maven_runner.py` to live in the example — runs external JVM programs packaged as Maven artifacts via `mvn:groupId:artifactId:version[:classifier]` URI scheme; thread-safe artifact caching, subprocess dispatch, step continuation
+- **Tri-mode agent** (`examples/maven/agent.py`): supports AgentPoller (default), RegistryRunner (`AFL_USE_REGISTRY=1`), and MavenArtifactRunner (`AFL_USE_MAVEN_RUNNER=1`) — unique to this example
+- **Documentation**: README.md with pipeline descriptions, ASCII flow diagrams, reference tables; USER_GUIDE.md with step-by-step walkthrough, MavenArtifactRunner execution model concept, facet encapsulation pattern
+- **~70 tests**: `tests/test_maven_compilation.py` (AFL compilation), `tests/test_handler_dispatch_maven.py` (handler dispatch), `tests/test_maven_runner.py` (runner unit tests moved from `tests/runtime/`)
+- **Removed from core runtime**: `MavenArtifactRunner` and `MavenRunnerConfig` no longer exported from `afl.runtime`
 
 ## Completed (v0.12.10) - Facet Encapsulation Tutorial
 - **Tutorial Part 8** (`docs/tutorial.md`): new "Facet Encapsulation" section teaching the composed facet pattern — using regular facets with `andThen` bodies to wrap event facet sequences into reusable subroutine-like units
