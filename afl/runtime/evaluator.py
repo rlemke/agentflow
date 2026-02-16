@@ -360,7 +360,7 @@ class ExecutionContext:
         """
         for decl in declarations:
             decl_type = decl.get("type", "")
-            if decl_type in ("FacetDecl", "EventFacetDecl"):
+            if decl_type in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
                 if decl.get("name") == short_name:
                     if prefix:
                         return f"{prefix}.{short_name}"
@@ -428,7 +428,7 @@ class ExecutionContext:
                     inner = decl.get("declarations", []) + decl.get("eventFacets", [])
                     target = parts[i]
                     for inner_decl in inner:
-                        if inner_decl.get("type") in ("FacetDecl", "EventFacetDecl"):
+                        if inner_decl.get("type") in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
                             if inner_decl.get("name") == target:
                                 return inner_decl
                     # Also check nested namespaces within this namespace
@@ -452,7 +452,7 @@ class ExecutionContext:
                 return None
 
         for decl in current_decls:
-            if decl.get("type") in ("FacetDecl", "EventFacetDecl"):
+            if decl.get("type") in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
                 if decl.get("name") == facet_short:
                     return decl
         return None
@@ -469,7 +469,7 @@ class ExecutionContext:
         """
         for decl in declarations:
             decl_type = decl.get("type", "")
-            if decl_type in ("FacetDecl", "EventFacetDecl"):
+            if decl_type in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
                 if decl.get("name") == facet_name:
                     return decl
             elif decl_type == "Namespace":

@@ -162,7 +162,7 @@ class DependencyGraph:
         """Recursively search declarations to resolve a qualified name."""
         for decl in declarations:
             decl_type = decl.get("type", "")
-            if decl_type in ("FacetDecl", "EventFacetDecl"):
+            if decl_type in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
                 if decl.get("name") == short_name:
                     if prefix:
                         return f"{prefix}.{short_name}"

@@ -521,6 +521,12 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.9) - Workflows Callable as Steps in andThen Blocks
+- **Emitter fix**: workflows now included in the unified `declarations` list in both `_program()` and `_namespace()`, enabling the runtime to resolve workflow names during step execution
+- **Runtime fix**: `"WorkflowDecl"` added to type-check tuples in `dependency.py` (`_resolve_in_declarations`) and `evaluator.py` (`_resolve_in_declarations`, `_search_declarations_qualified` ×2, `_search_declarations`), allowing workflow declarations to be found during qualified-name resolution and facet definition lookup
+- **New capability**: workflows can now be called as steps inside `andThen` blocks — an outer workflow can invoke an inner workflow, and the inner workflow's body expands inline just like a facet with a body
+- **7 new tests**: 3 emitter tests (top-level, namespaced, and mixed declarations), 2 validator tests (same-namespace and cross-namespace workflow calls), 2 evaluator tests (workflow-as-step body expansion at top level and in namespace)
+
 ## Completed (v0.12.8) - AWS Lambda + Step Functions Example with LocalStack
 - **New example** (`examples/aws-lambda/`): AWS serverless pipeline example with real boto3 calls against a LocalStack Docker environment, demonstrating andThen chains, call-time mixin composition, cross-namespace workflows, and foreach iteration
 - **5 AFL files**: `aws.lambda.types` (7 schemas), `aws.lambda.mixins` (6 mixin facets + 3 implicits), `aws.lambda` (7 Lambda event facets), `aws.stepfunctions` (5 Step Functions event facets), `aws.lambda.workflows` (4 workflows)

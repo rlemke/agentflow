@@ -267,6 +267,8 @@ class JSONEmitter:
             declarations.extend(self._convert(node.facets))
         if node.event_facets:
             declarations.extend(self._convert(node.event_facets))
+        if node.workflows:
+            declarations.extend(self._convert(node.workflows))
         if node.schemas:
             declarations.extend(self._convert(node.schemas))
         if declarations:
@@ -300,6 +302,8 @@ class JSONEmitter:
             declarations.extend(self._convert(node.facets))
         if node.event_facets:
             declarations.extend(self._convert(node.event_facets))
+        if node.workflows:
+            declarations.extend(self._convert(node.workflows))
         if node.schemas:
             declarations.extend(self._convert(node.schemas))
         if declarations:

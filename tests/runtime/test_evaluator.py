@@ -4069,3 +4069,247 @@ class TestIterationTraces:
         step_ids = {s.statement_id for s in steps if s.statement_id}
         assert "step-s1" in step_ids
         assert "step-s2" in step_ids
+
+
+class TestWorkflowAsStep:
+    """Test that workflows can be called as steps in andThen blocks."""
+
+    def test_workflow_calls_workflow(self):
+        """Outer workflow calls Inner workflow as a step; Inner body expands inline."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
+
+        # Inner workflow: has an andThen body with a facet call + yield
+        inner_workflow_decl = {
+            "type": "WorkflowDecl",
+            "name": "Inner",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "y", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-v",
+                        "name": "v",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {
+                                        "type": "BinaryExpr",
+                                        "operator": "+",
+                                        "left": {"type": "InputRef", "path": ["x"]},
+                                        "right": {"type": "Int", "value": 10},
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-Inner",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Inner",
+                        "args": [
+                            {
+                                "name": "y",
+                                "value": {"type": "StepRef", "path": ["v", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        # program_ast contains Inner as a declaration so the runtime can resolve it
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
+                inner_workflow_decl,
+            ],
+        }
+
+        # Outer workflow calls Inner as a step
+        outer_workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "Outer",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-inner",
+                        "name": "inner",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Inner",
+                            "args": [
+                                {
+                                    "name": "x",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-Outer",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Outer",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["inner", "y"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(
+            outer_workflow_ast, inputs={"x": 5}, program_ast=program_ast
+        )
+        assert result.success is True
+        assert result.outputs["result"] == 15
+
+        # Verify Inner's body expanded: step-v should exist
+        steps = list(store.get_steps_by_workflow(result.workflow_id))
+        step_ids = {s.statement_id for s in steps if s.statement_id}
+        assert "step-inner" in step_ids
+        assert "step-v" in step_ids
+
+        # Verify inner step resolves to WorkflowDecl target
+        inner_steps = [s for s in steps if s.statement_id == "step-inner"]
+        assert len(inner_steps) == 1
+        assert inner_steps[0].facet_name == "Inner"
+
+    def test_workflow_calls_workflow_in_namespace(self):
+        """Workflow calls another workflow within a namespace; resolved via declarations."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
+
+        inner_workflow_decl = {
+            "type": "WorkflowDecl",
+            "name": "Inner",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "y", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-v",
+                        "name": "v",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {
+                                        "type": "BinaryExpr",
+                                        "operator": "*",
+                                        "left": {"type": "InputRef", "path": ["x"]},
+                                        "right": {"type": "Int", "value": 2},
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-Inner",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Inner",
+                        "args": [
+                            {
+                                "name": "y",
+                                "value": {"type": "StepRef", "path": ["v", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "test",
+                    "declarations": [
+                        {
+                            "type": "FacetDecl",
+                            "name": "Value",
+                            "params": [{"name": "input", "type": "Long"}],
+                        },
+                        inner_workflow_decl,
+                    ],
+                }
+            ],
+        }
+
+        outer_workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "Outer",
+            "params": [{"name": "x", "type": "Long"}],
+            "returns": [{"name": "result", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-inner",
+                        "name": "inner",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Inner",
+                            "args": [
+                                {
+                                    "name": "x",
+                                    "value": {"type": "InputRef", "path": ["x"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-Outer",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "Outer",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["inner", "y"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(
+            outer_workflow_ast, inputs={"x": 7}, program_ast=program_ast
+        )
+        assert result.success is True
+        assert result.outputs["result"] == 14

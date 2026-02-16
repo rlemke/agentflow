@@ -1514,3 +1514,51 @@ class TestUnaryExprValidation:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestWorkflowAsStep:
+    """Test that workflows can be called as steps inside andThen blocks."""
+
+    def test_workflow_calls_workflow(self, validator):
+        """A workflow referencing another workflow as a step should validate."""
+        ast = parse("""
+        namespace test {
+            event facet DoWork(input: String) => (output: String)
+
+            workflow Inner(x: String) => (y: String) andThen {
+                w = DoWork(input = $.x)
+                yield Inner(y = w.output)
+            }
+
+            workflow Outer(x: String) => (result: String) andThen {
+                inner = Inner(x = $.x)
+                yield Outer(result = inner.y)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_workflow_calls_workflow_cross_namespace(self, validator):
+        """A workflow calling a workflow in another namespace should validate."""
+        ast = parse("""
+        namespace inner {
+            event facet DoWork(input: String) => (output: String)
+
+            workflow Process(x: String) => (y: String) andThen {
+                w = DoWork(input = $.x)
+                yield Process(y = w.output)
+            }
+        }
+
+        namespace outer {
+            use inner
+
+            workflow Main(x: String) => (result: String) andThen {
+                p = Process(x = $.x)
+                yield Main(result = p.y)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

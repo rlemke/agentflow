@@ -1119,3 +1119,58 @@ class TestUnaryExprEmission:
         assert arg_value["operator"] == "+"
         assert arg_value["right"]["type"] == "UnaryExpr"
         assert arg_value["right"]["operand"] == {"type": "Int", "value": 1}
+
+
+class TestWorkflowInDeclarations:
+    """Test that workflows appear in the unified declarations list."""
+
+    def test_top_level_workflow_in_declarations(self):
+        """Top-level workflow appears in program declarations."""
+        ast = parse("""
+        facet Value(input: Long)
+        workflow Main(x: Long) => (result: Long) andThen {
+            s = Value(input = $.x)
+            yield Main(result = s.input)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        decl_types = [d["type"] for d in data.get("declarations", [])]
+        assert "WorkflowDecl" in decl_types
+
+    def test_namespaced_workflow_in_declarations(self):
+        """Workflow inside namespace appears in namespace declarations."""
+        ast = parse("""
+        namespace test {
+            facet Value(input: Long)
+            workflow Main(x: Long) => (result: Long) andThen {
+                s = Value(input = $.x)
+                yield Main(result = s.input)
+            }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        ns = data["namespaces"][0]
+        decl_types = [d["type"] for d in ns.get("declarations", [])]
+        assert "WorkflowDecl" in decl_types
+
+    def test_workflow_alongside_facets_in_declarations(self):
+        """Workflows coexist with facets and event facets in declarations."""
+        ast = parse("""
+        namespace test {
+            event facet DoWork(input: String) => (output: String)
+            facet Helper(x: String)
+            workflow Main(x: String) => (result: String) andThen {
+                w = DoWork(input = $.x)
+                yield Main(result = w.output)
+            }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        ns = data["namespaces"][0]
+        decl_types = {d["type"] for d in ns.get("declarations", [])}
+        assert "FacetDecl" in decl_types
+        assert "EventFacetDecl" in decl_types
+        assert "WorkflowDecl" in decl_types

@@ -202,16 +202,16 @@ class TestResumeWorkflowEdgeCases:
 class TestExecuteWorkflowVariants:
     """Test various workflow source patterns."""
 
-    def test_execute_namespaced_workflow_not_found(self):
-        # _find_workflow currently does not search inside namespace.workflows
-        # so namespaced workflows are not found (known limitation)
+    def test_execute_namespaced_workflow_found(self):
+        # Workflows are now included in namespace declarations,
+        # so _find_workflow can resolve them.
         source = "namespace ns { workflow W() }"
         result = _tool_execute_workflow(
             {"source": source, "workflow_name": "W"}
         )
         data = json.loads(result[0].text)
-        assert data["success"] is False
-        assert "not found" in data["error"]
+        assert data["success"] is True
+        assert "workflow_id" in data
 
     def test_execute_top_level_workflow_found(self):
         source = "workflow TopLevel()"
