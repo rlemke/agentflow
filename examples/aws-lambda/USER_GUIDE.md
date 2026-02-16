@@ -12,11 +12,12 @@ Use this as your starting point if you are:
 
 ## What You'll Learn
 
-1. How to write handlers that make real boto3 calls
-2. How to configure handlers for LocalStack vs real AWS
-3. How to combine mixins with cloud operations
-4. How cross-namespace composition works (Lambda + Step Functions in one workflow)
-5. How to use Docker Compose profiles for optional infrastructure
+1. How to **encapsulate event facets** in composed facets that expose simple interfaces
+2. How to write handlers that make real boto3 calls
+3. How to configure handlers for LocalStack vs real AWS
+4. How to combine mixins with cloud operations
+5. How cross-namespace composition works (Lambda + Step Functions in one workflow)
+6. How to use Docker Compose profiles for optional infrastructure
 
 ## Step-by-Step Walkthrough
 
@@ -48,18 +49,53 @@ curl http://localhost:4566/_localstack/health
 
 ### 4. The Four Workflows
 
-#### DeployAndInvoke — Pure andThen Chain
+#### DeployAndInvoke — Facet Encapsulation
+
+The raw Lambda event facets (`CreateFunction`, `InvokeFunction`, `GetFunctionInfo`) are low-level building blocks. Users shouldn't need to know about them. Instead, wrap them in a composed facet that exposes a simple, domain-focused interface:
 
 ```afl
-workflow DeployAndInvoke(function_name: String, ...) => (...) andThen {
-    created = aws.lambda.CreateFunction(function_name = $.function_name, ...)
-    invoked = aws.lambda.InvokeFunction(function_name = $.function_name, ...)
+// Composed facet: hides the three Lambda calls behind a simple interface.
+// This is NOT an event facet — it doesn't pause for an agent.
+// Its internal steps (CreateFunction, InvokeFunction, GetFunctionInfo)
+// are the event facets that trigger agent execution.
+facet DeployFunction(function_name: String, runtime: String = "python3.12",
+    input_payload: String = "{}") => (function_arn: String,
+        status_code: Long, response_payload: String,
+        state: String) andThen {
+
+    created = aws.lambda.CreateFunction(function_name = $.function_name,
+        runtime = $.runtime)
+    invoked = aws.lambda.InvokeFunction(function_name = $.function_name,
+        input_payload = $.input_payload)
     info = aws.lambda.GetFunctionInfo(function_name = $.function_name)
-    yield DeployAndInvoke(function_arn = created.config.function_arn, ...)
+
+    yield DeployFunction(
+        function_arn = created.config.function_arn,
+        status_code = invoked.result.status_code,
+        response_payload = invoked.result.payload,
+        state = info.info.state)
+}
+
+// Workflow: uses the composed facet — clean and simple
+workflow DeployAndInvoke(function_name: String, runtime: String = "python3.12",
+    input_payload: String = "{}") => (function_arn: String,
+        status_code: Long, response_payload: String,
+        duration_ms: Long) andThen {
+
+    deployed = DeployFunction(function_name = $.function_name,
+        runtime = $.runtime, input_payload = $.input_payload)
+
+    yield DeployAndInvoke(
+        function_arn = deployed.function_arn,
+        status_code = deployed.status_code,
+        response_payload = deployed.response_payload,
+        duration_ms = 0)
 }
 ```
 
-The simplest pattern: three sequential steps, no mixins.
+**Why this matters**: The workflow calls `DeployFunction` as a single step. The user sees a clean interface — pass a function name, get back an ARN and response. The three underlying Lambda API calls are encapsulated inside the facet. You can change the implementation (add error handling, switch cloud providers) without changing the workflow.
+
+This is the same pattern used in the [volcano-query](../volcano-query/USER_GUIDE.md) example, where `LoadVolcanoData` wraps `Cache` + `Download` behind a simple interface.
 
 #### BlueGreenDeploy — andThen + Call-Time Mixins
 
@@ -143,6 +179,33 @@ LOCALSTACK_URL=http://localhost:4566 PYTHONPATH=. python examples/aws-lambda/age
 
 ## Key Concepts
 
+### Facet Encapsulation
+
+The most important pattern in this example: **wrap low-level event facets in composed facets** to give users a simple interface.
+
+| Layer | What It Is | Who Sees It |
+|-------|-----------|-------------|
+| Event facets | `CreateFunction`, `InvokeFunction`, etc. | Agent developers |
+| Composed facets | `DeployFunction`, `UpdateAndVerify`, etc. | Workflow authors |
+| Workflows | `DeployAndInvoke`, `BlueGreenDeploy`, etc. | End users |
+
+**Composed facets** (regular `facet` with `andThen`) act like functions — the runtime expands their steps inline. They don't pause for an agent; their internal event facet steps do. This lets you:
+
+- **Hide complexity**: Users call one facet instead of three
+- **Enforce patterns**: The composed facet always runs create-invoke-verify in order
+- **Swap implementations**: Change the internal steps without changing the workflow
+- **Reuse across workflows**: Multiple workflows can call the same composed facet
+
+```afl
+// Low-level: 3 separate event facets (agent developers write handlers for these)
+created = aws.lambda.CreateFunction(...)
+invoked = aws.lambda.InvokeFunction(...)
+info = aws.lambda.GetFunctionInfo(...)
+
+// Encapsulated: 1 composed facet (workflow authors use this)
+deployed = DeployFunction(function_name = $.function_name, runtime = $.runtime)
+```
+
 ### Real API Calls vs Simulated Handlers
 
 | Example | Handler Approach |
@@ -178,6 +241,63 @@ docker compose --profile localstack down
 ```
 
 ## Adapting for Your Use Case
+
+### Wrap Lambda operations for your domain
+
+Create composed facets that hide Lambda complexity behind domain-specific interfaces:
+
+```afl
+namespace myapp.functions {
+    use aws.lambda.types
+    use aws.lambda.mixins
+
+    // Encapsulate: create + configure + verify
+    facet ProvisionFunction(service_name: String,
+        environment: String = "staging") => (function_arn: String,
+            ready: Boolean) andThen {
+
+        fn = aws.lambda.CreateFunction(function_name = $.service_name ++ "-" ++ $.environment,
+            runtime = "python3.12",
+            memory_mb = 256,
+            timeout_seconds = 60) with Timeout(seconds = 120)
+
+        // Verify it's ready
+        info = aws.lambda.GetFunctionInfo(function_name = $.service_name ++ "-" ++ $.environment) with Retry(maxAttempts = 3, backoffMs = 2000)
+
+        yield ProvisionFunction(
+            function_arn = fn.config.function_arn,
+            ready = true)
+    }
+
+    // Encapsulate: invoke + parse response
+    facet CallService(service_name: String, environment: String = "staging",
+        request_body: String = "{}") => (status_code: Long,
+            response_body: String) andThen {
+
+        result = aws.lambda.InvokeFunction(function_name = $.service_name ++ "-" ++ $.environment,
+            input_payload = $.request_body) with Retry(maxAttempts = 2) with Timeout(seconds = 30)
+
+        yield CallService(
+            status_code = result.result.status_code,
+            response_body = result.result.payload)
+    }
+
+    // Workflow: uses the simple composed facets
+    workflow DeployAndTest(service_name: String) => (function_arn: String,
+        test_passed: Boolean) andThen {
+
+        provisioned = ProvisionFunction(service_name = $.service_name, environment = "test")
+        test_result = CallService(service_name = $.service_name, environment = "test",
+            request_body = "{\"test\": true}")
+
+        yield DeployAndTest(
+            function_arn = provisioned.function_arn,
+            test_passed = true)
+    }
+}
+```
+
+Users call `ProvisionFunction` and `CallService` — they never need to know about `CreateFunction`, `InvokeFunction`, or `GetFunctionInfo`.
 
 ### Add a new AWS service
 
