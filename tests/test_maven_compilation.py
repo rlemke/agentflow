@@ -71,16 +71,17 @@ class TestMavenTypes:
         assert program["type"] == "Program"
 
     def test_all_schemas_present(self):
-        """All 8 schemas are emitted."""
+        """All 9 schemas are emitted."""
         program = _compile("maven_types.afl")
         schema_names = _collect_names(program, "schemas")
         expected = [
             "ArtifactInfo", "DependencyTree", "BuildResult", "TestReport",
             "PublishResult", "QualityReport", "ProjectInfo", "ExecutionResult",
+            "PluginExecutionResult",
         ]
         for name in expected:
             assert name in schema_names, f"Missing schema: {name}"
-        assert len([n for n in schema_names if n in expected]) == 8
+        assert len([n for n in schema_names if n in expected]) == 9
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +179,29 @@ class TestMavenEventFacets:
         assert "artifact_id" in param_names
         assert "version" in param_names
 
+    def test_run_maven_plugin_facet(self):
+        """RunMavenPlugin event facet is present with expected params."""
+        program = _compile("maven_runner.afl", "maven_types.afl")
+
+        def _find_event_facet(node, name):
+            for ef in node.get("eventFacets", []):
+                if ef["name"] == name:
+                    return ef
+            for ns in node.get("namespaces", []):
+                found = _find_event_facet(ns, name)
+                if found:
+                    return found
+            return None
+
+        ef = _find_event_facet(program, "RunMavenPlugin")
+        assert ef is not None
+        param_names = [p["name"] for p in ef["params"]]
+        assert "workspace_path" in param_names
+        assert "plugin_group_id" in param_names
+        assert "plugin_artifact_id" in param_names
+        assert "plugin_version" in param_names
+        assert "goal" in param_names
+
 
 # ---------------------------------------------------------------------------
 # Workflows (with mixin composition)
@@ -261,6 +285,117 @@ class TestMavenWorkflows:
             "--primary", str(_AFL_DIR / "maven_workflows.afl"),
         ]
         for dep in self._DEPS:
+            args.extend(["--library", str(_AFL_DIR / dep)])
+        args.append("--check")
+        result = main(args)
+        assert result == 0
+
+    @staticmethod
+    def _find_workflow(program: dict, name: str) -> dict | None:
+        """Find a workflow by name in the emitted program."""
+        def _walk(node):
+            for wf in node.get("workflows", []):
+                if wf["name"] == name:
+                    return wf
+            for ns in node.get("namespaces", []):
+                found = _walk(ns)
+                if found:
+                    return found
+            return None
+        return _walk(program)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator workflows (workflow-as-step)
+# ---------------------------------------------------------------------------
+class TestMavenOrchestratorWorkflows:
+    """Compilation tests for maven_orchestrator.afl with workflow-as-step."""
+
+    _ALL_DEPS = [
+        "maven_types.afl",
+        "maven_mixins.afl",
+        "maven_resolve.afl",
+        "maven_build.afl",
+        "maven_publish.afl",
+        "maven_quality.afl",
+        "maven_runner.afl",
+        "maven_workflows.afl",
+    ]
+
+    def _compile_orchestrator(self) -> dict:
+        return _compile("maven_orchestrator.afl", *self._ALL_DEPS)
+
+    def test_orchestrator_compiles(self):
+        """maven_orchestrator.afl parses and validates with all deps."""
+        program = self._compile_orchestrator()
+        assert program["type"] == "Program"
+
+    def test_both_workflows_present(self):
+        """BuildTestAndRun and PluginVerifyAndRun are emitted."""
+        program = self._compile_orchestrator()
+        wf_names = _collect_names(program, "workflows")
+        assert "BuildTestAndRun" in wf_names
+        assert "PluginVerifyAndRun" in wf_names
+
+    def test_build_test_and_run_steps(self):
+        """BuildTestAndRun has steps build and run."""
+        program = self._compile_orchestrator()
+        wf = self._find_workflow(program, "BuildTestAndRun")
+        assert wf is not None
+        step_names = [s["name"] for s in wf["body"]["steps"]]
+        assert "build" in step_names
+        assert "run" in step_names
+
+    def test_plugin_verify_and_run_steps(self):
+        """PluginVerifyAndRun has steps checkstyle, spotbugs, run."""
+        program = self._compile_orchestrator()
+        wf = self._find_workflow(program, "PluginVerifyAndRun")
+        assert wf is not None
+        step_names = [s["name"] for s in wf["body"]["steps"]]
+        assert "checkstyle" in step_names
+        assert "spotbugs" in step_names
+        assert "run" in step_names
+
+    def test_build_test_and_run_returns(self):
+        """BuildTestAndRun yield has expected return field names."""
+        program = self._compile_orchestrator()
+        wf = self._find_workflow(program, "BuildTestAndRun")
+        assert wf is not None
+        ret_names = [r["name"] for r in wf["returns"]]
+        assert "artifact_path" in ret_names
+        assert "test_passed" in ret_names
+        assert "run_success" in ret_names
+        assert "run_exit_code" in ret_names
+
+    def test_plugin_verify_and_run_returns(self):
+        """PluginVerifyAndRun yield has expected return field names."""
+        program = self._compile_orchestrator()
+        wf = self._find_workflow(program, "PluginVerifyAndRun")
+        assert wf is not None
+        ret_names = [r["name"] for r in wf["returns"]]
+        assert "checkstyle_success" in ret_names
+        assert "spotbugs_success" in ret_names
+        assert "run_success" in ret_names
+        assert "run_exit_code" in ret_names
+
+    def test_plugin_verify_steps_have_mixins(self):
+        """Checkstyle and spotbugs steps have Timeout mixins."""
+        program = self._compile_orchestrator()
+        wf = self._find_workflow(program, "PluginVerifyAndRun")
+        assert wf is not None
+        for step in wf["body"]["steps"]:
+            if step["name"] in ("checkstyle", "spotbugs"):
+                call_mixins = step.get("call", {}).get("mixins", [])
+                assert len(call_mixins) > 0, (
+                    f"Step {step['name']} should have mixins"
+                )
+
+    def test_cli_check_orchestrator(self):
+        """The CLI --check flag succeeds for maven_orchestrator.afl."""
+        args = [
+            "--primary", str(_AFL_DIR / "maven_orchestrator.afl"),
+        ]
+        for dep in self._ALL_DEPS:
             args.extend(["--library", str(_AFL_DIR / dep)])
         args.append("--check")
         result = main(args)

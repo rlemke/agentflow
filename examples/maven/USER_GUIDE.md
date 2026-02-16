@@ -158,18 +158,75 @@ namespace maven.runner {
         jvm_args: String = "",
         workflow_id: String = "",
         runner_id: String = "") => (result: ExecutionResult)
+
+    event facet RunMavenPlugin(workspace_path: String,
+        plugin_group_id: String, plugin_artifact_id: String,
+        plugin_version: String,
+        goal: String,
+        phase: String = "",
+        jvm_args: String = "",
+        properties: String = "") => (result: PluginExecutionResult)
 }
 ```
 
-Use it in workflows to resolve dependencies and then run the artifact:
+`RunMavenArtifact` launches an executable JAR as a JVM subprocess. `RunMavenPlugin` invokes a Maven plugin goal (like `checkstyle:check` or `spotbugs:check`) within a workspace.
+
+Use them in workflows:
 
 ```afl
+// Run an artifact
 run = maven.runner.RunMavenArtifact(step_id = $.step_id,
     group_id = $.group_id, artifact_id = $.artifact_id,
     version = $.version) with Timeout(minutes = 10)
+
+// Run a plugin goal
+checkstyle = maven.runner.RunMavenPlugin(workspace_path = $.workspace_path,
+    plugin_group_id = "org.apache.maven.plugins",
+    plugin_artifact_id = "maven-checkstyle-plugin",
+    plugin_version = "3.3.1",
+    goal = "check") with Timeout(minutes = 5)
 ```
 
-### 8. Running
+### 8. Workflow-as-Step Orchestration
+
+Workflows can call other workflows as steps — a pattern called **workflow-as-step**. The called workflow runs as a sub-workflow, and its return values are available to subsequent steps.
+
+```afl
+namespace maven.orchestrator {
+    use maven.types
+    use maven.mixins
+
+    // Orchestrates BuildAndTest + RunArtifactPipeline as sub-workflows
+    workflow BuildTestAndRun(group_id: String, artifact_id: String,
+        version: String, workspace_path: String,
+        step_id: String) => (artifact_path: String,
+            test_passed: Long, run_success: Boolean,
+            run_exit_code: Long) andThen {
+
+        build = maven.workflows.BuildAndTest(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            workspace_path = $.workspace_path)
+
+        run = maven.workflows.RunArtifactPipeline(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            step_id = $.step_id)
+
+        yield BuildTestAndRun(
+            artifact_path = build.artifact_path,
+            test_passed = build.test_passed,
+            run_success = run.success,
+            run_exit_code = run.exit_code)
+    }
+}
+```
+
+Key points:
+- Sub-workflow steps use the same syntax as event facet calls — `name = ns.Workflow(params...)`
+- The sub-workflow's return fields are accessed via dot notation (e.g., `build.artifact_path`)
+- Sub-workflows are fully independent — they create their own steps and events internally
+- You can mix event facet calls and sub-workflow calls in the same `andThen` block
+
+### 9. Running
 
 ```bash
 source .venv/bin/activate

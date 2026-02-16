@@ -521,6 +521,14 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.13) - Maven Plugin Execution & Workflow-as-Step Orchestration
+- **`PluginExecutionResult` schema** (`maven_types.afl`): 9th schema in `maven.types` — captures Maven plugin goal execution output with `plugin_key`, `goal`, `phase`, `exit_code`, `success`, `duration_ms`, `output`, `artifact_path`
+- **`RunMavenPlugin` event facet** (`maven_runner.afl`): 2nd event facet in `maven.runner` — runs a Maven plugin goal within a workspace; parameters: `workspace_path`, `plugin_group_id`, `plugin_artifact_id`, `plugin_version`, `goal`, optional `phase`, `jvm_args`, `properties`; returns `PluginExecutionResult`
+- **Plugin handler** (`runner_handlers.py`): `_run_maven_plugin_handler` with `_default_phase()` helper mapping goals to lifecycle phases; `_DISPATCH` expanded from 1 to 2 entries; total registrations 13 → 14
+- **`maven_orchestrator.afl`** (new file): `maven.orchestrator` namespace with 2 workflows using **workflow-as-step** orchestration — `BuildTestAndRun` (calls `BuildAndTest` + `RunArtifactPipeline` as sub-workflows) and `PluginVerifyAndRun` (runs checkstyle + spotbugs plugins with `Timeout` mixins, then calls `RunArtifactPipeline` as sub-workflow)
+- **~10 new tests**: orchestrator compilation, both workflow names present, step names for each workflow, return field verification, mixin presence on plugin steps, CLI `--check`; updated schema count (8→9), dispatch keys (1→2), register count (13→14), added plugin dispatch test
+- **Documentation**: README.md with Pipelines 6-7, updated handler/AFL tables and counts; USER_GUIDE.md gains "Workflow-as-Step Orchestration" section
+
 ## Completed (v0.12.12) - RunMavenArtifact Event Facet
 - **`ExecutionResult` schema** (`maven_types.afl`): 8th schema in `maven.types` namespace capturing JVM subprocess results — `exit_code`, `success`, `duration_ms`, `stdout`, `stderr`, `artifact_path`
 - **`maven_runner.afl`** (new file): `maven.runner` namespace with `RunMavenArtifact` event facet — models the core MavenArtifactRunner operation (resolve Maven artifact, launch `java -jar`); parameters: `step_id`, `group_id`, `artifact_id`, `version`, optional `classifier`, `entrypoint`, `jvm_args`, `workflow_id`, `runner_id`; returns `ExecutionResult`

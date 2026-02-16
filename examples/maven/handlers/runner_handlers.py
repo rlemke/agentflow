@@ -1,7 +1,8 @@
-"""Maven artifact runner event facet handlers.
+"""Maven runner event facet handlers.
 
-Handles the RunMavenArtifact event facet from the maven.runner namespace.
-Simulates resolving a Maven artifact and launching it as a JVM subprocess.
+Handles the RunMavenArtifact and RunMavenPlugin event facets from the
+maven.runner namespace.  Simulates resolving Maven artifacts and launching
+JVM subprocesses or plugin goals.
 """
 
 import logging
@@ -11,6 +12,21 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 NAMESPACE = "maven.runner"
+
+
+def _default_phase(goal: str) -> str:
+    """Map a Maven plugin goal to its default lifecycle phase."""
+    mapping = {
+        "compile": "compile",
+        "testCompile": "test-compile",
+        "test": "test",
+        "check": "verify",
+        "jar": "package",
+        "install": "install",
+        "deploy": "deploy",
+        "site": "site",
+    }
+    return mapping.get(goal, "verify")
 
 
 def _run_maven_artifact_handler(payload: dict) -> dict[str, Any]:
@@ -50,9 +66,36 @@ def _run_maven_artifact_handler(payload: dict) -> dict[str, Any]:
     }
 
 
+def _run_maven_plugin_handler(payload: dict) -> dict[str, Any]:
+    """Simulate running a Maven plugin goal within a workspace."""
+    workspace_path = payload.get("workspace_path", "/tmp/workspace")
+    plugin_group_id = payload.get("plugin_group_id", "org.apache.maven.plugins")
+    plugin_artifact_id = payload.get("plugin_artifact_id", "maven-compiler-plugin")
+    plugin_version = payload.get("plugin_version", "3.11.0")
+    goal = payload.get("goal", "compile")
+    phase = payload.get("phase", "") or _default_phase(goal)
+    properties = payload.get("properties", "")
+
+    plugin_key = f"{plugin_group_id}:{plugin_artifact_id}:{plugin_version}"
+
+    return {
+        "result": {
+            "plugin_key": plugin_key,
+            "goal": goal,
+            "phase": phase,
+            "exit_code": 0,
+            "success": True,
+            "duration_ms": 850,
+            "output": f"[INFO] --- {plugin_artifact_id}:{plugin_version}:{goal} ({phase}) @ workspace ---",
+            "artifact_path": workspace_path,
+        },
+    }
+
+
 # RegistryRunner dispatch adapter
 _DISPATCH = {
     f"{NAMESPACE}.RunMavenArtifact": _run_maven_artifact_handler,
+    f"{NAMESPACE}.RunMavenPlugin": _run_maven_plugin_handler,
 }
 
 

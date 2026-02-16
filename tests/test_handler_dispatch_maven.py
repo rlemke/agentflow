@@ -151,8 +151,9 @@ class TestMavenQualityHandlers:
 class TestMavenRunnerHandlers:
     def test_dispatch_keys(self):
         mod = _maven_import("runner_handlers")
-        assert len(mod._DISPATCH) == 1
+        assert len(mod._DISPATCH) == 2
         assert "maven.runner.RunMavenArtifact" in mod._DISPATCH
+        assert "maven.runner.RunMavenPlugin" in mod._DISPATCH
 
     def test_handle_dispatches(self):
         mod = _maven_import("runner_handlers")
@@ -161,6 +162,23 @@ class TestMavenRunnerHandlers:
         assert "result" in result
         assert result["result"]["success"] is True
         assert result["result"]["exit_code"] == 0
+
+    def test_handle_plugin_dispatches(self):
+        mod = _maven_import("runner_handlers")
+        result = mod.handle({
+            "_facet_name": "maven.runner.RunMavenPlugin",
+            "workspace_path": "/tmp/ws",
+            "plugin_group_id": "org.apache.maven.plugins",
+            "plugin_artifact_id": "maven-checkstyle-plugin",
+            "plugin_version": "3.3.1",
+            "goal": "check",
+        })
+        assert isinstance(result, dict)
+        assert "result" in result
+        assert result["result"]["success"] is True
+        assert result["result"]["exit_code"] == 0
+        assert result["result"]["goal"] == "check"
+        assert result["result"]["phase"] == "verify"
 
     def test_handle_unknown_facet(self):
         mod = _maven_import("runner_handlers")
@@ -171,7 +189,7 @@ class TestMavenRunnerHandlers:
         mod = _maven_import("runner_handlers")
         runner = MagicMock()
         mod.register_handlers(runner)
-        assert runner.register_handler.call_count == 1
+        assert runner.register_handler.call_count == 2
 
 
 class TestMavenInitRegistryHandlers:
@@ -179,5 +197,5 @@ class TestMavenInitRegistryHandlers:
         mod = _maven_import("__init__")
         runner = MagicMock()
         mod.register_all_registry_handlers(runner)
-        # 3 resolve + 4 build + 3 publish + 2 quality + 1 runner = 13
-        assert runner.register_handler.call_count == 13
+        # 3 resolve + 4 build + 3 publish + 2 quality + 2 runner = 14
+        assert runner.register_handler.call_count == 14

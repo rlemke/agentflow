@@ -1,0 +1,64 @@
+namespace maven.orchestrator {
+
+    use maven.types
+    use maven.mixins
+
+    // -----------------------------------------------------------------------
+    // Workflow 6: BuildTestAndRun — workflow-as-step orchestration
+    // Calls BuildAndTest + RunArtifactPipeline as sub-workflows
+    // -----------------------------------------------------------------------
+    workflow BuildTestAndRun(group_id: String, artifact_id: String,
+        version: String, workspace_path: String,
+        step_id: String) => (artifact_path: String,
+            test_passed: Long, run_success: Boolean,
+            run_exit_code: Long) andThen {
+
+        build = maven.workflows.BuildAndTest(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            workspace_path = $.workspace_path)
+
+        run = maven.workflows.RunArtifactPipeline(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            step_id = $.step_id)
+
+        yield BuildTestAndRun(
+            artifact_path = build.artifact_path,
+            test_passed = build.test_passed,
+            run_success = run.success,
+            run_exit_code = run.exit_code)
+    }
+
+    // -----------------------------------------------------------------------
+    // Workflow 7: PluginVerifyAndRun — plugins + workflow-as-step
+    // Run checkstyle + spotbugs plugins, then RunArtifactPipeline sub-workflow
+    // -----------------------------------------------------------------------
+    workflow PluginVerifyAndRun(group_id: String, artifact_id: String,
+        version: String, workspace_path: String,
+        step_id: String) => (checkstyle_success: Boolean,
+            spotbugs_success: Boolean, run_success: Boolean,
+            run_exit_code: Long) andThen {
+
+        checkstyle = maven.runner.RunMavenPlugin(workspace_path = $.workspace_path,
+            plugin_group_id = "org.apache.maven.plugins",
+            plugin_artifact_id = "maven-checkstyle-plugin",
+            plugin_version = "3.3.1",
+            goal = "check") with Timeout(minutes = 5)
+
+        spotbugs = maven.runner.RunMavenPlugin(workspace_path = $.workspace_path,
+            plugin_group_id = "com.github.spotbugs",
+            plugin_artifact_id = "spotbugs-maven-plugin",
+            plugin_version = "4.8.3.0",
+            goal = "check",
+            properties = "-Dspotbugs.effort=max") with Timeout(minutes = 10)
+
+        run = maven.workflows.RunArtifactPipeline(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            step_id = $.step_id)
+
+        yield PluginVerifyAndRun(
+            checkstyle_success = checkstyle.result.success,
+            spotbugs_success = spotbugs.result.success,
+            run_success = run.success,
+            run_exit_code = run.exit_code)
+    }
+}

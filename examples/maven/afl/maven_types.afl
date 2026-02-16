@@ -77,4 +77,15 @@ namespace maven.types {
         stderr: String,
         artifact_path: String
     }
+
+    schema PluginExecutionResult {
+        plugin_key: String,
+        goal: String,
+        phase: String,
+        exit_code: Long,
+        success: Boolean,
+        duration_ms: Long,
+        output: String,
+        artifact_path: String
+    }
 }

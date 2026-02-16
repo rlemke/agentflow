@@ -1,6 +1,6 @@
 # Maven Build Lifecycle Agent
 
-A Maven build lifecycle agent demonstrating AFL's **mixin composition** and the **MavenArtifactRunner** execution model — running external JVM programs packaged as Maven artifacts alongside standard handler-based execution.
+A Maven build lifecycle agent demonstrating AFL's **mixin composition**, the **MavenArtifactRunner** execution model, and **workflow-as-step orchestration** — running external JVM programs packaged as Maven artifacts alongside standard handler-based execution.
 
 ## What it does
 
@@ -11,6 +11,8 @@ This example demonstrates:
 - **Foreach iteration** for multi-module parallel builds
 - **Tri-mode agent** supporting AgentPoller, RegistryRunner, and MavenArtifactRunner
 - **MavenArtifactRunner** — JVM subprocess execution model (resolves Maven artifacts, launches `java -jar` subprocesses)
+- **Maven plugin goal execution** — `RunMavenPlugin` event facet for running plugin goals within a workspace
+- **Workflow-as-step orchestration** — composing workflows from sub-workflows (`BuildTestAndRun`, `PluginVerifyAndRun`)
 
 ### Mixin Composition Patterns
 
@@ -101,6 +103,28 @@ ResolveDependencies  -->  RunMavenArtifact + Timeout
 
 **Inputs**: `group_id`, `artifact_id`, `version`, `step_id`, `workflow_id` (optional), `runner_id` (optional)
 **Outputs**: `success`, `exit_code`, `duration_ms`
+
+### Pipeline 6: BuildTestAndRun (workflow-as-step)
+
+Orchestrates `BuildAndTest` and `RunArtifactPipeline` as sub-workflow steps.
+
+```
+BuildAndTest (sub-workflow)  -->  RunArtifactPipeline (sub-workflow)
+```
+
+**Inputs**: `group_id`, `artifact_id`, `version`, `workspace_path`, `step_id`
+**Outputs**: `artifact_path`, `test_passed`, `run_success`, `run_exit_code`
+
+### Pipeline 7: PluginVerifyAndRun (workflow-as-step)
+
+Run checkstyle + spotbugs Maven plugin goals, then invoke `RunArtifactPipeline` as a sub-workflow.
+
+```
+RunMavenPlugin(checkstyle) + Timeout  -->  RunMavenPlugin(spotbugs) + Timeout  -->  RunArtifactPipeline (sub-workflow)
+```
+
+**Inputs**: `group_id`, `artifact_id`, `version`, `workspace_path`, `step_id`
+**Outputs**: `checkstyle_success`, `spotbugs_success`, `run_success`, `run_exit_code`
 
 ## Prerequisites
 
@@ -212,17 +236,18 @@ implicit defaultRepository = Repository(url = "https://repo1.maven.org/maven2", 
 | `build_handlers.py` | `maven.build` | CompileProject, RunUnitTests, PackageArtifact, GenerateJavadoc | Build lifecycle operations |
 | `publish_handlers.py` | `maven.publish` | DeployToRepository, PublishSnapshot, PromoteRelease | Artifact publishing and deployment |
 | `quality_handlers.py` | `maven.quality` | CheckstyleAnalysis, DependencyCheck | Code quality and security analysis |
-| `runner_handlers.py` | `maven.runner` | RunMavenArtifact | JVM subprocess execution via Maven artifacts |
+| `runner_handlers.py` | `maven.runner` | RunMavenArtifact, RunMavenPlugin | JVM subprocess execution and Maven plugin goals |
 
 ## AFL source files
 
 | File | Namespace | Description |
 |------|-----------|-------------|
-| `maven_types.afl` | `maven.types` | 8 schemas (ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo, ExecutionResult) |
+| `maven_types.afl` | `maven.types` | 9 schemas (ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo, ExecutionResult, PluginExecutionResult) |
 | `maven_mixins.afl` | `maven.mixins` | 6 mixin facets + 3 implicit defaults |
 | `maven_resolve.afl` | `maven.resolve` | 3 dependency resolution event facets |
 | `maven_build.afl` | `maven.build` | 4 build lifecycle event facets |
 | `maven_publish.afl` | `maven.publish` | 3 publish/deploy event facets |
 | `maven_quality.afl` | `maven.quality` | 2 quality analysis event facets |
-| `maven_runner.afl` | `maven.runner` | 1 event facet for JVM subprocess execution (RunMavenArtifact) |
+| `maven_runner.afl` | `maven.runner` | 2 event facets for JVM execution (RunMavenArtifact, RunMavenPlugin) |
 | `maven_workflows.afl` | `maven.workflows` | 5 workflow pipelines demonstrating mixin composition |
+| `maven_orchestrator.afl` | `maven.orchestrator` | 2 orchestrator workflows using workflow-as-step (BuildTestAndRun, PluginVerifyAndRun) |

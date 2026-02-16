@@ -8,4 +8,12 @@ namespace maven.runner {
         jvm_args: String = "",
         workflow_id: String = "",
         runner_id: String = "") => (result: ExecutionResult)
+
+    event facet RunMavenPlugin(workspace_path: String,
+        plugin_group_id: String, plugin_artifact_id: String,
+        plugin_version: String,
+        goal: String,
+        phase: String = "",
+        jvm_args: String = "",
+        properties: String = "") => (result: PluginExecutionResult)
 }
