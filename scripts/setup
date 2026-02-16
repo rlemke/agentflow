@@ -40,6 +40,8 @@ Options:
   --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
                        (default: 0)
   --hdfs               Start HDFS namenode + datanode services
+  --hdfs-namenode-dir PATH  Use external directory for HDFS NameNode data
+  --hdfs-datanode-dir PATH  Use external directory for HDFS DataNode data
   --jenkins            Start Jenkins CI/CD server
   --postgis            Start PostGIS database and wire into OSM agents
   --check-only         Verify Docker is available, then exit
@@ -58,6 +60,8 @@ while [[ $# -gt 0 ]]; do
         --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
         --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
         --hdfs)          HDFS=true;             shift ;;
+        --hdfs-namenode-dir) export HDFS_NAMENODE_DIR="$2"; HDFS=true; shift 2 ;;
+        --hdfs-datanode-dir) export HDFS_DATANODE_DIR="$2"; HDFS=true; shift 2 ;;
         --jenkins)       JENKINS=true;          shift ;;
         --postgis)       POSTGIS=true;          shift ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
@@ -192,6 +196,12 @@ if [ "$HDFS" = true ]; then
     PROFILE_ARGS="$PROFILE_ARGS --profile hdfs"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.hdfs.yml"
     echo "HDFS support enabled — OSM agents will use hdfs://namenode:8020 for caching"
+    if [ -n "${HDFS_NAMENODE_DIR:-}" ]; then
+        echo "  NameNode data dir: $HDFS_NAMENODE_DIR"
+    fi
+    if [ -n "${HDFS_DATANODE_DIR:-}" ]; then
+        echo "  DataNode data dir: $HDFS_DATANODE_DIR"
+    fi
     echo ""
 fi
 if [ "$JENKINS" = true ]; then

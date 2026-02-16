@@ -282,6 +282,29 @@ pytest tests/ --hdfs -v -k hdfs
 
 Without the `--hdfs` flag, all HDFS tests are skipped automatically.
 
+### External Storage for HDFS
+
+By default, HDFS uses Docker named volumes (`hadoop_namenode`, `hadoop_datanode`). To place HDFS data on an external filesystem (e.g., a large SSD, NFS mount, or dedicated disk), set the `HDFS_NAMENODE_DIR` and `HDFS_DATANODE_DIR` environment variables to host paths:
+
+```bash
+# Use external directories for HDFS data
+export HDFS_NAMENODE_DIR=/mnt/hdfs/namenode
+export HDFS_DATANODE_DIR=/mnt/hdfs/datanode
+docker compose --profile hdfs up -d
+
+# Or via the setup script
+scripts/setup --hdfs \
+  --hdfs-namenode-dir /mnt/hdfs/namenode \
+  --hdfs-datanode-dir /mnt/hdfs/datanode
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HDFS_NAMENODE_DIR` | `hadoop_namenode` (named volume) | Host path for NameNode metadata |
+| `HDFS_DATANODE_DIR` | `hadoop_datanode` (named volume) | Host path for DataNode block storage |
+
+When the variables are unset, Docker uses named volumes (the original behavior). When set to a host path (e.g., `/mnt/hdfs/datanode`), Docker creates a bind mount instead. Ensure the target directories exist and have appropriate permissions before starting the containers.
+
 ## Jenkins CI/CD
 
 AgentFlow includes an optional Jenkins service for CI/CD pipelines. Jenkins runs with Docker socket access, allowing it to build and test AgentFlow Docker images.
