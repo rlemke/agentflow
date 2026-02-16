@@ -4,7 +4,10 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 
 | Example | Description |
 |---------|-------------|
+| [hello-agent](hello-agent/) | Minimal end-to-end example demonstrating the AgentFlow execution model |
 | [osm-geocoder](osm-geocoder/) | Geocoding agent that resolves addresses to coordinates using the OpenStreetMap Nominatim API |
+| [genomics](genomics/) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows |
+| [jenkins](jenkins/) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.) |
 
 ## Running an Example
 
