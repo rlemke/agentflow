@@ -928,6 +928,60 @@ python examples/osm-geocoder/agent.py
 for f in examples/osm-geocoder/afl/*.afl; do afl "$f" --check; done
 ```
 
+### Genomics Cohort Analysis
+
+Bioinformatics pipeline demonstrating **foreach fan-out** (per-sample QC, alignment, variant calling) and **linear fan-in** (joint genotyping, annotation, publishing). Located in `examples/genomics/` — see [examples/genomics/README.md](examples/genomics/README.md).
+
+**AFL sources** (7 files):
+- `genomics.afl` — 8 schemas, 9 event facets, 2 workflows (SamplePipeline, CohortAnalysis)
+- `genomics_cache.afl` — 17 per-entity cache event facets (reference genomes, annotations, SRA archives)
+- `genomics_index_cache.afl` — 10 aligner index event facets (BWA, STAR, Bowtie2)
+- `genomics_resolve.afl` — 4 name-based resource resolution facets
+- `genomics_operations.afl` — 5 low-level cache operations
+- `genomics_cache_types.afl` — cache layer schemas
+- `genomics_cache_workflows.afl` — 3 cache-aware workflows (PrepareReference, PrepareSample, CachedCohortAnalysis)
+
+**Python handlers** (5 modules, 45 dispatch keys):
+- `genomics_handlers.py` — 9 core pipeline handlers
+- `cache_handlers.py` — 17 factory-built cache handlers
+- `index_handlers.py` — 10 aligner index handlers
+- `resolve_handlers.py` — 4 name resolution handlers with alias maps
+- `operations_handlers.py` — 5 low-level cache operations
+
+```bash
+# Start the agent
+PYTHONPATH=. python examples/genomics/agent.py
+
+# RegistryRunner mode
+AFL_USE_REGISTRY=1 PYTHONPATH=. python examples/genomics/agent.py
+```
+
+### Jenkins CI/CD Pipelines
+
+CI/CD pipeline example showcasing AFL's **mixin composition** — small reusable facets (Retry, Timeout, Credentials, Notification, AgentLabel, Stash) composed onto event facets at both signature and call time. Located in `examples/jenkins/` — see [examples/jenkins/README.md](examples/jenkins/README.md).
+
+**AFL sources** (9 files):
+- `jenkins_types.afl` — 7 schemas (ScmInfo, BuildResult, TestReport, QualityReport, Artifact, DeployResult, PipelineStatus)
+- `jenkins_mixins.afl` — 6 mixin facets + 3 implicit defaults
+- `jenkins_scm.afl` through `jenkins_notify.afl` — 17 event facets across 6 domain namespaces
+- `jenkins_pipelines.afl` — 4 workflows (JavaMavenCI, DockerK8sDeploy, MultiModuleBuild, FullCIPipeline)
+
+**Python handlers** (6 modules, 17 dispatch keys):
+- `scm_handlers.py` — GitCheckout, GitMerge
+- `build_handlers.py` — MavenBuild, GradleBuild, NpmBuild, DockerBuild
+- `test_handlers.py` — RunTests, CodeQuality, SecurityScan
+- `artifact_handlers.py` — ArchiveArtifacts, PublishToRegistry, DockerPush
+- `deploy_handlers.py` — DeployToEnvironment, DeployToK8s, RollbackDeploy
+- `notify_handlers.py` — SlackNotify, EmailNotify
+
+```bash
+# Start the agent
+PYTHONPATH=. python examples/jenkins/agent.py
+
+# RegistryRunner mode
+AFL_USE_REGISTRY=1 PYTHONPATH=. python examples/jenkins/agent.py
+```
+
 ## Scripts
 
 Executable convenience scripts in `scripts/` — no `PYTHONPATH` setup needed:
