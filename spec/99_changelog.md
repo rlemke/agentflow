@@ -520,3 +520,8 @@
 - **Docker Compose** (`docker-compose.yml`): HDFS volume mounts now use env var substitution — `${HDFS_NAMENODE_DIR:-hadoop_namenode}:/hadoop/dfs/name` and `${HDFS_DATANODE_DIR:-hadoop_datanode}:/hadoop/dfs/data`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage (NFS, SSD, dedicated disk)
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
+
+## Completed (v0.12.5) - Configurable External Storage for MongoDB & PostGIS
+- **Docker Compose** (`docker-compose.yml`): MongoDB and PostGIS volume mounts now use env var substitution — `${MONGODB_DATA_DIR:-mongodb_data}:/data/db` and `${POSTGIS_DATA_DIR:-postgis_data}:/var/lib/postgresql/data`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage
+- **Setup script** (`scripts/setup`): added `--mongodb-data-dir PATH` and `--postgis-data-dir PATH` options; `--postgis-data-dir` auto-enables `--postgis`; prints configured paths in status output
+- **Deployment docs** (`docs/deployment.md`): new "External Storage for PostGIS" and "External Storage for MongoDB" sections with usage examples and env var tables

@@ -382,6 +382,42 @@ When using the override file, the following environment variable is set automati
 |----------|-------|-------------|
 | `AFL_POSTGIS_URL` | `postgresql://afl:afl@postgis:5432/afl_gis` | PostGIS connection string |
 
+### External Storage for PostGIS
+
+By default, PostGIS uses a Docker named volume (`postgis_data`). To place data on an external filesystem, set the `POSTGIS_DATA_DIR` environment variable:
+
+```bash
+# Use an external directory for PostGIS data
+export POSTGIS_DATA_DIR=/mnt/ssd/postgis
+docker compose --profile postgis up -d
+
+# Or via the setup script
+scripts/setup --postgis --postgis-data-dir /mnt/ssd/postgis
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGIS_DATA_DIR` | `postgis_data` (named volume) | Host path for PostgreSQL/PostGIS data |
+
+### External Storage for MongoDB
+
+By default, MongoDB uses a Docker named volume (`mongodb_data`). To place data on an external filesystem, set the `MONGODB_DATA_DIR` environment variable:
+
+```bash
+# Use an external directory for MongoDB data
+export MONGODB_DATA_DIR=/mnt/ssd/mongodb
+docker compose up -d
+
+# Or via the setup script
+scripts/setup --mongodb-data-dir /mnt/ssd/mongodb
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MONGODB_DATA_DIR` | `mongodb_data` (named volume) | Host path for MongoDB data files |
+
+Ensure target directories exist and have appropriate permissions before starting the containers.
+
 ## Security
 
 ### MongoDB Authentication

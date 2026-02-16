@@ -44,6 +44,8 @@ Options:
   --hdfs-datanode-dir PATH  Use external directory for HDFS DataNode data
   --jenkins            Start Jenkins CI/CD server
   --postgis            Start PostGIS database and wire into OSM agents
+  --postgis-data-dir PATH   Use external directory for PostGIS data
+  --mongodb-data-dir PATH   Use external directory for MongoDB data
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -64,6 +66,8 @@ while [[ $# -gt 0 ]]; do
         --hdfs-datanode-dir) export HDFS_DATANODE_DIR="$2"; HDFS=true; shift 2 ;;
         --jenkins)       JENKINS=true;          shift ;;
         --postgis)       POSTGIS=true;          shift ;;
+        --postgis-data-dir) export POSTGIS_DATA_DIR="$2"; POSTGIS=true; shift 2 ;;
+        --mongodb-data-dir) export MONGODB_DATA_DIR="$2"; shift 2 ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -215,6 +219,13 @@ if [ "$POSTGIS" = true ]; then
     PROFILE_ARGS="$PROFILE_ARGS --profile postgis"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.postgis.yml"
     echo "PostGIS enabled — OSM agents will use postgresql://afl:afl@postgis:5432/afl_gis"
+    if [ -n "${POSTGIS_DATA_DIR:-}" ]; then
+        echo "  PostGIS data dir: $POSTGIS_DATA_DIR"
+    fi
+    echo ""
+fi
+if [ -n "${MONGODB_DATA_DIR:-}" ]; then
+    echo "MongoDB external data dir: $MONGODB_DATA_DIR"
     echo ""
 fi
 

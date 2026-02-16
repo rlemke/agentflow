@@ -15,7 +15,7 @@ services:
     ports:
       - "${MONGODB_PORT:-27018}:27017"  # Use 27018 externally to avoid conflicts
     volumes:
-      - mongodb_data:/data/db
+      - ${MONGODB_DATA_DIR:-mongodb_data}:/data/db
     healthcheck:
       test: mongosh --eval "db.runCommand('ping').ok" --quiet
       interval: 5s
@@ -204,7 +204,7 @@ services:
       - POSTGRES_USER=afl
       - POSTGRES_PASSWORD=afl
     volumes:
-      - postgis_data:/var/lib/postgresql/data
+      - ${POSTGIS_DATA_DIR:-postgis_data}:/var/lib/postgresql/data
     healthcheck:
       test: pg_isready -U afl
       interval: 5s
