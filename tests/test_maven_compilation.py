@@ -1,7 +1,7 @@
 """Tests for the Maven build lifecycle example AFL files.
 
-Verifies that all 7 AFL files parse, validate, and compile correctly,
-and that the 4 workflow pipelines using mixin composition compile with
+Verifies that all 8 AFL files parse, validate, and compile correctly,
+and that the 5 workflow pipelines using mixin composition compile with
 all dependencies.
 """
 
@@ -71,16 +71,16 @@ class TestMavenTypes:
         assert program["type"] == "Program"
 
     def test_all_schemas_present(self):
-        """All 7 schemas are emitted."""
+        """All 8 schemas are emitted."""
         program = _compile("maven_types.afl")
         schema_names = _collect_names(program, "schemas")
         expected = [
             "ArtifactInfo", "DependencyTree", "BuildResult", "TestReport",
-            "PublishResult", "QualityReport", "ProjectInfo",
+            "PublishResult", "QualityReport", "ProjectInfo", "ExecutionResult",
         ]
         for name in expected:
             assert name in schema_names, f"Missing schema: {name}"
-        assert len([n for n in schema_names if n in expected]) == 7
+        assert len([n for n in schema_names if n in expected]) == 8
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +151,33 @@ class TestMavenEventFacets:
         for name in expected:
             assert name in facet_names, f"Missing quality facet: {name}"
 
+    def test_runner_facets(self):
+        """maven_runner.afl compiles with types dependency."""
+        program = _compile("maven_runner.afl", "maven_types.afl")
+        facet_names = _collect_names(program, "eventFacets")
+        assert "RunMavenArtifact" in facet_names
+
+    def test_runner_facet_params(self):
+        """RunMavenArtifact has expected parameters."""
+        program = _compile("maven_runner.afl", "maven_types.afl")
+        # Find the event facet
+        def _find_event_facet(node, name):
+            for ef in node.get("eventFacets", []):
+                if ef["name"] == name:
+                    return ef
+            for ns in node.get("namespaces", []):
+                found = _find_event_facet(ns, name)
+                if found:
+                    return found
+            return None
+        ef = _find_event_facet(program, "RunMavenArtifact")
+        assert ef is not None
+        param_names = [p["name"] for p in ef["params"]]
+        assert "step_id" in param_names
+        assert "group_id" in param_names
+        assert "artifact_id" in param_names
+        assert "version" in param_names
+
 
 # ---------------------------------------------------------------------------
 # Workflows (with mixin composition)
@@ -165,6 +192,7 @@ class TestMavenWorkflows:
         "maven_build.afl",
         "maven_publish.afl",
         "maven_quality.afl",
+        "maven_runner.afl",
     ]
 
     def _compile_workflows(self) -> dict:
@@ -176,11 +204,12 @@ class TestMavenWorkflows:
         assert program["type"] == "Program"
 
     def test_all_workflows_present(self):
-        """All 4 workflow names are emitted."""
+        """All 5 workflow names are emitted."""
         program = self._compile_workflows()
         wf_names = _collect_names(program, "workflows")
         expected = ["BuildAndTest", "ReleaseArtifact",
-                     "DependencyAudit", "MultiModuleBuild"]
+                     "DependencyAudit", "MultiModuleBuild",
+                     "RunArtifactPipeline"]
         for name in expected:
             assert name in wf_names, f"Missing workflow: {name}"
 
@@ -216,6 +245,15 @@ class TestMavenWorkflows:
         assert "tests" in step_names
         assert "pkg" in step_names
         assert "deploy" in step_names
+
+    def test_run_artifact_pipeline_steps(self):
+        """RunArtifactPipeline has the expected step names."""
+        program = self._compile_workflows()
+        wf = self._find_workflow(program, "RunArtifactPipeline")
+        assert wf is not None
+        step_names = [s["name"] for s in wf["body"]["steps"]]
+        assert "deps" in step_names
+        assert "run" in step_names
 
     def test_cli_check_workflows(self):
         """The CLI --check flag succeeds for maven_workflows.afl."""

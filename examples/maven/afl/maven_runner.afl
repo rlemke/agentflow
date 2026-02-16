@@ -1,0 +1,11 @@
+namespace maven.runner {
+    use maven.types
+
+    event facet RunMavenArtifact(step_id: String,
+        group_id: String, artifact_id: String, version: String,
+        classifier: String = "",
+        entrypoint: String = "",
+        jvm_args: String = "",
+        workflow_id: String = "",
+        runner_id: String = "") => (result: ExecutionResult)
+}

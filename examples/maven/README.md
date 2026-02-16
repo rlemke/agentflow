@@ -91,6 +91,17 @@ foreach module:
 **Inputs**: `group_id`, `workspace_path`, `modules` (JSON array of `{name, test_suite, packaging}`)
 **Outputs**: per-module `artifact_path`, `module_name`, `test_passed`
 
+### Pipeline 5: RunArtifactPipeline
+
+Resolve dependencies and run a Maven artifact as a JVM subprocess.
+
+```
+ResolveDependencies  -->  RunMavenArtifact + Timeout
+```
+
+**Inputs**: `group_id`, `artifact_id`, `version`, `step_id`, `workflow_id` (optional), `runner_id` (optional)
+**Outputs**: `success`, `exit_code`, `duration_ms`
+
 ## Prerequisites
 
 ```bash
@@ -119,6 +130,7 @@ afl --primary examples/maven/afl/maven_workflows.afl \
     --library examples/maven/afl/maven_build.afl \
     --library examples/maven/afl/maven_publish.afl \
     --library examples/maven/afl/maven_quality.afl \
+    --library examples/maven/afl/maven_runner.afl \
     --check
 ```
 
@@ -200,15 +212,17 @@ implicit defaultRepository = Repository(url = "https://repo1.maven.org/maven2", 
 | `build_handlers.py` | `maven.build` | CompileProject, RunUnitTests, PackageArtifact, GenerateJavadoc | Build lifecycle operations |
 | `publish_handlers.py` | `maven.publish` | DeployToRepository, PublishSnapshot, PromoteRelease | Artifact publishing and deployment |
 | `quality_handlers.py` | `maven.quality` | CheckstyleAnalysis, DependencyCheck | Code quality and security analysis |
+| `runner_handlers.py` | `maven.runner` | RunMavenArtifact | JVM subprocess execution via Maven artifacts |
 
 ## AFL source files
 
 | File | Namespace | Description |
 |------|-----------|-------------|
-| `maven_types.afl` | `maven.types` | 7 schemas (ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo) |
+| `maven_types.afl` | `maven.types` | 8 schemas (ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo, ExecutionResult) |
 | `maven_mixins.afl` | `maven.mixins` | 6 mixin facets + 3 implicit defaults |
 | `maven_resolve.afl` | `maven.resolve` | 3 dependency resolution event facets |
 | `maven_build.afl` | `maven.build` | 4 build lifecycle event facets |
 | `maven_publish.afl` | `maven.publish` | 3 publish/deploy event facets |
 | `maven_quality.afl` | `maven.quality` | 2 quality analysis event facets |
-| `maven_workflows.afl` | `maven.workflows` | 4 workflow pipelines demonstrating mixin composition |
+| `maven_runner.afl` | `maven.runner` | 1 event facet for JVM subprocess execution (RunMavenArtifact) |
+| `maven_workflows.afl` | `maven.workflows` | 5 workflow pipelines demonstrating mixin composition |

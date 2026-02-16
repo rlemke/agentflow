@@ -143,7 +143,33 @@ workflow MultiModuleBuild(group_id: String,
 
 Note: Mixin arguments can use dynamic expressions like `"clean compile -pl " ++ $.mod.name`.
 
-### 7. Running
+### 7. Run Maven Artifacts
+
+The `RunMavenArtifact` event facet models the core MavenArtifactRunner operation — resolving a Maven artifact and launching it as a JVM subprocess:
+
+```afl
+namespace maven.runner {
+    use maven.types
+
+    event facet RunMavenArtifact(step_id: String,
+        group_id: String, artifact_id: String, version: String,
+        classifier: String = "",
+        entrypoint: String = "",
+        jvm_args: String = "",
+        workflow_id: String = "",
+        runner_id: String = "") => (result: ExecutionResult)
+}
+```
+
+Use it in workflows to resolve dependencies and then run the artifact:
+
+```afl
+run = maven.runner.RunMavenArtifact(step_id = $.step_id,
+    group_id = $.group_id, artifact_id = $.artifact_id,
+    version = $.version) with Timeout(minutes = 10)
+```
+
+### 8. Running
 
 ```bash
 source .venv/bin/activate
@@ -163,6 +189,7 @@ python -m afl.cli \
     --library examples/maven/afl/maven_build.afl \
     --library examples/maven/afl/maven_publish.afl \
     --library examples/maven/afl/maven_quality.afl \
+    --library examples/maven/afl/maven_runner.afl \
     --check
 
 # Run the agent (AgentPoller mode)

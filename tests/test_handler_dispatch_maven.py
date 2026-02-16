@@ -148,10 +148,36 @@ class TestMavenQualityHandlers:
         assert runner.register_handler.call_count == 2
 
 
+class TestMavenRunnerHandlers:
+    def test_dispatch_keys(self):
+        mod = _maven_import("runner_handlers")
+        assert len(mod._DISPATCH) == 1
+        assert "maven.runner.RunMavenArtifact" in mod._DISPATCH
+
+    def test_handle_dispatches(self):
+        mod = _maven_import("runner_handlers")
+        result = mod.handle({"_facet_name": "maven.runner.RunMavenArtifact", "step_id": "step-1", "group_id": "com.example", "artifact_id": "app", "version": "1.0.0"})
+        assert isinstance(result, dict)
+        assert "result" in result
+        assert result["result"]["success"] is True
+        assert result["result"]["exit_code"] == 0
+
+    def test_handle_unknown_facet(self):
+        mod = _maven_import("runner_handlers")
+        with pytest.raises(ValueError, match="Unknown facet"):
+            mod.handle({"_facet_name": "maven.runner.NonExistent"})
+
+    def test_register_handlers(self):
+        mod = _maven_import("runner_handlers")
+        runner = MagicMock()
+        mod.register_handlers(runner)
+        assert runner.register_handler.call_count == 1
+
+
 class TestMavenInitRegistryHandlers:
     def test_register_all_registry_handlers(self):
         mod = _maven_import("__init__")
         runner = MagicMock()
         mod.register_all_registry_handlers(runner)
-        # 3 resolve + 4 build + 3 publish + 2 quality = 12
-        assert runner.register_handler.call_count == 12
+        # 3 resolve + 4 build + 3 publish + 2 quality + 1 runner = 13
+        assert runner.register_handler.call_count == 13

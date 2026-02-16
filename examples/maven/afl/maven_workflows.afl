@@ -120,4 +120,29 @@ namespace maven.workflows {
             module_name = $.mod.name,
             test_passed = tests.report.passed)
     }
+
+    // -----------------------------------------------------------------------
+    // Workflow 5: RunArtifactPipeline — resolve deps then run artifact
+    // resolve -> run Maven artifact as JVM subprocess
+    // -----------------------------------------------------------------------
+    workflow RunArtifactPipeline(group_id: String, artifact_id: String,
+        version: String, step_id: String,
+        workflow_id: String = "",
+        runner_id: String = "") => (success: Boolean,
+            exit_code: Long, duration_ms: Long) andThen {
+
+        deps = maven.resolve.ResolveDependencies(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version)
+
+        run = maven.runner.RunMavenArtifact(step_id = $.step_id,
+            group_id = $.group_id, artifact_id = $.artifact_id,
+            version = $.version,
+            workflow_id = $.workflow_id,
+            runner_id = $.runner_id) with Timeout(minutes = 10)
+
+        yield RunArtifactPipeline(
+            success = run.result.success,
+            exit_code = run.result.exit_code,
+            duration_ms = run.result.duration_ms)
+    }
 }

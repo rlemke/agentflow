@@ -68,4 +68,13 @@ namespace maven.types {
         modules: Json,
         parent_pom: String
     }
+
+    schema ExecutionResult {
+        exit_code: Long,
+        success: Boolean,
+        duration_ms: Long,
+        stdout: String,
+        stderr: String,
+        artifact_path: String
+    }
 }
