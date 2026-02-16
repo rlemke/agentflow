@@ -1,0 +1,100 @@
+namespace aws.lambda.workflows {
+
+    use aws.lambda.types
+    use aws.lambda.mixins
+
+    // -----------------------------------------------------------------------
+    // Workflow 1: Deploy and Invoke — pure andThen chain
+    // Creates a Lambda function, invokes it, and verifies the result
+    // -----------------------------------------------------------------------
+    workflow DeployAndInvoke(function_name: String, runtime: String = "python3.12",
+        input_payload: String = "{}") => (function_arn: String,
+            status_code: Long, response_payload: String,
+            duration_ms: Long) andThen {
+
+        created = aws.lambda.CreateFunction(function_name = $.function_name,
+            runtime = $.runtime)
+
+        invoked = aws.lambda.InvokeFunction(function_name = $.function_name,
+            input_payload = $.input_payload)
+
+        info = aws.lambda.GetFunctionInfo(function_name = $.function_name)
+
+        yield DeployAndInvoke(
+            function_arn = created.config.function_arn,
+            status_code = invoked.result.status_code,
+            response_payload = invoked.result.payload,
+            duration_ms = invoked.result.duration_ms)
+    }
+
+    // -----------------------------------------------------------------------
+    // Workflow 2: Blue-Green Deploy — andThen + call-time mixins
+    // Updates function code with tracing, invokes with retry+timeout, verifies
+    // -----------------------------------------------------------------------
+    workflow BlueGreenDeploy(function_name: String,
+        s3_bucket: String, s3_key: String,
+        input_payload: String = "{}") => (function_arn: String,
+            status_code: Long, response_payload: String,
+            state: String) andThen {
+
+        updated = aws.lambda.UpdateFunctionCode(function_name = $.function_name,
+            s3_bucket = $.s3_bucket,
+            s3_key = $.s3_key) with Tracing(mode = "Active")
+
+        invoked = aws.lambda.InvokeFunction(function_name = $.function_name,
+            input_payload = $.input_payload) with Retry(maxAttempts = 3, backoffMs = 2000) with Timeout(seconds = 60)
+
+        info = aws.lambda.GetFunctionInfo(function_name = $.function_name) with Timeout(seconds = 30)
+
+        yield BlueGreenDeploy(
+            function_arn = updated.config.function_arn,
+            status_code = invoked.result.status_code,
+            response_payload = invoked.result.payload,
+            state = info.info.state)
+    }
+
+    // -----------------------------------------------------------------------
+    // Workflow 3: Step Function Pipeline — cross-namespace andThen + mixins
+    // Creates Lambda, creates state machine, starts and monitors execution
+    // -----------------------------------------------------------------------
+    workflow StepFunctionPipeline(function_name: String,
+        state_machine_name: String,
+        input_payload: String = "{}") => (function_arn: String,
+            state_machine_arn: String, execution_status: String,
+            output_payload: String) andThen {
+
+        fn = aws.lambda.CreateFunction(function_name = $.function_name) with Timeout(seconds = 60)
+
+        sm = aws.stepfunctions.CreateStateMachine(state_machine_name = $.state_machine_name)
+
+        exec = aws.stepfunctions.StartExecution(state_machine_arn = sm.config.state_machine_arn,
+            input_payload = $.input_payload) with Retry(maxAttempts = 2, backoffMs = 3000)
+
+        result = aws.stepfunctions.DescribeExecution(execution_arn = exec.result.execution_arn) with Timeout(seconds = 120)
+
+        yield StepFunctionPipeline(
+            function_arn = fn.config.function_arn,
+            state_machine_arn = sm.config.state_machine_arn,
+            execution_status = result.result.status,
+            output_payload = result.result.output_payload)
+    }
+
+    // -----------------------------------------------------------------------
+    // Workflow 4: Batch Processor — foreach + per-iteration mixins
+    // Invokes a Lambda function for each item in a batch
+    // -----------------------------------------------------------------------
+    workflow BatchProcessor(function_name: String,
+        items: Json) => (function_name: String,
+            status_code: Long, response_payload: String,
+            duration_ms: Long) andThen foreach item in $.items {
+
+        invoked = aws.lambda.InvokeFunction(function_name = $.function_name,
+            input_payload = $.item.payload) with Retry(maxAttempts = 2, backoffMs = 500) with Timeout(seconds = 60)
+
+        yield BatchProcessor(
+            function_name = $.function_name,
+            status_code = invoked.result.status_code,
+            response_payload = invoked.result.payload,
+            duration_ms = invoked.result.duration_ms)
+    }
+}

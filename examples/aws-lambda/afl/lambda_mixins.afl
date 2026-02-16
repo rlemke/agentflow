@@ -1,0 +1,25 @@
+namespace aws.lambda.mixins {
+
+    // Retry failed invocations with configurable backoff
+    facet Retry(maxAttempts: Int = 3, backoffMs: Int = 1000)
+
+    // Maximum execution timeout for a step
+    facet Timeout(seconds: Int = 300)
+
+    // Dead letter queue for failed invocations
+    facet DLQ(dlq_arn: String)
+
+    // VPC configuration for Lambda functions
+    facet VpcConfig(subnet_ids: String, security_group_ids: String)
+
+    // X-Ray tracing mode
+    facet Tracing(mode: String = "Active")
+
+    // Memory size override
+    facet MemorySize(mb: Int = 128)
+
+    // Namespace-level defaults
+    implicit defaultRetry = Retry(maxAttempts = 3, backoffMs = 1000)
+    implicit defaultTimeout = Timeout(seconds = 300)
+    implicit defaultTracing = Tracing(mode = "Active")
+}

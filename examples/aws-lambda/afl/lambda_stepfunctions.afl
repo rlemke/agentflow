@@ -1,0 +1,19 @@
+namespace aws.stepfunctions {
+    use aws.lambda.types
+
+    event facet CreateStateMachine(state_machine_name: String,
+        definition: String = "",
+        role_arn: String = "") => (config: StateMachineConfig)
+
+    event facet StartExecution(state_machine_arn: String,
+        input_payload: String = "{}",
+        execution_name: String = "") => (result: ExecutionResult)
+
+    event facet DescribeExecution(execution_arn: String) => (result: ExecutionResult)
+
+    event facet DeleteStateMachine(state_machine_arn: String) => (config: StateMachineConfig)
+
+    event facet ListExecutions(state_machine_arn: String,
+        status_filter: String = "",
+        max_results: Int = 100) => (info: ExecutionInfo)
+}

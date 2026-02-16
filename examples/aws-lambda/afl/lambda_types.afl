@@ -1,0 +1,68 @@
+namespace aws.lambda.types {
+
+    schema FunctionConfig {
+        function_name: String,
+        function_arn: String,
+        runtime: String,
+        handler: String,
+        role_arn: String,
+        memory_mb: Long,
+        timeout_seconds: Long,
+        code_size: Long,
+        last_modified: String
+    }
+
+    schema InvokeResult {
+        function_name: String,
+        status_code: Long,
+        payload: String,
+        executed_version: String,
+        log_result: String,
+        duration_ms: Long
+    }
+
+    schema FunctionInfo {
+        function_name: String,
+        function_arn: String,
+        runtime: String,
+        state: String,
+        code_size: Long,
+        memory_mb: Long,
+        last_modified: String
+    }
+
+    schema LayerInfo {
+        layer_name: String,
+        layer_arn: String,
+        version: Long,
+        code_size: Long,
+        compatible_runtimes: String
+    }
+
+    schema StateMachineConfig {
+        state_machine_arn: String,
+        state_machine_name: String,
+        definition: String,
+        role_arn: String,
+        creation_date: String,
+        status: String
+    }
+
+    schema ExecutionResult {
+        execution_arn: String,
+        state_machine_arn: String,
+        status: String,
+        start_date: String,
+        stop_date: String,
+        input_payload: String,
+        output_payload: String
+    }
+
+    schema ExecutionInfo {
+        execution_arn: String,
+        state_machine_arn: String,
+        status: String,
+        start_date: String,
+        name: String
+    }
+}

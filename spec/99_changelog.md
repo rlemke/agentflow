@@ -521,6 +521,15 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.8) - AWS Lambda + Step Functions Example with LocalStack
+- **New example** (`examples/aws-lambda/`): AWS serverless pipeline example with real boto3 calls against a LocalStack Docker environment, demonstrating andThen chains, call-time mixin composition, cross-namespace workflows, and foreach iteration
+- **5 AFL files**: `aws.lambda.types` (7 schemas), `aws.lambda.mixins` (6 mixin facets + 3 implicits), `aws.lambda` (7 Lambda event facets), `aws.stepfunctions` (5 Step Functions event facets), `aws.lambda.workflows` (4 workflows)
+- **12 handlers** across 2 modules (`lambda_handlers`, `stepfunctions_handlers`) making real boto3 calls to LocalStack (`LOCALSTACK_URL` env var, default `http://localhost:4566`); follows dual-mode dispatch adapter pattern (AgentPoller + RegistryRunner)
+- **4 workflows**: DeployAndInvoke (pure andThen chain), BlueGreenDeploy (andThen + call-time mixins), StepFunctionPipeline (cross-namespace andThen + mixins), BatchProcessor (foreach + per-iteration mixins)
+- **Docker integration**: LocalStack service (`localstack/localstack`) with Lambda, Step Functions, S3, IAM services; `agent-aws-lambda` service; both under `localstack` profile; `Dockerfile.aws-lambda` based on python:3.12-slim
+- **23 new tests**: 13 compilation tests (types, mixins, event facets, workflows with step/foreach verification) and 10 handler dispatch tests (dispatch keys, unknown facet errors, registry registration counts); handler tests use `pytest.importorskip("boto3")` for graceful skipping
+- 1636 passed, 35 skipped (without `--hdfs`/`--mongodb`/`--postgis`)
+
 ## Completed (v0.12.7) - Jenkins CI/CD Example with Mixin Composition
 - **New example** (`examples/jenkins/`): Jenkins CI/CD pipeline example showcasing AFL's `with` mixin composition — small reusable facets (Retry, Timeout, Credentials, Notification, AgentLabel, Stash) composed onto event facets at both signature and call time
 - **9 AFL files**: `jenkins.types` (7 schemas), `jenkins.mixins` (6 mixin facets + 3 implicits), `jenkins.scm` (2 event facets with signature-level mixin), `jenkins.build` (4), `jenkins.test` (3), `jenkins.artifact` (3), `jenkins.deploy` (3), `jenkins.notify` (2), `jenkins.pipeline` (4 workflows)

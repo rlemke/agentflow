@@ -982,6 +982,32 @@ PYTHONPATH=. python examples/jenkins/agent.py
 AFL_USE_REGISTRY=1 PYTHONPATH=. python examples/jenkins/agent.py
 ```
 
+### AWS Lambda + Step Functions
+
+Serverless pipeline example with **real boto3 calls** against a **LocalStack** Docker environment. Demonstrates andThen chains, call-time mixin composition, cross-namespace workflows, and foreach iteration. Located in `examples/aws-lambda/` — see [examples/aws-lambda/README.md](examples/aws-lambda/README.md).
+
+**AFL sources** (5 files):
+- `lambda_types.afl` — 7 schemas (FunctionConfig, InvokeResult, FunctionInfo, LayerInfo, StateMachineConfig, ExecutionResult, ExecutionInfo)
+- `lambda_mixins.afl` — 6 mixin facets + 3 implicit defaults (Retry, Timeout, DLQ, VpcConfig, Tracing, MemorySize)
+- `lambda_functions.afl` — 7 Lambda event facets (CreateFunction, InvokeFunction, etc.)
+- `lambda_stepfunctions.afl` — 5 Step Functions event facets (CreateStateMachine, StartExecution, etc.)
+- `lambda_workflows.afl` — 4 workflows (DeployAndInvoke, BlueGreenDeploy, StepFunctionPipeline, BatchProcessor)
+
+**Python handlers** (2 modules, 12 dispatch keys):
+- `lambda_handlers.py` — 7 handlers with real boto3 Lambda calls
+- `stepfunctions_handlers.py` — 5 handlers with real boto3 Step Functions calls
+
+```bash
+# Start LocalStack
+docker compose --profile localstack up -d
+
+# Start the agent
+LOCALSTACK_URL=http://localhost:4566 PYTHONPATH=. python examples/aws-lambda/agent.py
+
+# RegistryRunner mode
+AFL_USE_REGISTRY=1 LOCALSTACK_URL=http://localhost:4566 PYTHONPATH=. python examples/aws-lambda/agent.py
+```
+
 ## Scripts
 
 Executable convenience scripts in `scripts/` — no `PYTHONPATH` setup needed:

@@ -1,0 +1,29 @@
+namespace aws.lambda {
+    use aws.lambda.types
+
+    event facet CreateFunction(function_name: String, runtime: String = "python3.12",
+        handler: String = "lambda_function.lambda_handler",
+        memory_mb: Int = 128,
+        timeout_seconds: Int = 30,
+        environment_vars: String = "") => (config: FunctionConfig)
+
+    event facet InvokeFunction(function_name: String,
+        input_payload: String = "{}",
+        invocation_type: String = "RequestResponse") => (result: InvokeResult)
+
+    event facet UpdateFunctionCode(function_name: String,
+        zip_file_path: String = "",
+        s3_bucket: String = "",
+        s3_key: String = "") => (config: FunctionConfig)
+
+    event facet DeleteFunction(function_name: String) => (config: FunctionConfig)
+
+    event facet ListFunctions(max_items: Int = 50,
+        marker: String = "") => (config: FunctionConfig)
+
+    event facet GetFunctionInfo(function_name: String) => (info: FunctionInfo)
+
+    event facet PublishLayer(layer_name: String,
+        compatible_runtimes: String = "python3.12",
+        description: String = "") => (layer: LayerInfo)
+}

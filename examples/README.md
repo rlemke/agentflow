@@ -8,6 +8,7 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [osm-geocoder](osm-geocoder/) | Geocoding agent that resolves addresses to coordinates using the OpenStreetMap Nominatim API |
 | [genomics](genomics/) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows |
 | [jenkins](jenkins/) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.) |
+| [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
 
 ## Running an Example
 
