@@ -515,3 +515,8 @@
 - **Dispatch tests** (`tests/test_handler_dispatch_osm.py`): added `TestOsmPostgisHandlers` class (4 tests: dispatch_keys, handle_dispatches, handle_unknown_facet, register_handlers)
 - **PostGIS import tests** (`tests/test_postgis_import.py`): `TestPostgisImporterModule` (7 tests — boolean flags, default/env URL, sanitize_url, DDL keywords); `TestPostgisHandlerDispatch` (5 tests — dispatch key, count, handle with stats, unknown facet, register count); `TestPostgisImportLive` (4 tests gated by `--postgis` — ensure_schema creates tables, spatial indexes exist, import log entry written, reimport detects prior)
 - 1571 passed, 35 skipped (without `--hdfs`/`--mongodb`/`--postgis`)
+
+## Completed (v0.12.4) - Configurable External Storage for HDFS
+- **Docker Compose** (`docker-compose.yml`): HDFS volume mounts now use env var substitution — `${HDFS_NAMENODE_DIR:-hadoop_namenode}:/hadoop/dfs/name` and `${HDFS_DATANODE_DIR:-hadoop_datanode}:/hadoop/dfs/data`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage (NFS, SSD, dedicated disk)
+- **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
+- **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
