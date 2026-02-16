@@ -1,0 +1,27 @@
+namespace jenkins.mixins {
+
+    // Retry failed steps with configurable backoff
+    facet Retry(maxAttempts: Int = 3, backoffSeconds: Int = 30)
+
+    // Maximum execution time for a step
+    facet Timeout(minutes: Int = 30)
+
+    // Attach authentication context (SSH keys, tokens, passwords)
+    facet Credentials(credentialId: String, type: String = "token")
+
+    // Notify a channel on completion or failure
+    facet Notification(channel: String, onSuccess: Boolean = true,
+        onFailure: Boolean = true)
+
+    // Select which Jenkins agent/node to run on
+    facet AgentLabel(label: String = "any")
+
+    // Stash workspace files for sharing between pipeline stages
+    facet Stash(name: String, includes: String = "**/*",
+        excludes: String = "")
+
+    // Namespace-level defaults
+    implicit defaultRetry = Retry(maxAttempts = 3, backoffSeconds = 30)
+    implicit defaultTimeout = Timeout(minutes = 30)
+    implicit defaultAgent = AgentLabel(label = "linux")
+}

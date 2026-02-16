@@ -1,0 +1,69 @@
+namespace jenkins.types {
+
+    schema ScmInfo {
+        repo: String,
+        branch: String,
+        commit_sha: String,
+        commit_message: String,
+        author: String,
+        workspace_path: String,
+        clone_duration_ms: Long
+    }
+
+    schema BuildResult {
+        artifact_path: String,
+        build_tool: String,
+        version: String,
+        success: Boolean,
+        duration_ms: Long,
+        warnings: Long,
+        errors: Long
+    }
+
+    schema TestReport {
+        total: Long,
+        passed: Long,
+        failed: Long,
+        skipped: Long,
+        duration_ms: Long,
+        report_path: String,
+        coverage_pct: Double
+    }
+
+    schema QualityReport {
+        tool: String,
+        issues: Long,
+        critical: Long,
+        major: Long,
+        minor: Long,
+        report_path: String,
+        passed: Boolean
+    }
+
+    schema Artifact {
+        name: String,
+        path: String,
+        size_bytes: Long,
+        checksum: String,
+        registry_url: String,
+        tag: String
+    }
+
+    schema DeployResult {
+        environment: String,
+        strategy: String,
+        version: String,
+        url: String,
+        replicas: Long,
+        healthy: Boolean,
+        deploy_id: String
+    }
+
+    schema PipelineStatus {
+        pipeline_name: String,
+        build_number: Long,
+        status: String,
+        duration_ms: Long,
+        url: String
+    }
+}

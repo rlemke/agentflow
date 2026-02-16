@@ -1,0 +1,14 @@
+namespace jenkins.artifact {
+    use jenkins.types
+
+    event facet ArchiveArtifacts(workspace_path: String,
+        includes: String,
+        excludes: String = "") => (artifact: Artifact)
+
+    event facet PublishToRegistry(artifact_path: String,
+        registry_url: String, group_id: String = "",
+        version: String = "") => (artifact: Artifact)
+
+    event facet DockerPush(image_tag: String,
+        registry_url: String) => (artifact: Artifact)
+}

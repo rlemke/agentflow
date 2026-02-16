@@ -1,0 +1,11 @@
+namespace jenkins.notify {
+    use jenkins.types
+
+    event facet SlackNotify(channel: String, message: String,
+        color: String = "good",
+        mention: String = "") => (sent: Boolean, timestamp: String)
+
+    event facet EmailNotify(recipients: String, subject: String,
+        body: String,
+        attach_log: Boolean = false) => (sent: Boolean, message_id: String)
+}

@@ -521,6 +521,13 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.7) - Jenkins CI/CD Example with Mixin Composition
+- **New example** (`examples/jenkins/`): Jenkins CI/CD pipeline example showcasing AFL's `with` mixin composition — small reusable facets (Retry, Timeout, Credentials, Notification, AgentLabel, Stash) composed onto event facets at both signature and call time
+- **9 AFL files**: `jenkins.types` (7 schemas), `jenkins.mixins` (6 mixin facets + 3 implicits), `jenkins.scm` (2 event facets with signature-level mixin), `jenkins.build` (4), `jenkins.test` (3), `jenkins.artifact` (3), `jenkins.deploy` (3), `jenkins.notify` (2), `jenkins.pipeline` (4 workflows)
+- **17 handlers** across 6 modules (`scm_handlers`, `build_handlers`, `test_handlers`, `artifact_handlers`, `deploy_handlers`, `notify_handlers`) following the dual-mode dispatch adapter pattern (AgentPoller + RegistryRunner)
+- **4 workflows** demonstrating: call-time single/multiple mixins, signature-level mixin, `foreach` with per-iteration mixins, parallel stages with independent mixin composition, string concatenation in mixin args
+- **42 new tests**: 17 compilation tests (types, mixins, event facets, pipeline workflows with mixin AST verification) and 25 handler dispatch tests (dispatch keys, handle routing, unknown facet errors, registry registration counts)
+
 ## Completed (v0.12.6) - Configurable External Storage for Jenkins & GraphHopper
 - **Docker Compose** (`docker-compose.yml`): Jenkins and GraphHopper volume mounts now use env var substitution — `${JENKINS_HOME_DIR:-jenkins_home}:/var/jenkins_home` and `${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage
 - **Setup script** (`scripts/setup`): added `--jenkins-home-dir PATH` and `--graphhopper-data-dir PATH` options; `--jenkins-home-dir` auto-enables `--jenkins`; prints configured paths in status output

@@ -1,0 +1,15 @@
+namespace jenkins.test {
+    use jenkins.types
+
+    event facet RunTests(workspace_path: String,
+        framework: String = "junit", suite: String = "unit",
+        parallel: Boolean = true) => (report: TestReport)
+
+    event facet CodeQuality(workspace_path: String,
+        tool: String = "sonarqube",
+        config_path: String = "sonar-project.properties") => (report: QualityReport)
+
+    event facet SecurityScan(workspace_path: String,
+        scanner: String = "trivy",
+        severity_threshold: String = "HIGH") => (report: QualityReport)
+}

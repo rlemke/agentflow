@@ -1,0 +1,21 @@
+namespace jenkins.build {
+    use jenkins.types
+
+    event facet MavenBuild(workspace_path: String,
+        goals: String = "clean package", profiles: String = "",
+        jdk_version: String = "17",
+        skip_tests: Boolean = false) => (result: BuildResult)
+
+    event facet GradleBuild(workspace_path: String,
+        tasks: String = "build",
+        jdk_version: String = "17") => (result: BuildResult)
+
+    event facet NpmBuild(workspace_path: String,
+        build_script: String = "build",
+        node_version: String = "20") => (result: BuildResult)
+
+    event facet DockerBuild(workspace_path: String,
+        dockerfile: String = "Dockerfile",
+        image_tag: String,
+        build_args: String = "") => (result: BuildResult)
+}

@@ -1,0 +1,12 @@
+namespace jenkins.scm {
+    use jenkins.types
+
+    // Signature-level mixin: checkout always gets a timeout
+    event facet GitCheckout(repo: String, branch: String = "main",
+        depth: Int = 0,
+        submodules: Boolean = false) => (info: ScmInfo) with jenkins.mixins.Timeout(minutes = 10)
+
+    event facet GitMerge(workspace_path: String,
+        source_branch: String,
+        target_branch: String = "main") => (info: ScmInfo)
+}

@@ -1,0 +1,16 @@
+namespace jenkins.deploy {
+    use jenkins.types
+
+    event facet DeployToEnvironment(artifact_path: String,
+        environment: String = "staging",
+        strategy: String = "rolling",
+        version: String = "") => (result: DeployResult)
+
+    event facet DeployToK8s(artifact_path: String,
+        k8s_namespace: String = "default", cluster: String = "default",
+        replicas: Int = 2,
+        image_tag: String = "") => (result: DeployResult)
+
+    event facet RollbackDeploy(deploy_id: String,
+        environment: String) => (result: DeployResult)
+}

@@ -1,0 +1,154 @@
+namespace jenkins.pipeline {
+
+    use jenkins.types
+    use jenkins.mixins
+
+    // -----------------------------------------------------------------------
+    // Pipeline 1: Java Maven CI — call-time mixin composition
+    // Shows: with Timeout(), with Retry(), with Credentials(), with Notification()
+    // -----------------------------------------------------------------------
+    workflow JavaMavenCI(repo: String, branch: String = "main",
+        environment: String = "staging") => (deploy_url: String,
+            test_passed: Long, test_total: Long,
+            version: String) andThen {
+
+        // Checkout with credential mixin
+        src = jenkins.scm.GitCheckout(repo = $.repo,
+            branch = $.branch) with Credentials(credentialId = "git-ssh-key", type = "ssh")
+
+        // Build with timeout + retry
+        build = jenkins.build.MavenBuild(workspace_path = src.info.workspace_path,
+            goals = "clean package -DskipTests") with Timeout(minutes = 20) with Retry(maxAttempts = 2, backoffSeconds = 60)
+
+        // Test with timeout
+        tests = jenkins.test.RunTests(workspace_path = src.info.workspace_path,
+            framework = "junit",
+            suite = "unit") with Timeout(minutes = 15)
+
+        // Deploy with credentials + notification
+        deploy = jenkins.deploy.DeployToEnvironment(artifact_path = build.result.artifact_path,
+            environment = $.environment,
+            version = build.result.version) with Credentials(credentialId = "deploy-token") with Notification(channel = "#deployments")
+
+        yield JavaMavenCI(
+            deploy_url = deploy.result.url,
+            test_passed = tests.report.passed,
+            test_total = tests.report.total,
+            version = build.result.version)
+    }
+
+    // -----------------------------------------------------------------------
+    // Pipeline 2: Docker Kubernetes Deploy — credentials + agent labels
+    // Shows: with AgentLabel(), with Credentials()
+    // -----------------------------------------------------------------------
+    workflow DockerK8sDeploy(repo: String, branch: String = "main",
+        image_tag: String, registry_url: String,
+        k8s_namespace: String = "default",
+        replicas: Int = 2) => (deploy_url: String,
+            image: String, healthy: Boolean) andThen {
+
+        src = jenkins.scm.GitCheckout(repo = $.repo,
+            branch = $.branch) with AgentLabel(label = "docker")
+
+        build = jenkins.build.DockerBuild(workspace_path = src.info.workspace_path,
+            image_tag = $.image_tag) with Timeout(minutes = 30) with AgentLabel(label = "docker")
+
+        scan = jenkins.test.SecurityScan(workspace_path = src.info.workspace_path,
+            scanner = "trivy", severity_threshold = "CRITICAL")
+
+        push = jenkins.artifact.DockerPush(image_tag = $.image_tag,
+            registry_url = $.registry_url) with Credentials(credentialId = "registry-creds") with Retry(maxAttempts = 3, backoffSeconds = 10)
+
+        deploy = jenkins.deploy.DeployToK8s(artifact_path = push.artifact.path,
+            k8s_namespace = $.k8s_namespace, cluster = "production",
+            replicas = $.replicas,
+            image_tag = $.image_tag) with Credentials(credentialId = "k8s-token") with Timeout(minutes = 10)
+
+        notify = jenkins.notify.SlackNotify(channel = "#releases",
+            message = "Deployed " ++ $.image_tag ++ " to k8s/" ++ $.k8s_namespace,
+            color = "good")
+
+        yield DockerK8sDeploy(
+            deploy_url = deploy.result.url,
+            image = push.artifact.tag,
+            healthy = deploy.result.healthy)
+    }
+
+    // -----------------------------------------------------------------------
+    // Pipeline 3: Multi-Module Build — foreach + stash mixins
+    // Shows: andThen foreach with per-iteration mixins
+    // -----------------------------------------------------------------------
+    workflow MultiModuleBuild(repo: String, branch: String = "main",
+        modules: Json) => (artifact_path: String,
+            module_name: String,
+            test_passed: Long) andThen foreach mod in $.modules {
+
+        src = jenkins.scm.GitCheckout(repo = $.repo, branch = $.branch)
+
+        build = jenkins.build.GradleBuild(workspace_path = src.info.workspace_path,
+            tasks = $.mod.build_task) with Timeout(minutes = 20) with Stash(name = $.mod.name ++ "-build", includes = $.mod.output_pattern)
+
+        tests = jenkins.test.RunTests(workspace_path = src.info.workspace_path,
+            framework = "junit",
+            suite = $.mod.test_suite) with Timeout(minutes = 15) with Retry(maxAttempts = 2)
+
+        archive = jenkins.artifact.ArchiveArtifacts(workspace_path = src.info.workspace_path,
+            includes = $.mod.output_pattern)
+
+        yield MultiModuleBuild(
+            artifact_path = archive.artifact.path,
+            module_name = $.mod.name,
+            test_passed = tests.report.passed)
+    }
+
+    // -----------------------------------------------------------------------
+    // Pipeline 4: Full CI with Quality Gates — comprehensive composition
+    // Shows: parallel stages, quality gates, conditional notification
+    // -----------------------------------------------------------------------
+    workflow FullCIPipeline(repo: String, branch: String = "main",
+        deploy_env: String = "staging",
+        notify_channel: String = "#ci") => (deploy_url: String,
+            version: String, test_coverage: Double,
+            quality_issues: Long,
+            security_critical: Long) andThen {
+
+        // Stage 1: Checkout
+        src = jenkins.scm.GitCheckout(repo = $.repo,
+            branch = $.branch) with Credentials(credentialId = "git-ssh-key", type = "ssh") with Timeout(minutes = 5)
+
+        // Stage 2: Build
+        build = jenkins.build.MavenBuild(workspace_path = src.info.workspace_path,
+            goals = "clean package") with Timeout(minutes = 25) with Retry(maxAttempts = 2) with AgentLabel(label = "linux-large")
+
+        // Stage 3: Parallel quality gates (no inter-dependencies)
+        tests = jenkins.test.RunTests(workspace_path = src.info.workspace_path,
+            framework = "junit",
+            parallel = true) with Timeout(minutes = 20)
+
+        quality = jenkins.test.CodeQuality(workspace_path = src.info.workspace_path,
+            tool = "sonarqube") with Timeout(minutes = 15) with Credentials(credentialId = "sonar-token")
+
+        security = jenkins.test.SecurityScan(workspace_path = src.info.workspace_path,
+            scanner = "trivy",
+            severity_threshold = "HIGH") with Timeout(minutes = 10)
+
+        // Stage 4: Archive + Deploy
+        archive = jenkins.artifact.ArchiveArtifacts(workspace_path = src.info.workspace_path,
+            includes = "target/*.jar") with Stash(name = "build-artifacts")
+
+        deploy = jenkins.deploy.DeployToEnvironment(artifact_path = archive.artifact.path,
+            environment = $.deploy_env, version = build.result.version,
+            strategy = "rolling") with Credentials(credentialId = "deploy-token") with Timeout(minutes = 10) with Notification(channel = $.notify_channel, onSuccess = true, onFailure = true)
+
+        // Stage 5: Notify
+        notify = jenkins.notify.SlackNotify(channel = $.notify_channel,
+            message = "Pipeline complete: " ++ build.result.version ++ " deployed to " ++ $.deploy_env)
+
+        yield FullCIPipeline(
+            deploy_url = deploy.result.url,
+            version = build.result.version,
+            test_coverage = tests.report.coverage_pct,
+            quality_issues = quality.report.issues,
+            security_critical = security.report.critical)
+    }
+}
