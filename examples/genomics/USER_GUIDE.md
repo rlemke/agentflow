@@ -17,6 +17,7 @@ Use this as your starting point if you are:
 3. How to organize schemas, event facets, and workflows across multiple AFL files
 4. How factory-built handlers reduce boilerplate for large numbers of similar facets
 5. How name resolution (alias maps) provides user-friendly resource lookups
+6. How to **encapsulate multi-step pipelines** behind simple composed facets
 
 ## Step-by-Step Walkthrough
 
@@ -140,6 +141,95 @@ def _make_cache_handler(name, info):
 _DISPATCH = {f"genomics.cache.reference.{name}": _make_cache_handler(name, info)
              for name, info in REFERENCE_REGISTRY.items()}
 ```
+
+### Facet Encapsulation — Hiding Pipeline Complexity
+
+The raw event facets (`QcReads`, `AlignReads`, `CallVariants`, `JointGenotype`, `NormalizeFilter`, `Annotate`, etc.) are low-level building blocks that require domain expertise to chain together correctly. Instead, **wrap multi-step chains in composed facets** that expose a simple interface:
+
+```afl
+namespace genomics.library {
+    use genomics.types
+
+    // Composed facet: encapsulates QC → Align → CallVariants per sample.
+    // Users never see the three-step chain — they just call ProcessSample.
+    facet ProcessSample(sample_id: String, r1_uri: String, r2_uri: String,
+        reference_build: String = "GRCh38") => (gvcf_path: String,
+            sample_id: String, variant_count: Long) andThen {
+
+        qc = genomics.Facets.QcReads(sample_id = $.sample_id,
+            r1_uri = $.r1_uri, r2_uri = $.r2_uri)
+
+        aligned = genomics.Facets.AlignReads(sample_id = qc.result.sample_id,
+            clean_fastq_path = qc.result.clean_fastq_path,
+            reference_build = $.reference_build)
+
+        called = genomics.Facets.CallVariants(sample_id = aligned.result.sample_id,
+            bam_path = aligned.result.bam_path,
+            reference_build = $.reference_build)
+
+        yield ProcessSample(
+            gvcf_path = called.result.gvcf_path,
+            sample_id = called.result.sample_id,
+            variant_count = called.result.variant_count)
+    }
+
+    // Composed facet: encapsulates joint genotyping → normalize → annotate → publish.
+    // Hides the entire post-processing chain behind a single call.
+    facet AnalyzeCohort(dataset_id: String, gvcf_dir: String,
+        reference_build: String = "GRCh38") => (package_path: String,
+            total_variants: Long, sample_count: Long) andThen {
+
+        joint = genomics.Facets.JointGenotype(gvcf_dir = $.gvcf_dir,
+            reference_build = $.reference_build, sample_count = 4)
+
+        norm = genomics.Facets.NormalizeFilter(vcf_path = joint.result.cohort_vcf_path,
+            reference_build = $.reference_build)
+
+        annotated = genomics.Facets.Annotate(vcf_path = norm.result.filtered_vcf_path,
+            annotation_path = "/ref/dbsnp.vcf.gz")
+
+        stats = genomics.Facets.CohortAnalytics(
+            variant_table_path = annotated.result.variant_table_path,
+            dataset_id = $.dataset_id)
+
+        published = genomics.Facets.Publish(
+            variant_table_path = annotated.result.variant_table_path,
+            qc_report_path = stats.result.qc_report_path,
+            stats_path = stats.result.stats_path,
+            dataset_id = $.dataset_id)
+
+        yield AnalyzeCohort(
+            package_path = published.result.package_path,
+            total_variants = annotated.result.variant_count,
+            sample_count = joint.result.sample_count)
+    }
+
+    // Workflow: clean and simple — two composed facets instead of nine raw steps
+    workflow FullCohortPipeline(dataset_id: String,
+        samples: Json,
+        reference_build: String = "GRCh38") => (package_path: String,
+            total_variants: Long) andThen foreach sample in $.samples {
+
+        processed = ProcessSample(sample_id = $.sample.sample_id,
+            r1_uri = $.sample.r1_uri, r2_uri = $.sample.r2_uri,
+            reference_build = $.reference_build)
+
+        yield FullCohortPipeline(
+            package_path = "/pending",
+            total_variants = processed.variant_count)
+    }
+}
+```
+
+**Why this matters:**
+
+| Layer | What the User Sees | What's Hidden |
+|-------|-------------------|---------------|
+| Event facets | `QcReads`, `AlignReads`, `CallVariants`, `JointGenotype`, etc. | Handler implementations |
+| Composed facets | `ProcessSample(sample_id, r1, r2)`, `AnalyzeCohort(dataset_id, gvcf_dir)` | QC/alignment/variant-calling chain, normalization/annotation pipeline |
+| Workflows | `FullCohortPipeline(dataset_id, samples)` | The entire pipeline structure |
+
+This is the **library facet** pattern — bioinformatics teams define `ProcessSample` and `AnalyzeCohort` with the correct step ordering and parameter wiring; research teams call them without needing to understand the nine underlying event facets or their data dependencies.
 
 ### Name Resolution with Aliases
 

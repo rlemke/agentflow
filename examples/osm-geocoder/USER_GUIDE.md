@@ -17,6 +17,7 @@ Use this as your starting point if you are:
 3. How factory-built handlers work with geographic registries
 4. How to use the `AgentPoller` for a standalone agent service
 5. How to write integration tests for composed workflows
+6. How to **encapsulate low-level operations** behind simple composed facets for library reuse
 
 ## Overview
 
@@ -182,6 +183,85 @@ for ns, regions in REGISTRY.items():
     for name, url in regions.items():
         _DISPATCH[f"{ns}.{name}"] = _make_handler(name, url)
 ```
+
+### Facet Encapsulation — Hiding Data Pipeline Complexity
+
+The raw event facets (`Cache`, `Download`, `Tile`, `RoutingGraph`, `PostGisImport`, etc.) are low-level operations that require OSM domain expertise to chain correctly. Instead, **wrap multi-step data pipelines in composed facets** that expose a simple, domain-focused interface:
+
+```afl
+namespace osm.library {
+    use osm.types
+
+    // Composed facet: encapsulates cache + download + tile generation.
+    // Users never see the three-step chain — they just call PrepareRegion.
+    facet PrepareRegion(region: String) => (cache: OSMCache,
+            tile_path: String) andThen {
+
+        cached = osm.geo.Operations.Cache(region = $.region)
+
+        downloaded = osm.geo.Operations.Download(cache = cached.cache)
+
+        tiled = osm.geo.Operations.Tile(cache = downloaded.downloadCache)
+
+        yield PrepareRegion(
+            cache = downloaded.downloadCache,
+            tile_path = tiled.tiles.path)
+    }
+
+    // Composed facet: encapsulates cache + download + routing graph build.
+    // Hides PBF downloads and GraphHopper configuration behind one call.
+    facet BuildRoutingData(region: String) => (cache: OSMCache,
+            graph_path: String) andThen {
+
+        cached = osm.geo.Operations.Cache(region = $.region)
+
+        downloaded = osm.geo.Operations.Download(cache = cached.cache)
+
+        graph = osm.geo.Operations.RoutingGraph(cache = downloaded.downloadCache)
+
+        yield BuildRoutingData(
+            cache = downloaded.downloadCache,
+            graph_path = graph.graph.path)
+    }
+
+    // Composed facet: encapsulates full GIS import pipeline.
+    // Cache → download → PostGIS import in one call.
+    facet ImportToPostGIS(region: String) => (cache: OSMCache,
+            import_status: String) andThen {
+
+        cached = osm.geo.Operations.Cache(region = $.region)
+
+        downloaded = osm.geo.Operations.Download(cache = cached.cache)
+
+        imported = osm.geo.Operations.PostGisImport(cache = downloaded.downloadCache)
+
+        yield ImportToPostGIS(
+            cache = downloaded.downloadCache,
+            import_status = "complete")
+    }
+
+    // Workflow: clean and simple — users call composed facets, not raw operations
+    workflow PrepareEuropeRouting(countries: Json) => (graph_path: String,
+            region: String) andThen foreach country in $.countries {
+
+        routable = BuildRoutingData(region = $.country.name)
+
+        yield PrepareEuropeRouting(
+            graph_path = routable.graph_path,
+            region = $.country.name)
+    }
+}
+```
+
+**Why this matters:**
+
+| Layer | What the User Sees | What's Hidden |
+|-------|-------------------|---------------|
+| Event facets | `Cache`, `Download`, `Tile`, `RoutingGraph`, `PostGisImport` | Handler implementations, PBF/tile formats |
+| Composed facets | `PrepareRegion(region)`, `BuildRoutingData(region)`, `ImportToPostGIS(region)` | Cache configuration, download URLs, tool-specific parameters |
+| Workflows | `PrepareEuropeRouting(countries)` | The entire data pipeline structure |
+
+This is the **library facet** pattern — the GIS team defines `PrepareRegion` and `BuildRoutingData` with correct operation ordering; application teams call them without needing to understand cache semantics, PBF file formats, or GraphHopper configuration.
 
 ### Composed Workflows
 

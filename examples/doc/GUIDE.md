@@ -135,6 +135,31 @@ event facet GitCheckout(...) => (info: ScmInfo) with Timeout(minutes = 10)
 implicit defaultRetry = Retry(maxAttempts = 3, backoffSeconds = 30)
 ```
 
+### Facet Encapsulation
+
+Wrap low-level event facets in composed facets to expose simple, domain-focused interfaces. This is the **library facet** pattern — infrastructure teams define the composed facets; consumers use them without knowing the internal steps.
+
+```afl
+// Low-level: 3 separate event facets (agent developers write handlers for these)
+cached = osm.geo.Operations.Cache(region = "Belgium")
+downloaded = osm.geo.Operations.Download(cache = cached.cache)
+graph = osm.geo.Operations.RoutingGraph(cache = downloaded.downloadCache)
+
+// Encapsulated: 1 composed facet (workflow authors use this)
+routable = BuildRoutingData(region = "Belgium")
+```
+
+The composed facet is a regular `facet` (not `event facet`) with an `andThen` body. The runtime expands its steps inline — the internal event facets still pause for agents, but the user only sees the simple outer interface.
+
+Every intermediate-to-advanced example uses this pattern:
+
+| Example | Composed Facets | What They Hide |
+|---------|----------------|----------------|
+| [genomics](../genomics/) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
+| [jenkins](../jenkins/) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
+| [aws-lambda](../aws-lambda/) | `DeployFunction`, `UpdateAndVerify` | Lambda create→invoke→verify steps |
+| [osm-geocoder](../osm-geocoder/) | `PrepareRegion`, `BuildRoutingData` | Cache→download→tile/graph pipeline |
+
 ### Cross-Namespace Composition
 
 Import facets from other namespaces to compose new workflows.

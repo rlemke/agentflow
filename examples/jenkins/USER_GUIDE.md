@@ -17,6 +17,7 @@ Use this as your starting point if you are:
 3. How to attach mixins at **signature level** (always applied)
 4. How `implicit` declarations provide namespace-level defaults
 5. How to combine foreach iteration with per-iteration mixins
+6. How to **encapsulate complex pipelines** behind simple composed facets with baked-in mixins
 
 ## Step-by-Step Walkthrough
 
@@ -124,6 +125,83 @@ PYTHONPATH=. python examples/jenkins/agent.py
 ```
 
 ## Key Concepts
+
+### Facet Encapsulation — Hiding Pipeline Complexity
+
+The `JavaMavenCI` workflow has four steps with credentials, timeouts, and retries scattered across each one. A workflow author shouldn't need to know about all that. Instead, **wrap the pipeline in a composed facet** that bakes in the mixins and exposes a simple interface:
+
+```afl
+namespace jenkins.library {
+    use jenkins.types
+    use jenkins.mixins
+
+    // Composed facet: encapsulates checkout + build + test with all mixins baked in.
+    // Users never see Credentials, Timeout, or Retry — they just call BuildAndTest.
+    facet BuildAndTest(repo: String, branch: String = "main",
+        goals: String = "clean package",
+        test_suite: String = "unit") => (artifact_path: String,
+            version: String, test_passed: Long,
+            test_total: Long) andThen {
+
+        src = jenkins.scm.GitCheckout(repo = $.repo,
+            branch = $.branch) with Credentials(credentialId = "git-ssh-key", type = "ssh")
+
+        build = jenkins.build.MavenBuild(workspace_path = src.info.workspace_path,
+            goals = $.goals) with Timeout(minutes = 20) with Retry(maxAttempts = 2, backoffSeconds = 60)
+
+        tests = jenkins.test.RunTests(workspace_path = src.info.workspace_path,
+            framework = "junit",
+            suite = $.test_suite) with Timeout(minutes = 15)
+
+        yield BuildAndTest(
+            artifact_path = build.result.artifact_path,
+            version = build.result.version,
+            test_passed = tests.report.passed,
+            test_total = tests.report.total)
+    }
+
+    // Composed facet: encapsulates deploy + notification with credentials baked in
+    facet DeployWithNotification(artifact_path: String, environment: String,
+        version: String,
+        notify_channel: String = "#deployments") => (deploy_url: String,
+            healthy: Boolean) andThen {
+
+        deploy = jenkins.deploy.DeployToEnvironment(artifact_path = $.artifact_path,
+            environment = $.environment,
+            version = $.version) with Credentials(credentialId = "deploy-token") with Notification(channel = $.notify_channel)
+
+        yield DeployWithNotification(
+            deploy_url = deploy.result.url,
+            healthy = deploy.result.healthy)
+    }
+
+    // Workflow: clean and simple — two composed facets instead of four raw steps + mixins
+    workflow SimpleMavenCI(repo: String, branch: String = "main",
+        environment: String = "staging") => (deploy_url: String,
+            version: String, test_passed: Long) andThen {
+
+        built = BuildAndTest(repo = $.repo, branch = $.branch)
+
+        deployed = DeployWithNotification(artifact_path = built.artifact_path,
+            environment = $.environment, version = built.version)
+
+        yield SimpleMavenCI(
+            deploy_url = deployed.deploy_url,
+            version = built.version,
+            test_passed = built.test_passed)
+    }
+}
+```
+
+**Why this matters:**
+
+| Layer | What the User Sees | What's Hidden |
+|-------|-------------------|---------------|
+| Event facets | `GitCheckout`, `MavenBuild`, `RunTests`, `DeployToEnvironment` | Handler implementations |
+| Composed facets | `BuildAndTest(repo, branch)`, `DeployWithNotification(artifact, env)` | Mixins, credential IDs, timeout values, retry policies |
+| Workflows | `SimpleMavenCI(repo, environment)` | The entire pipeline structure |
+
+This is the **library facet** pattern — composed facets become reusable building blocks that teams share. The CI team defines `BuildAndTest` with the right mixins; application teams call it without knowing about retry policies or credential management.
 
 ### Mixin Composition Patterns
 
