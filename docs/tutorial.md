@@ -1,6 +1,6 @@
 # AFL Tutorial -- Agent Flow Language
 
-This tutorial walks through AFL (Agent Flow Language) in seven progressive
+This tutorial walks through AFL (Agent Flow Language) in eight progressive
 parts.  Each part introduces a small set of constructs, shows complete
 examples, and explains how the pieces fit together.  By the end you will be
 able to write multi-step workflows with schemas, event facets, composition,
@@ -473,7 +473,7 @@ Use parentheses to override operator precedence:
 
 ## Part 7 -- Putting It Together
 
-This final part combines namespaces, schemas, event facets, composition, and
+This part combines namespaces, schemas, event facets, composition, and
 multi-step logic into a complete workflow.
 
 ### A data processing pipeline
@@ -607,6 +607,194 @@ automatically without requiring custom agent code.
 
 ---
 
+## Part 8 -- Facet Encapsulation
+
+### The problem
+
+As workflows grow, calling event facets directly becomes unwieldy.  A workflow
+that orchestrates five or six event facets in sequence turns into a long,
+flat list of steps.  Worse, if two workflows need the same sequence of event
+facets, the logic is duplicated — and changes must be made in both places.
+
+### The solution: composed facets
+
+A regular `facet` (not `event facet`, not `workflow`) can have its own
+`andThen` body.  Inside the body it calls event facets as steps, wiring
+their inputs and outputs together.  The composed facet doesn't pause
+itself — its internal event facets do.  From the outside, calling the
+composed facet looks like calling a traditional subroutine.
+
+### Simple example
+
+Suppose you have two event facets — one that fetches raw data and one that
+transforms it:
+
+```afl
+namespace pipeline {
+
+    schema ProcessedResult {
+        record_count: Long,
+        output_path: String
+    }
+
+    event facet FetchData(url: String) => (raw_path: String)
+    event facet TransformData(input_path: String, format: String) => (result: ProcessedResult)
+}
+```
+
+**Before** — the workflow calls both event facets directly:
+
+```afl
+namespace pipeline {
+
+    schema ProcessedResult {
+        record_count: Long,
+        output_path: String
+    }
+
+    event facet FetchData(url: String) => (raw_path: String)
+    event facet TransformData(input_path: String, format: String) => (result: ProcessedResult)
+
+    workflow Ingest(url: String, format: String = "csv") => (output_path: String) andThen {
+        fetched = FetchData(url = $.url)
+        transformed = TransformData(input_path = fetched.raw_path, format = $.format)
+        yield Ingest(output_path = transformed.result.output_path)
+    }
+}
+```
+
+This works, but every workflow that needs fetch-then-transform must repeat
+the same two steps.
+
+**After** — wrap the two steps into a composed facet:
+
+```afl
+namespace pipeline {
+
+    schema ProcessedResult {
+        record_count: Long,
+        output_path: String
+    }
+
+    event facet FetchData(url: String) => (raw_path: String)
+    event facet TransformData(input_path: String, format: String) => (result: ProcessedResult)
+
+    facet FetchAndTransform(url: String, format: String = "csv") => (result: ProcessedResult) andThen {
+        fetched = FetchData(url = $.url)
+        transformed = TransformData(input_path = fetched.raw_path, format = $.format)
+        yield FetchAndTransform(result = transformed.result)
+    }
+
+    workflow Ingest(url: String, format: String = "csv") => (output_path: String) andThen {
+        ft = FetchAndTransform(url = $.url, format = $.format)
+        yield Ingest(output_path = ft.result.output_path)
+    }
+}
+```
+
+Now `FetchAndTransform` is a reusable unit.  The workflow reads like a single
+function call, and any changes to the fetch-transform logic happen in one
+place.
+
+Key points:
+
+- `FetchAndTransform` is a regular `facet`, not an `event facet`.  It does not
+  pause for an agent itself.
+- Its internal steps (`FetchData`, `TransformData`) are event facets, so the
+  runtime pauses at each one to wait for agent results.
+- The composed facet has a `=>` return clause and a `yield`, just like a
+  workflow.
+- Callers see a simple interface: give me a URL and format, get back a result.
+
+### Real-world example: volcano data loading
+
+The `examples/volcano-query/` example defines a `LoadVolcanoData` facet that
+wraps cache lookup and data download into a single reusable step:
+
+```afl
+facet LoadVolcanoData(region: String = "US") => (cache: OSMCache) andThen {
+    c = Cache(region = $.region)
+    d = osm.geo.Operations.Download(cache = c.cache)
+    yield LoadVolcanoData(cache = d.downloadCache)
+}
+```
+
+The workflow `FindVolcanoes` calls it as if it were a simple function:
+
+```afl
+workflow FindVolcanoes(region: String = "US") => (results: Json) andThen {
+    data = LoadVolcanoData(region = $.region)
+    query = QueryVolcanoes(cache = data.cache)
+    yield FindVolcanoes(results = query.results)
+}
+```
+
+The caller never needs to know that `LoadVolcanoData` internally coordinates
+a cache lookup followed by a download.  If the caching strategy changes, only
+the composed facet needs updating.
+
+### Benefits
+
+| Benefit | How it helps |
+|---------|-------------|
+| Hide complexity | Callers see one step instead of many |
+| Enforce ordering | The composed facet wires step dependencies correctly once |
+| Swap implementations | Change internal event facets without touching callers |
+| Reuse across workflows | Multiple workflows share the same composed facet |
+| Layer abstractions | Composed facets can call other composed facets |
+
+### Baking in mixins
+
+Composed facets can attach mixins to their internal steps, so callers
+never need to think about retry policies, timeouts, or credentials.
+
+The `examples/jenkins/` example demonstrates this with a `BuildAndTest` facet
+that bakes in credentials, timeouts, and retries:
+
+```afl
+facet BuildAndTest(repo: String, branch: String = "main",
+    goals: String = "clean package",
+    test_suite: String = "unit") => (artifact_path: String,
+        version: String, test_passed: Long,
+        test_total: Long) andThen {
+
+    src = jenkins.scm.GitCheckout(repo = $.repo,
+        branch = $.branch) with Credentials(credentialId = "git-ssh-key", type = "ssh")
+
+    build = jenkins.build.MavenBuild(workspace_path = src.info.workspace_path,
+        goals = $.goals) with Timeout(minutes = 20) with Retry(maxAttempts = 2, backoffSeconds = 60)
+
+    tests = jenkins.test.RunTests(workspace_path = src.info.workspace_path,
+        framework = "junit",
+        suite = $.test_suite) with Timeout(minutes = 15)
+
+    yield BuildAndTest(
+        artifact_path = build.result.artifact_path,
+        version = build.result.version,
+        test_passed = tests.report.passed,
+        test_total = tests.report.total)
+}
+```
+
+Callers just write:
+
+```afl
+    build = BuildAndTest(repo = "github.com/team/app", branch = "release")
+```
+
+They never see `Credentials`, `Timeout`, or `Retry` — those cross-cutting
+concerns are the composed facet's responsibility.
+
+Key points:
+
+- Mixins on internal steps are invisible to the caller.
+- The composed facet's parameter list is the public API; everything else is
+  an implementation detail.
+- This is especially useful for teams where platform engineers define composed
+  facets and application developers consume them.
+
+---
+
 ## Quick Reference
 
 | Construct | Syntax |
@@ -623,6 +811,7 @@ automatically without requiring custom agent code.
 | Step reference | `stepName.attrName` |
 | Mixin | `with Facet(arg = val)` / `with Facet(arg = val) as alias` |
 | Implicit | `implicit name = Facet(arg = val)` |
+| Composed facet | `facet Name(p: Type) => (r: Type) andThen { ... }` |
 | Foreach | `andThen foreach item in $.list { ... }` |
 | Arithmetic | `+`, `-`, `*`, `/`, `%` |
 | Concatenation | `++` |
