@@ -521,6 +521,17 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.10) - Facet Encapsulation Tutorial
+- **Tutorial Part 8** (`docs/tutorial.md`): new "Facet Encapsulation" section teaching the composed facet pattern — using regular facets with `andThen` bodies to wrap event facet sequences into reusable subroutine-like units
+- **The problem / solution**: explains why calling event facets directly doesn't scale and introduces composed facets as the abstraction layer
+- **Before/after example**: `FetchAndTransform` wrapping `FetchData` + `TransformData` in a `pipeline` namespace; both AFL snippets verified with `afl --check`
+- **Real-world example**: adapted from `examples/volcano-query/` showing `LoadVolcanoData` wrapping `Cache` + `Download`, called by `FindVolcanoes` workflow
+- **Benefits table**: hide complexity, enforce ordering, swap implementations, reuse across workflows, layer abstractions
+- **Baking in mixins**: adapted from `examples/jenkins/` showing `BuildAndTest` with embedded `Credentials`, `Timeout`, and `Retry` mixins invisible to callers
+- **Quick Reference**: added "Composed facet" row to the reference table
+- **Intro updated**: "seven progressive parts" → "eight progressive parts"
+- 1633 passed, 36 skipped
+
 ## Completed (v0.12.9) - Workflows Callable as Steps in andThen Blocks
 - **Emitter fix**: workflows now included in the unified `declarations` list in both `_program()` and `_namespace()`, enabling the runtime to resolve workflow names during step execution
 - **Runtime fix**: `"WorkflowDecl"` added to type-check tuples in `dependency.py` (`_resolve_in_declarations`) and `evaluator.py` (`_resolve_in_declarations`, `_search_declarations_qualified` ×2, `_search_declarations`), allowing workflow declarations to be found during qualified-name resolution and facet definition lookup
