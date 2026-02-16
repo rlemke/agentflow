@@ -521,6 +521,18 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.11) - Maven Artifact Runner Agent
+- **New agent execution model** (`afl/runtime/maven_runner.py`): `MavenArtifactRunner` class that runs external JVM programs packaged as Maven artifacts — claims event tasks, resolves and downloads Maven artifacts (with local caching), launches JVM subprocesses, and handles step continuation and workflow resumption
+- **`MavenRunnerConfig` dataclass**: extends the standard runner config with Maven-specific fields — `cache_dir` (default `~/.afl/maven-cache`), `repository_url` (default Maven Central), `java_command`, `default_timeout_ms` (5 min)
+- **Maven URI scheme**: `mvn:groupId:artifactId:version[:classifier]` in `HandlerRegistration.module_uri`; `entrypoint` field holds optional main class (empty = executable JAR); JVM args via `metadata["jvm_args"]` list
+- **Artifact caching**: thread-safe per-artifact download locks; cache layout `{cache_dir}/{groupPath}/{artifactId}/{version}/{artifactId}-{version}[-{classifier}].jar`; download via `urllib.request.urlopen()` with 60s timeout
+- **Program contract**: invoked as `java -jar artifact.jar <stepId>` or `java -cp artifact.jar MainClass <stepId>`; environment variables `AFL_STEP_ID`, `AFL_MONGODB_URL`, `AFL_MONGODB_DATABASE`; exit 0 = success, non-zero = failure
+- **Step lifecycle**: agent reads returns from MongoDB after subprocess exit, calls `evaluator.continue_step()` + `evaluator.resume()` on success, `evaluator.fail_step()` on failure/timeout
+- **Registry filtering**: only picks up `mvn:` URI registrations (ignores Python module URIs); topic filtering via fnmatch patterns
+- **Same lifecycle as RegistryRunner**: server registration, heartbeat, poll loop, thread pool, AST caching, graceful shutdown
+- **Runtime exports**: `MavenArtifactRunner` and `MavenRunnerConfig` added to `afl.runtime.__init__`
+- **~30 new tests** (`tests/runtime/test_maven_runner.py`): config defaults, URI parsing (valid/invalid/classifier), artifact resolution (cache hit/miss, URL construction, custom repo, download errors), event processing (success/failure/timeout/missing registration/JVM args/main class/env vars), registry refresh (mvn-only filtering, topic filtering), handler registration validation, lifecycle (start/stop, server state), AST caching, step returns reading
+
 ## Completed (v0.12.10) - Facet Encapsulation Tutorial
 - **Tutorial Part 8** (`docs/tutorial.md`): new "Facet Encapsulation" section teaching the composed facet pattern — using regular facets with `andThen` bodies to wrap event facet sequences into reusable subroutine-like units
 - **The problem / solution**: explains why calling event facets directly doesn't scale and introduces composed facets as the abstraction layer
