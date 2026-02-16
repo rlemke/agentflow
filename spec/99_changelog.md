@@ -521,6 +521,16 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.12) - RunMavenArtifact Event Facet
+- **`ExecutionResult` schema** (`maven_types.afl`): 8th schema in `maven.types` namespace capturing JVM subprocess results — `exit_code`, `success`, `duration_ms`, `stdout`, `stderr`, `artifact_path`
+- **`maven_runner.afl`** (new file): `maven.runner` namespace with `RunMavenArtifact` event facet — models the core MavenArtifactRunner operation (resolve Maven artifact, launch `java -jar`); parameters: `step_id`, `group_id`, `artifact_id`, `version`, optional `classifier`, `entrypoint`, `jvm_args`, `workflow_id`, `runner_id`; returns `ExecutionResult`
+- **`runner_handlers.py`** (new file): simulated handler following the `_DISPATCH` pattern; builds realistic artifact path from Maven coordinates, simulates successful JVM execution; dual-mode registration (AgentPoller + RegistryRunner)
+- **Handler wiring** (`handlers/__init__.py`): `register_runner_handlers` added to imports, `__all__`, `register_all_handlers()`, and `register_all_registry_handlers()` (12 → 13 total handler registrations)
+- **`RunArtifactPipeline` workflow** (`maven_workflows.afl`): 5th workflow — resolves dependencies then runs Maven artifact as JVM subprocess with `Timeout(minutes = 10)` mixin; returns `success`, `exit_code`, `duration_ms`
+- **7 new tests**: 3 compilation tests (runner facet parsing, parameter verification, pipeline step names) and 4 handler dispatch tests (dispatch keys, handle dispatches with result assertions, unknown facet error, register count)
+- **Documentation**: README.md updated with Pipeline 5, handler/AFL tables, counts; USER_GUIDE.md gains new "Run Maven Artifacts" walkthrough section
+- 1723 passed, 35 skipped (without `--hdfs`/`--mongodb`/`--postgis`)
+
 ## Completed (v0.12.11) - Maven Build Lifecycle Example
 - **New example** (`examples/maven/`): Maven build lifecycle agent demonstrating AFL mixin composition and the MavenArtifactRunner JVM subprocess execution model — following the Jenkins/AWS Lambda example pattern
 - **7 AFL files** defining the Maven build lifecycle domain: `maven.types` (7 schemas: ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo), `maven.mixins` (6 mixin facets + 3 implicits: Retry, Timeout, Repository, Profile, JvmArgs, Settings), `maven.resolve` (3 event facets), `maven.build` (4 event facets), `maven.publish` (3 event facets), `maven.quality` (2 event facets), `maven.workflows` (4 workflows: BuildAndTest, ReleaseArtifact, DependencyAudit, MultiModuleBuild)
