@@ -46,6 +46,8 @@ Options:
   --postgis            Start PostGIS database and wire into OSM agents
   --postgis-data-dir PATH   Use external directory for PostGIS data
   --mongodb-data-dir PATH   Use external directory for MongoDB data
+  --jenkins-home-dir PATH   Use external directory for Jenkins home
+  --graphhopper-data-dir PATH  Use external directory for GraphHopper data
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -65,9 +67,11 @@ while [[ $# -gt 0 ]]; do
         --hdfs-namenode-dir) export HDFS_NAMENODE_DIR="$2"; HDFS=true; shift 2 ;;
         --hdfs-datanode-dir) export HDFS_DATANODE_DIR="$2"; HDFS=true; shift 2 ;;
         --jenkins)       JENKINS=true;          shift ;;
+        --jenkins-home-dir) export JENKINS_HOME_DIR="$2"; JENKINS=true; shift 2 ;;
         --postgis)       POSTGIS=true;          shift ;;
         --postgis-data-dir) export POSTGIS_DATA_DIR="$2"; POSTGIS=true; shift 2 ;;
         --mongodb-data-dir) export MONGODB_DATA_DIR="$2"; shift 2 ;;
+        --graphhopper-data-dir) export GRAPHHOPPER_DATA_DIR="$2"; shift 2 ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -212,6 +216,9 @@ if [ "$JENKINS" = true ]; then
     SERVICES="$SERVICES jenkins"
     PROFILE_ARGS="$PROFILE_ARGS --profile jenkins"
     echo "Jenkins CI/CD enabled — Web UI at http://localhost:9090"
+    if [ -n "${JENKINS_HOME_DIR:-}" ]; then
+        echo "  Jenkins home dir: $JENKINS_HOME_DIR"
+    fi
     echo ""
 fi
 if [ "$POSTGIS" = true ]; then
@@ -226,6 +233,10 @@ if [ "$POSTGIS" = true ]; then
 fi
 if [ -n "${MONGODB_DATA_DIR:-}" ]; then
     echo "MongoDB external data dir: $MONGODB_DATA_DIR"
+    echo ""
+fi
+if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
+    echo "GraphHopper external data dir: $GRAPHHOPPER_DATA_DIR"
     echo ""
 fi
 

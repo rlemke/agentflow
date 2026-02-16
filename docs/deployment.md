@@ -336,6 +336,23 @@ scripts/setup --jenkins                    # Jenkins only
 scripts/setup --jenkins --build            # Rebuild images first
 ```
 
+### External Storage for Jenkins
+
+By default, Jenkins uses a Docker named volume (`jenkins_home`). To place Jenkins data on an external filesystem, set the `JENKINS_HOME_DIR` environment variable:
+
+```bash
+# Use an external directory for Jenkins data
+export JENKINS_HOME_DIR=/mnt/ssd/jenkins
+docker compose --profile jenkins up -d
+
+# Or via the setup script
+scripts/setup --jenkins --jenkins-home-dir /mnt/ssd/jenkins
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JENKINS_HOME_DIR` | `jenkins_home` (named volume) | Host path for Jenkins home directory |
+
 ## PostGIS Integration
 
 AgentFlow supports PostGIS as a spatial database for OSM geocoder agents. The OSM geocoder defines a `PostGisImport` event facet for importing geospatial data into PostGIS.
@@ -415,6 +432,23 @@ scripts/setup --mongodb-data-dir /mnt/ssd/mongodb
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MONGODB_DATA_DIR` | `mongodb_data` (named volume) | Host path for MongoDB data files |
+
+### External Storage for GraphHopper
+
+By default, the OSM Geocoder agent uses a Docker named volume (`graphhopper_data`) for GraphHopper routing graphs. To place GraphHopper data on an external filesystem, set the `GRAPHHOPPER_DATA_DIR` environment variable:
+
+```bash
+# Use an external directory for GraphHopper data
+export GRAPHHOPPER_DATA_DIR=/mnt/ssd/graphhopper
+docker compose up -d agent-osm-geocoder
+
+# Or via the setup script
+scripts/setup --osm-agents 2 --graphhopper-data-dir /mnt/ssd/graphhopper
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GRAPHHOPPER_DATA_DIR` | `graphhopper_data` (named volume) | Host path for GraphHopper routing graph data |
 
 Ensure target directories exist and have appropriate permissions before starting the containers.
 

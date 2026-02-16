@@ -95,7 +95,7 @@ services:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
     volumes:
-      - graphhopper_data:/data/graphhopper
+      - ${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper
     depends_on:
       mongodb:
         condition: service_healthy
@@ -182,7 +182,7 @@ services:
       - "9090:8080"   # Web UI
       - "50000:50000" # Agent
     volumes:
-      - jenkins_home:/var/jenkins_home
+      - ${JENKINS_HOME_DIR:-jenkins_home}:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: curl -f http://localhost:8080/login || exit 1

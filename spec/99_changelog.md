@@ -521,6 +521,11 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.6) - Configurable External Storage for Jenkins & GraphHopper
+- **Docker Compose** (`docker-compose.yml`): Jenkins and GraphHopper volume mounts now use env var substitution — `${JENKINS_HOME_DIR:-jenkins_home}:/var/jenkins_home` and `${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage
+- **Setup script** (`scripts/setup`): added `--jenkins-home-dir PATH` and `--graphhopper-data-dir PATH` options; `--jenkins-home-dir` auto-enables `--jenkins`; prints configured paths in status output
+- **Deployment docs** (`docs/deployment.md`): new "External Storage for Jenkins" and "External Storage for GraphHopper" sections with usage examples and env var tables
+
 ## Completed (v0.12.5) - Configurable External Storage for MongoDB & PostGIS
 - **Docker Compose** (`docker-compose.yml`): MongoDB and PostGIS volume mounts now use env var substitution — `${MONGODB_DATA_DIR:-mongodb_data}:/data/db` and `${POSTGIS_DATA_DIR:-postgis_data}:/var/lib/postgresql/data`; when unset, uses Docker named volumes (unchanged default); when set to a host path, creates bind mounts to external storage
 - **Setup script** (`scripts/setup`): added `--mongodb-data-dir PATH` and `--postgis-data-dir PATH` options; `--postgis-data-dir` auto-enables `--postgis`; prints configured paths in status output
