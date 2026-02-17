@@ -530,7 +530,7 @@
 - **Source concatenation**: all AFL source texts concatenated into a single `compiled_sources` entry, as required by `RunnerService._execute_workflow` which reads `compiled_sources[0].content`
 - **Console script**: `afl-submit` entry point added to `pyproject.toml`
 - **`run_30states.sh` updated**: step 5 now passes AFL source files via `--primary`/`--library` instead of pre-compiled JSON
-- 2098 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+- 2121 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
 ## Completed (v0.12.19) - Reorganize Example Tests into Standardized Structure
 
