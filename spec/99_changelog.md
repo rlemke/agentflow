@@ -521,6 +521,13 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.14) - Composed Facets, Multiple andThen Blocks, Arithmetic & Statement-level andThen
+- **Validator fix**: `_validate_and_then_block` now accepts `extra_yield_targets` parameter; inline step bodies pass the step's call target as an additional valid yield target, so `yield ResolveDependencies(...)` inside a step body validates correctly
+- **`maven_composed.afl`** (new file): `maven.composed` namespace with 2 **composed facets** — `CompileAndTest` (resolve → compile+Retry → test+Timeout → package) and `FullQualityGate` (checkstyle+Timeout, dependency check+Timeout) with **arithmetic** (`total_issues = style.report.issues + security.report.issues`)
+- **`maven_pipelines.afl`** (new file): `maven.pipelines` namespace with 2 workflows — `FullBuildPipeline` using **multiple andThen blocks** (concurrent build + quality paths) and `InstrumentedBuild` using **statement-level andThen** on the deps step plus **arithmetic** for duration aggregation (`total_duration_ms = build.result.duration_ms + tests.report.duration_ms`)
+- **~17 new tests**: 2 validator tests (`TestStepBodyValidation` — valid/invalid inner yield targets), 7 composed facet tests (`TestMavenComposedFacets` — compilation, facet presence, steps, mixins, arithmetic, CLI check), 8 pipeline tests (`TestMavenPipelinesWorkflows` — compilation, workflow presence, multiple blocks, block steps, statement andThen, arithmetic, CLI check)
+- **Documentation**: README.md with Pipelines 8-9, updated AFL source files table; USER_GUIDE.md gains "Composed Facets", "Multiple andThen Blocks", "Arithmetic Expressions", "Statement-level andThen Body" sections
+
 ## Completed (v0.12.13) - Maven Plugin Execution & Workflow-as-Step Orchestration
 - **`PluginExecutionResult` schema** (`maven_types.afl`): 9th schema in `maven.types` — captures Maven plugin goal execution output with `plugin_key`, `goal`, `phase`, `exit_code`, `success`, `duration_ms`, `output`, `artifact_path`
 - **`RunMavenPlugin` event facet** (`maven_runner.afl`): 2nd event facet in `maven.runner` — runs a Maven plugin goal within a workspace; parameters: `workspace_path`, `plugin_group_id`, `plugin_artifact_id`, `plugin_version`, `goal`, optional `phase`, `jvm_args`, `properties`; returns `PluginExecutionResult`

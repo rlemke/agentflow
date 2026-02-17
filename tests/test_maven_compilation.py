@@ -306,6 +306,215 @@ class TestMavenWorkflows:
 
 
 # ---------------------------------------------------------------------------
+# Composed facets (composed facets with arithmetic)
+# ---------------------------------------------------------------------------
+class TestMavenComposedFacets:
+    """Compilation tests for maven_composed.afl with composed facets."""
+
+    _DEPS = [
+        "maven_types.afl",
+        "maven_mixins.afl",
+        "maven_resolve.afl",
+        "maven_build.afl",
+        "maven_quality.afl",
+    ]
+
+    def _compile_composed(self) -> dict:
+        return _compile("maven_composed.afl", *self._DEPS)
+
+    def test_composed_compiles(self):
+        """maven_composed.afl parses and validates with all deps."""
+        program = self._compile_composed()
+        assert program["type"] == "Program"
+
+    def test_composed_facets_present(self):
+        """CompileAndTest and FullQualityGate are emitted as facets."""
+        program = self._compile_composed()
+        facet_names = _collect_names(program, "facets")
+        assert "CompileAndTest" in facet_names
+        assert "FullQualityGate" in facet_names
+
+    def test_compile_and_test_steps(self):
+        """CompileAndTest has steps: deps, build, tests, pkg."""
+        program = self._compile_composed()
+        facet = self._find_facet(program, "CompileAndTest")
+        assert facet is not None
+        step_names = [s["name"] for s in facet["body"]["steps"]]
+        assert step_names == ["deps", "build", "tests", "pkg"]
+
+    def test_compile_and_test_mixins(self):
+        """CompileAndTest has Retry on build and Timeout on tests."""
+        program = self._compile_composed()
+        facet = self._find_facet(program, "CompileAndTest")
+        assert facet is not None
+        for step in facet["body"]["steps"]:
+            if step["name"] == "build":
+                call_mixins = step["call"].get("mixins", [])
+                assert any(
+                    m["target"] == "Retry" for m in call_mixins
+                ), "build step should have Retry mixin"
+            if step["name"] == "tests":
+                call_mixins = step["call"].get("mixins", [])
+                assert any(
+                    m["target"] == "Timeout" for m in call_mixins
+                ), "tests step should have Timeout mixin"
+
+    def test_quality_gate_steps(self):
+        """FullQualityGate has steps: style, security."""
+        program = self._compile_composed()
+        facet = self._find_facet(program, "FullQualityGate")
+        assert facet is not None
+        step_names = [s["name"] for s in facet["body"]["steps"]]
+        assert step_names == ["style", "security"]
+
+    def test_quality_gate_arithmetic(self):
+        """FullQualityGate yield total_issues uses BinaryExpr with + operator."""
+        program = self._compile_composed()
+        facet = self._find_facet(program, "FullQualityGate")
+        assert facet is not None
+        yield_call = facet["body"]["yield"]["call"]
+        total_arg = next(
+            a for a in yield_call["args"] if a["name"] == "total_issues"
+        )
+        assert total_arg["value"]["type"] == "BinaryExpr"
+        assert total_arg["value"]["operator"] == "+"
+        assert total_arg["value"]["left"]["type"] == "StepRef"
+        assert total_arg["value"]["right"]["type"] == "StepRef"
+
+    def test_cli_check_composed(self):
+        """The CLI --check flag succeeds for maven_composed.afl."""
+        args = [
+            "--primary", str(_AFL_DIR / "maven_composed.afl"),
+        ]
+        for dep in self._DEPS:
+            args.extend(["--library", str(_AFL_DIR / dep)])
+        args.append("--check")
+        result = main(args)
+        assert result == 0
+
+    @staticmethod
+    def _find_facet(program: dict, name: str) -> dict | None:
+        """Find a facet by name in the emitted program."""
+        def _walk(node):
+            for f in node.get("facets", []):
+                if f["name"] == name:
+                    return f
+            for ns in node.get("namespaces", []):
+                found = _walk(ns)
+                if found:
+                    return found
+            return None
+        return _walk(program)
+
+
+# ---------------------------------------------------------------------------
+# Pipeline workflows (multiple andThen blocks, statement-level andThen, arithmetic)
+# ---------------------------------------------------------------------------
+class TestMavenPipelinesWorkflows:
+    """Compilation tests for maven_pipelines.afl."""
+
+    _DEPS = [
+        "maven_types.afl",
+        "maven_mixins.afl",
+        "maven_resolve.afl",
+        "maven_build.afl",
+        "maven_quality.afl",
+        "maven_composed.afl",
+    ]
+
+    def _compile_pipelines(self) -> dict:
+        return _compile("maven_pipelines.afl", *self._DEPS)
+
+    def test_pipelines_compiles(self):
+        """maven_pipelines.afl parses and validates."""
+        program = self._compile_pipelines()
+        assert program["type"] == "Program"
+
+    def test_both_pipelines_present(self):
+        """FullBuildPipeline and InstrumentedBuild are emitted."""
+        program = self._compile_pipelines()
+        wf_names = _collect_names(program, "workflows")
+        assert "FullBuildPipeline" in wf_names
+        assert "InstrumentedBuild" in wf_names
+
+    def test_full_build_pipeline_multiple_blocks(self):
+        """FullBuildPipeline body is a list of length 2."""
+        program = self._compile_pipelines()
+        wf = self._find_workflow(program, "FullBuildPipeline")
+        assert wf is not None
+        assert isinstance(wf["body"], list)
+        assert len(wf["body"]) == 2
+
+    def test_full_build_pipeline_block_steps(self):
+        """Block 0 has ct, block 1 has qg."""
+        program = self._compile_pipelines()
+        wf = self._find_workflow(program, "FullBuildPipeline")
+        assert wf is not None
+        block0_steps = [s["name"] for s in wf["body"][0]["steps"]]
+        block1_steps = [s["name"] for s in wf["body"][1]["steps"]]
+        assert "ct" in block0_steps
+        assert "qg" in block1_steps
+
+    def test_instrumented_build_steps(self):
+        """InstrumentedBuild has steps: deps, build, tests, pkg."""
+        program = self._compile_pipelines()
+        wf = self._find_workflow(program, "InstrumentedBuild")
+        assert wf is not None
+        step_names = [s["name"] for s in wf["body"]["steps"]]
+        assert step_names == ["deps", "build", "tests", "pkg"]
+
+    def test_instrumented_build_statement_andthen(self):
+        """deps step has an inline body (AndThenBlock) with dl sub-step."""
+        program = self._compile_pipelines()
+        wf = self._find_workflow(program, "InstrumentedBuild")
+        assert wf is not None
+        deps_step = next(s for s in wf["body"]["steps"] if s["name"] == "deps")
+        assert deps_step.get("body") is not None
+        assert deps_step["body"]["type"] == "AndThenBlock"
+        inner_steps = [s["name"] for s in deps_step["body"]["steps"]]
+        assert "dl" in inner_steps
+
+    def test_instrumented_build_arithmetic(self):
+        """Yield total_duration_ms uses BinaryExpr with StepRef operands."""
+        program = self._compile_pipelines()
+        wf = self._find_workflow(program, "InstrumentedBuild")
+        assert wf is not None
+        yield_call = wf["body"]["yield"]["call"]
+        total_arg = next(
+            a for a in yield_call["args"] if a["name"] == "total_duration_ms"
+        )
+        assert total_arg["value"]["type"] == "BinaryExpr"
+        assert total_arg["value"]["operator"] == "+"
+        assert total_arg["value"]["left"]["type"] == "StepRef"
+        assert total_arg["value"]["right"]["type"] == "StepRef"
+
+    def test_cli_check_pipelines(self):
+        """The CLI --check flag succeeds for maven_pipelines.afl."""
+        args = [
+            "--primary", str(_AFL_DIR / "maven_pipelines.afl"),
+        ]
+        for dep in self._DEPS:
+            args.extend(["--library", str(_AFL_DIR / dep)])
+        args.append("--check")
+        result = main(args)
+        assert result == 0
+
+    @staticmethod
+    def _find_workflow(program: dict, name: str) -> dict | None:
+        """Find a workflow by name in the emitted program."""
+        def _walk(node):
+            for wf in node.get("workflows", []):
+                if wf["name"] == name:
+                    return wf
+            for ns in node.get("namespaces", []):
+                found = _walk(ns)
+                if found:
+                    return found
+            return None
+        return _walk(program)
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator workflows (workflow-as-step)
 # ---------------------------------------------------------------------------
 class TestMavenOrchestratorWorkflows:

@@ -1,0 +1,59 @@
+namespace maven.pipelines {
+    use maven.types
+    use maven.mixins
+    use maven.resolve
+    use maven.build
+    use maven.quality
+    use maven.composed
+
+    // Multiple andThen blocks: concurrent build + quality paths
+    workflow FullBuildPipeline(group_id: String, artifact_id: String,
+        version: String, workspace_path: String) => (artifact_path: String,
+            test_passed: Long, quality_issues: Long,
+            security_issues: Long,
+            total_issues: Long) andThen {
+
+        ct = maven.composed.CompileAndTest(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version,
+            workspace_path = $.workspace_path)
+
+        yield FullBuildPipeline(
+            artifact_path = ct.artifact_path,
+            test_passed = ct.test_passed)
+    } andThen {
+
+        qg = maven.composed.FullQualityGate(workspace_path = $.workspace_path)
+
+        yield FullBuildPipeline(
+            quality_issues = qg.quality_issues,
+            security_issues = qg.security_issues,
+            total_issues = qg.total_issues)
+    }
+
+    // Statement-level andThen + arithmetic
+    workflow InstrumentedBuild(group_id: String, artifact_id: String,
+        version: String,
+        workspace_path: String) => (artifact_path: String,
+            test_passed: Long,
+            total_duration_ms: Long) andThen {
+
+        deps = maven.resolve.ResolveDependencies(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version) andThen {
+            dl = maven.resolve.DownloadArtifact(group_id = $.group_id,
+                artifact_id = $.artifact_id, version = $.version)
+            yield ResolveDependencies(info = dl.info)
+        }
+
+        build = maven.build.CompileProject(workspace_path = $.workspace_path,
+            goals = "clean compile") with Retry(maxAttempts = 2)
+        tests = maven.build.RunUnitTests(workspace_path = $.workspace_path,
+            parallel = true) with Timeout(minutes = 15)
+        pkg = maven.build.PackageArtifact(workspace_path = $.workspace_path,
+            packaging = "jar")
+
+        yield InstrumentedBuild(
+            artifact_path = pkg.info.path,
+            test_passed = tests.report.passed,
+            total_duration_ms = build.result.duration_ms + tests.report.duration_ms)
+    }
+}

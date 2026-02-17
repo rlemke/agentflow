@@ -226,7 +226,105 @@ Key points:
 - Sub-workflows are fully independent — they create their own steps and events internally
 - You can mix event facet calls and sub-workflow calls in the same `andThen` block
 
-### 9. Running
+### 9. Composed Facets
+
+Composed facets wrap multi-step sequences into reusable units — regular `facet` declarations with `andThen` bodies. No handler is needed; the runtime expands them inline.
+
+```afl
+namespace maven.composed {
+    use maven.types
+    use maven.mixins
+
+    facet CompileAndTest(group_id: String, artifact_id: String,
+        version: String,
+        workspace_path: String) => (artifact_path: String,
+            test_passed: Long, test_total: Long,
+            build_duration_ms: Long) andThen {
+
+        deps = maven.resolve.ResolveDependencies(group_id = $.group_id,
+            artifact_id = $.artifact_id, version = $.version)
+        build = maven.build.CompileProject(workspace_path = $.workspace_path,
+            goals = "clean compile") with Retry(maxAttempts = 2)
+        tests = maven.build.RunUnitTests(workspace_path = $.workspace_path,
+            parallel = true) with Timeout(minutes = 15)
+        pkg = maven.build.PackageArtifact(workspace_path = $.workspace_path,
+            packaging = "jar")
+
+        yield CompileAndTest(
+            artifact_path = pkg.info.path,
+            test_passed = tests.report.passed,
+            test_total = tests.report.total,
+            build_duration_ms = build.result.duration_ms)
+    }
+}
+```
+
+Callers use composed facets like any other facet — they don't need to know the internal steps:
+
+```afl
+ct = maven.composed.CompileAndTest(group_id = $.group_id,
+    artifact_id = $.artifact_id, version = $.version,
+    workspace_path = $.workspace_path)
+```
+
+### 10. Multiple andThen Blocks
+
+A workflow can have multiple `andThen` blocks that execute concurrently. Each block yields a different subset of the workflow's return fields:
+
+```afl
+workflow FullBuildPipeline(...) => (artifact_path: String,
+    test_passed: Long, quality_issues: Long,
+    security_issues: Long,
+    total_issues: Long) andThen {
+
+    ct = maven.composed.CompileAndTest(...)
+
+    yield FullBuildPipeline(
+        artifact_path = ct.artifact_path,
+        test_passed = ct.test_passed)
+} andThen {
+
+    qg = maven.composed.FullQualityGate(workspace_path = $.workspace_path)
+
+    yield FullBuildPipeline(
+        quality_issues = qg.quality_issues,
+        security_issues = qg.security_issues,
+        total_issues = qg.total_issues)
+}
+```
+
+The two blocks run independently — the build path and quality gate path proceed in parallel.
+
+### 11. Arithmetic Expressions
+
+AFL supports arithmetic operators (`+`, `-`, `*`, `/`, `%`) in yield arguments and call arguments. Use them to compute derived values from step outputs:
+
+```afl
+yield FullQualityGate(
+    total_issues = style.report.issues + security.report.issues)
+
+yield InstrumentedBuild(
+    total_duration_ms = build.result.duration_ms + tests.report.duration_ms)
+```
+
+The validator catches type errors at compile time (e.g., string + int).
+
+### 12. Statement-level andThen Body
+
+Individual steps can have inline `andThen` blocks. The inner yield targets the step's call facet (not the containing workflow):
+
+```afl
+deps = maven.resolve.ResolveDependencies(group_id = $.group_id,
+    artifact_id = $.artifact_id, version = $.version) andThen {
+    dl = maven.resolve.DownloadArtifact(group_id = $.group_id,
+        artifact_id = $.artifact_id, version = $.version)
+    yield ResolveDependencies(info = dl.info)
+}
+```
+
+The inner `yield ResolveDependencies(...)` provides the return values for the `deps` step. Subsequent steps see `deps.info` as the download result.
+
+### 13. Running
 
 ```bash
 source .venv/bin/activate

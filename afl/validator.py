@@ -635,7 +635,12 @@ class AFLValidator:
         if decl.body:
             self._validate_body(decl.body, decl.sig)
 
-    def _validate_and_then_block(self, body: AndThenBlock, containing_sig: FacetSig) -> None:
+    def _validate_and_then_block(
+        self,
+        body: AndThenBlock,
+        containing_sig: FacetSig,
+        extra_yield_targets: set[str] | None = None,
+    ) -> None:
         """Validate an andThen block."""
         if not body.block:
             return
@@ -647,6 +652,8 @@ class AFLValidator:
         valid_yield_targets = {containing_sig.name}
         for mixin in containing_sig.mixins:
             valid_yield_targets.add(mixin.name.split(".")[-1])  # Use short name
+        if extra_yield_targets:
+            valid_yield_targets |= extra_yield_targets
 
         # Track steps and their return attributes
         steps: dict[str, StepInfo] = {}
@@ -708,7 +715,10 @@ class AFLValidator:
 
             # Validate inline step body if present
             if step.body:
-                self._validate_and_then_block(step.body, containing_sig)
+                step_target = step.call.name.split(".")[-1]
+                self._validate_and_then_block(
+                    step.body, containing_sig, extra_yield_targets={step_target}
+                )
 
         # Validate yield statements and check for duplicate targets
         yield_targets_used: set[str] = set()

@@ -1516,6 +1516,49 @@ class TestUnaryExprValidation:
         assert result.is_valid, [str(e) for e in result.errors]
 
 
+class TestStepBodyValidation:
+    """Test yield target validation inside inline step bodies."""
+
+    def test_valid_inner_yield_targets_step_call(self, validator):
+        """Inner yield targeting the step's call facet should pass."""
+        ast = parse("""
+        namespace test {
+            event facet Inner(x: String) => (y: String)
+            event facet Outer(a: String) => (b: String)
+
+            workflow Main(x: String) => (result: String) andThen {
+                s = Outer(a = $.x) andThen {
+                    i = Inner(x = $.x)
+                    yield Outer(b = i.y)
+                }
+                yield Main(result = s.b)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_invalid_inner_yield_target(self, validator):
+        """Inner yield targeting a random name should fail."""
+        ast = parse("""
+        namespace test {
+            event facet Inner(x: String) => (y: String)
+            event facet Outer(a: String) => (b: String)
+
+            workflow Main(x: String) => (result: String) andThen {
+                s = Outer(a = $.x) andThen {
+                    i = Inner(x = $.x)
+                    yield BadName(b = i.y)
+                }
+                yield Main(result = s.b)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("BadName" in str(e) for e in result.errors)
+
+
 class TestWorkflowAsStep:
     """Test that workflows can be called as steps inside andThen blocks."""
 

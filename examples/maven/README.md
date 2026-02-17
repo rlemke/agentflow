@@ -1,6 +1,6 @@
 # Maven Build Lifecycle Agent
 
-A Maven build lifecycle agent demonstrating AFL's **mixin composition**, the **MavenArtifactRunner** execution model, and **workflow-as-step orchestration** — running external JVM programs packaged as Maven artifacts alongside standard handler-based execution.
+A Maven build lifecycle agent demonstrating AFL's **mixin composition**, **composed facets**, **multiple andThen blocks**, **arithmetic expressions**, **statement-level andThen bodies**, the **MavenArtifactRunner** execution model, and **workflow-as-step orchestration** — running external JVM programs packaged as Maven artifacts alongside standard handler-based execution.
 
 ## What it does
 
@@ -125,6 +125,29 @@ RunMavenPlugin(checkstyle) + Timeout  -->  RunMavenPlugin(spotbugs) + Timeout  -
 
 **Inputs**: `group_id`, `artifact_id`, `version`, `workspace_path`, `step_id`
 **Outputs**: `checkstyle_success`, `spotbugs_success`, `run_success`, `run_exit_code`
+
+### Pipeline 8: FullBuildPipeline (multiple andThen blocks)
+
+Concurrent build and quality gate paths using **multiple andThen blocks**.
+
+```
+andThen block 0:  CompileAndTest (composed facet)
+andThen block 1:  FullQualityGate (composed facet)
+```
+
+**Inputs**: `group_id`, `artifact_id`, `version`, `workspace_path`
+**Outputs**: `artifact_path`, `test_passed`, `quality_issues`, `security_issues`, `total_issues`
+
+### Pipeline 9: InstrumentedBuild (statement-level andThen + arithmetic)
+
+Build pipeline with **statement-level andThen** on the deps step and **arithmetic** for duration aggregation.
+
+```
+ResolveDependencies andThen { DownloadArtifact }  -->  CompileProject + Retry  -->  RunUnitTests + Timeout  -->  PackageArtifact
+```
+
+**Inputs**: `group_id`, `artifact_id`, `version`, `workspace_path`
+**Outputs**: `artifact_path`, `test_passed`, `total_duration_ms` (build + test duration)
 
 ## Prerequisites
 
@@ -251,3 +274,5 @@ implicit defaultRepository = Repository(url = "https://repo1.maven.org/maven2", 
 | `maven_runner.afl` | `maven.runner` | 2 event facets for JVM execution (RunMavenArtifact, RunMavenPlugin) |
 | `maven_workflows.afl` | `maven.workflows` | 5 workflow pipelines demonstrating mixin composition |
 | `maven_orchestrator.afl` | `maven.orchestrator` | 2 orchestrator workflows using workflow-as-step (BuildTestAndRun, PluginVerifyAndRun) |
+| `maven_composed.afl` | `maven.composed` | 2 composed facets with arithmetic (CompileAndTest, FullQualityGate) |
+| `maven_pipelines.afl` | `maven.pipelines` | 2 pipeline workflows with multiple andThen blocks and statement-level andThen |
