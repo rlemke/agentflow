@@ -150,6 +150,55 @@ def handle(payload: dict) -> dict:
 
 Handlers are pure functions: receive a payload dict, return a result dict.
 
+### How the JVM Program Reads and Returns Step Data
+
+The MavenArtifactRunner passes step and database information to the JVM subprocess via environment variables:
+
+| Variable | Description |
+|---|---|
+| `AFL_STEP_ID` | The step ID — use this to look up step parameters in MongoDB |
+| `AFL_MONGODB_URL` | MongoDB connection string (e.g. `mongodb://localhost:27017`) |
+| `AFL_MONGODB_DATABASE` | Database name (e.g. `afl`) |
+
+The step ID is also passed as the first command-line argument.
+
+**Reading parameters**: The JVM program connects to MongoDB using `AFL_MONGODB_URL` and `AFL_MONGODB_DATABASE`, looks up the step document by `AFL_STEP_ID`, and reads input parameters from `attributes.params`.
+
+**Writing returns**: Before exiting, the program writes its return values to `attributes.returns` on the same step document. After the program exits with code 0, the runner reads those returns and uses them to continue the workflow.
+
+```java
+// Minimal Java example
+public class MyHandler {
+    public static void main(String[] args) {
+        String stepId = System.getenv("AFL_STEP_ID");
+        String mongoUrl = System.getenv("AFL_MONGODB_URL");
+        String dbName = System.getenv("AFL_MONGODB_DATABASE");
+
+        // Connect to MongoDB, read step params
+        MongoClient client = MongoClients.create(mongoUrl);
+        MongoDatabase db = client.getDatabase(dbName);
+        Document step = db.getCollection("steps").find(eq("_id", stepId)).first();
+        Document params = step.get("attributes", Document.class)
+                              .get("params", Document.class);
+
+        String input = params.get("input", Document.class).getString("value");
+
+        // ... do work ...
+
+        // Write returns back to the step document
+        Document returns = new Document("output", new Document()
+            .append("name", "output")
+            .append("value", result)
+            .append("type_hint", "String"));
+        db.getCollection("steps").updateOne(
+            eq("_id", stepId),
+            set("attributes.returns", returns));
+    }
+}
+```
+
+If your JVM program does not need to read step parameters or return values — for example, a fire-and-forget task — it can ignore the environment variables entirely. The runner will still mark the step as completed when the process exits with code 0.
+
 ### Use the MavenArtifactRunner with real JVM handlers
 
 1. Package your Java handler as an executable JAR

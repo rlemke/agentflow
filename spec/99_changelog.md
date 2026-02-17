@@ -521,6 +521,15 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.16) - Refactor MavenArtifactRunner to Subclass RegistryRunner
+- **`MavenRunnerConfig(RegistryRunnerConfig)`**: now extends `RegistryRunnerConfig` instead of duplicating all infrastructure fields; only declares Maven-specific fields (`cache_dir`, `repository_url`, `java_command`, `default_timeout_ms`) plus `service_name` override (`"afl-maven-runner"`)
+- **`MavenArtifactRunner(RegistryRunner)`**: now extends `RegistryRunner`, inheriting poll loop, heartbeat, server registration, thread pool/futures management, AST caching, task claiming, workflow resume, and shutdown — ~500 lines of duplicated infrastructure removed
+- **Overridden methods**: `__init__` (sets `self._dispatcher = None` to disable Python module dispatch, adds Maven-specific state), `register_handler` (validates `mvn:` URI scheme then delegates to super), `_refresh_registry` (filters to `mvn:` URI registrations only), `_process_event` (Maven subprocess dispatch — unchanged logic)
+- **`self._dispatcher = None`**: inherited `_resume_workflow` passes `dispatcher=self._dispatcher` to `evaluator.resume()`; with `None`, no inline dispatch occurs during resume — event facets create tasks picked up in the next poll cycle (correct behavior for Maven)
+- **Test update**: `_current_time_ms` import changed from `maven_runner` to `afl.runtime.registry_runner`; all 41 Maven runner tests pass unchanged
+- **No changes to `RegistryRunner`**: subclassing works without modifications to the base class
+- File reduced from 853 lines to ~370 lines
+
 ## Completed (v0.12.15) - Strip Maven Example to MavenArtifactRunner Only
 - **Removed simulated build lifecycle**: deleted 10 AFL files (`maven_build.afl`, `maven_resolve.afl`, `maven_publish.afl`, `maven_quality.afl`, `maven_mixins.afl`, `maven_composed.afl`, `maven_pipelines.afl`, `maven_advanced.afl`, `maven_workflows.afl`, `maven_orchestrator.afl`) and 4 handler modules (`build_handlers.py`, `resolve_handlers.py`, `publish_handlers.py`, `quality_handlers.py`) that contained only simulated/stub implementations
 - **Retained runner-only files**: `maven_runner.afl` (RunMavenArtifact + RunMavenPlugin event facets), `maven_types.afl` (ExecutionResult + PluginExecutionResult schemas), `runner_handlers.py`, `maven_runner.py` (MavenArtifactRunner)

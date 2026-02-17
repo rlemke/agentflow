@@ -56,8 +56,8 @@ if _MAVEN_DIR not in sys.path:
 from maven_runner import (
     MavenArtifactRunner,
     MavenRunnerConfig,
-    _current_time_ms,
 )
+from afl.runtime.registry_runner import _current_time_ms
 
 # =========================================================================
 # Fixtures
