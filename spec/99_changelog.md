@@ -532,7 +532,9 @@
 - **`run_30states.sh` updated**: step 5 now passes AFL source files via `--primary`/`--library` instead of pre-compiled JSON
 - **Flat namespace fix**: `_find_workflow_in_program` in both `submit.py` and `RunnerService` now handles flat dotted namespace names (e.g. `osm.geo.UnitedStates.sample`) that the emitter produces for multi-file compilations — tries flat prefix matching before falling back to step-by-step nested navigation
 - **`run_30states.sh` MongoDB port**: sets `AFL_MONGODB_URL` to use `MONGODB_PORT` (default 27018) matching the Docker Compose host-side port mapping
-- 2122 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+- **WebHDFS storage backend**: replaced pyarrow's native `HadoopFileSystem` (requires libhdfs.so JNI library) with WebHDFS REST API via `requests` — works on any platform (ARM64/macOS/Linux) without Hadoop native libraries; uses `AFL_WEBHDFS_PORT` env var (default 9870)
+- **Docker simplification**: removed `INSTALL_HDFS` build arg and pyarrow from all Dockerfiles (runner, osm-geocoder, osm-geocoder-lite); HDFS support now only requires `requests`
+- 2127 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
 ## Completed (v0.12.19) - Reorganize Example Tests into Standardized Structure
 
