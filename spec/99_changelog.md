@@ -521,6 +521,13 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.22) - Multi-andThen Block Fix and Dependency Chain Tests
+
+- **Fix `FacetScriptsBeginHandler` crash on multi-block bodies**: `scripts.py` line 47 crashed with `'list' object has no attribute 'get'` when a workflow had multiple `andThen` blocks (emitter produces a list of block dicts instead of a single dict) — added `isinstance(body, list)` guard to pass through correctly
+- **AddLongs dependency chain test**: 10-step workflow (`s1`–`s10`) with cross-step arithmetic using non-event facet `LongValue(value: Long)` — verifies full compile → execute lifecycle with `input=1` (output=223) and `input=5` (output=331)
+- **MultiAndThenEventTest**: 5 concurrent `andThen` blocks, each with 6 cross-dependent steps calling `facet Value(a, b) => (value:Int) andThen { yield Value(value = $.a + $.b) }` — verifies compilation (5 blocks × 6 steps), execution with `parameter=1` (all outputs=25) and `parameter=5` (all outputs=37)
+- 2135 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.21) - 30-State Workflow End-to-End Fixes
 
 - **Pass `program_ast` to `resume()`**: `RunnerService._resume_workflow()`, `AgentPoller._load_workflow_ast()`, and `RegistryRunner._load_workflow_ast()` now cache and pass the full `program_dict` when calling `evaluator.resume()` — fixes facet `andThen` body expansion during resume (wrapper facet bodies were silently empty because `get_facet_definition()` returned None when `program_ast` was None)
