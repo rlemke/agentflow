@@ -521,6 +521,17 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.19) - Reorganize Example Tests into Standardized Structure
+
+- **New directory layout**: every example now has `tests/{mocked,real}/{afl,scripts,py}` — mocked tests (unit/compile-time with mocks/stubs) in `mocked/py/`, integration tests requiring live services in `real/py/`, and AFL test fixtures in `real/afl/`
+- **53 test files moved** across 5 examples: aws-lambda (2), genomics (3), jenkins (2), maven (3), osm-geocoder (43 — 38 mocked + 5 real/py + 3 real/afl); 4 examples with empty structure only (continental-lz, doc, hello-agent, volcano-query)
+- **osm-geocoder/integration/ removed**: 6 test files + conftest/helpers → `tests/real/py/`, 3 AFL fixtures → `tests/real/afl/`, relative imports (`from .helpers`) converted to absolute
+- **Per-example conftest.py** in each `tests/mocked/py/`: adds example root to `sys.path`, purges stale `handlers` package from `sys.modules` to prevent cross-example import conflicts, autouse fixture re-establishes correct path before each test
+- **Import path fixes**: all `Path(__file__).resolve().parent` chains updated for new directory depth (4 `.parent` calls from `tests/mocked/py/` to example root); docstring run-paths updated in all 27 osm-geocoder test files
+- **pyproject.toml**: `testpaths` expanded from `["tests"]` to `["tests", "examples"]`
+- **real/py conftest.py** scoped skip: `pytest_collection_modifyitems` now only marks tests in its own directory with the `--mongodb` skip, preventing global test skipping
+- 2098 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`boto3`)
+
 ## Completed (v0.12.18) - Remove Dead Handler Registrations for Non-Event Facets
 - **`cache_handlers.py` stripped to data-only module**: removed `register_cache_handlers()`, `_DISPATCH`, `_build_dispatch()`, `handle()`, and `register_handlers()` — these registered ~250 handlers for regular facets (e.g., `osm.geo.cache.Africa.Malawi`) that expand inline via `andThen` bodies and never produce event tasks; retained `REGION_REGISTRY` (used by `operations_handlers.py` and `region_resolver.py`) and `_make_handler()`
 - **`graphhopper_handlers.py` cache portion removed**: deleted `_make_cache_handler()`, `GRAPHHOPPER_CACHE_REGISTRY` (~250 entries across 9 namespaces), and cache registration loops from `_build_dispatch()` and `register_graphhopper_handlers()`; only the 6 `osm.geo.Operations.GraphHopper.*` event facet handlers remain
