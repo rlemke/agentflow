@@ -24,8 +24,8 @@ from handlers.elevation_handlers import (
 def main():
     # Path to sample data
     sample_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..",
-        "test_data",
+        os.path.dirname(__file__), "..",
+        "data",
         "sample_trails.geojson"
     )
 
