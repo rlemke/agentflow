@@ -17,7 +17,7 @@ NAMESPACE = "osm.geo.Operations"
 # All event facets in osm.geo.Operations and their return parameter names.
 # NOTE: Cache is handled separately (takes region:String, not cache:OSMCache).
 OPERATIONS_FACETS: dict[str, str | None] = {
-    "Download": None,  # => ()
+    "Download": "downloadCache",  # => (downloadCache: OSMCache)
     "Tile": "tiles",
     "RoutingGraph": "graph",
     "Status": "stats",
