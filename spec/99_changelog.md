@@ -521,6 +521,17 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.20) - CLI Submit Module
+
+- **New `afl/runtime/submit.py`**: CLI module (`python -m afl.runtime.submit`) for submitting AFL workflows to the runtime via MongoDB — compiles AFL sources, validates, creates `FlowDefinition`/`WorkflowDefinition`/`RunnerDefinition`/`TaskDefinition` entities, and queues an `afl:execute` task for the RunnerService
+- **Multi-source input**: supports `--primary FILE` (repeatable) and `--library FILE` (repeatable) flags mirroring `afl compile`, plus legacy positional arg for single-file mode
+- **Workflow lookup**: `--workflow NAME` with qualified-name resolution (e.g. `ns.sub.WorkflowName`) matching the RunnerService's `_find_workflow_in_program` logic
+- **Default parameter merging**: extracts default values from workflow AST params and merges with `--inputs JSON` overrides
+- **Source concatenation**: all AFL source texts concatenated into a single `compiled_sources` entry, as required by `RunnerService._execute_workflow` which reads `compiled_sources[0].content`
+- **Console script**: `afl-submit` entry point added to `pyproject.toml`
+- **`run_30states.sh` updated**: step 5 now passes AFL source files via `--primary`/`--library` instead of pre-compiled JSON
+- 2098 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.19) - Reorganize Example Tests into Standardized Structure
 
 - **New directory layout**: every example now has `tests/{mocked,real}/{afl,scripts,py}` — mocked tests (unit/compile-time with mocks/stubs) in `mocked/py/`, integration tests requiring live services in `real/py/`, and AFL test fixtures in `real/afl/`
