@@ -157,6 +157,24 @@ class TestWorkflowLookup:
         captured = capsys.readouterr()
         assert "not found" not in captured.err
 
+    def test_flat_dotted_namespace_found(self, tmp_path, capsys):
+        """Multi-file compile produces flat dotted namespace names."""
+        lib = tmp_path / "lib.afl"
+        lib.write_text("namespace osm.geo {\n  schema Region { name: String }\n}")
+        main_f = tmp_path / "main.afl"
+        main_f.write_text(
+            "namespace osm.geo.sample {\n"
+            "  use osm.geo\n"
+            "  workflow Download(region: osm.geo.Region)\n"
+            "}"
+        )
+        result = main([
+            "--primary", str(main_f), "--library", str(lib),
+            "--workflow", "osm.geo.sample.Download",
+        ])
+        captured = capsys.readouterr()
+        assert "not found" not in captured.err
+
     def test_wrong_namespace_not_found(self, namespaced_wf, capsys):
         result = main([str(namespaced_wf), "--workflow", "wrong.Execute"])
         assert result == 1
