@@ -264,6 +264,58 @@ class TestCompileAndExecuteEdgeCases:
         assert wf_ast is None
 
 
+AFL_ADD_LONGS = """\
+namespace afl.test.dependency {
+    facet LongValue(value: Long)
+    workflow AddLongs(input:Long = 1) => (output:Long = 2) andThen {
+       s1 = LongValue(value = $.input + 1 )
+       s2 = LongValue(value = s1.value + 2)
+       s3 = LongValue(value = s2.value + s1.value)
+       s4 = LongValue(value = s3.value + 4)
+       s5 = LongValue(value = s4.value + 5)
+       s6 = LongValue(value = s5.value + s4.value + s5.value)
+       s7 = LongValue(value = s6.value + 7)
+       s8 = LongValue(value = s7.value + 8)
+       s9 = LongValue(value = s8.value + 9)
+       s10 = LongValue(value = s9.value + s7.value + s9.value + s1.value + s3.value + s6.value)
+       yield AddLongs(output = s10.value)
+    }
+}
+"""
+
+class TestAddLongsDependencyChain:
+    """10-step dependency chain with arithmetic — all non-event facets complete immediately.
+
+    s1=input+1, s2=s1+2, s3=s2+s1, s4=s3+4, s5=s4+5,
+    s6=s5+s4+s5, s7=s6+7, s8=s7+8, s9=s8+9,
+    s10=s9+s7+s9+s1+s3+s6 → output
+    """
+
+    def test_compiles_with_10_steps(self):
+        compiled = _compile(AFL_ADD_LONGS)
+        wf = _find_workflow(compiled, "AddLongs")
+        assert wf is not None
+        assert wf["type"] == "WorkflowDecl"
+        steps = wf["body"]["steps"]
+        assert len(steps) == 10
+
+    def test_default_input_completes_with_223(self, store, evaluator):
+        compiled = _compile(AFL_ADD_LONGS)
+        wf = _find_workflow(compiled, "AddLongs")
+        result = evaluator.execute(wf, inputs={"input": 1}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        assert result.outputs["output"] == 223
+
+    def test_custom_input_completes_with_331(self, store, evaluator):
+        compiled = _compile(AFL_ADD_LONGS)
+        wf = _find_workflow(compiled, "AddLongs")
+        result = evaluator.execute(wf, inputs={"input": 5}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        assert result.outputs["output"] == 331
+
+
 AFL_TOP_LEVEL_WORKFLOW = """\
 event facet AddOne(input: Long) => (output: Long)
 
