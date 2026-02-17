@@ -530,6 +530,7 @@
 - **Import path fixes**: all `Path(__file__).resolve().parent` chains updated for new directory depth (4 `.parent` calls from `tests/mocked/py/` to example root); docstring run-paths updated in all 27 osm-geocoder test files
 - **pyproject.toml**: `testpaths` expanded from `["tests"]` to `["tests", "examples"]`
 - **real/py conftest.py** scoped skip: `pytest_collection_modifyitems` now only marks tests in its own directory with the `--mongodb` skip, preventing global test skipping
+- **Follow-up moves**: `test_data/` → `tests/mocked/data/`; `osmstates30.afl`, `osmstates30.json`, `run_30states.sh` → `tests/real/{afl,scripts}/` with script path references updated
 - 2098 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`boto3`)
 
 ## Completed (v0.12.18) - Remove Dead Handler Registrations for Non-Event Facets
