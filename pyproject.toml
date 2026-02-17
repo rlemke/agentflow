@@ -53,7 +53,7 @@ where = ["."]
 include = ["afl*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "examples"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 log_file = "afl-test.log"
