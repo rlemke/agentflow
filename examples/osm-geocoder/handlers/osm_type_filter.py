@@ -4,6 +4,8 @@ Filters OSM data by element type (node, way, relation) and tags,
 with optional dependency inclusion for complete geometry reconstruction.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from dataclasses import dataclass, field
