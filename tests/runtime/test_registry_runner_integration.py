@@ -233,7 +233,7 @@ class TestRegistryRunnerAddOne:
 
         step_after = store.get_step(step_id)
         assert step_after.state != StepState.EVENT_TRANSMIT
-        assert step_after.attributes.get_param("output") == 6
+        assert step_after.attributes.get_return("output") == 6
 
     def test_handler_failure_marks_step_error(self, store, evaluator, tmp_path):
         """If the handler raises, the step transitions to STATEMENT_ERROR."""
@@ -436,7 +436,7 @@ class TestRegistryRunnerMultiStep:
 
         # After Double, output should be 10
         double_step = store.get_step(double_step_id)
-        assert double_step.attributes.get_param("output") == 10
+        assert double_step.attributes.get_return("output") == 10
 
         # Manually resume to create Square step
         evaluator.resume(result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST)
@@ -451,7 +451,7 @@ class TestRegistryRunnerMultiStep:
 
         # After Square, output should be 100
         square_step = store.get_step(square_step_id)
-        assert square_step.attributes.get_param("output") == 100
+        assert square_step.attributes.get_return("output") == 100
 
     def test_multi_step_first_handler_fails(self, store, evaluator, tmp_path):
         """If the first handler fails, the workflow does not proceed to step 2."""
@@ -903,7 +903,7 @@ class TestRegistryRunnerComplexResume:
 
         runner.poll_once()
         step_a = store.get_step(blocked[0].id)
-        assert step_a.attributes.get_param("output") == 12
+        assert step_a.attributes.get_return("output") == 12
 
         evaluator.resume(result.workflow_id, PIPELINE_WORKFLOW_AST, PIPELINE_PROGRAM_AST)
 
@@ -914,7 +914,7 @@ class TestRegistryRunnerComplexResume:
 
         runner.poll_once()
         step_b = store.get_step(blocked[0].id)
-        assert step_b.attributes.get_param("output") == 36
+        assert step_b.attributes.get_return("output") == 36
 
         evaluator.resume(result.workflow_id, PIPELINE_WORKFLOW_AST, PIPELINE_PROGRAM_AST)
 
@@ -925,7 +925,7 @@ class TestRegistryRunnerComplexResume:
 
         runner.poll_once()
         step_c = store.get_step(blocked[0].id)
-        assert step_c.attributes.get_param("output") == 35
+        assert step_c.attributes.get_return("output") == 35
 
     def test_middle_step_failure_stops_pipeline(self, store, evaluator, tmp_path):
         """If StepB fails, StepC is never created."""

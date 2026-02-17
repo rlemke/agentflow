@@ -891,7 +891,7 @@ class Evaluator:
         # Apply result as return attributes
         if result:
             for name, value in result.items():
-                step.set_attribute(name, value)
+                step.set_attribute(name, value, is_return=True)
 
         # Request state change to continue processing
         step.request_state_change(True)

@@ -233,7 +233,7 @@ class TestAddOneAgent:
         # Verify step.output = 6 after agent processing
         step_after = store.get_step(step_id)
         assert step_after.state != StepState.EVENT_TRANSMIT
-        assert step_after.attributes.get_param("output") == 6
+        assert step_after.attributes.get_return("output") == 6
 
     def test_server_registers_with_handler(self, store, evaluator, poller):
         """The agent registers as a server with its handler name."""
