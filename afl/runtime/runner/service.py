@@ -857,10 +857,25 @@ class RunnerService:
         if "." in workflow_name:
             parts = workflow_name.split(".")
             short_name = parts[-1]
-            ns_parts = parts[:-1]
+            ns_prefix = ".".join(parts[:-1])
 
-            # Navigate through namespaces (emitter uses "namespaces" key,
-            # but also check "declarations" for alternative AST formats)
+            # Strategy 1: flat namespace match (dotted name equals full prefix)
+            for ns in program_dict.get("namespaces", []):
+                if ns.get("name") == ns_prefix:
+                    for w in ns.get("workflows", []):
+                        if w.get("name") == short_name:
+                            return w
+            for decl in program_dict.get("declarations", []):
+                if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
+                    for w in decl.get("workflows", []):
+                        if w.get("name") == short_name:
+                            return w
+                    for d in decl.get("declarations", []):
+                        if d.get("type") == "WorkflowDecl" and d.get("name") == short_name:
+                            return d
+
+            # Strategy 2: nested namespace navigation (step by step)
+            ns_parts = parts[:-1]
             current = program_dict
             for ns_name in ns_parts:
                 found_ns = None
