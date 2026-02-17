@@ -203,6 +203,7 @@ if [ "$HDFS" = true ]; then
     SERVICES="$SERVICES namenode datanode"
     PROFILE_ARGS="$PROFILE_ARGS --profile hdfs"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.hdfs.yml"
+    export INSTALL_HDFS=true
     echo "HDFS support enabled — OSM agents will use hdfs://namenode:8020 for caching"
     if [ -n "${HDFS_NAMENODE_DIR:-}" ]; then
         echo "  NameNode data dir: $HDFS_NAMENODE_DIR"

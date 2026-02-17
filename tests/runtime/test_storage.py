@@ -135,99 +135,153 @@ class TestLocalStorageBackend:
 # ---------------------------------------------------------------------------
 
 class TestHDFSStorageBackend:
-    """Tests for HDFSStorageBackend (mocked pyarrow)."""
+    """Tests for HDFSStorageBackend (WebHDFS via mocked requests)."""
 
-    def _make_backend(self, mock_hdfs_cls, **kwargs):
-        """Create an HDFSStorageBackend with mocked pyarrow."""
+    def _make_backend(self, **kwargs):
+        """Create an HDFSStorageBackend with requests available."""
         import afl.runtime.storage as mod
-        orig = mod.HAS_PYARROW
-        mod.HAS_PYARROW = True
+        orig = mod.HAS_REQUESTS
+        mod.HAS_REQUESTS = True
         try:
             backend = HDFSStorageBackend(**kwargs)
         finally:
-            mod.HAS_PYARROW = orig
+            mod.HAS_REQUESTS = orig
         return backend
 
-    def test_missing_pyarrow_raises(self):
-        with patch("afl.runtime.storage.HAS_PYARROW", False):
-            with pytest.raises(RuntimeError, match="pyarrow is required"):
+    def test_missing_requests_raises(self):
+        with patch("afl.runtime.storage.HAS_REQUESTS", False):
+            with pytest.raises(RuntimeError, match="requests is required"):
                 HDFSStorageBackend()
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_init(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls, host="namenode", port=8020, user="hdfs")
-        mock_hdfs_cls.assert_called_once_with(host="namenode", port=8020, user="hdfs")
+    def test_init(self):
+        backend = self._make_backend(host="namenode", port=8020, user="hdfs")
+        assert "namenode" in backend._base_url
+        assert backend._user == "hdfs"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_strip_uri(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    def test_strip_uri(self):
+        backend = self._make_backend()
         assert backend._strip_uri("hdfs://namenode:8020/data/file.txt") == "/data/file.txt"
         assert backend._strip_uri("/local/path") == "/local/path"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_exists(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
-        backend._fs.get_file_info.return_value = MagicMock()
+    @patch("afl.runtime.storage._requests")
+    def test_exists(self, mock_req):
+        backend = self._make_backend()
+        mock_req.get.return_value = MagicMock(status_code=200)
         assert backend.exists("hdfs://host:8020/data/file.txt") is True
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_exists_not_found(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
-        backend._fs.get_file_info.side_effect = FileNotFoundError
+    @patch("afl.runtime.storage._requests")
+    def test_exists_not_found(self, mock_req):
+        backend = self._make_backend()
+        mock_req.get.return_value = MagicMock(status_code=404)
         assert backend.exists("hdfs://host:8020/missing.txt") is False
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_open_read(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
-        mock_stream = MagicMock()
-        backend._fs.open_input_stream.return_value = mock_stream
+    @patch("afl.runtime.storage._requests")
+    def test_open_read(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.text = "hello"
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
         result = backend.open("hdfs://host:8020/data/file.txt", "r")
-        backend._fs.open_input_stream.assert_called_once_with("/data/file.txt")
-        assert result is mock_stream
+        assert result.read() == "hello"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_open_write(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
-        mock_stream = MagicMock()
-        backend._fs.open_output_stream.return_value = mock_stream
-        result = backend.open("hdfs://host:8020/data/file.txt", "w")
-        backend._fs.open_output_stream.assert_called_once_with("/data/file.txt")
-        assert result is mock_stream
+    @patch("afl.runtime.storage._requests")
+    def test_open_read_binary(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.content = b"binary data"
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
+        result = backend.open("hdfs://host:8020/data/file.bin", "rb")
+        assert result.read() == b"binary data"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_makedirs(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    def test_open_write(self):
+        backend = self._make_backend()
+        stream = backend.open("hdfs://host:8020/data/file.txt", "w")
+        from afl.runtime.storage import _WebHDFSWriteStream
+        assert isinstance(stream, _WebHDFSWriteStream)
+
+    @patch("afl.runtime.storage._requests")
+    def test_makedirs(self, mock_req):
+        backend = self._make_backend()
+        mock_req.put.return_value = MagicMock(status_code=200, raise_for_status=MagicMock())
         backend.makedirs("hdfs://host:8020/data/newdir")
-        backend._fs.create_dir.assert_called_once_with("/data/newdir", recursive=True)
+        mock_req.put.assert_called_once()
+        call_args = mock_req.put.call_args
+        assert "MKDIRS" in str(call_args)
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_getsize(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
-        mock_info = MagicMock()
-        mock_info.size = 42
-        backend._fs.get_file_info.return_value = mock_info
+    @patch("afl.runtime.storage._requests")
+    def test_getsize(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"FileStatus": {"length": 42}}
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
         assert backend.getsize("/data/file.txt") == 42
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_rmtree(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    @patch("afl.runtime.storage._requests")
+    def test_rmtree(self, mock_req):
+        backend = self._make_backend()
+        mock_req.delete.return_value = MagicMock(status_code=200, raise_for_status=MagicMock())
         backend.rmtree("hdfs://host:8020/data/dir")
-        backend._fs.delete_dir.assert_called_once_with("/data/dir")
+        mock_req.delete.assert_called_once()
+        call_args = mock_req.delete.call_args
+        assert "DELETE" in str(call_args)
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_join(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    def test_join(self):
+        backend = self._make_backend()
         assert backend.join("/data", "sub", "file.txt") == "/data/sub/file.txt"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_dirname(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    def test_dirname(self):
+        backend = self._make_backend()
         assert backend.dirname("/data/sub/file.txt") == "/data/sub"
 
-    @patch("afl.runtime.storage.HadoopFileSystem", create=True)
-    def test_basename(self, mock_hdfs_cls):
-        backend = self._make_backend(mock_hdfs_cls)
+    def test_basename(self):
+        backend = self._make_backend()
         assert backend.basename("/data/sub/file.txt") == "file.txt"
+
+    @patch("afl.runtime.storage._requests")
+    def test_getmtime(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"FileStatus": {"modificationTime": 1700000000000}}
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
+        assert backend.getmtime("/data/file.txt") == 1700000000.0
+
+    @patch("afl.runtime.storage._requests")
+    def test_isfile(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"FileStatus": {"type": "FILE"}}
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
+        assert backend.isfile("/data/file.txt") is True
+
+    @patch("afl.runtime.storage._requests")
+    def test_isdir(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"FileStatus": {"type": "DIRECTORY"}}
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
+        assert backend.isdir("/data/dir") is True
+
+    @patch("afl.runtime.storage._requests")
+    def test_listdir(self, mock_req):
+        backend = self._make_backend()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "FileStatuses": {"FileStatus": [
+                {"pathSuffix": "a.txt"},
+                {"pathSuffix": "b.txt"},
+            ]}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_req.get.return_value = mock_resp
+        assert backend.listdir("/data") == ["a.txt", "b.txt"]
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +310,6 @@ class TestGetStorageBackend:
         b2 = get_storage_backend("/tmp/other")
         assert b1 is b2
 
-    @patch("afl.runtime.storage.HAS_PYARROW", True)
     @patch("afl.runtime.storage.HDFSStorageBackend")
     def test_hdfs_uri(self, mock_hdfs_cls):
         mock_instance = MagicMock()
@@ -265,7 +318,6 @@ class TestGetStorageBackend:
         mock_hdfs_cls.assert_called_once_with(host="namenode", port=8020)
         assert backend is mock_instance
 
-    @patch("afl.runtime.storage.HAS_PYARROW", True)
     @patch("afl.runtime.storage.HDFSStorageBackend")
     def test_hdfs_caching(self, mock_hdfs_cls):
         mock_instance = MagicMock()

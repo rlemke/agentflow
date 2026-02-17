@@ -32,9 +32,8 @@ RUN mkdir -p /opt/graphhopper && \
 ENV GRAPHHOPPER_JAR=/opt/graphhopper/graphhopper-web.jar
 ENV GRAPHHOPPER_GRAPH_DIR=/data/graphhopper/graphs
 
-# Optional HDFS support (pyarrow)
-ARG INSTALL_HDFS=false
-RUN if [ "$INSTALL_HDFS" = "true" ]; then pip install --no-cache-dir "pyarrow>=14.0"; fi
+# HDFS support uses WebHDFS REST API via requests (no native libs needed)
+# requests is already installed via requirements.txt
 
 # Optional PostGIS support (psycopg2)
 ARG INSTALL_POSTGIS=false
