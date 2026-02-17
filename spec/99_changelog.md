@@ -521,6 +521,15 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.15) - Strip Maven Example to MavenArtifactRunner Only
+- **Removed simulated build lifecycle**: deleted 10 AFL files (`maven_build.afl`, `maven_resolve.afl`, `maven_publish.afl`, `maven_quality.afl`, `maven_mixins.afl`, `maven_composed.afl`, `maven_pipelines.afl`, `maven_advanced.afl`, `maven_workflows.afl`, `maven_orchestrator.afl`) and 4 handler modules (`build_handlers.py`, `resolve_handlers.py`, `publish_handlers.py`, `quality_handlers.py`) that contained only simulated/stub implementations
+- **Retained runner-only files**: `maven_runner.afl` (RunMavenArtifact + RunMavenPlugin event facets), `maven_types.afl` (ExecutionResult + PluginExecutionResult schemas), `runner_handlers.py`, `maven_runner.py` (MavenArtifactRunner)
+- **Simplified agent**: removed tri-mode switching (AgentPoller/RegistryRunner/MavenArtifactRunner); `agent.py` now runs MavenArtifactRunner directly — no `AFL_USE_REGISTRY`/`AFL_USE_MAVEN_RUNNER` env vars
+- **Reduced `maven_types.afl`**: 9 schemas → 2 (removed ArtifactInfo, DependencyTree, BuildResult, TestReport, PublishResult, QualityReport, ProjectInfo)
+- **Simplified `handlers/__init__.py`**: removed imports/registrations for resolve, build, publish, quality handlers; kept only runner_handlers
+- **Pruned tests**: removed 6 test classes (`TestMavenMixins`, `TestMavenWorkflows`, `TestMavenComposedFacets`, `TestMavenPipelinesWorkflows`, `TestMavenOrchestratorWorkflows`, `TestMavenAdvancedWorkflows`) and 5 handler test classes; updated schema count (9→2) and handler registration count (14→2)
+- **Rewrote documentation**: README.md and USER_GUIDE.md focused on MavenArtifactRunner only
+
 ## Completed (v0.12.14) - Composed Facets, Multiple andThen Blocks, Arithmetic & Statement-level andThen
 - **Validator fix**: `_validate_and_then_block` now accepts `extra_yield_targets` parameter; inline step bodies pass the step's call target as an additional valid yield target, so `yield ResolveDependencies(...)` inside a step body validates correctly
 - **`maven_composed.afl`** (new file): `maven.composed` namespace with 2 **composed facets** — `CompileAndTest` (resolve → compile+Retry → test+Timeout → package) and `FullQualityGate` (checkstyle+Timeout, dependency check+Timeout) with **arithmetic** (`total_issues = style.report.issues + security.report.issues`)
