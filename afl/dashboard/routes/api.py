@@ -351,15 +351,20 @@ def _runner_dict(runner) -> dict:
 
 
 def _step_dict(step) -> dict:
-    return {
+    d = {
         "id": step.id,
         "workflow_id": step.workflow_id,
         "object_type": step.object_type,
+        "facet_name": step.facet_name,
         "state": step.state,
         "statement_id": step.statement_id,
         "container_id": step.container_id,
         "block_id": step.block_id,
     }
+    if step.attributes:
+        d["params"] = {k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.params.items()}
+        d["returns"] = {k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.returns.items()}
+    return d
 
 
 def _task_dict(task) -> dict:

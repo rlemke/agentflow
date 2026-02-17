@@ -1,6 +1,28 @@
 <tr>
-    <td><a href="/steps/{{ step.id }}" class="mono">{{ step.id|truncate_uuid }}</a></td>
-    <td>{{ step.object_type }}</td>
+    <td><a href="/steps/{{ step.id }}">{{ step.statement_id or step.id|truncate_uuid }}</a></td>
+    <td>{% if step.facet_name %}{{ step.facet_name.split('.')[-1] }}{% else %}{{ step.object_type }}{% endif %}</td>
     <td><span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span></td>
-    <td class="mono">{{ step.statement_id or "—" }}</td>
+    <td>
+        {% if step.attributes and (step.attributes.params or step.attributes.returns) %}
+        <details>
+            <summary>view</summary>
+            {% if step.attributes.params %}
+            <strong>Params</strong>
+            <table>
+                {% for name, attr in step.attributes.params.items() %}
+                <tr><td>{{ name }}</td><td><code>{{ attr.value|tojson }}</code></td></tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            {% if step.attributes.returns %}
+            <strong>Returns</strong>
+            <table>
+                {% for name, attr in step.attributes.returns.items() %}
+                <tr><td>{{ name }}</td><td><code>{{ attr.value|tojson }}</code></td></tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+        </details>
+        {% else %}&mdash;{% endif %}
+    </td>
 </tr>
