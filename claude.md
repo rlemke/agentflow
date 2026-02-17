@@ -49,11 +49,12 @@ This repository contains the **AgentFlow** platform:
 
 ```bash
 # Tests
-pytest tests/ -v                    # full suite
-pytest tests/ -v -x                 # stop on first failure
-pytest tests/ --cov=afl --cov-report=term-missing  # with coverage
-pytest tests/ --cov=afl --cov-report=html          # HTML coverage report
+pytest tests/ examples/ -v          # full suite
+pytest tests/ examples/ -v -x      # stop on first failure
+pytest tests/ examples/ --cov=afl --cov-report=term-missing  # with coverage
+pytest tests/ examples/ --cov=afl --cov-report=html          # HTML coverage report
 pytest tests/runtime/test_mongo_store.py --mongodb -v  # real MongoDB
+pytest examples/osm-geocoder/tests/ -v               # single example
 
 # CLI
 afl input.afl -o output.json       # compile
@@ -76,7 +77,7 @@ python -m afl.mcp                   # MCP server (stdio)
 | `afl/runtime/runner/` | Distributed runner service |
 | `afl/mcp/` | MCP server for LLM agents |
 | `afl/dashboard/` | FastAPI web monitoring dashboard |
-| `tests/` | All tests (compiler, runtime, dashboard, MCP) |
+| `tests/` | Core tests (compiler, runtime, dashboard, MCP) |
 | `agents/` | Multi-language agent libraries (Python, Scala, Go, TypeScript, Java) |
 | `examples/osm-geocoder/` | OSM geocoding example (22 AFL files, ~480+ handlers) |
 | `spec/` | Language and runtime specifications |
@@ -119,4 +120,4 @@ python -m afl.mcp                   # MCP server (stdio)
 - `spec/70_examples.md` — iteration traces for Examples 2, 3, 4
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.18)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.19)
