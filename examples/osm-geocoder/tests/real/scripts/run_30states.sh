@@ -5,12 +5,14 @@
 # starts the AgentFlow stack, compiles the workflow, and submits it.
 #
 # Usage:
-#   examples/osm-geocoder/run_30states.sh
+#   examples/osm-geocoder/tests/real/scripts/run_30states.sh
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REAL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+EXAMPLE_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 HDFS_BASE="$HOME/data/hdfs"
 MONGODB_DATA="$HOME/data/mongodb"
@@ -58,16 +60,16 @@ echo ""
 # 4. Compile the AFL workflow
 # ---------------------------------------------------------------------------
 echo "=== Compiling osmstates30.afl ==="
-AFL_FILE="$SCRIPT_DIR/afl/osmstates30.afl"
-OUTPUT_FILE="$SCRIPT_DIR/osmstates30.json"
+AFL_FILE="$REAL_DIR/afl/osmstates30.afl"
+OUTPUT_FILE="$REAL_DIR/osmstates30.json"
 
 cd "$PROJECT_DIR"
 source .venv/bin/activate 2>/dev/null || true
 
 afl --primary "$AFL_FILE" \
-    --library "$SCRIPT_DIR/afl/osmtypes.afl" \
-    --library "$SCRIPT_DIR/afl/osmoperations.afl" \
-    --library "$SCRIPT_DIR/afl/osmcache.afl" \
+    --library "$EXAMPLE_DIR/afl/osmtypes.afl" \
+    --library "$EXAMPLE_DIR/afl/osmoperations.afl" \
+    --library "$EXAMPLE_DIR/afl/osmcache.afl" \
     -o "$OUTPUT_FILE"
 
 echo "  Compiled to: $OUTPUT_FILE"
