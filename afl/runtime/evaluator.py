@@ -528,6 +528,7 @@ class Evaluator:
         program_ast: dict | None = None,
         runner_id: str = "",
         dispatcher: "HandlerDispatcher | None" = None,
+        wf_id: str = "",
     ) -> ExecutionResult:
         """Execute a workflow.
 
@@ -537,11 +538,12 @@ class Evaluator:
             program_ast: Optional program AST for facet lookups
             runner_id: Optional runner ID for task creation context
             dispatcher: Optional handler dispatcher for inline event execution
+            wf_id: Optional explicit workflow ID (used to align with submitted workflow record)
 
         Returns:
             ExecutionResult with outputs or error
         """
-        wf_id = workflow_id()
+        wf_id = WorkflowId(wf_id) if wf_id else workflow_id()
         workflow_name = workflow_ast.get("name", "unknown")
 
         logger.info(

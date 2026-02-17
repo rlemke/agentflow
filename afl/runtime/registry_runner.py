@@ -383,14 +383,36 @@ class RegistryRunner:
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
 
-            for w in program_dict.get("workflows", []):
-                if w["name"] == wf.name:
-                    return w
-
-            return None
+            return self._find_workflow_in_program(program_dict, wf.name)
         except Exception:
             logger.debug("Could not load AST for workflow %s", workflow_id, exc_info=True)
             return None
+
+    @staticmethod
+    def _find_workflow_in_program(program_dict: dict, workflow_name: str) -> dict | None:
+        """Find a workflow in the program AST by name.
+
+        Supports both simple names and qualified names (e.g. "ns.WorkflowName").
+        """
+        for w in program_dict.get("workflows", []):
+            if w.get("name") == workflow_name:
+                return w
+
+        if "." in workflow_name:
+            parts = workflow_name.split(".")
+            short_name = parts[-1]
+            ns_prefix = ".".join(parts[:-1])
+
+            for decl in program_dict.get("declarations", []):
+                if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
+                    for w in decl.get("workflows", []):
+                        if w.get("name") == short_name:
+                            return w
+                    for d in decl.get("declarations", []):
+                        if d.get("type") == "WorkflowDecl" and d.get("name") == short_name:
+                            return d
+
+        return None
 
     # =========================================================================
     # Server Registration

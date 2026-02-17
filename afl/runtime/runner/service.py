@@ -762,6 +762,7 @@ class RunnerService:
             Dict with status and workflow_id
         """
         flow_id = payload.get("flow_id", "")
+        submitted_wf_id = payload.get("workflow_id", "")
         workflow_name = payload.get("workflow_name", "")
         inputs = payload.get("inputs") or {}
         runner_id = payload.get("runner_id", "")
@@ -803,12 +804,14 @@ class RunnerService:
             if workflow_ast is None:
                 raise RuntimeError(f"Workflow '{workflow_name}' not found in flow '{flow_id}'")
 
-            # Execute
+            # Execute — use the submitted workflow UUID so that external
+            # agents can look up the AST via get_workflow(workflow_id).
             result = self._evaluator.execute(
                 workflow_ast,
                 inputs=inputs,
                 program_ast=program_dict,
                 runner_id=runner_id,
+                wf_id=submitted_wf_id,
             )
 
             # Cache AST for resume

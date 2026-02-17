@@ -406,6 +406,7 @@ def main(args: list[str] | None = None) -> int:
         task_list_name=parsed.task_list,
         data={
             "flow_id": flow_id,
+            "workflow_id": wf_id,
             "workflow_name": parsed.workflow,
             "inputs": inputs,
             "runner_id": runner_id,
