@@ -157,6 +157,13 @@ def _find_workflow_in_program(program_dict: dict, workflow_name: str) -> dict | 
     return None
 
 
+def _connect_store(config):
+    """Create a MongoStore from config. Separated for testability."""
+    from .mongo_store import MongoStore
+
+    return MongoStore.from_config(config.mongodb)
+
+
 def _search_namespace_workflows(namespace: dict, workflow_name: str) -> dict | None:
     """Recursively search a namespace for a workflow by name."""
     for w in namespace.get("workflows", []):
@@ -324,11 +331,10 @@ def main(args: list[str] | None = None) -> int:
         TaskState,
         WorkflowDefinition,
     )
-    from .mongo_store import MongoStore
     from .types import generate_id
 
     try:
-        store = MongoStore.from_config(config.mongodb)
+        store = _connect_store(config)
     except Exception as e:
         print(f"Error connecting to MongoDB: {e}", file=sys.stderr)
         return 1
