@@ -530,7 +530,8 @@
 - **Source concatenation**: all AFL source texts concatenated into a single `compiled_sources` entry, as required by `RunnerService._execute_workflow` which reads `compiled_sources[0].content`
 - **Console script**: `afl-submit` entry point added to `pyproject.toml`
 - **`run_30states.sh` updated**: step 5 now passes AFL source files via `--primary`/`--library` instead of pre-compiled JSON
-- **Flat namespace fix**: `_find_workflow_in_program` now handles flat dotted namespace names (e.g. `osm.geo.UnitedStates.sample`) that the emitter produces for multi-file compilations — tries flat prefix matching before falling back to step-by-step nested navigation
+- **Flat namespace fix**: `_find_workflow_in_program` in both `submit.py` and `RunnerService` now handles flat dotted namespace names (e.g. `osm.geo.UnitedStates.sample`) that the emitter produces for multi-file compilations — tries flat prefix matching before falling back to step-by-step nested navigation
+- **`run_30states.sh` MongoDB port**: sets `AFL_MONGODB_URL` to use `MONGODB_PORT` (default 27018) matching the Docker Compose host-side port mapping
 - 2122 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
 ## Completed (v0.12.19) - Reorganize Example Tests into Standardized Structure
