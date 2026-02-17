@@ -521,6 +521,14 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.23) - Runner State Completion After Event Processing
+
+- **Fix runner never marked complete**: `AgentPoller._resume_workflow()` and `RegistryRunner._resume_workflow()` now check the `ExecutionResult` returned by `evaluator.resume()` — when status is `COMPLETED`, updates runner state to `RunnerState.COMPLETED` with `end_time` and `duration`; when `ERROR`, updates to `RunnerState.FAILED`
+- **Propagate `runner_id` through resume**: both `_resume_workflow()` methods now pass `runner_id` to `evaluator.resume()` so that event tasks created during resume inherit the runner_id — without this, child tasks (e.g. Download events created after Cache events complete) had empty `runner_id` and the final resume could not update the runner
+- **Per-workflow resume lock**: added `_resume_locks: dict[str, threading.Lock]` to both `AgentPoller` and `RegistryRunner` — prevents concurrent `resume()` calls for the same workflow from overwriting each other's step state via `replace_one` (uses non-blocking `acquire`; if lock is held, the resume is skipped)
+- **Verified with `run_30states.sh`**: `Download30States` workflow (121 tasks: 1 execute + 30 Cache + 90 Download) completes with runner state correctly transitioning to `completed` in ~289 seconds
+- 2148 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.22) - Multi-andThen Block Fix and Dependency Chain Tests
 
 - **Fix `FacetScriptsBeginHandler` crash on multi-block bodies**: `scripts.py` line 47 crashed with `'list' object has no attribute 'get'` when a workflow had multiple `andThen` blocks (emitter produces a list of block dicts instead of a single dict) — added `isinstance(body, list)` guard to pass through correctly
