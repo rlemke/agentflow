@@ -79,6 +79,7 @@ echo ""
 # 5. Submit the workflow
 # ---------------------------------------------------------------------------
 echo "=== Submitting Download30States workflow ==="
+export AFL_MONGODB_URL="mongodb://localhost:${MONGODB_PORT:-27018}"
 python -m afl.runtime.submit \
     --primary "$AFL_FILE" \
     --library "$EXAMPLE_DIR/afl/osmtypes.afl" \
