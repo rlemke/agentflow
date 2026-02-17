@@ -7,7 +7,6 @@ from .airquality_handlers import register_airquality_handlers
 from .amenity_handlers import register_amenity_handlers
 from .boundary_handlers import register_boundary_handlers
 from .building_handlers import register_building_handlers
-from .cache_handlers import register_cache_handlers
 from .downloader import download as download_region  # noqa: F401
 from .elevation_handlers import register_elevation_handlers
 from .filter_handlers import register_filter_handlers
@@ -35,7 +34,6 @@ __all__ = [
     "register_amenity_handlers",
     "register_boundary_handlers",
     "register_building_handlers",
-    "register_cache_handlers",
     "register_elevation_handlers",
     "register_filter_handlers",
     "register_graphhopper_handlers",
@@ -64,7 +62,6 @@ def register_all_handlers(poller) -> None:
     register_amenity_handlers(poller)
     register_boundary_handlers(poller)
     register_building_handlers(poller)
-    register_cache_handlers(poller)
     register_elevation_handlers(poller)
     register_filter_handlers(poller)
     register_graphhopper_handlers(poller)
@@ -91,7 +88,6 @@ def register_all_registry_handlers(runner) -> None:
     from .amenity_handlers import register_handlers as reg_amenity
     from .boundary_handlers import register_handlers as reg_boundary
     from .building_handlers import register_handlers as reg_building
-    from .cache_handlers import register_handlers as reg_cache
     from .elevation_handlers import register_handlers as reg_elevation
     from .filter_handlers import register_handlers as reg_filter
     from .graphhopper_handlers import register_handlers as reg_graphhopper
@@ -115,7 +111,6 @@ def register_all_registry_handlers(runner) -> None:
     reg_amenity(runner)
     reg_boundary(runner)
     reg_building(runner)
-    reg_cache(runner)
     reg_elevation(runner)
     reg_filter(runner)
     reg_graphhopper(runner)

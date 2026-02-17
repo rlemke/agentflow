@@ -294,92 +294,6 @@ def clean_graph_handler(payload: dict) -> dict:
 
 
 # -----------------------------------------------------------------------------
-# Cache Facet Handlers
-# -----------------------------------------------------------------------------
-
-def _make_cache_handler(region_name: str):
-    """Factory function to create a GraphHopper cache handler for a region."""
-    def handler(payload: dict) -> dict:
-        return build_graph_handler(payload)
-    return handler
-
-
-# Registry of all GraphHopper cache namespaces and their facets
-GRAPHHOPPER_CACHE_REGISTRY: dict[str, list[str]] = {
-    "osm.geo.cache.GraphHopper.Africa": [
-        "AllAfrica", "Africa", "Algeria", "Angola", "Benin", "Botswana",
-        "BurkinaFaso", "Burundi", "CapeVerde", "Cameroon", "CentralAfricanRepublic",
-        "Chad", "Comores", "Congo_Brazzaville", "Congo_Kinshasa", "Djibouti",
-        "Egypt", "EquatorialGuinea", "Eritrea", "Eswatini", "Ethiopia", "Gabon",
-        "Gambia", "Ghana", "Guinea", "GuineaBissau", "Kenya", "Lesotho",
-        "Liberia", "Libya", "Madagascar", "Malawi", "Mali", "Mauritania",
-        "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria",
-        "Rwanda", "SaoTomeAndPrincipe", "Senegal", "Seychelles", "SierraLeone",
-        "Somalia", "SouthAfrica", "SouthSudan", "Sudan", "Tanzania", "Togo",
-        "Tunisia", "Uganda", "Zambia", "Zimbabwe",
-    ],
-    "osm.geo.cache.GraphHopper.Asia": [
-        "AllAsia", "Asia", "Afghanistan", "Armenia", "Azerbaijan", "Bangladesh",
-        "Bhutan", "Brunei", "Cambodia", "China", "EastTimor", "GCCStates",
-        "India", "Indonesia", "Iran", "Iraq", "Japan", "Jordan", "Kazakhstan",
-        "Kyrgyzstan", "Laos", "Lebanon", "Malaysia", "Maldives", "Mongolia",
-        "Myanmar", "Nepal", "NorthKorea", "Pakistan", "IsraelAndPalestine",
-        "Philippines", "SaudiArabia", "Singapore", "SouthKorea", "SriLanka",
-        "Syria", "Tajikistan", "Taiwan", "Thailand", "Turkmenistan",
-        "Uzbekistan", "Vietnam", "Yemen",
-    ],
-    "osm.geo.cache.GraphHopper.Australia": [
-        "AllAustralia", "Australia", "Fiji", "Kiribati", "MarshallIslands",
-        "Micronesia", "Nauru", "NewCaledonia", "NewZealand", "Palau",
-        "PapuaNewGuinea", "Samoa", "SolomonIslands", "Tonga", "Tuvalu", "Vanuatu",
-    ],
-    "osm.geo.cache.GraphHopper.Europe": [
-        "AllEurope", "Europe", "Albania", "Andorra", "Austria", "Belarus",
-        "Belgium", "BosniaHerzegovina", "Bulgaria", "Croatia", "Cyprus",
-        "CzechRepublic", "Denmark", "Estonia", "FaroeIslands", "Finland",
-        "France", "Georgia", "Germany", "Greece", "Hungary", "Iceland",
-        "Ireland", "IsleOfMan", "Italy", "Kosovo", "Latvia", "Liechtenstein",
-        "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro",
-        "Netherlands", "NorthMacedonia", "Norway", "Poland", "Portugal",
-        "Romania", "Russia", "Serbia", "Slovakia", "Slovenia", "Spain",
-        "Sweden", "Switzerland", "Turkey", "Ukraine", "UnitedKingdom",
-    ],
-    "osm.geo.cache.GraphHopper.NorthAmerica": [
-        "AllNorthAmerica", "NorthAmerica", "Canada", "Greenland", "Mexico",
-        "UnitedStates",
-    ],
-    "osm.geo.cache.GraphHopper.SouthAmerica": [
-        "AllSouthAmerica", "SouthAmerica", "Argentina", "Bolivia", "Brazil",
-        "Chile", "Colombia", "Ecuador", "Guyana", "Paraguay", "Peru",
-        "Suriname", "Uruguay", "Venezuela",
-    ],
-    "osm.geo.cache.GraphHopper.CentralAmerica": [
-        "AllCentralAmerica", "CentralAmerica", "Belize", "CostaRica", "Cuba",
-        "ElSalvador", "Guatemala", "Haiti", "Honduras", "Jamaica", "Nicaragua",
-        "Panama",
-    ],
-    "osm.geo.cache.GraphHopper.UnitedStates": [
-        "AllUnitedStates", "Alabama", "Alaska", "Arizona", "Arkansas",
-        "California", "Colorado", "Connecticut", "Delaware", "DistrictOfColumbia",
-        "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
-        "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts",
-        "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska",
-        "Nevada", "NewHampshire", "NewJersey", "NewMexico", "NewYork",
-        "NorthCarolina", "NorthDakota", "Ohio", "Oklahoma", "Oregon",
-        "Pennsylvania", "RhodeIsland", "SouthCarolina", "SouthDakota",
-        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-        "WestVirginia", "Wisconsin", "Wyoming",
-    ],
-    "osm.geo.cache.GraphHopper.Canada": [
-        "AllCanada", "Alberta", "BritishColumbia", "Manitoba", "NewBrunswick",
-        "NewfoundlandAndLabrador", "NorthwestTerritories", "NovaScotia",
-        "Nunavut", "Ontario", "PrinceEdwardIsland", "Quebec", "Saskatchewan",
-        "Yukon",
-    ],
-}
-
-
-# -----------------------------------------------------------------------------
 # Registration
 # -----------------------------------------------------------------------------
 
@@ -395,24 +309,14 @@ GRAPHHOPPER_OPERATIONS_HANDLERS = {
 
 
 def register_graphhopper_handlers(poller) -> int:
-    """Register all GraphHopper handlers with the poller.
+    """Register all GraphHopper operation handlers with the poller.
 
     Returns the number of handlers registered.
     """
     count = 0
-
-    # Register operations handlers
     for name, handler in GRAPHHOPPER_OPERATIONS_HANDLERS.items():
         poller.register(name, handler)
         count += 1
-
-    # Register cache facet handlers
-    for namespace, facets in GRAPHHOPPER_CACHE_REGISTRY.items():
-        for facet_name in facets:
-            qualified_name = f"{namespace}.{facet_name}"
-            poller.register(qualified_name, _make_cache_handler(facet_name))
-            count += 1
-
     return count
 
 
@@ -421,13 +325,8 @@ _DISPATCH: dict[str, callable] = {}
 
 
 def _build_dispatch() -> None:
-    # Operations handlers (direct functions)
     for name, handler in GRAPHHOPPER_OPERATIONS_HANDLERS.items():
         _DISPATCH[name] = handler
-    # Cache facet handlers
-    for namespace, facets in GRAPHHOPPER_CACHE_REGISTRY.items():
-        for facet_name in facets:
-            _DISPATCH[f"{namespace}.{facet_name}"] = _make_cache_handler(facet_name)
 
 
 _build_dispatch()

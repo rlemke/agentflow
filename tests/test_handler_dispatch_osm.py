@@ -208,25 +208,6 @@ class TestOsmAirqualityHandlers:
         assert runner.register_handler.call_count == len(mod._DISPATCH)
 
 
-class TestOsmCacheHandlers:
-    def test_dispatch_keys(self):
-        mod = _osm_import("cache_handlers")
-        assert len(mod._DISPATCH) > 100
-
-    def test_handle_dispatches(self):
-        mod = _osm_import("cache_handlers")
-        facet = next(iter(mod._DISPATCH))
-        result = mod.handle({"_facet_name": facet})
-        assert isinstance(result, dict)
-        assert "cache" in result
-
-    def test_register_handlers(self):
-        mod = _osm_import("cache_handlers")
-        runner = MagicMock()
-        mod.register_handlers(runner)
-        assert runner.register_handler.call_count == len(mod._DISPATCH)
-
-
 class TestOsmOperationsHandlers:
     def test_dispatch_keys(self):
         mod = _osm_import("operations_handlers")
@@ -266,13 +247,15 @@ class TestOsmPoiHandlers:
 class TestOsmGraphhopperHandlers:
     def test_dispatch_keys(self):
         mod = _osm_import("graphhopper_handlers")
-        assert len(mod._DISPATCH) > 50
+        assert len(mod._DISPATCH) == 6
+        for key in mod._DISPATCH:
+            assert key.startswith("osm.geo.Operations.GraphHopper.")
 
     def test_register_handlers(self):
         mod = _osm_import("graphhopper_handlers")
         runner = MagicMock()
         mod.register_handlers(runner)
-        assert runner.register_handler.call_count == len(mod._DISPATCH)
+        assert runner.register_handler.call_count == 6
 
 
 class TestOsmTigerHandlers:
@@ -426,4 +409,5 @@ class TestOsmInitRegistryHandlers:
         mod = _osm_import("__init__")
         runner = MagicMock()
         mod.register_all_registry_handlers(runner)
-        assert runner.register_handler.call_count > 100
+        # Only event facet handlers remain (no cache/graphhopper cache registrations)
+        assert runner.register_handler.call_count > 50

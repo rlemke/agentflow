@@ -1,10 +1,13 @@
-"""Cache event facet handlers for OSM region downloads.
+"""OSM region registry data for Geofabrik downloads.
 
-Each handler downloads the .osm.pbf file from Geofabrik (with local
-filesystem caching) and returns an OSMCache dict.
+Provides REGION_REGISTRY mapping namespace → { FacetName: geofabrik_path }
+and a _make_handler() factory used by operations_handlers.py.
+
+Note: The actual event facet for cache operations is osm.geo.Operations.Cache,
+handled by operations_handlers.py. The individual region facets (e.g.,
+osm.geo.cache.Africa.Malawi) are regular facets with andThen bodies that
+expand inline — they never produce event tasks.
 """
-
-import os
 
 from .downloader import download
 
@@ -323,47 +326,3 @@ REGION_REGISTRY: dict[str, dict[str, str]] = {
         "Russia": "russia",
     },
 }
-
-
-def register_cache_handlers(poller) -> None:
-    """Register all cache event facet handlers with the poller.
-
-    Registers handlers for ~250 geographic region facets across 11 namespaces.
-    Each handler returns an OSMCache dict with the Geofabrik download URL.
-    """
-    for namespace, facets in REGION_REGISTRY.items():
-        for facet_name, region_path in facets.items():
-            qualified_name = f"{namespace}.{facet_name}"
-            poller.register(qualified_name, _make_handler(region_path))
-
-
-# RegistryRunner dispatch adapter
-_DISPATCH: dict[str, callable] = {}
-
-
-def _build_dispatch() -> None:
-    for namespace, facets in REGION_REGISTRY.items():
-        for facet_name, region_path in facets.items():
-            _DISPATCH[f"{namespace}.{facet_name}"] = _make_handler(region_path)
-
-
-_build_dispatch()
-
-
-def handle(payload: dict) -> dict:
-    """RegistryRunner dispatch entrypoint."""
-    facet_name = payload["_facet_name"]
-    handler = _DISPATCH.get(facet_name)
-    if handler is None:
-        raise ValueError(f"Unknown facet: {facet_name}")
-    return handler(payload)
-
-
-def register_handlers(runner) -> None:
-    """Register all facets with a RegistryRunner."""
-    for facet_name in _DISPATCH:
-        runner.register_handler(
-            facet_name=facet_name,
-            module_uri=f"file://{os.path.abspath(__file__)}",
-            entrypoint="handle",
-        )
