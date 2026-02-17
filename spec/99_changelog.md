@@ -525,7 +525,7 @@
 
 - **Pass `program_ast` to `resume()`**: `RunnerService._resume_workflow()`, `AgentPoller._load_workflow_ast()`, and `RegistryRunner._load_workflow_ast()` now cache and pass the full `program_dict` when calling `evaluator.resume()` — fixes facet `andThen` body expansion during resume (wrapper facet bodies were silently empty because `get_facet_definition()` returned None when `program_ast` was None)
 - **Fix Download handler return value**: `OPERATIONS_FACETS["Download"]` changed from `None` to `"downloadCache"` in `examples/osm-geocoder/handlers/operations_handlers.py` — the AFL definition declares `event facet Download(cache:OSMCache) => (downloadCache:OSMCache)` so the handler must return `{downloadCache: {...}}`
-- **30-state workflow validated end-to-end**: `Download30States` workflow runs to completion in Docker (474/474 steps complete, 0 errors, 181/181 tasks completed) — all Cache, Download, and wrapper steps produce correct return attributes
+- **30-state workflow validated end-to-end**: `Download30States` workflow runs to completion in Docker (1080/1080 steps complete, 0 errors, 481/481 tasks completed) — all Cache, Download, and wrapper steps produce correct return attributes
 
 ## Completed (v0.12.20) - CLI Submit Module
 
