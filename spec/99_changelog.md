@@ -521,6 +521,11 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.17) - 30-State OSM Download Workflow
+- **`osmstates30.afl`** (`examples/osm-geocoder/afl/osmstates30.afl`): new AFL workflow in `osm.geo.UnitedStates.sample` namespace; `Download30States` workflow downloads OSM data for 30 randomly chosen US states (Alaska, Arizona, California, Colorado, Connecticut, Florida, Georgia, Idaho, Illinois, Indiana, Iowa, Kansas, Kentucky, Louisiana, Maine, Maryland, Michigan, Minnesota, Missouri, Montana, Nevada, NewYork, NorthCarolina, Ohio, Oregon, Pennsylvania, Tennessee, Texas, Virginia, Washington); follows the `UnitedStatesIndividually` pattern — calls each state's cache facet, downloads via `Download(cache = ...)`, yields concatenated `downloadCache` results using `++`
+- **`run_30states.sh`** (`examples/osm-geocoder/run_30states.sh`): convenience startup script that creates `~/data/hdfs/{namenode,datanode}` and `~/data/mongodb` directories, bootstraps the Docker stack via `scripts/setup` with `--hdfs`, `--hdfs-namenode-dir`, `--hdfs-datanode-dir`, `--mongodb-data-dir`, and `--osm-agents 1`, waits for MongoDB readiness, compiles the AFL file with all library dependencies, submits the workflow, and prints dashboard access instructions
+- 1697 passed, 35 skipped (without `--hdfs`/`--mongodb`/`--postgis`)
+
 ## Completed (v0.12.16) - Refactor MavenArtifactRunner to Subclass RegistryRunner
 - **`MavenRunnerConfig(RegistryRunnerConfig)`**: now extends `RegistryRunnerConfig` instead of duplicating all infrastructure fields; only declares Maven-specific fields (`cache_dir`, `repository_url`, `java_command`, `default_timeout_ms`) plus `service_name` override (`"afl-maven-runner"`)
 - **`MavenArtifactRunner(RegistryRunner)`**: now extends `RegistryRunner`, inheriting poll loop, heartbeat, server registration, thread pool/futures management, AST caching, task claiming, workflow resume, and shutdown — ~500 lines of duplicated infrastructure removed
