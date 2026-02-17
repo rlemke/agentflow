@@ -79,9 +79,12 @@ echo ""
 # 5. Submit the workflow
 # ---------------------------------------------------------------------------
 echo "=== Submitting Download30States workflow ==="
-python -m afl.runtime.submit "$OUTPUT_FILE" \
-    --workflow "osm.geo.UnitedStates.sample.Download30States" 2>/dev/null || \
-    echo "  (Submit via dashboard or MCP if the CLI submit is not available)"
+python -m afl.runtime.submit \
+    --primary "$AFL_FILE" \
+    --library "$EXAMPLE_DIR/afl/osmtypes.afl" \
+    --library "$EXAMPLE_DIR/afl/osmoperations.afl" \
+    --library "$EXAMPLE_DIR/afl/osmcache.afl" \
+    --workflow "osm.geo.UnitedStates.sample.Download30States"
 echo ""
 
 # ---------------------------------------------------------------------------

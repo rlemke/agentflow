@@ -47,6 +47,7 @@ afl = "afl.cli:main"
 afl-dashboard = "afl.dashboard.__main__:main"
 afl-runner = "afl.runtime.runner.__main__:main"
 afl-mcp = "afl.mcp.__main__:main"
+afl-submit = "afl.runtime.submit:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
