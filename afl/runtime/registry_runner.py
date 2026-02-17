@@ -383,6 +383,9 @@ class RegistryRunner:
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
 
+            # Cache program AST for facet definition lookups during resume
+            self._program_ast_cache[workflow_id] = program_dict
+
             return self._find_workflow_in_program(program_dict, wf.name)
         except Exception:
             logger.debug("Could not load AST for workflow %s", workflow_id, exc_info=True)

@@ -152,6 +152,7 @@ class RunnerService:
         self._active_lock = threading.Lock()
         self._handled_counts: dict[str, HandledCount] = {}
         self._ast_cache: dict[str, dict] = {}
+        self._program_ast_cache: dict[str, dict] = {}
         self._start_time_ms: int = 0
         self._http_server: HTTPServer | None = None
         self._http_thread: threading.Thread | None = None
@@ -816,6 +817,7 @@ class RunnerService:
 
             # Cache AST for resume
             self._ast_cache[result.workflow_id] = workflow_ast
+            self._program_ast_cache[result.workflow_id] = program_dict
 
             # Update runner with evaluator's workflow_id so dashboard can find steps
             if runner:
@@ -978,7 +980,8 @@ class RunnerService:
             )
             return
 
-        self._evaluator.resume(workflow_id, workflow_ast)
+        program_ast = self._program_ast_cache.get(workflow_id)
+        self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
 
     def _load_workflow_ast(self, workflow_id: str) -> dict | None:
         """Attempt to load the workflow AST from persistence.
@@ -1011,6 +1014,9 @@ class RunnerService:
             ast = parser.parse(flow.compiled_sources[0].content)
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
+
+            # Cache program AST for facet definition lookups during resume
+            self._program_ast_cache[workflow_id] = program_dict
 
             return self._find_workflow_in_program(program_dict, wf.name)
         except Exception:
