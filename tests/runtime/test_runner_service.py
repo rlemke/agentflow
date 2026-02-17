@@ -347,15 +347,16 @@ class TestRunnerServicePolling:
         steps = svc._poll_event_steps()
         assert len(steps) == 0
 
-    def test_poll_pending_tasks(self, store, registry, evaluator):
-        """Pending tasks are found for the configured task list."""
+    def test_poll_pending_tasks(self, store, evaluator):
+        """Pending tasks with a built-in handler are found."""
+        registry = ToolRegistry()
         config = RunnerConfig(task_list="mylist")
         svc = RunnerService(store, evaluator, config, registry)
 
-        # Create a pending task
+        # Create a pending afl:execute task (built-in handler)
         task = TaskDefinition(
             uuid=generate_id(),
-            name="SomeTask",
+            name="afl:execute",
             runner_id="r1",
             workflow_id="w1",
             flow_id="f1",
@@ -369,20 +370,41 @@ class TestRunnerServicePolling:
         assert len(tasks) == 1
         assert tasks[0].uuid == task.uuid
 
-    def test_poll_ignores_wrong_task_list(self, store, registry, evaluator):
+    def test_poll_ignores_wrong_task_list(self, store, evaluator):
         """Tasks from a different list are not returned."""
+        registry = ToolRegistry()
         config = RunnerConfig(task_list="mylist")
         svc = RunnerService(store, evaluator, config, registry)
 
         task = TaskDefinition(
             uuid=generate_id(),
-            name="SomeTask",
+            name="afl:execute",
             runner_id="r1",
             workflow_id="w1",
             flow_id="f1",
             step_id="s1",
             state=TaskState.PENDING,
             task_list_name="otherlist",
+        )
+        store.save_task(task)
+
+        tasks = svc._poll_pending_tasks()
+        assert len(tasks) == 0
+
+    def test_poll_ignores_unhandled_tasks(self, store, registry, evaluator):
+        """Tasks with no registered handler are not returned."""
+        config = RunnerConfig(task_list="mylist")
+        svc = RunnerService(store, evaluator, config, registry)
+
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="osm.geo.Operations.Cache",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.PENDING,
+            task_list_name="mylist",
         )
         store.save_task(task)
 

@@ -390,17 +390,22 @@ class RunnerService:
     def _poll_pending_tasks(self) -> list:
         """Find pending tasks for this runner's task list.
 
-        Excludes event tasks (those are handled via claim_task).
-        Event tasks are identified by having a handler registered for their name.
+        Only returns tasks for built-in handlers (like afl:execute).
+        User-registered event handlers are processed via claim_task
+        (which respects topics filtering). Tasks with no handler at all
+        are left untouched for the correct external agent.
         """
         tasks = list(self._persistence.get_pending_tasks(self._config.task_list))
-        # Filter out event tasks — any task whose name matches a registered
-        # handler (excluding built-in handlers like afl:execute) is an event
-        # task and will be claimed via claim_task instead.
-        handler_names = {
+        # Event handler names: user-registered handlers (everything except afl:execute)
+        event_handler_names = {
             name for name in self._tool_registry._handlers.keys() if name != "afl:execute"
         }
-        return [t for t in tasks if t.name not in handler_names and t.name != RESUME_TASK_NAME]
+        return [
+            t for t in tasks
+            if t.name not in event_handler_names
+            and t.name in self._tool_registry._handlers
+            and t.name != RESUME_TASK_NAME
+        ]
 
     # =========================================================================
     # Locking
