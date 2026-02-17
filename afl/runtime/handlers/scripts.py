@@ -44,7 +44,7 @@ class FacetScriptsBeginHandler(StateHandler):
             return StateChangeResult(step=self.step)
 
         body = facet_def.get("body")
-        if body is None or body.get("type") != "ScriptBlock":
+        if body is None or isinstance(body, list) or body.get("type") != "ScriptBlock":
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
 

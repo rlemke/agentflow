@@ -316,6 +316,97 @@ class TestAddLongsDependencyChain:
         assert result.outputs["output"] == 331
 
 
+AFL_MULTI_ANDTHEN = """\
+namespace afl.test.basic.test_runners {
+    facet Value(a:Int = 0,b:Int=1) => (value:Int) andThen {
+      yield Value(value = $.a + $.b)
+    }
+    workflow MultiAndThenEventTest(parameter:Int = 1) => (output1:Int = 0,output2:Int = 0,output3:Int = 0,output4:Int = 0,output5:Int = 0) andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenEventTest(output1 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenEventTest(output2 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenEventTest(output3 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenEventTest(output4 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenEventTest(output5 = v1.value + v5.value)
+    }
+}
+"""
+
+
+class TestMultiAndThenBlocks:
+    """5 concurrent andThen blocks with facet-computed values.
+
+    Facet Value(a, b) => (value = a + b) via its own andThen body.
+    Each block has 6 steps with cross-step dependencies and a yield.
+    All 5 blocks execute the same computation independently.
+    """
+
+    def test_compiles_with_5_blocks(self):
+        compiled = _compile(AFL_MULTI_ANDTHEN)
+        wf = _find_workflow(compiled, "MultiAndThenEventTest")
+        assert wf is not None
+        body = wf["body"]
+        assert isinstance(body, list)
+        assert len(body) == 5
+
+    def test_each_block_has_6_steps(self):
+        compiled = _compile(AFL_MULTI_ANDTHEN)
+        wf = _find_workflow(compiled, "MultiAndThenEventTest")
+        for i, block in enumerate(wf["body"]):
+            assert len(block["steps"]) == 6, f"block {i} should have 6 steps"
+
+    def test_default_parameter_all_outputs_25(self, store, evaluator):
+        compiled = _compile(AFL_MULTI_ANDTHEN)
+        wf = _find_workflow(compiled, "MultiAndThenEventTest")
+        result = evaluator.execute(wf, inputs={"parameter": 1}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        for i in range(1, 6):
+            assert result.outputs[f"output{i}"] == 25
+
+    def test_parameter_5_all_outputs_37(self, store, evaluator):
+        compiled = _compile(AFL_MULTI_ANDTHEN)
+        wf = _find_workflow(compiled, "MultiAndThenEventTest")
+        result = evaluator.execute(wf, inputs={"parameter": 5}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        for i in range(1, 6):
+            assert result.outputs[f"output{i}"] == 37
+
+
 AFL_TOP_LEVEL_WORKFLOW = """\
 event facet AddOne(input: Long) => (output: Long)
 
