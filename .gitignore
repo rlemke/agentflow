@@ -26,5 +26,8 @@ afl-test.log
 .claude/settings.local.json
 .claude/plans/
 
+# Compiled AFL output
+examples/osm-geocoder/tests/real/osmstates30.json
+
 # OS
 .DS_Store
