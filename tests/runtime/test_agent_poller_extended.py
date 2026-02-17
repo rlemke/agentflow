@@ -120,7 +120,7 @@ class TestResumeWorkflow:
         poller.cache_workflow_ast("wf-1", ast)
 
         poller._resume_workflow("wf-1")
-        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=None)
+        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=None, runner_id="")
 
     def test_resume_with_cached_program_ast(self, poller, evaluator):
         ast = {"name": "TestWF", "body": {}}
@@ -128,7 +128,7 @@ class TestResumeWorkflow:
         poller.cache_workflow_ast("wf-1", ast, program_ast=prog)
 
         poller._resume_workflow("wf-1")
-        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=prog)
+        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=prog, runner_id="")
 
     def test_resume_no_ast_logs_warning(self, poller, evaluator):
         # No cached AST and _load_workflow_ast returns None
@@ -142,7 +142,7 @@ class TestResumeWorkflow:
         with patch.object(poller, "_load_workflow_ast", return_value=ast):
             poller._resume_workflow("wf-1")
 
-        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=None)
+        evaluator.resume.assert_called_once_with("wf-1", ast, program_ast=None, runner_id="")
         assert poller._ast_cache["wf-1"] is ast
 
 

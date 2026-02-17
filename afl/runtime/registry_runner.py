@@ -648,7 +648,11 @@ class RegistryRunner:
 
             program_ast = self._program_ast_cache.get(workflow_id)
             result = self._evaluator.resume(
-                workflow_id, workflow_ast, program_ast=program_ast, dispatcher=self._dispatcher
+                workflow_id,
+                workflow_ast,
+                program_ast=program_ast,
+                runner_id=runner_id,
+                dispatcher=self._dispatcher,
             )
 
             if runner_id and result.status in (

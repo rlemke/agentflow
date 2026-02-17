@@ -604,7 +604,9 @@ class AgentPoller:
                 return
 
             program_ast = self._program_ast_cache.get(workflow_id)
-            result = self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+            result = self._evaluator.resume(
+                workflow_id, workflow_ast, program_ast=program_ast, runner_id=runner_id
+            )
 
             if runner_id and result.status in (
                 ExecutionStatus.COMPLETED,
