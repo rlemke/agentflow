@@ -407,6 +407,108 @@ class TestMultiAndThenBlocks:
             assert result.outputs[f"output{i}"] == 37
 
 
+AFL_MULTI_ANDTHEN_NESTED = """\
+namespace afl.test.basic.test_runners {
+    facet IntValueAdd(a:Int, b:Int) => (value:Int) andThen {
+       yield IntValueAdd(value = $.a + $.b)
+    }
+    facet Value(a:Int = 0,b:Int=1) => (value:Int) andThen {
+      a = IntValueAdd(a = $.a, b = $.b)
+      b = IntValueAdd(a = $.a + 1, b = $.b + 1)
+      c = IntValueAdd(a = a.a + a.value, b = b.b + b.value)
+      yield Value(value = $.a + $.b + c.value)
+    }
+    workflow MultiAndThenTest2(parameter:Int = 1) => (output1:Int = 0,output2:Int = 0,output3:Int = 0,output4:Int = 0,output5:Int = 0) andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenTest2(output1 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenTest2(output2 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenTest2(output3 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenTest2(output4 = v1.value + v5.value)
+    } andThen {
+      v0 = Value(a = 3 + $.parameter, b = 2)
+      v1 = Value(a = v0.a + v0.b, b = v0.value)
+      v2 = Value(a = v1.a, b = v0.b + v0.value)
+      v3 = Value(a = v0.a + v1.b, b = v2.value)
+      v4 = Value(b = v1.a + v2.a)
+      v5 = Value(a = v1.value + v1.b + v4.value + v4.b + v3.a + v3.value)
+      yield MultiAndThenTest2(output5 = v1.value + v5.value)
+    }
+}
+"""
+
+
+class TestMultiAndThenNestedFacets:
+    """5 concurrent andThen blocks with two-level nested facet andThen bodies.
+
+    IntValueAdd(a, b) => (value = a + b) via its own andThen body.
+    Value(a, b) => (value) via a 3-step andThen body calling IntValueAdd.
+    Each workflow block has 6 steps with cross-step dependencies.
+    """
+
+    def test_compiles_with_5_blocks(self):
+        compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
+        wf = _find_workflow(compiled, "MultiAndThenTest2")
+        assert wf is not None
+        body = wf["body"]
+        assert isinstance(body, list)
+        assert len(body) == 5
+
+    def test_value_facet_has_3_step_body(self):
+        compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
+        # Find the Value facet definition
+        for decl in compiled.get("declarations", []):
+            if decl.get("type") == "Namespace":
+                for nested in decl.get("declarations", []):
+                    if nested.get("name") == "Value" and nested.get("type") == "FacetDecl":
+                        assert len(nested["body"]["steps"]) == 3
+                        return
+        pytest.fail("Value facet not found")
+
+    def test_default_parameter_all_outputs_2470(self, store, evaluator):
+        compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
+        wf = _find_workflow(compiled, "MultiAndThenTest2")
+        result = evaluator.execute(wf, inputs={"parameter": 1}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        for i in range(1, 6):
+            assert result.outputs[f"output{i}"] == 2470
+
+    def test_parameter_5_all_outputs_3814(self, store, evaluator):
+        compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
+        wf = _find_workflow(compiled, "MultiAndThenTest2")
+        result = evaluator.execute(wf, inputs={"parameter": 5}, program_ast=compiled)
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        for i in range(1, 6):
+            assert result.outputs[f"output{i}"] == 3814
+
+
 AFL_TOP_LEVEL_WORKFLOW = """\
 event facet AddOne(input: Long) => (output: Long)
 
