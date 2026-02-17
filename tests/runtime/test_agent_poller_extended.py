@@ -15,6 +15,7 @@ class FakeTask:
     name: str = "ns.DoWork"
     step_id: str = "s-1"
     workflow_id: str = "wf-1"
+    runner_id: str = ""
     data: dict = None
     state: str = "running"
     error: dict = None

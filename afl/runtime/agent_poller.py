@@ -60,11 +60,12 @@ from dataclasses import dataclass
 from typing import Any, Union
 
 from .entities import (
+    RunnerState,
     ServerDefinition,
     ServerState,
     TaskState,
 )
-from .evaluator import Evaluator
+from .evaluator import Evaluator, ExecutionStatus
 from .persistence import PersistenceAPI
 from .types import generate_id
 
@@ -126,6 +127,8 @@ class AgentPoller:
         self._active_lock = threading.Lock()
         self._ast_cache: dict[str, dict] = {}
         self._program_ast_cache: dict[str, dict] = {}
+        self._resume_locks: dict[str, threading.Lock] = {}
+        self._resume_locks_lock = threading.Lock()
 
     @property
     def server_id(self) -> str:
@@ -540,7 +543,7 @@ class AgentPoller:
             self._evaluator.continue_step(task.step_id, result)
 
             # Resume the workflow
-            self._resume_workflow(task.workflow_id)
+            self._resume_workflow(task.workflow_id, task.runner_id)
 
             # Mark task completed
             task.state = TaskState.COMPLETED
@@ -574,23 +577,63 @@ class AgentPoller:
     # Workflow Resume
     # =========================================================================
 
-    def _resume_workflow(self, workflow_id: str) -> None:
+    def _resume_workflow(self, workflow_id: str, runner_id: str = "") -> None:
         """Resume a paused workflow after step completion."""
-        workflow_ast = self._ast_cache.get(workflow_id)
-        if workflow_ast is None:
-            workflow_ast = self._load_workflow_ast(workflow_id)
-            if workflow_ast:
-                self._ast_cache[workflow_id] = workflow_ast
+        # Acquire per-workflow lock to prevent concurrent resumes
+        with self._resume_locks_lock:
+            if workflow_id not in self._resume_locks:
+                self._resume_locks[workflow_id] = threading.Lock()
+            lock = self._resume_locks[workflow_id]
 
-        if workflow_ast is None:
-            logger.warning(
-                "No AST available for workflow %s, skipping resume",
-                workflow_id,
-            )
+        if not lock.acquire(blocking=False):
+            logger.debug("Resume already in progress for workflow %s, skipping", workflow_id)
             return
 
-        program_ast = self._program_ast_cache.get(workflow_id)
-        self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+        try:
+            workflow_ast = self._ast_cache.get(workflow_id)
+            if workflow_ast is None:
+                workflow_ast = self._load_workflow_ast(workflow_id)
+                if workflow_ast:
+                    self._ast_cache[workflow_id] = workflow_ast
+
+            if workflow_ast is None:
+                logger.warning(
+                    "No AST available for workflow %s, skipping resume",
+                    workflow_id,
+                )
+                return
+
+            program_ast = self._program_ast_cache.get(workflow_id)
+            result = self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+
+            if runner_id and result.status in (
+                ExecutionStatus.COMPLETED,
+                ExecutionStatus.ERROR,
+            ):
+                self._update_runner_state(runner_id, result)
+        finally:
+            lock.release()
+
+    def _update_runner_state(self, runner_id: str, result: "ExecutionResult") -> None:
+        """Update runner state based on execution result."""
+        from .evaluator import ExecutionResult  # noqa: F811 (type hint)
+
+        try:
+            runner = self._persistence.get_runner(runner_id)
+            if runner and runner.state == RunnerState.RUNNING:
+                now = _current_time_ms()
+                if result.status == ExecutionStatus.COMPLETED:
+                    runner.state = RunnerState.COMPLETED
+                    runner.end_time = now
+                    runner.duration = now - (runner.start_time or now)
+                elif result.status == ExecutionStatus.ERROR:
+                    runner.state = RunnerState.FAILED
+                    runner.end_time = now
+                    runner.duration = now - (runner.start_time or now)
+                self._persistence.save_runner(runner)
+                logger.info("Updated runner %s state to %s", runner_id, runner.state)
+        except Exception:
+            logger.debug("Could not update runner %s", runner_id, exc_info=True)
 
     # =========================================================================
     # Shutdown

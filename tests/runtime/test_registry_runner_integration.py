@@ -23,6 +23,7 @@ Tests cover:
 """
 
 import asyncio
+import threading
 
 import pytest
 
@@ -34,9 +35,14 @@ from afl.runtime import (
     StepState,
     Telemetry,
 )
-from afl.runtime.entities import TaskState
+from afl.runtime.entities import (
+    RunnerDefinition,
+    RunnerState,
+    TaskState,
+    WorkflowDefinition,
+)
 from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
-from afl.runtime.types import ObjectType
+from afl.runtime.types import ObjectType, generate_id
 
 
 # =========================================================================
@@ -1153,3 +1159,213 @@ class TestRegistryRunnerForeach:
         # At least one step should be in error state (the item==2 iteration)
         error_steps = store.get_steps_by_state(StepState.STATEMENT_ERROR)
         assert len(error_steps) >= 1
+
+
+# =========================================================================
+# 6. Runner state completion — runner transitions to COMPLETED after resume
+# =========================================================================
+
+
+def _create_runner_entity(store, workflow_id, runner_id=None):
+    """Create and save a RunnerDefinition in RUNNING state for a workflow."""
+    if runner_id is None:
+        runner_id = generate_id()
+    wf_def = WorkflowDefinition(
+        uuid=workflow_id,
+        name="TestWorkflow",
+        namespace_id="ns-1",
+        facet_id="f-1",
+        flow_id="flow-1",
+        starting_step="step-1",
+        version="1.0",
+    )
+    runner = RunnerDefinition(
+        uuid=runner_id,
+        workflow_id=workflow_id,
+        workflow=wf_def,
+        state=RunnerState.RUNNING,
+        start_time=int(__import__("time").time() * 1000),
+    )
+    store.save_runner(runner)
+    return runner
+
+
+class TestRegistryRunnerStateCompletion:
+    """Tests that runner state transitions to COMPLETED after all events finish."""
+
+    def test_runner_completed_after_single_event(self, store, evaluator, tmp_path):
+        """Runner state transitions to COMPLETED when workflow completes via poll_once."""
+        _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
+        runner = _make_runner(store, evaluator)
+
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST,
+            inputs={"x": 1},
+            program_ast=ADDONE_PROGRAM_AST,
+            runner_id="test-runner-1",
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Create a runner entity in RUNNING state
+        runner_entity = _create_runner_entity(store, result.workflow_id, "test-runner-1")
+
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        # Runner state should now be COMPLETED
+        updated_runner = store.get_runner("test-runner-1")
+        assert updated_runner.state == RunnerState.COMPLETED
+        assert updated_runner.end_time > 0
+        assert updated_runner.duration > 0
+
+    def test_runner_completed_after_pipeline(self, store, evaluator, tmp_path):
+        """Runner transitions to COMPLETED after multi-step pipeline finishes."""
+        _register_file_handler(
+            store, tmp_path, "pipeline.StepA",
+            "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
+        )
+        _register_file_handler(
+            store, tmp_path, "pipeline.StepB",
+            "def handle(payload):\n    return {'output': payload['input'] * 3}\n",
+        )
+        _register_file_handler(
+            store, tmp_path, "pipeline.StepC",
+            "def handle(payload):\n    return {'output': payload['input'] - 1}\n",
+        )
+        runner = _make_runner(store, evaluator)
+
+        result = evaluator.execute(
+            PIPELINE_WORKFLOW_AST,
+            inputs={"x": 5},
+            program_ast=PIPELINE_PROGRAM_AST,
+            runner_id="pipeline-runner-1",
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        _create_runner_entity(store, result.workflow_id, "pipeline-runner-1")
+
+        runner.cache_workflow_ast(
+            result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST
+        )
+
+        # Process all tasks (auto-resume handles inline dispatch)
+        total = 0
+        for _ in range(10):
+            d = runner.poll_once()
+            total += d
+            if d == 0:
+                break
+
+        updated = store.get_runner("pipeline-runner-1")
+        assert updated.state == RunnerState.COMPLETED
+        assert updated.end_time > 0
+
+    def test_runner_stays_running_when_paused(self, store, evaluator, tmp_path):
+        """Runner stays RUNNING when workflow pauses (not all events done)."""
+        _register_file_handler(
+            store, tmp_path, "pipeline.StepA",
+            "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
+        )
+        # Don't register StepB/StepC so we can control step-by-step
+        runner = _make_runner(store, evaluator)
+
+        result = evaluator.execute(
+            PIPELINE_WORKFLOW_AST,
+            inputs={"x": 5},
+            program_ast=PIPELINE_PROGRAM_AST,
+            runner_id="partial-runner-1",
+        )
+        assert result.status == ExecutionStatus.PAUSED
+        _create_runner_entity(store, result.workflow_id, "partial-runner-1")
+
+        # Only process StepA — workflow re-pauses waiting for StepB
+        runner.poll_once()
+
+        updated = store.get_runner("partial-runner-1")
+        assert updated.state == RunnerState.RUNNING
+
+    def test_runner_no_update_without_runner_id(self, store, evaluator, tmp_path):
+        """When runner_id is empty on the task, no runner update occurs."""
+        _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
+        runner = _make_runner(store, evaluator)
+
+        # Execute without runner_id — task.runner_id will be ""
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST,
+            inputs={"x": 1},
+            program_ast=ADDONE_PROGRAM_AST,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
+        dispatched = runner.poll_once()
+        assert dispatched == 1
+
+        # No runner entity should have been created or updated
+        # (get_runner returns None for non-existent IDs)
+        assert store.get_runner("") is None
+
+
+class TestRegistryRunnerConcurrentResumeLock:
+    """Tests that per-workflow resume lock prevents concurrent resumes."""
+
+    def test_concurrent_resume_skipped(self, store, evaluator, tmp_path):
+        """When resume is already in progress, a second attempt is skipped."""
+        _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
+        runner = _make_runner(store, evaluator)
+
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST,
+            inputs={"x": 1},
+            program_ast=ADDONE_PROGRAM_AST,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
+
+        # Manually acquire the resume lock for this workflow
+        with runner._resume_locks_lock:
+            runner._resume_locks[result.workflow_id] = threading.Lock()
+        lock = runner._resume_locks[result.workflow_id]
+        lock.acquire()
+
+        try:
+            # _resume_workflow should return immediately (lock already held)
+            runner._resume_workflow(result.workflow_id)
+
+            # Workflow should still be paused (resume was skipped)
+            blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            assert len(blocked) >= 1
+        finally:
+            lock.release()
+
+    def test_lock_released_after_resume(self, store, evaluator, tmp_path):
+        """After resume completes, the lock is released for future resumes."""
+        _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
+        runner = _make_runner(store, evaluator)
+
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST,
+            inputs={"x": 1},
+            program_ast=ADDONE_PROGRAM_AST,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Process the event
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
+        runner.poll_once()
+
+        # Lock should be released after poll_once (which calls _resume_workflow)
+        lock = runner._resume_locks.get(result.workflow_id)
+        if lock:
+            assert lock.acquire(blocking=False), "Lock should be available after resume"
+            lock.release()

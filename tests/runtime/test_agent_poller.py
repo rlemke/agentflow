@@ -35,9 +35,12 @@ from afl.runtime import (
 )
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 from afl.runtime.entities import (
+    RunnerDefinition,
+    RunnerState,
     ServerState,
     TaskDefinition,
     TaskState,
+    WorkflowDefinition,
 )
 from afl.runtime.types import generate_id
 
@@ -479,3 +482,115 @@ class TestAgentPollerLifecycle:
         t.join(timeout=2)
 
         assert not poller.is_running
+
+
+# =========================================================================
+# TestAgentPollerRunnerState
+# =========================================================================
+
+
+def _create_runner_entity(store, workflow_id, runner_id):
+    """Create and save a RunnerDefinition in RUNNING state."""
+    wf_def = WorkflowDefinition(
+        uuid=workflow_id,
+        name="TestWorkflow",
+        namespace_id="ns-1",
+        facet_id="f-1",
+        flow_id="flow-1",
+        starting_step="step-1",
+        version="1.0",
+    )
+    runner = RunnerDefinition(
+        uuid=runner_id,
+        workflow_id=workflow_id,
+        workflow=wf_def,
+        state=RunnerState.RUNNING,
+        start_time=int(time.time() * 1000),
+    )
+    store.save_runner(runner)
+    return runner
+
+
+class TestAgentPollerRunnerState:
+    """Tests that AgentPoller updates runner state after resume."""
+
+    def test_runner_completed_after_event(self, store, evaluator, workflow_ast, program_ast):
+        """Runner state transitions to COMPLETED when workflow completes."""
+        result = evaluator.execute(
+            workflow_ast,
+            inputs={"x": 1},
+            program_ast=program_ast,
+            runner_id="ap-runner-1",
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        _create_runner_entity(store, result.workflow_id, "ap-runner-1")
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", lambda p: {"output": 42})
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast)
+
+        dispatched = poller.poll_once()
+        assert dispatched == 1
+
+        updated_runner = store.get_runner("ap-runner-1")
+        assert updated_runner.state == RunnerState.COMPLETED
+        assert updated_runner.end_time > 0
+        assert updated_runner.duration > 0
+
+    def test_runner_stays_running_without_runner_id(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """When task has no runner_id, runner state is not touched."""
+        result = evaluator.execute(
+            workflow_ast,
+            inputs={"x": 1},
+            program_ast=program_ast,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", lambda p: {"output": 42})
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast)
+
+        dispatched = poller.poll_once()
+        assert dispatched == 1
+        # No runner entity exists, no error occurs
+
+    def test_concurrent_resume_lock(self, store, evaluator, workflow_ast, program_ast):
+        """Resume lock prevents concurrent resumes for the same workflow."""
+        result = evaluator.execute(
+            workflow_ast,
+            inputs={"x": 1},
+            program_ast=program_ast,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast)
+
+        # Pre-acquire the lock
+        with poller._resume_locks_lock:
+            poller._resume_locks[result.workflow_id] = threading.Lock()
+        lock = poller._resume_locks[result.workflow_id]
+        lock.acquire()
+
+        try:
+            # Resume should be skipped (lock held)
+            poller._resume_workflow(result.workflow_id)
+            blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            assert len(blocked) >= 1  # still paused
+        finally:
+            lock.release()
