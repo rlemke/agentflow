@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..dependencies import get_store
+from ..tree import build_step_tree
 
 router = APIRouter(prefix="/api")
 
@@ -66,6 +67,7 @@ def api_runner_steps(
     runner_id: str,
     request: Request,
     partial: bool = False,
+    view: str = "flat",
     store=Depends(get_store),
 ):
     """Return steps for a runner's workflow."""
@@ -77,6 +79,12 @@ def api_runner_steps(
 
     if partial:
         templates = request.app.state.templates
+        if view == "tree":
+            tree = build_step_tree(list(steps))
+            html = templates.get_template("partials/step_tree.html").render(
+                tree=tree, request=request
+            )
+            return HTMLResponse(html)
         html = ""
         for step in steps:
             html += templates.get_template("partials/step_row.html").render(

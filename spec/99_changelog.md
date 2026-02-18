@@ -521,6 +521,18 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.27) - Hierarchical Tree View for Dashboard Step List
+
+- **`afl/dashboard/tree.py`** (NEW): `StepNode` dataclass and `build_step_tree()` function that converts a flat step list into a hierarchical tree using `container_id` / `block_id` relationships — no extra DB queries needed
+- **`afl/dashboard/templates/partials/step_tree.html`** (NEW): recursive Jinja2 template rendering tree nodes as nested `<details>` elements; root and first-level blocks default open, deeper levels collapsed
+- **`afl/dashboard/routes/runners.py`**: `runner_detail()` and `runner_steps()` now pass `tree=build_step_tree(list(steps))` to template context
+- **`afl/dashboard/routes/api.py`**: `api_runner_steps()` accepts `view=tree` query parameter; when `partial=true&view=tree`, renders tree partial instead of flat rows
+- **`afl/dashboard/templates/runners/detail.html`**: toggle button group (Flat / Tree) with both views; flat table has htmx polling, tree container polls with `?view=tree`
+- **`afl/dashboard/templates/steps/list.html`**: same toggle + both views for standalone steps page
+- **`afl/dashboard/static/style.css`**: `.view-toggle` segmented button group, `.step-tree-container` with left-border guide lines and indentation, `.tree-facet` / `.tree-duration` muted secondary info
+- **11 new tests** (`tests/dashboard/test_step_tree.py`): 7 `build_step_tree` unit tests (empty, single root, block+statements, deep nesting, multiple roots, order preservation, orphans) + 4 integration tests (tree partial, flat partial unchanged, detail toggle, steps page toggle)
+- 2173 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.26) - Descriptive Step Variable Names in Cache Facets
 
 - **`osmcache.afl`**: renamed single-letter `c` step variable to camelCase facet name in all 225 cache facets (e.g. `c = Cache(region = "Africa")` → `africa = Cache(region = "Africa")`, `c.cache` → `africa.cache`)

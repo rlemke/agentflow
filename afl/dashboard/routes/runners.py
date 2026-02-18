@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from ..dependencies import get_store
+from ..tree import build_step_tree
 
 router = APIRouter(prefix="/runners")
 
@@ -56,7 +57,7 @@ def runner_detail(runner_id: str, request: Request, store=Depends(get_store)):
     return request.app.state.templates.TemplateResponse(
         request,
         "runners/detail.html",
-        {"runner": runner, "steps": steps, "logs": logs},
+        {"runner": runner, "steps": steps, "tree": build_step_tree(list(steps)), "logs": logs},
     )
 
 
@@ -68,7 +69,7 @@ def runner_steps(runner_id: str, request: Request, store=Depends(get_store)):
     return request.app.state.templates.TemplateResponse(
         request,
         "steps/list.html",
-        {"steps": steps, "runner": runner},
+        {"steps": steps, "tree": build_step_tree(list(steps)), "runner": runner},
     )
 
 

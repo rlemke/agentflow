@@ -62,6 +62,12 @@
 </div>
 
 <h2>Steps</h2>
+<div class="view-toggle">
+    <button class="view-toggle-btn active" onclick="document.getElementById('step-flat').style.display='';document.getElementById('step-tree').style.display='none';this.classList.add('active');this.nextElementSibling.classList.remove('active');">Flat</button>
+    <button class="view-toggle-btn" onclick="document.getElementById('step-tree').style.display='';document.getElementById('step-flat').style.display='none';this.classList.add('active');this.previousElementSibling.classList.remove('active');">Tree</button>
+</div>
+
+<div id="step-flat">
 <figure>
 <table>
     <thead>
@@ -76,6 +82,16 @@
     </tbody>
 </table>
 </figure>
+</div>
+
+<div id="step-tree" style="display:none">
+<div class="step-tree-container"
+     hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true&view=tree"
+     hx-trigger="every 5s"
+     hx-swap="innerHTML">
+    {% with tree=tree %}{% include "partials/step_tree.html" %}{% endwith %}
+</div>
+</div>
 
 {% if logs %}
 <h2>Logs</h2>

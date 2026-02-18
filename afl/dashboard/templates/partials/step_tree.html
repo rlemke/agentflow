@@ -1,0 +1,15 @@
+{% for node in tree %}
+<details class="step-tree-node" {% if node.depth < 2 %}open{% endif %}>
+    <summary>
+        <span class="badge badge-{{ node.step.state|state_color }}">{{ node.step.state|state_label }}</span>
+        <a href="/steps/{{ node.step.id }}">{{ node.step.statement_name or node.step.id|truncate_uuid }}</a>
+        {% if node.step.facet_name %}<span class="tree-facet">{{ node.step.facet_name.split('.')[-1] }}</span>{% endif %}
+        {% if node.step.start_time %}<span class="tree-duration">{{ (node.step.last_modified - node.step.start_time)|duration }}</span>{% endif %}
+    </summary>
+    {% if node.children %}
+    <div class="tree-children">
+        {% with tree=node.children %}{% include "partials/step_tree.html" %}{% endwith %}
+    </div>
+    {% endif %}
+</details>
+{% endfor %}

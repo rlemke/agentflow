@@ -68,3 +68,65 @@ td details code {
 pre code {
     font-size: 0.85em;
 }
+
+/* View toggle button group */
+.view-toggle {
+    display: inline-flex;
+    gap: 0;
+    margin-bottom: 1rem;
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.view-toggle-btn {
+    padding: 0.3em 1em;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--primary);
+    font-size: 0.85em;
+    cursor: pointer;
+    margin: 0;
+}
+.view-toggle-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+.view-toggle-btn:not(.active):hover {
+    background: var(--primary-focus, rgba(16, 149, 193, 0.1));
+}
+
+/* Step tree view */
+.step-tree-container details.step-tree-node {
+    border-left: 2px solid var(--muted-border-color, #ddd);
+    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+.step-tree-container > details.step-tree-node {
+    border-left: none;
+    margin-left: 0;
+    padding-left: 0;
+}
+.step-tree-container details summary {
+    cursor: pointer;
+    padding: 0.25em 0;
+    font-size: 0.9em;
+    list-style: revert;
+}
+.step-tree-container details summary .badge {
+    margin-right: 0.4em;
+}
+.tree-facet {
+    color: var(--muted-color, #6c757d);
+    font-size: 0.85em;
+    margin-left: 0.5em;
+}
+.tree-duration {
+    color: var(--muted-color, #6c757d);
+    font-size: 0.8em;
+    margin-left: 0.5em;
+}
+.tree-children {
+    margin-left: 0.25rem;
+}
