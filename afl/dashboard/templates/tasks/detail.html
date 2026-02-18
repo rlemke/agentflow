@@ -16,7 +16,9 @@
                 <tr><th>Name</th><td>{{ task.name }}</td></tr>
                 <tr><th>State</th><td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td></tr>
                 <tr><th>Task List</th><td>{{ task.task_list_name }}</td></tr>
+                <tr><th>Step Name</th><td>{{ step_name or "—" }}</td></tr>
                 <tr><th>Data Type</th><td>{{ task.data_type or "—" }}</td></tr>
+                <tr><th>Duration</th><td>{{ (task.updated - task.created)|duration }}</td></tr>
                 <tr><th>Created</th><td>{{ task.created|timestamp }}</td></tr>
                 <tr><th>Updated</th><td>{{ task.updated|timestamp }}</td></tr>
             </table>

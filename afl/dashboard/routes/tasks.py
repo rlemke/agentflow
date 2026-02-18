@@ -30,10 +30,18 @@ def task_list(request: Request, state: str | None = None, store=Depends(get_stor
         tasks = store.get_tasks_by_state(state)
     else:
         tasks = store.get_all_tasks()
+
+    step_names: dict[str, str] = {}
+    for task in tasks:
+        if task.step_id and task.step_id not in step_names:
+            step = store.get_step(task.step_id)
+            if step:
+                step_names[task.step_id] = step.statement_id or step.facet_name or ""
+
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/list.html",
-        {"tasks": tasks, "filter_state": state},
+        {"tasks": tasks, "filter_state": state, "step_names": step_names},
     )
 
 
@@ -41,8 +49,13 @@ def task_list(request: Request, state: str | None = None, store=Depends(get_stor
 def task_detail(task_id: str, request: Request, store=Depends(get_store)):
     """Show task detail."""
     task = store.get_task(task_id)
+    step_name = ""
+    if task and task.step_id:
+        step = store.get_step(task.step_id)
+        if step:
+            step_name = step.statement_id or step.facet_name or ""
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/detail.html",
-        {"task": task},
+        {"task": task, "step_name": step_name},
     )

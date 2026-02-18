@@ -187,8 +187,10 @@ class TestTableRendering:
         html = resp.text
         assert "<th>ID</th>" in html
         assert "<th>Name</th>" in html
+        assert "<th>Step</th>" in html
         assert "<th>State</th>" in html
         assert "<th>Task List</th>" in html
+        assert "<th>Duration</th>" in html
 
     def test_flow_list_column_headers(self, client):
         tc, store = client

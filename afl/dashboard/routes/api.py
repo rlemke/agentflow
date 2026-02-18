@@ -360,6 +360,8 @@ def _step_dict(step) -> dict:
         "statement_id": step.statement_id,
         "container_id": step.container_id,
         "block_id": step.block_id,
+        "start_time": step.start_time,
+        "last_modified": step.last_modified,
     }
     if step.attributes:
         d["params"] = {k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.params.items()}
@@ -380,4 +382,5 @@ def _task_dict(task) -> dict:
         "data_type": task.data_type,
         "created": task.created,
         "updated": task.updated,
+        "duration": task.updated - task.created if task.updated and task.created else 0,
     }

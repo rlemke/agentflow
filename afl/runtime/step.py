@@ -140,6 +140,8 @@ class StepDefinition:
 
     # Metadata
     timestamp: str | None = None  # Last update timestamp
+    start_time: int = 0       # Creation timestamp (ms epoch)
+    last_modified: int = 0    # Last update timestamp (ms epoch)
 
     @classmethod
     def create(

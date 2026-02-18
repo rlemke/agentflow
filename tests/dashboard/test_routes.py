@@ -1323,6 +1323,70 @@ class TestTaskDetailAndFiltering:
         assert "/flows/flow-1" in resp.text
         assert "/steps/step-1" in resp.text
 
+    def test_task_list_shows_step_name(self, client):
+        tc, store = client
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import StepId, WorkflowId
+
+        step = StepDefinition(
+            id=StepId("step-1"),
+            workflow_id=WorkflowId("wf-1"),
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+            statement_id="myStep",
+        )
+        store.save_step(step)
+        store.save_task(_make_task("t-1"))
+
+        resp = tc.get("/tasks")
+        assert resp.status_code == 200
+        assert "myStep" in resp.text
+
+    def test_task_detail_shows_step_name_and_duration(self, client):
+        tc, store = client
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import StepId, WorkflowId
+
+        step = StepDefinition(
+            id=StepId("step-1"),
+            workflow_id=WorkflowId("wf-1"),
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+            statement_id="myStep",
+        )
+        store.save_step(step)
+        store.save_task(_make_task("t-1", state="completed"))
+
+        resp = tc.get("/tasks/t-1")
+        assert resp.status_code == 200
+        assert "Step Name" in resp.text
+        assert "myStep" in resp.text
+        assert "Duration" in resp.text
+
+    def test_step_list_shows_duration(self, client):
+        tc, store = client
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import step_id as make_step_id
+
+        wf = _make_workflow()
+        runner = _make_runner("r-1", workflow=wf)
+        store.save_runner(runner)
+
+        sid = make_step_id()
+        step = StepDefinition(
+            id=sid,
+            workflow_id=wf.uuid,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+            start_time=1000,
+            last_modified=6000,
+        )
+        store.save_step(step)
+
+        resp = tc.get("/runners/r-1/steps")
+        assert resp.status_code == 200
+        assert "Duration" in resp.text
+
 
 class TestFlowDetailImprovements:
     def test_flow_detail_shows_namespaces(self, client):

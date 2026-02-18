@@ -99,6 +99,10 @@ class MemoryStore(PersistenceAPI):
 
     def save_step(self, step: StepDefinition) -> None:
         """Save a step to the store."""
+        now = _current_time_ms()
+        if not step.start_time:
+            step.start_time = now
+        step.last_modified = now
         # Remove from old indexes if updating
         if step.id in self._steps:
             old_step = self._steps[step.id]

@@ -272,6 +272,10 @@ class MongoStore(PersistenceAPI):
 
     def save_step(self, step: StepDefinition) -> None:
         """Save a step to the store."""
+        now = _current_time_ms()
+        if not step.start_time:
+            step.start_time = now
+        step.last_modified = now
         doc = self._step_to_doc(step)
         self._db.steps.replace_one({"uuid": step.id}, doc, upsert=True)
 
@@ -792,6 +796,8 @@ class MongoStore(PersistenceAPI):
             "facet_name": step.facet_name or None,
             "is_block": step.is_block,
             "is_starting_step": getattr(step, "is_starting_step", False),
+            "start_time": step.start_time,
+            "last_modified": step.last_modified,
             "version": {
                 "workflow_version": step.version.workflow_version,
                 "step_schema_version": step.version.step_schema_version,
@@ -876,6 +882,9 @@ class MongoStore(PersistenceAPI):
                 step.attributes.returns[k] = AttributeValue(
                     v["name"], v["value"], v.get("type_hint", "Any")
                 )
+
+        step.start_time = doc.get("start_time", 0)
+        step.last_modified = doc.get("last_modified", 0)
 
         if doc.get("error") and hasattr(step, "transition"):
             step.transition.error = Exception(doc["error"])

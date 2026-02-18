@@ -23,11 +23,12 @@
         <tr>
             <th>ID</th>
             <th>Name</th>
+            <th>Step</th>
             <th>State</th>
             <th>Task List</th>
             <th>Runner</th>
+            <th>Duration</th>
             <th>Created</th>
-            <th>Updated</th>
         </tr>
     </thead>
     <tbody>
@@ -35,11 +36,12 @@
         <tr>
             <td class="mono"><a href="/tasks/{{ task.uuid }}">{{ task.uuid|truncate_uuid }}</a></td>
             <td>{{ task.name }}</td>
+            <td>{{ step_names.get(task.step_id, '') or '—' }}</td>
             <td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td>
             <td>{{ task.task_list_name }}</td>
             <td><a href="/runners/{{ task.runner_id }}" class="mono">{{ task.runner_id|truncate_uuid }}</a></td>
+            <td>{{ (task.updated - task.created)|duration }}</td>
             <td>{{ task.created|timestamp }}</td>
-            <td>{{ task.updated|timestamp }}</td>
         </tr>
         {% endfor %}
     </tbody>
