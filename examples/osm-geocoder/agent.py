@@ -103,7 +103,7 @@ def main() -> None:
             service_name="osm-geocoder",
             server_group="osm",
             poll_interval_ms=2000,
-            max_concurrent=3,
+            max_concurrent=5,
             topics=topics,
         )
 
@@ -135,7 +135,7 @@ def main() -> None:
             service_name="osm-geocoder",
             server_group="osm",
             poll_interval_ms=2000,
-            max_concurrent=3,  # respect Nominatim rate limits
+            max_concurrent=5,
         )
 
         poller = AgentPoller(persistence=store, evaluator=evaluator, config=config)
