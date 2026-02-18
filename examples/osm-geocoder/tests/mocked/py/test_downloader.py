@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 from handlers import downloader as _downloader_mod  # noqa: E402
 from handlers.downloader import (  # noqa: E402
     CACHE_DIR,
+    FORMAT_EXTENSIONS,
     GEOFABRIK_BASE,
     cache_path,
     download,
@@ -204,6 +205,88 @@ class TestDownloadHttpError:
 
         with pytest.raises(requests.HTTPError, match="404 Not Found"):
             download("nonexistent/region")
+
+
+class TestDownloadMirror:
+    """Tests for AFL_GEOFABRIK_MIRROR local mirror support."""
+
+    def test_mirror_hit_returns_cached(self, tmp_path):
+        """When mirror has the file, returns wasInCache=True with mirror path."""
+        mirror_dir = str(tmp_path / "mirror")
+        region = "africa/algeria"
+        ext = FORMAT_EXTENSIONS["pbf"]
+        mirror_file = os.path.join(mirror_dir, f"{region}-latest.{ext}")
+        os.makedirs(os.path.dirname(mirror_file), exist_ok=True)
+        with open(mirror_file, "wb") as f:
+            f.write(b"fake-pbf-data")
+
+        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
+             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.requests.get") as mock_get:
+            result = download(region)
+
+        assert result["wasInCache"] is True
+        assert result["path"] == mirror_file
+        assert result["url"] == geofabrik_url(region)
+        assert result["size"] == 13
+        mock_get.assert_not_called()
+
+    def test_mirror_miss_falls_through_to_download(self, tmp_path):
+        """Mirror set but file missing — proceeds to HTTP download."""
+        mirror_dir = str(tmp_path / "empty-mirror")
+        os.makedirs(mirror_dir, exist_ok=True)
+
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"downloaded"]
+        mock_response.raise_for_status.return_value = None
+
+        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
+             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=10), \
+             mock.patch(f"{MODULE}.os.replace"), \
+             mock.patch("builtins.open", new_callable=mock.mock_open), \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
+            result = download("africa/algeria")
+
+        assert result["wasInCache"] is False
+        mock_get.assert_called_once()
+
+    def test_mirror_not_set_skips_check(self):
+        """Without AFL_GEOFABRIK_MIRROR, goes straight to HTTP."""
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"data"]
+        mock_response.raise_for_status.return_value = None
+
+        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", None), \
+             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.os.path.isfile") as mock_isfile, \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=4), \
+             mock.patch(f"{MODULE}.os.replace"), \
+             mock.patch("builtins.open", new_callable=mock.mock_open), \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
+            download("africa/algeria")
+
+        mock_isfile.assert_not_called()
+
+    def test_mirror_path_structure(self, tmp_path):
+        """Mirror path matches {mirror_dir}/{region_path}-latest.{ext}."""
+        mirror_dir = str(tmp_path / "mirror")
+        for fmt, ext in FORMAT_EXTENSIONS.items():
+            region = "north-america/us/california"
+            expected = os.path.join(mirror_dir, f"{region}-latest.{ext}")
+            mirror_file = os.path.join(mirror_dir, f"{region}-latest.{ext}")
+            os.makedirs(os.path.dirname(mirror_file), exist_ok=True)
+            with open(mirror_file, "wb") as f:
+                f.write(b"x" * 7)
+
+            with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
+                 mock.patch(f"{MODULE}.os.path.exists", return_value=False):
+                result = download(region, fmt=fmt)
+
+            assert result["path"] == expected
+            assert result["wasInCache"] is True
 
 
 class TestDownloadShapefileCacheHit:
