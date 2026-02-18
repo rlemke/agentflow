@@ -8,6 +8,7 @@ All tests are offline — HTTP requests and filesystem access are mocked.
 
 import os
 import sys
+import threading
 from unittest import mock
 
 import pytest
@@ -120,13 +121,14 @@ class TestDownloadCacheMiss:
         mock_get.return_value = mock_response
         return mock_response
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
     def test_returns_cache_miss(
-        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
     ):
         self._setup_mocks(mock_get)
 
@@ -137,12 +139,15 @@ class TestDownloadCacheMiss:
         assert result["url"] == geofabrik_url("africa/algeria")
         assert result["path"] == cache_path("africa/algeria")
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
-    def test_streams_to_file(self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize):
+    def test_streams_to_file(
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
+    ):
         self._setup_mocks(mock_get)
 
         download("africa/algeria")
@@ -151,13 +156,14 @@ class TestDownloadCacheMiss:
         assert mock_get.call_args.kwargs["stream"] is True
         mock_open().write.assert_called_once_with(b"fake-pbf-data")
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
     def test_creates_parent_directories(
-        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
     ):
         self._setup_mocks(mock_get)
 
@@ -166,12 +172,15 @@ class TestDownloadCacheMiss:
         expected_dir = os.path.dirname(cache_path("north-america/us/california"))
         mock_makedirs.assert_called_once_with(expected_dir, exist_ok=True)
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
-    def test_sets_user_agent(self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize):
+    def test_sets_user_agent(
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
+    ):
         self._setup_mocks(mock_get)
 
         download("africa/algeria")
@@ -222,13 +231,14 @@ class TestDownloadShapefileCacheMiss:
         mock_get.return_value = mock_response
         return mock_response
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
     def test_returns_cache_miss_shp(
-        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
     ):
         self._setup_mocks(mock_get)
 
@@ -238,12 +248,15 @@ class TestDownloadShapefileCacheMiss:
         assert result["url"] == geofabrik_url("africa/algeria", fmt="shp")
         assert result["path"] == cache_path("africa/algeria", fmt="shp")
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch(f"{MODULE}.os.path.getsize", return_value=13)
     @mock.patch(f"{MODULE}.os.makedirs")
     @mock.patch("builtins.open", new_callable=mock.mock_open)
     @mock.patch(f"{MODULE}.requests.get")
     @mock.patch(f"{MODULE}.os.path.exists", return_value=False)
-    def test_requests_shp_url(self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize):
+    def test_requests_shp_url(
+        self, mock_exists, mock_get, mock_open, mock_makedirs, mock_getsize, mock_replace
+    ):
         self._setup_mocks(mock_get)
 
         download("africa/algeria", fmt="shp")
@@ -285,9 +298,10 @@ class TestDownloadUrlCacheHit:
         assert "date" in result
         mock_get.assert_not_called()
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch.object(_downloader_mod, "get_storage_backend")
     @mock.patch.object(_downloader_mod.requests, "get")
-    def test_force_redownloads(self, mock_get, mock_gsb):
+    def test_force_redownloads(self, mock_get, mock_gsb, mock_replace):
         storage = _mock_storage()
         storage.exists.return_value = True
         storage.getsize.return_value = 42
@@ -313,9 +327,10 @@ class TestDownloadUrlCacheMiss:
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch.object(_downloader_mod, "get_storage_backend")
     @mock.patch.object(_downloader_mod.requests, "get")
-    def test_downloads_and_returns(self, mock_get, mock_gsb):
+    def test_downloads_and_returns(self, mock_get, mock_gsb, mock_replace):
         storage = _mock_storage()
         storage.exists.return_value = False
         storage.getsize.return_value = 15
@@ -331,9 +346,10 @@ class TestDownloadUrlCacheMiss:
         mock_get.assert_called_once()
         storage.makedirs.assert_called_once()
 
+    @mock.patch(f"{MODULE}.os.replace")
     @mock.patch.object(_downloader_mod, "get_storage_backend")
     @mock.patch.object(_downloader_mod.requests, "get")
-    def test_streams_to_storage(self, mock_get, mock_gsb):
+    def test_streams_to_storage(self, mock_get, mock_gsb, mock_replace):
         storage = _mock_storage()
         storage.exists.return_value = False
         storage.getsize.return_value = 15
@@ -342,8 +358,15 @@ class TestDownloadUrlCacheMiss:
 
         download_url("https://example.com/file.zip", "/output/file.zip")
 
-        storage.open.assert_called_once_with("/output/file.zip", "wb")
+        # File is written to a temp path (not final path) then atomically renamed
+        assert storage.open.call_count == 1
+        written_path = storage.open.call_args[0][0]
+        assert written_path.startswith("/output/file.zip.tmp.")
+        assert storage.open.call_args[0][1] == "wb"
         storage.open().__enter__().write.assert_called_once_with(b"downloaded-data")
+        # os.replace moves temp → final
+        mock_replace.assert_called_once()
+        assert mock_replace.call_args[0][1] == "/output/file.zip"
 
     @mock.patch.object(_downloader_mod, "get_storage_backend")
     @mock.patch.object(_downloader_mod.requests, "get")
@@ -362,6 +385,12 @@ class TestDownloadUrlCacheMiss:
         assert result["path"] == "hdfs://namenode:8020/data/output.csv"
         assert result["wasInCache"] is False
         mock_gsb.assert_called_with("hdfs://namenode:8020/data/output.csv")
+
+    def _setup_mocks(self, mock_get):
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"downloaded-data"]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
 
 
 class TestDownloadUrlHttpError:
@@ -382,3 +411,217 @@ class TestDownloadUrlHttpError:
 
         with pytest.raises(requests.HTTPError, match="403 Forbidden"):
             download_url("https://example.com/secret.dat", "/tmp/secret.dat")
+
+
+# ---------------------------------------------------------------------------
+# Lock deduplication and atomic write tests
+# ---------------------------------------------------------------------------
+
+
+class TestDownloadLockDeduplication:
+    """Concurrent downloads to the same path should result in a single HTTP request."""
+
+    def setup_method(self):
+        _downloader_mod._path_locks.clear()
+
+    def test_concurrent_downloads_single_fetch(self):
+        """5 threads request same region — only 1 HTTP request is made."""
+        downloaded = {"done": False}
+
+        def exists_effect(path):
+            return downloaded["done"]
+
+        def replace_effect(src, dst):
+            downloaded["done"] = True
+
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"fake-data"]
+        mock_response.raise_for_status.return_value = None
+
+        with mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect), \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
+             mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect), \
+             mock.patch("builtins.open", new_callable=mock.mock_open), \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
+
+            results = []
+            errors = []
+            barrier = threading.Barrier(5)
+
+            def do_download():
+                try:
+                    barrier.wait(timeout=5)
+                    results.append(download("africa/algeria"))
+                except Exception as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=do_download) for _ in range(5)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10)
+
+            assert not errors, f"Unexpected errors: {errors}"
+            assert len(results) == 5
+            # Only one HTTP request should have been made
+            assert mock_get.call_count == 1
+
+        cache_hits = [r for r in results if r["wasInCache"]]
+        cache_misses = [r for r in results if not r["wasInCache"]]
+        assert len(cache_misses) == 1
+        assert len(cache_hits) == 4
+
+    def test_lock_recheck_returns_cache_hit(self):
+        """Thread that acquires the lock after another finishes gets wasInCache=True."""
+        call_count = [0]
+
+        def exists_effect(path):
+            call_count[0] += 1
+            # First call (fast-path) returns False; second call (re-check) returns True
+            return call_count[0] > 1
+
+        with mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=100):
+            result = download("africa/algeria")
+
+        assert result["wasInCache"] is True
+        assert call_count[0] == 2
+
+    def test_different_paths_not_blocked(self):
+        """Concurrent downloads to different paths both proceed independently."""
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"data"]
+        mock_response.raise_for_status.return_value = None
+
+        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
+             mock.patch(f"{MODULE}.os.replace"), \
+             mock.patch("builtins.open", new_callable=mock.mock_open), \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
+
+            results = []
+
+            def dl(region):
+                results.append(download(region))
+
+            t1 = threading.Thread(target=dl, args=("africa/algeria",))
+            t2 = threading.Thread(target=dl, args=("europe/germany",))
+            t1.start()
+            t2.start()
+            t1.join(timeout=5)
+            t2.join(timeout=5)
+
+        assert len(results) == 2
+        assert mock_get.call_count == 2
+
+
+class TestDownloadUrlLockDeduplication:
+    """Concurrent download_url() calls for the same path should deduplicate."""
+
+    def setup_method(self):
+        _downloader_mod._path_locks.clear()
+
+    def test_concurrent_download_url_single_fetch(self):
+        """Multiple concurrent download_url() calls — only 1 HTTP request."""
+        downloaded = {"done": False}
+
+        def exists_effect(path):
+            return downloaded["done"]
+
+        def replace_effect(src, dst):
+            downloaded["done"] = True
+
+        storage = _mock_storage()
+        storage.exists.side_effect = exists_effect
+        storage.getsize.return_value = 50
+
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"data"]
+        mock_response.raise_for_status.return_value = None
+
+        with mock.patch.object(_downloader_mod, "get_storage_backend", return_value=storage), \
+             mock.patch.object(_downloader_mod.requests, "get",
+                               return_value=mock_response) as mock_get, \
+             mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect):
+
+            results = []
+            barrier = threading.Barrier(3)
+
+            def dl():
+                barrier.wait(timeout=5)
+                results.append(download_url("https://example.com/f.bin", "/out/f.bin"))
+
+            threads = [threading.Thread(target=dl) for _ in range(3)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10)
+
+            assert len(results) == 3
+            assert mock_get.call_count == 1
+
+        assert sum(1 for r in results if r["wasInCache"]) == 2
+        assert sum(1 for r in results if not r["wasInCache"]) == 1
+
+
+class TestDownloadAtomicWrite:
+    """Atomic temp-file-then-rename pattern tests."""
+
+    def setup_method(self):
+        _downloader_mod._path_locks.clear()
+
+    def test_partial_download_cleaned_up(self):
+        """HTTP error mid-download triggers temp file cleanup."""
+        import requests as req_lib
+
+        mock_response = mock.Mock()
+        mock_response.raise_for_status.side_effect = req_lib.HTTPError("500 Server Error")
+
+        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.remove") as mock_os_remove, \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
+
+            with pytest.raises(req_lib.HTTPError, match="500"):
+                download("africa/algeria")
+
+            # Temp file cleanup was attempted
+            mock_os_remove.assert_called_once()
+            cleaned_path = mock_os_remove.call_args[0][0]
+            assert ".tmp." in cleaned_path
+
+    def test_temp_file_not_visible_as_cache_path(self):
+        """Data is written to a temp path, then atomically renamed to the cache path."""
+        local_path = cache_path("africa/algeria")
+
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"data"]
+        mock_response.raise_for_status.return_value = None
+
+        paths_opened = []
+        mock_file = mock.mock_open()
+
+        def track_open(path, mode="r"):
+            paths_opened.append(path)
+            return mock_file()
+
+        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
+             mock.patch(f"{MODULE}.os.makedirs"), \
+             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
+             mock.patch(f"{MODULE}.os.replace") as mock_replace, \
+             mock.patch("builtins.open", side_effect=track_open), \
+             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
+
+            download("africa/algeria")
+
+        # File was written to a temp path, not the final cache path
+        assert len(paths_opened) >= 1
+        assert all(".tmp." in p for p in paths_opened)
+        assert local_path not in paths_opened
+        # os.replace was called to atomically move temp → final
+        mock_replace.assert_called_once()
+        src, dst = mock_replace.call_args[0]
+        assert ".tmp." in src
+        assert dst == local_path

@@ -34,6 +34,7 @@ class StorageBackend(Protocol):
     def listdir(self, path: str) -> list[str]: ...
     def walk(self, path: str) -> Iterator[tuple[str, list[str], list[str]]]: ...
     def rmtree(self, path: str) -> None: ...
+    def remove(self, path: str) -> None: ...
     def join(self, *parts: str) -> str: ...
     def dirname(self, path: str) -> str: ...
     def basename(self, path: str) -> str: ...
@@ -71,6 +72,9 @@ class LocalStorageBackend:
 
     def rmtree(self, path: str) -> None:
         shutil.rmtree(path)
+
+    def remove(self, path: str) -> None:
+        os.remove(path)
 
     def join(self, *parts: str) -> str:
         return os.path.join(*parts)
@@ -239,6 +243,14 @@ class HDFSStorageBackend:
         r = _requests.delete(
             self._url(hdfs_path),
             params=self._params(op="DELETE", recursive="true"),
+        )
+        r.raise_for_status()
+
+    def remove(self, path: str) -> None:
+        hdfs_path = self._strip_uri(path)
+        r = _requests.delete(
+            self._url(hdfs_path),
+            params=self._params(op="DELETE", recursive="false"),
         )
         r.raise_for_status()
 
