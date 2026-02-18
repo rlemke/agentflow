@@ -521,6 +521,16 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.24) - Generic Download Facet for Arbitrary URLs
+
+- **Download facet signature change** (`osmoperations.afl`): `event facet Download(cache:OSMCache)` → `event facet Download(url:String, path:String, force:Boolean) => (downloadCache:OSMCache)` — Download is now a general-purpose file downloader accepting any URL and any destination path (local or HDFS), decoupled from OSM-specific cache semantics
+- **`download_url()` function** (`handlers/downloader.py`): new generic download function that fetches any URL to any file path; uses `get_storage_backend(path)` so HDFS URIs (`hdfs://namenode:8020/...`) work transparently; `force=True` re-downloads even when the file exists; returns OSMCache-compatible dict with `url`, `path`, `date`, `size`, `wasInCache` fields
+- **Custom `_download_handler`** (`operations_handlers.py`): replaces the generic `_make_operation_handler` passthrough with a dedicated handler that extracts `url`, `path`, `force` from the payload and calls `download_url()`; registered in both `register_operations_handlers()` and `_build_dispatch()`; `"Download"` removed from the generic `OPERATIONS_FACETS` map
+- **Removed redundant Download steps from 9 regional AFL files** (`osmafrica.afl`, `osmasia.afl`, `osmaustralia.afl`, `osmcanada.afl`, `osmcentralamerica.afl`, `osmeurope.afl`, `osmnorthamerica.afl`, `osmsouthamerica.afl`, `osmunitedstates.afl`): all `dl_xxx = Download(cache = xxx.cache)` steps removed; yield statements now reference `xxx.cache` directly since the Cache facet already performs the download; `use osm.geo.Operations` import removed from all 9 files
+- **Cleaned up `osmcontinents.afl`**: removed Download references from commented-out code block
+- **6 new tests** (`test_downloader.py`): `TestDownloadUrlCacheHit` (cache hit returns without HTTP, force re-downloads), `TestDownloadUrlCacheMiss` (downloads and returns, streams to storage, HDFS path routing), `TestDownloadUrlHttpError` (HTTP errors propagate)
+- 2157 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.23) - Runner State Completion After Event Processing
 
 - **Fix runner never marked complete**: `AgentPoller._resume_workflow()` and `RegistryRunner._resume_workflow()` now check the `ExecutionResult` returned by `evaluator.resume()` — when status is `COMPLETED`, updates runner state to `RunnerState.COMPLETED` with `end_time` and `duration`; when `ERROR`, updates to `RunnerState.FAILED`
