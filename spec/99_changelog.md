@@ -521,6 +521,13 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.26) - Descriptive Step Variable Names in Cache Facets
+
+- **`osmcache.afl`**: renamed single-letter `c` step variable to camelCase facet name in all 225 cache facets (e.g. `c = Cache(region = "Africa")` → `africa = Cache(region = "Africa")`, `c.cache` → `africa.cache`)
+- **`osmgraphhoppercache.afl`**: renamed `g` step variable to camelCase facet name in all 55 GraphHopper facets (e.g. `g = BuildGraph(...)` → `africa = BuildGraph(...)`, `g.graph` → `africa.graph`)
+- **`volcano.afl`**: renamed `c` → `loadVolcanoData` to match enclosing facet name
+- 2162 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.25) - retry_step() Runtime Operation
 
 - **`Evaluator.retry_step(step_id)`** (`evaluator.py`): resets a step from `STATEMENT_ERROR` back to `EVENT_TRANSMIT` so agents can re-execute it; clears the step error and resets the associated task from `failed` to `pending` — eliminates manual MongoDB manipulation for transient failures (e.g. SSL errors during downloads)
