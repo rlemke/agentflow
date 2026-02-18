@@ -358,6 +358,7 @@ def _step_dict(step) -> dict:
         "facet_name": step.facet_name,
         "state": step.state,
         "statement_id": step.statement_id,
+        "statement_name": step.statement_name,
         "container_id": step.container_id,
         "block_id": step.block_id,
         "start_time": step.start_time,

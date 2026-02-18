@@ -118,6 +118,7 @@ class StepDefinition:
     # Hierarchy
     workflow_id: WorkflowId
     statement_id: StatementId | None = None
+    statement_name: str = ""  # Human-readable name (e.g. "s1" from "s1 = Facet()")
     container_type: str | None = None  # ObjectType of container
     container_id: StepId | None = None  # Step ID of containing step
     block_id: BlockId | None = None  # Block containing this step
@@ -150,6 +151,7 @@ class StepDefinition:
         object_type: str,
         facet_name: str = "",
         statement_id: StatementId | None = None,
+        statement_name: str = "",
         container_id: StepId | None = None,
         container_type: str | None = None,
         block_id: BlockId | None = None,
@@ -162,6 +164,7 @@ class StepDefinition:
             object_type: Type of step (VariableAssignment, YieldAssignment, etc.)
             facet_name: Name of the facet being invoked
             statement_id: Link to statement definition
+            statement_name: Human-readable statement name (e.g. "s1")
             container_id: Step containing this step
             container_type: Type of container
             block_id: Block containing this step
@@ -175,6 +178,7 @@ class StepDefinition:
             object_type=object_type,
             workflow_id=workflow_id,
             statement_id=statement_id,
+            statement_name=statement_name,
             container_id=container_id,
             container_type=container_type,
             block_id=block_id,

@@ -790,6 +790,7 @@ class MongoStore(PersistenceAPI):
             "object_type": step.object_type,
             "state": step.state,
             "statement_id": step.statement_id,
+            "statement_name": step.statement_name,
             "container_id": step.container_id,
             "root_id": step.root_id,
             "block_id": step.block_id,
@@ -853,6 +854,7 @@ class MongoStore(PersistenceAPI):
         step.transition.request_transition = doc.get("request_transition", False)
 
         step.statement_id = doc.get("statement_id")
+        step.statement_name = doc.get("statement_name", "")
         step.container_id = StepId(doc["container_id"]) if doc.get("container_id") else None
         step.root_id = StepId(doc["root_id"]) if doc.get("root_id") else None
         step.block_id = BlockId(doc["block_id"]) if doc.get("block_id") else None

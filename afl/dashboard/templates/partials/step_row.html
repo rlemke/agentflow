@@ -1,5 +1,5 @@
 <tr>
-    <td><a href="/steps/{{ step.id }}">{{ step.statement_id or step.id|truncate_uuid }}</a></td>
+    <td><a href="/steps/{{ step.id }}">{{ step.statement_name or step.statement_id or step.id|truncate_uuid }}</a></td>
     <td>{% if step.facet_name %}{{ step.facet_name.split('.')[-1] }}{% else %}{{ step.object_type }}{% endif %}</td>
     <td><span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span></td>
     <td>{% if step.start_time %}{{ (step.last_modified - step.start_time)|duration }}{% else %}&mdash;{% endif %}</td>
