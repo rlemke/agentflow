@@ -275,6 +275,13 @@ class MemoryStore(PersistenceAPI):
             if t.task_list_name == task_list and t.state == "pending"
         ]
 
+    def get_task_for_step(self, step_id: str) -> Optional["TaskDefinition"]:
+        """Get the most recent task associated with a step."""
+        matching = [t for t in self._tasks.values() if t.step_id == step_id]
+        if not matching:
+            return None
+        return max(matching, key=lambda t: t.created)
+
     def save_task(self, task: "TaskDefinition") -> None:
         """Save a task."""
         self._tasks[task.uuid] = task

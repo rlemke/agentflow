@@ -140,6 +140,20 @@ def create_server(
                 },
             ),
             Tool(
+                name="afl_retry_step",
+                description="Retry a failed step by resetting it to EVENT_TRANSMIT.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "step_id": {
+                            "type": "string",
+                            "description": "ID of the failed step to retry",
+                        },
+                    },
+                    "required": ["step_id"],
+                },
+            ),
+            Tool(
                 name="afl_resume_workflow",
                 description="Resume a paused workflow execution.",
                 inputSchema={
@@ -240,6 +254,8 @@ def create_server(
             return _tool_execute_workflow(arguments)
         elif name == "afl_continue_step":
             return _tool_continue_step(arguments, _get_store)
+        elif name == "afl_retry_step":
+            return _tool_retry_step(arguments, _get_store)
         elif name == "afl_resume_workflow":
             return _tool_resume_workflow(arguments, _get_store)
         elif name == "afl_manage_runner":
@@ -419,6 +435,25 @@ def _tool_continue_step(
         store = get_store()
         evaluator = Evaluator(store)
         evaluator.continue_step(step_id, result=result_data)
+        result = {"success": True}
+    except Exception as e:
+        result = {"success": False, "error": str(e)}
+    return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+
+def _tool_retry_step(
+    arguments: dict[str, Any],
+    get_store: Any,
+) -> list[TextContent]:
+    """Retry a failed step."""
+    step_id = arguments.get("step_id", "")
+
+    try:
+        from afl.runtime import Evaluator
+
+        store = get_store()
+        evaluator = Evaluator(store)
+        evaluator.retry_step(step_id)
         result = {"success": True}
     except Exception as e:
         result = {"success": False, "error": str(e)}

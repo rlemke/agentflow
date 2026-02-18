@@ -923,6 +923,40 @@ class Evaluator:
         step.mark_error(RuntimeError(error_message))
         self.persistence.save_step(step)
 
+    def retry_step(self, step_id: StepId) -> None:
+        """Retry a failed step by resetting it to EVENT_TRANSMIT.
+
+        Resets a step from STATEMENT_ERROR back to EVENT_TRANSMIT so that
+        the agent can re-execute it. Also resets the associated task from
+        failed back to pending.
+
+        Args:
+            step_id: The step ID to retry
+        """
+        logger.info("Retry step: step_id=%s", step_id)
+        step = self.persistence.get_step(step_id)
+        if step is None:
+            raise ValueError(f"Step {step_id} not found")
+        if step.state != StepState.STATEMENT_ERROR:
+            raise ValueError(
+                f"Step {step_id} is at {step.state}, expected {StepState.STATEMENT_ERROR}"
+            )
+
+        # Reset step state to EVENT_TRANSMIT
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
+        step.transition.clear_error()
+        step.transition.request_transition = False
+        step.transition.changed = True
+        self.persistence.save_step(step)
+
+        # Reset associated task to pending
+        task = self.persistence.get_task_for_step(step_id)
+        if task is not None:
+            task.state = "pending"
+            task.error = None
+            self.persistence.save_task(task)
+
     def resume(
         self,
         workflow_id_val: WorkflowId,

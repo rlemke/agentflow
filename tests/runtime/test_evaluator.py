@@ -1774,6 +1774,65 @@ class TestEvaluatorEdgeCases:
         with pytest.raises(ValueError, match="expected"):
             evaluator.continue_step(step.id)
 
+    def test_retry_step_not_found(self, evaluator):
+        """retry_step raises ValueError when step not found."""
+        with pytest.raises(ValueError, match="not found"):
+            evaluator.retry_step("non-existent-step")
+
+    def test_retry_step_wrong_state(self, store, evaluator):
+        """retry_step raises ValueError when step not at STATEMENT_ERROR."""
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+        )
+        # Leave in CREATED state
+        store.save_step(step)
+
+        with pytest.raises(ValueError, match="expected"):
+            evaluator.retry_step(step.id)
+
+    def test_retry_step_resets_to_event_transmit(self, store, evaluator):
+        """retry_step resets step from STATEMENT_ERROR to EVENT_TRANSMIT."""
+        from afl.runtime.entities import TaskDefinition
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import ObjectType
+
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Download",
+        )
+        step.mark_error(RuntimeError("SSL error"))
+        store.save_step(step)
+
+        # Create an associated failed task
+        task = TaskDefinition(
+            uuid="task-retry-1",
+            name="Download",
+            runner_id="runner-1",
+            workflow_id="wf-1",
+            flow_id="flow-1",
+            step_id=step.id,
+            state="failed",
+            created=1000,
+            error={"message": "SSL error"},
+        )
+        store.save_task(task)
+
+        evaluator.retry_step(step.id)
+
+        reloaded = store.get_step(step.id)
+        assert reloaded.state == StepState.EVENT_TRANSMIT
+        assert reloaded.transition.error is None
+        assert reloaded.transition.request_transition is False
+
+        reloaded_task = store.get_task_for_step(step.id)
+        assert reloaded_task.state == "pending"
+        assert reloaded_task.error is None
+
     def test_resume_exception_returns_error(self, store):
         """resume returns ERROR when exception raised (lines 707-709)."""
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))

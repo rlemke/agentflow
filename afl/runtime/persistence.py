@@ -327,6 +327,18 @@ class PersistenceAPI(Protocol):
         ...
 
     @abstractmethod
+    def get_task_for_step(self, step_id: str) -> Optional["TaskDefinition"]:
+        """Get the most recent task associated with a step.
+
+        Args:
+            step_id: The step's unique identifier
+
+        Returns:
+            The most recent task for the step, or None if not found
+        """
+        ...
+
+    @abstractmethod
     def save_task(self, task: "TaskDefinition") -> None:
         """Save a task.
 

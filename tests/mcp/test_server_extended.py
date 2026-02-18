@@ -18,6 +18,7 @@ from afl.mcp.server import (
     _handle_resource,
     _tool_continue_step,
     _tool_resume_workflow,
+    _tool_retry_step,
 )
 from afl.runtime import MemoryStore
 from afl.runtime.states import StepState
@@ -114,6 +115,61 @@ class TestContinueStep:
 
         data = json.loads(result[0].text)
         assert data["success"] is True
+
+
+# ============================================================================
+# Tool: afl_retry_step
+# ============================================================================
+
+
+class TestRetryStep:
+    def test_retry_step_success(self):
+        from afl.runtime.entities import TaskDefinition
+
+        mem = MemoryStore()
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Download",
+        )
+        step.mark_error(RuntimeError("SSL error"))
+        mem.save_step(step)
+
+        task = TaskDefinition(
+            uuid="task-retry-1",
+            name="Download",
+            runner_id="runner-1",
+            workflow_id="wf-1",
+            flow_id="flow-1",
+            step_id=step.id,
+            state="failed",
+            created=1000,
+            error={"message": "SSL error"},
+        )
+        mem.save_task(task)
+
+        result = _tool_retry_step(
+            {"step_id": step.id},
+            lambda: mem,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        reloaded = mem.get_step(step.id)
+        assert reloaded.state == StepState.EVENT_TRANSMIT
+
+    def test_retry_step_not_found(self):
+        mem = MemoryStore()
+
+        result = _tool_retry_step(
+            {"step_id": "nonexistent"},
+            lambda: mem,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "not found" in data["error"]
 
 
 # ============================================================================

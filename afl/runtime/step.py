@@ -77,6 +77,10 @@ class StepTransition:
         self.error = error
         self.changed = True
 
+    def clear_error(self) -> None:
+        """Clear any error state."""
+        self.error = None
+
     @property
     def is_requesting_state_change(self) -> bool:
         """Check if step is requesting a state change."""

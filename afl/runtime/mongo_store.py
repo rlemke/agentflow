@@ -443,6 +443,14 @@ class MongoStore(PersistenceAPI):
         doc = self._db.tasks.find_one({"uuid": task_id})
         return self._doc_to_task(doc) if doc else None
 
+    def get_task_for_step(self, step_id: str) -> TaskDefinition | None:
+        """Get the most recent task associated with a step."""
+        doc = self._db.tasks.find_one(
+            {"step_id": step_id},
+            sort=[("created", -1)],
+        )
+        return self._doc_to_task(doc) if doc else None
+
     def get_pending_tasks(self, task_list: str) -> Sequence[TaskDefinition]:
         """Get pending tasks for a task list."""
         docs = self._db.tasks.find({"task_list_name": task_list, "state": "pending"})
