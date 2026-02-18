@@ -14,8 +14,8 @@ namespace volcano {
     use osm.geo.Visualization
 
     facet LoadVolcanoData(region: String = "US") => (cache: OSMCache) andThen {
-        c = Cache(region = $.region)
-        d = osm.geo.Operations.Download(cache = c.cache)
+        loadVolcanoData = Cache(region = $.region)
+        d = osm.geo.Operations.Download(cache = loadVolcanoData.cache)
         yield LoadVolcanoData(cache = d.downloadCache)
     }
 
