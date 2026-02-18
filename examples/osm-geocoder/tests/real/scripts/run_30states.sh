@@ -36,7 +36,7 @@ echo "=== Starting AgentFlow stack ==="
     --hdfs-namenode-dir "$HDFS_BASE/namenode" \
     --hdfs-datanode-dir "$HDFS_BASE/datanode" \
     --mongodb-data-dir "$MONGODB_DATA" \
-    --osm-agents 1
+    --osm-agents 3
 echo ""
 
 # ---------------------------------------------------------------------------
