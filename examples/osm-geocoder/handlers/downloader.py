@@ -1,7 +1,8 @@
 """Standalone HTTP downloader with filesystem caching for OSM data.
 
 Downloads .osm.pbf files from Geofabrik and caches them locally.
-No AgentFlow dependencies — can be used independently.
+Also provides a generic download_url() for fetching any URL to any path
+(local or HDFS).  No AgentFlow dependencies — can be used independently.
 """
 
 import os
@@ -74,6 +75,51 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
     return {
         "url": url,
         "path": local_path,
+        "date": datetime.now(UTC).isoformat(),
+        "size": size,
+        "wasInCache": False,
+    }
+
+
+def download_url(url: str, path: str, force: bool = False) -> dict:
+    """Download any URL to a local or HDFS file path.
+
+    Args:
+        url: The URL to download from.
+        path: Destination file path (local filesystem or ``hdfs://`` URI).
+        force: If True, re-download even when the file already exists.
+
+    Returns:
+        OSMCache-compatible dict with url, path, date, size, and wasInCache fields.
+
+    Raises:
+        requests.HTTPError: If the download fails.
+    """
+    storage = get_storage_backend(path)
+
+    if not force and storage.exists(path):
+        size = storage.getsize(path)
+        return {
+            "url": url,
+            "path": path,
+            "date": datetime.now(UTC).isoformat(),
+            "size": size,
+            "wasInCache": True,
+        }
+
+    storage.makedirs(storage.dirname(path), exist_ok=True)
+
+    response = requests.get(url, stream=True, headers={"User-Agent": USER_AGENT}, timeout=300)
+    response.raise_for_status()
+
+    with storage.open(path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    size = storage.getsize(path)
+    return {
+        "url": url,
+        "path": path,
         "date": datetime.now(UTC).isoformat(),
         "size": size,
         "wasInCache": False,

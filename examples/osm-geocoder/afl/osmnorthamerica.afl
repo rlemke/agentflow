@@ -1,7 +1,6 @@
 namespace osm.geo.NorthAmerica.cache {
 // NorthAmerica
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.NorthAmerica
 
 
@@ -12,15 +11,10 @@ namespace osm.geo.NorthAmerica.cache {
     unitedStates = UnitedStates()
     greenland = Greenland()
 
-    dl_canada = Download(cache = canada.cache)
-    dl_mexico = Download(cache = mexico.cache)
-    dl_unitedStates = Download(cache = unitedStates.cache)
-    dl_greenland = Download(cache = greenland.cache)
-
-    yield NorthAmericaIndividually(cache = dl_canada.downloadCache ++
-                                   dl_mexico.downloadCache ++
-                                   dl_unitedStates.downloadCache ++
-                                   dl_greenland.downloadCache)
+    yield NorthAmericaIndividually(cache = canada.cache ++
+                                   mexico.cache ++
+                                   unitedStates.cache ++
+                                   greenland.cache)
 
   }
 

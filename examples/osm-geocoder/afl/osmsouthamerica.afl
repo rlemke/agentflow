@@ -1,7 +1,6 @@
 namespace osm.geo.SouthAmerica.cache {
 // SouthAmerica
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.SouthAmerica
 
 
@@ -20,31 +19,17 @@ namespace osm.geo.SouthAmerica.cache {
     uruguay = Uruguay()
     venezuela = Venezuela()
 
-    dl_argentina = Download(cache = argentina.cache)
-    dl_bolivia = Download(cache = bolivia.cache)
-    dl_brazil = Download(cache = brazil.cache)
-    dl_chile = Download(cache = chile.cache)
-    dl_colombia = Download(cache = colombia.cache)
-    dl_ecuador = Download(cache = ecuador.cache)
-    dl_guyana = Download(cache = guyana.cache)
-    dl_paraguay = Download(cache = paraguay.cache)
-    dl_peru = Download(cache = peru.cache)
-    dl_suriname = Download(cache = suriname.cache)
-    dl_uruguay = Download(cache = uruguay.cache)
-    dl_venezuela = Download(cache = venezuela.cache)
-
-
-    yield SouthAmericaIndividually(cache = dl_argentina.downloadCache ++
-                                   dl_bolivia.downloadCache ++
-                                   dl_brazil.downloadCache ++
-                                   dl_chile.downloadCache ++
-                                   dl_colombia.downloadCache ++
-                                   dl_ecuador.downloadCache ++
-                                   dl_guyana.downloadCache ++
-                                   dl_paraguay.downloadCache ++
-                                   dl_peru.downloadCache ++
-                                   dl_suriname.downloadCache ++
-                                   dl_uruguay.downloadCache ++
-                                   dl_venezuela.downloadCache)
+    yield SouthAmericaIndividually(cache = argentina.cache ++
+                                   bolivia.cache ++
+                                   brazil.cache ++
+                                   chile.cache ++
+                                   colombia.cache ++
+                                   ecuador.cache ++
+                                   guyana.cache ++
+                                   paraguay.cache ++
+                                   peru.cache ++
+                                   suriname.cache ++
+                                   uruguay.cache ++
+                                   venezuela.cache)
   }
 }

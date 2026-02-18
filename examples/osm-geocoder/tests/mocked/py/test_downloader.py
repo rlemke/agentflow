@@ -15,11 +15,13 @@ import pytest
 # The example directory uses hyphens, so add it to sys.path for direct import.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
+from handlers import downloader as _downloader_mod  # noqa: E402
 from handlers.downloader import (  # noqa: E402
     CACHE_DIR,
     GEOFABRIK_BASE,
     cache_path,
     download,
+    download_url,
     geofabrik_url,
 )
 
@@ -248,3 +250,135 @@ class TestDownloadShapefileCacheMiss:
 
         called_url = mock_get.call_args[0][0]
         assert called_url.endswith("-latest.free.shp.zip")
+
+
+# ---------------------------------------------------------------------------
+# download_url() — generic URL-to-path downloader
+# ---------------------------------------------------------------------------
+
+
+def _mock_storage():
+    """Create a mock StorageBackend with context-manager-aware open()."""
+    s = mock.MagicMock()
+    s.dirname.side_effect = os.path.dirname
+    s.join.side_effect = os.path.join
+    return s
+
+
+class TestDownloadUrlCacheHit:
+    """When the destination file already exists and force=False."""
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_returns_cache_hit(self, mock_get, mock_gsb):
+        storage = _mock_storage()
+        storage.exists.return_value = True
+        storage.getsize.return_value = 9999
+        mock_gsb.return_value = storage
+
+        result = download_url("https://example.com/data.pbf", "/data/output.pbf")
+
+        assert result["wasInCache"] is True
+        assert result["size"] == 9999
+        assert result["url"] == "https://example.com/data.pbf"
+        assert result["path"] == "/data/output.pbf"
+        assert "date" in result
+        mock_get.assert_not_called()
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_force_redownloads(self, mock_get, mock_gsb):
+        storage = _mock_storage()
+        storage.exists.return_value = True
+        storage.getsize.return_value = 42
+        mock_gsb.return_value = storage
+
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"new-data"]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        result = download_url("https://example.com/data.pbf", "/data/output.pbf", force=True)
+
+        assert result["wasInCache"] is False
+        mock_get.assert_called_once()
+
+
+class TestDownloadUrlCacheMiss:
+    """When the destination file does not exist."""
+
+    def _setup_mocks(self, mock_get):
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"downloaded-data"]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_downloads_and_returns(self, mock_get, mock_gsb):
+        storage = _mock_storage()
+        storage.exists.return_value = False
+        storage.getsize.return_value = 15
+        mock_gsb.return_value = storage
+        self._setup_mocks(mock_get)
+
+        result = download_url("https://example.com/file.zip", "/output/file.zip")
+
+        assert result["wasInCache"] is False
+        assert result["size"] == 15
+        assert result["url"] == "https://example.com/file.zip"
+        assert result["path"] == "/output/file.zip"
+        mock_get.assert_called_once()
+        storage.makedirs.assert_called_once()
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_streams_to_storage(self, mock_get, mock_gsb):
+        storage = _mock_storage()
+        storage.exists.return_value = False
+        storage.getsize.return_value = 15
+        mock_gsb.return_value = storage
+        self._setup_mocks(mock_get)
+
+        download_url("https://example.com/file.zip", "/output/file.zip")
+
+        storage.open.assert_called_once_with("/output/file.zip", "wb")
+        storage.open().__enter__().write.assert_called_once_with(b"downloaded-data")
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_hdfs_path(self, mock_get, mock_gsb):
+        storage = _mock_storage()
+        storage.exists.return_value = False
+        storage.getsize.return_value = 100
+        mock_gsb.return_value = storage
+        self._setup_mocks(mock_get)
+
+        result = download_url(
+            "https://example.com/data.csv",
+            "hdfs://namenode:8020/data/output.csv",
+        )
+
+        assert result["path"] == "hdfs://namenode:8020/data/output.csv"
+        assert result["wasInCache"] is False
+        mock_gsb.assert_called_with("hdfs://namenode:8020/data/output.csv")
+
+
+class TestDownloadUrlHttpError:
+    """HTTP errors propagate from download_url."""
+
+    @mock.patch.object(_downloader_mod, "get_storage_backend")
+    @mock.patch.object(_downloader_mod.requests, "get")
+    def test_raises_on_http_error(self, mock_get, mock_gsb):
+        import requests
+
+        storage = _mock_storage()
+        storage.exists.return_value = False
+        mock_gsb.return_value = storage
+
+        mock_response = mock.Mock()
+        mock_response.raise_for_status.side_effect = requests.HTTPError("403 Forbidden")
+        mock_get.return_value = mock_response
+
+        with pytest.raises(requests.HTTPError, match="403 Forbidden"):
+            download_url("https://example.com/secret.dat", "/tmp/secret.dat")

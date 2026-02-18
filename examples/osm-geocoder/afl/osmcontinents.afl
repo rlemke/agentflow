@@ -1,7 +1,6 @@
 namespace osm.geo.Continents.cache {
 // Continents
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.Continents
 
 
@@ -10,34 +9,22 @@ namespace osm.geo.Continents.cache {
     planet = Planet()
     africa = Africa()
     antarctica = Antarctica()
-    asia = Asisa()
+    asia = Asia()
     australia = Australia()
     centralAmerica = CentralAmerica()
     europe = Europe()
     southAmerica = SouthAmerica()
     russia = Russia()
 
-    dl_planet = Download(cache = planet.cache)
-    dl_africa = Download(cache = africa.cache)
-    dl_antarctica = Download(cache = antarctica.cache)
-    dl_asia = Download(cache = asia.cache)
-    dl_australia = Download(cache = australia.cache)
-    dl_centralAmerica = Download(cache = centralAmerica.cache)
-    dl_europe = Download(cache = europe.cache)
-    dl_southAmerica = Download(cache = southAmerica.cache)
-    dl_russia = Download(cache = russia.cache)
-
     yield ContinentsIndividually(cache =
-      dl_planet.downloadCache ++
-      dl_africa.downloadCache ++
-      dl_antarctica.downloadCache ++
-      //dl_asia.downloadCache ++
-      dl_australia.downloadCache ++
-      dl_centralAmerica.downloadCache ++
-      dl_europe.downloadCache ++
-      dl_southAmerica.downloadCache ++
-      dl_russia.downloadCache)
+      planet.cache ++
+      africa.cache ++
+      antarctica.cache ++
+      australia.cache ++
+      centralAmerica.cache ++
+      europe.cache ++
+      southAmerica.cache ++
+      russia.cache)
       */
   }
 }
-

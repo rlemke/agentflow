@@ -17,7 +17,6 @@ NAMESPACE = "osm.geo.Operations"
 # All event facets in osm.geo.Operations and their return parameter names.
 # NOTE: Cache is handled separately (takes region:String, not cache:OSMCache).
 OPERATIONS_FACETS: dict[str, str | None] = {
-    "Download": "downloadCache",  # => (downloadCache: OSMCache)
     "Tile": "tiles",
     "RoutingGraph": "graph",
     "Status": "stats",
@@ -92,6 +91,23 @@ def _make_shapefile_handler(facet_name: str):
     return handler
 
 
+def _download_handler(payload: dict) -> dict:
+    """Handle the Download event facet: download any URL to any file path.
+
+    Takes url:String, path:String, force:Boolean and downloads the content.
+    The path may be a local filesystem path or an hdfs:// URI.
+    Returns downloadCache:OSMCache.
+    """
+    from .downloader import download_url
+
+    url = payload.get("url", "")
+    path = payload.get("path", "")
+    force = payload.get("force", False)
+
+    log.info("Download: %s -> %s (force=%s)", url, path, force)
+    return {"downloadCache": download_url(url, path, force=force)}
+
+
 def _cache_handler(payload: dict) -> dict:
     """Handle the Cache event facet: resolve a region name and download the PBF.
 
@@ -125,6 +141,8 @@ def register_operations_handlers(poller) -> None:
     """Register all operations event facet handlers with the poller."""
     # Register the Cache handler (takes region:String, not cache:OSMCache)
     poller.register(f"{NAMESPACE}.Cache", _cache_handler)
+    # Register the Download handler (takes url:String, path:String, force:Boolean)
+    poller.register(f"{NAMESPACE}.Download", _download_handler)
 
     shapefile_facets = {"DownloadShapefile", "DownloadShapefileAll"}
     for facet_name, return_param in OPERATIONS_FACETS.items():
@@ -141,6 +159,7 @@ _DISPATCH: dict[str, callable] = {}
 
 def _build_dispatch() -> None:
     _DISPATCH[f"{NAMESPACE}.Cache"] = _cache_handler
+    _DISPATCH[f"{NAMESPACE}.Download"] = _download_handler
     shapefile_facets = {"DownloadShapefile", "DownloadShapefileAll"}
     for facet_name, return_param in OPERATIONS_FACETS.items():
         qualified_name = f"{NAMESPACE}.{facet_name}"

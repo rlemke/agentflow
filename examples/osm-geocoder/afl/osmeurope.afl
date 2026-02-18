@@ -1,7 +1,6 @@
 namespace osm.geo.Europe.cache {
 // Europe
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.Europe
 
   facet EuropeIndividually () => (cache: [OSMCache]) andThen {
@@ -52,99 +51,50 @@ namespace osm.geo.Europe.cache {
     ukraine = Ukraine()
     unitedKingdom = UnitedKingdom()
 
-
-    dl_albania = Download(cache = albania.cache)
-    dl_andorra = Download(cache = andorra.cache)
-    dl_austria = Download(cache = austria.cache)
-    dl_belarus = Download(cache = belarus.cache)
-    dl_belgium = Download(cache = belgium.cache)
-    dl_bosniaAndHerzegovina = Download(cache = bosniaAndHerzegovina.cache)
-    dl_bulgaria = Download(cache = bulgaria.cache)
-    dl_croatia = Download(cache = croatia.cache)
-    dl_cyprus = Download(cache = cyprus.cache)
-    dl_czechRepublic = Download(cache = czechRepublic.cache)
-    dl_denmark = Download(cache = denmark.cache)
-    dl_estonia = Download(cache = estonia.cache)
-    dl_finland = Download(cache = finland.cache)
-    dl_france = Download(cache = france.cache)
-    dl_germany = Download(cache = germany.cache)
-    dl_greece = Download(cache = greece.cache)
-    dl_georgia = Download(cache = georgia.cache)
-    dl_hungary = Download(cache = hungary.cache)
-    dl_iceland = Download(cache = iceland.cache)
-    dl_ireland = Download(cache = ireland.cache)
-    dl_italy = Download(cache = italy.cache)
-    dl_kosovo = Download(cache = kosovo.cache)
-    dl_latvia = Download(cache = latvia.cache)
-    dl_liechtenstein = Download(cache = liechtenstein.cache)
-    dl_lithuania = Download(cache = lithuania.cache)
-    dl_luxembourg = Download(cache = luxembourg.cache)
-    dl_macedonia = Download(cache = macedonia.cache)
-    dl_malta = Download(cache = malta.cache)
-    dl_moldova = Download(cache = moldova.cache)
-    dl_monaco = Download(cache = monaco.cache)
-    dl_montenegro = Download(cache = montenegro.cache)
-    dl_netherlands = Download(cache = netherlands.cache)
-    dl_norway = Download(cache = norway.cache)
-    dl_poland = Download(cache = poland.cache)
-    dl_portugal = Download(cache = portugal.cache)
-    dl_romania = Download(cache = romania.cache)
-    dl_serbia = Download(cache = serbia.cache)
-    dl_slovakia = Download(cache = slovakia.cache)
-    dl_slovenia = Download(cache = slovenia.cache)
-    dl_spain = Download(cache = spain.cache)
-    dl_sweden = Download(cache = sweden.cache)
-    dl_switzerland = Download(cache = switzerland.cache)
-    dl_turkey = Download(cache = turkey.cache)
-    dl_ukraine = Download(cache = ukraine.cache)
-    dl_unitedKingdom = Download(cache = unitedKingdom.cache)
-
-
-
-    yield EuropeIndividually(cache = dl_albania.downloadCache ++
-            dl_andorra.downloadCache ++
-            dl_austria.downloadCache ++
-            dl_belarus.downloadCache ++
-            dl_belgium.downloadCache ++
-            dl_bosniaAndHerzegovina.downloadCache ++
-            dl_bulgaria.downloadCache ++
-            dl_croatia.downloadCache ++
-            dl_cyprus.downloadCache ++
-            dl_czechRepublic.downloadCache ++
-            dl_denmark.downloadCache ++
-            dl_estonia.downloadCache ++
-            dl_finland.downloadCache ++
-            dl_france.downloadCache ++
-            dl_germany.downloadCache ++
-            dl_greece.downloadCache ++
-            dl_georgia.downloadCache ++
-            dl_hungary.downloadCache ++
-            dl_iceland.downloadCache ++
-            dl_ireland.downloadCache ++
-            dl_italy.downloadCache ++
-            dl_kosovo.downloadCache ++
-            dl_latvia.downloadCache ++
-            dl_liechtenstein.downloadCache ++
-            dl_lithuania.downloadCache ++
-            dl_luxembourg.downloadCache ++
-            dl_macedonia.downloadCache ++
-            dl_malta.downloadCache ++
-            dl_moldova.downloadCache ++
-            dl_monaco.downloadCache ++
-            dl_montenegro.downloadCache ++
-            dl_netherlands.downloadCache ++
-            dl_norway.downloadCache ++
-            dl_poland.downloadCache ++
-            dl_portugal.downloadCache ++
-            dl_romania.downloadCache ++
-            dl_serbia.downloadCache ++
-            dl_slovakia.downloadCache ++
-            dl_slovenia.downloadCache ++
-            dl_spain.downloadCache ++
-            dl_sweden.downloadCache ++
-            dl_switzerland.downloadCache ++
-            dl_turkey.downloadCache ++
-            dl_ukraine.downloadCache ++
-            dl_unitedKingdom.downloadCache)
+    yield EuropeIndividually(cache = albania.cache ++
+            andorra.cache ++
+            austria.cache ++
+            belarus.cache ++
+            belgium.cache ++
+            bosniaAndHerzegovina.cache ++
+            bulgaria.cache ++
+            croatia.cache ++
+            cyprus.cache ++
+            czechRepublic.cache ++
+            denmark.cache ++
+            estonia.cache ++
+            finland.cache ++
+            france.cache ++
+            germany.cache ++
+            greece.cache ++
+            georgia.cache ++
+            hungary.cache ++
+            iceland.cache ++
+            ireland.cache ++
+            italy.cache ++
+            kosovo.cache ++
+            latvia.cache ++
+            liechtenstein.cache ++
+            lithuania.cache ++
+            luxembourg.cache ++
+            macedonia.cache ++
+            malta.cache ++
+            moldova.cache ++
+            monaco.cache ++
+            montenegro.cache ++
+            netherlands.cache ++
+            norway.cache ++
+            poland.cache ++
+            portugal.cache ++
+            romania.cache ++
+            serbia.cache ++
+            slovakia.cache ++
+            slovenia.cache ++
+            spain.cache ++
+            sweden.cache ++
+            switzerland.cache ++
+            turkey.cache ++
+            ukraine.cache ++
+            unitedKingdom.cache)
  }
 }

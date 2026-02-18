@@ -12,7 +12,7 @@ namespace osm.geo.Operations {
     use osm.types
 
     event facet Cache(region:String) => (cache:OSMCache)
-    event facet Download(cache:OSMCache) => (downloadCache:OSMCache)
+    event facet Download(url:String, path:String, force:Boolean) => (downloadCache:OSMCache)
     event facet Tile(cache:OSMCache) => (tiles:OSMCache)
     event facet RoutingGraph(cache:OSMCache) => (graph:OSMCache)
     event facet Status(cache:OSMCache) => (stats:OSMCache)

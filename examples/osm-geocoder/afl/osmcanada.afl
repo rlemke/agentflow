@@ -1,7 +1,6 @@
 namespace osm.geo.Canada.cache {
 // Canada
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.Canada
 
   facet CanadaIndividually () => (cache: [OSMCache]) andThen {
@@ -18,35 +17,18 @@ namespace osm.geo.Canada.cache {
     saskatchewan = Saskatchewan()
     yukon = Yukon()
 
-
-    dl_alberta = Download(cache = alberta.cache)
-    dl_britishColumbia = Download(cache = britishColumbia.cache)
-    dl_manitoba = Download(cache = manitoba.cache)
-    dl_newBrunswick = Download(cache = newBrunswick.cache)
-    dl_newfoundlandAndLabrador = Download(cache = newfoundlandAndLabrador.cache)
-    dl_novaScotia = Download(cache = novaScotia.cache)
-    dl_ontario = Download(cache = ontario.cache)
-    dl_princeEdwardIsland = Download(cache = princeEdwardIsland.cache)
-    dl_quebec = Download(cache = quebec.cache)
-    dl_saskatchewan = Download(cache = saskatchewan.cache)
-    dl_yukon = Download(cache = yukon.cache)
-
-    yield CanadaIndividually(cache = dl_alberta.downloadCache ++
-                             dl_britishColumbia.downloadCache ++
-                             dl_manitoba.downloadCache ++
-                             dl_newBrunswick.downloadCache ++
-                             dl_newfoundlandAndLabrador.downloadCache ++
-                             dl_novaScotia.downloadCache ++
-                             dl_ontario.downloadCache ++
-                             dl_princeEdwardIsland.downloadCache ++
-                             dl_quebec.downloadCache ++
-                             dl_saskatchewan.downloadCache ++
-                             dl_yukon.downloadCache)
-
-
+    yield CanadaIndividually(cache = alberta.cache ++
+                             britishColumbia.cache ++
+                             manitoba.cache ++
+                             newBrunswick.cache ++
+                             newfoundlandAndLabrador.cache ++
+                             novaScotia.cache ++
+                             ontario.cache ++
+                             princeEdwardIsland.cache ++
+                             quebec.cache ++
+                             saskatchewan.cache ++
+                             yukon.cache)
 
   }
 
-
 }
-

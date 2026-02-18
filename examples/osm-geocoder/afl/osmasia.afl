@@ -1,129 +1,87 @@
 namespace osm.geo.Asia.cache {
   use osm.types
-  use osm.geo.Operations
   use osm.geo.cache.Asia
 
   facet AsiaIndividually() => (cache: [OSMCache]) andThen {
 
     afghanistan = Afghanistan()
-    armenia =  Armenia()
-    azerbaijan =  Azerbaijan()
-    bangladesh =  Bangladesh()
-    bhutan =  Bhutan()
-    brunei =  Brunei()
-    cambodia =  Cambodia()
-    china =  China()
-    eastTimor =  EastTimor()
-    gCCStates =  GCCStates()
-    india =  India()
-    indonesia =  Indonesia()
-    iran =  Iran()
-    iraq =  Iraq()
-    japan =  Japan()
-    jordan =  Jordan()
-    kazakhstan =  Kazakhstan()
-    kyrgyzstan =  Kyrgyzstan()
-    laos =  Laos()
-    lebanon =  Lebanon()
-    malaysia =  Malaysia()
-    maldives =  Maldives()
-    mongolia =  Mongolia()
-    myanmar =  Myanmar()
-    nepal =  Nepal()
-    northKorea =  NorthKorea()
-    pakistan =  Pakistan()
-    israelAndPalestine =  IsraelAndPalestine()
-    philippines =  Philippines()
-    southKorea =  SouthKorea()
-    sriLanka =  SriLanka()
-    syria =  Syria()
-    tajikistan =  Tajikistan()
-    thailand =  Thailand()
-    turkmenistan =  Turkmenistan()
-    uzbekistan =  Uzbekistan()
-    vietnam =  Vietnam()
-    yemen =  Yemen()
+    armenia = Armenia()
+    azerbaijan = Azerbaijan()
+    bangladesh = Bangladesh()
+    bhutan = Bhutan()
+    brunei = Brunei()
+    cambodia = Cambodia()
+    china = China()
+    eastTimor = EastTimor()
+    gCCStates = GCCStates()
+    india = India()
+    indonesia = Indonesia()
+    iran = Iran()
+    iraq = Iraq()
+    japan = Japan()
+    jordan = Jordan()
+    kazakhstan = Kazakhstan()
+    kyrgyzstan = Kyrgyzstan()
+    laos = Laos()
+    lebanon = Lebanon()
+    malaysia = Malaysia()
+    maldives = Maldives()
+    mongolia = Mongolia()
+    myanmar = Myanmar()
+    nepal = Nepal()
+    northKorea = NorthKorea()
+    pakistan = Pakistan()
+    israelAndPalestine = IsraelAndPalestine()
+    philippines = Philippines()
+    southKorea = SouthKorea()
+    sriLanka = SriLanka()
+    syria = Syria()
+    tajikistan = Tajikistan()
+    thailand = Thailand()
+    turkmenistan = Turkmenistan()
+    uzbekistan = Uzbekistan()
+    vietnam = Vietnam()
+    yemen = Yemen()
 
-    dl_afghanistan = Download(cache = afghanistan.cache)
-    dl_armenia =  Download(cache = armenia.cache)
-    dl_azerbaijan =  Download(cache = azerbaijan.cache)
-    dl_bangladesh =  Download(cache = bangladesh.cache)
-    dl_bhutan =  Download(cache = bhutan.cache)
-    dl_brunei =  Download(cache = brunei.cache)
-    dl_cambodia =  Download(cache = cambodia.cache)
-    dl_china =  Download(cache = china.cache)
-    dl_eastTimor =  Download(cache = eastTimor.cache)
-    dl_gCCStates =  Download(cache = gCCStates.cache)
-    dl_india =  Download(cache = india.cache)
-    dl_indonesia =  Download(cache = indonesia.cache)
-    dl_iran =  Download(cache = iran.cache)
-    dl_iraq =  Download(cache = iraq.cache)
-    dl_japan =  Download(cache = japan.cache)
-    dl_jordan =  Download(cache = jordan.cache)
-    dl_kazakhstan =  Download(cache = kazakhstan.cache)
-    dl_kyrgyzstan =  Download(cache = kyrgyzstan.cache)
-    dl_laos =  Download(cache = laos.cache)
-    dl_lebanon =  Download(cache = lebanon.cache)
-    dl_malaysia =  Download(cache = malaysia.cache)
-    dl_maldives =  Download(cache = maldives.cache)
-    dl_mongolia =  Download(cache = mongolia.cache)
-    dl_myanmar =  Download(cache = myanmar.cache)
-    dl_nepal =  Download(cache = nepal.cache)
-    dl_northKorea =  Download(cache = northKorea.cache)
-    dl_pakistan =  Download(cache = pakistan.cache)
-    dl_israelAndPalestine =  Download(cache = israelAndPalestine.cache)
-    dl_philippines =  Download(cache = philippines.cache)
-    dl_southKorea =  Download(cache = southKorea.cache)
-    dl_sriLanka =  Download(cache = sriLanka.cache)
-    dl_syria =  Download(cache = syria.cache)
-    dl_tajikistan =  Download(cache = tajikistan.cache)
-    dl_thailand =  Download(cache = thailand.cache)
-    dl_turkmenistan =  Download(cache = turkmenistan.cache)
-    dl_uzbekistan =  Download(cache = uzbekistan.cache)
-    dl_vietnam =  Download(cache = vietnam.cache)
-    dl_yemen =  Download(cache = yemen.cache)
-
-    yield AsiaIndividually(cache = dl_afghanistan.downloadCache ++
-                                   dl_armenia.downloadCache ++
-                                   dl_azerbaijan.downloadCache ++
-                                   dl_bangladesh.downloadCache ++
-                                   dl_bhutan.downloadCache ++
-                                   dl_brunei.downloadCache ++
-                                   dl_cambodia.downloadCache ++
-                                   dl_china.downloadCache ++
-                                   dl_eastTimor.downloadCache ++
-                                   dl_gCCStates.downloadCache ++
-                                   dl_india.downloadCache ++
-                                   dl_indonesia.downloadCache ++
-                                   dl_iran.downloadCache ++
-                                   dl_iraq.downloadCache ++
-                                   dl_japan.downloadCache ++
-                                   dl_jordan.downloadCache ++
-                                   dl_kazakhstan.downloadCache ++
-                                   dl_kyrgyzstan.downloadCache ++
-                                   dl_laos.downloadCache ++
-                                   dl_lebanon.downloadCache ++
-                                   dl_malaysia.downloadCache ++
-                                   dl_maldives.downloadCache ++
-                                   dl_mongolia.downloadCache ++
-                                   dl_myanmar.downloadCache ++
-                                   dl_nepal.downloadCache ++
-                                   dl_northKorea.downloadCache ++
-                                   dl_pakistan.downloadCache ++
-                                   dl_israelAndPalestine.downloadCache ++
-                                   dl_philippines.downloadCache ++
-                                   dl_southKorea.downloadCache ++
-                                   dl_sriLanka.downloadCache ++
-                                   dl_syria.downloadCache ++
-                                   dl_tajikistan.downloadCache ++
-                                   dl_thailand.downloadCache ++
-                                   dl_turkmenistan.downloadCache ++
-                                   dl_uzbekistan.downloadCache ++
-                                   dl_vietnam.downloadCache ++
-                                   dl_yemen.downloadCache)
+    yield AsiaIndividually(cache = afghanistan.cache ++
+                                   armenia.cache ++
+                                   azerbaijan.cache ++
+                                   bangladesh.cache ++
+                                   bhutan.cache ++
+                                   brunei.cache ++
+                                   cambodia.cache ++
+                                   china.cache ++
+                                   eastTimor.cache ++
+                                   gCCStates.cache ++
+                                   india.cache ++
+                                   indonesia.cache ++
+                                   iran.cache ++
+                                   iraq.cache ++
+                                   japan.cache ++
+                                   jordan.cache ++
+                                   kazakhstan.cache ++
+                                   kyrgyzstan.cache ++
+                                   laos.cache ++
+                                   lebanon.cache ++
+                                   malaysia.cache ++
+                                   maldives.cache ++
+                                   mongolia.cache ++
+                                   myanmar.cache ++
+                                   nepal.cache ++
+                                   northKorea.cache ++
+                                   pakistan.cache ++
+                                   israelAndPalestine.cache ++
+                                   philippines.cache ++
+                                   southKorea.cache ++
+                                   sriLanka.cache ++
+                                   syria.cache ++
+                                   tajikistan.cache ++
+                                   thailand.cache ++
+                                   turkmenistan.cache ++
+                                   uzbekistan.cache ++
+                                   vietnam.cache ++
+                                   yemen.cache)
 
   }
 
 }
-
-
