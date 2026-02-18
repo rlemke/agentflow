@@ -533,6 +533,16 @@
 - **11 new tests** (`tests/dashboard/test_step_tree.py`): 7 `build_step_tree` unit tests (empty, single root, block+statements, deep nesting, multiple roots, order preservation, orphans) + 4 integration tests (tree partial, flat partial unchanged, detail toggle, steps page toggle)
 - 2173 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.28) - Download Lock Deduplication for Concurrent Cache Access
+
+- **Per-path thread locks** (`handlers/downloader.py`): added `_path_locks` dict with a `_path_locks_guard` and `_get_path_lock()` helper — prevents duplicate HTTP downloads when multiple RegistryRunner threads request the same cached file simultaneously; uses double-checked locking pattern (fast-path `exists()` check without lock, re-check after acquiring lock)
+- **Atomic temp-file writes** (`handlers/downloader.py`): `download()` and `download_url()` now write to a temp file (`path.tmp.{pid}.{tid}`) then `os.replace()` to the final path — cache file is always either absent or complete (never partial); on error, temp file is cleaned up via `storage.remove()` with OSError suppression
+- **Extracted helpers** (`handlers/downloader.py`): `_cache_hit()`, `_cache_miss()`, and `_stream_to_file()` reduce duplication between `download()` and `download_url()`
+- **HDFS-aware path handling** (`handlers/downloader.py`): `download_url()` uses atomic temp-file pattern for local paths only; HDFS paths (`hdfs://`) write directly since `os.replace()` cannot rename across filesystems
+- **`StorageBackend.remove()`** (`afl/runtime/storage.py`): added `remove(path)` to the protocol and both implementations — `LocalStorageBackend` delegates to `os.remove()`, `HDFSStorageBackend` uses WebHDFS DELETE (non-recursive)
+- **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
+- 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.26) - Descriptive Step Variable Names in Cache Facets
 
 - **`osmcache.afl`**: renamed single-letter `c` step variable to camelCase facet name in all 225 cache facets (e.g. `c = Cache(region = "Africa")` → `africa = Cache(region = "Africa")`, `c.cache` → `africa.cache`)
