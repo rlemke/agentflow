@@ -33,6 +33,23 @@ try:
 except ImportError:
     PYMONGO_AVAILABLE = False
 
+    # Fallback constants so MongoStore works with mongomock without pymongo
+    ASCENDING = 1
+
+    try:
+        from mongomock.collection import (
+            DuplicateKeyError,  # type: ignore[assignment]
+            ReturnDocument,  # type: ignore[assignment]
+        )
+    except ImportError:
+
+        class ReturnDocument:  # type: ignore[no-redef]
+            AFTER = True
+            BEFORE = False
+
+        class DuplicateKeyError(Exception):  # type: ignore[no-redef]
+            pass
+
 if TYPE_CHECKING:
     from ..config import MongoDBConfig
 
