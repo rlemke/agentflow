@@ -240,15 +240,19 @@ class TestAddOneAgent:
         # Start/stop to trigger registration
         import threading
 
+        import time
+
         poller._config.poll_interval_ms = 50
         t = threading.Thread(target=poller.start, daemon=True)
         t.start()
 
-        import time
-
-        time.sleep(0.1)
-
-        server = store.get_server(poller.server_id)
+        # Poll for server registration (may take >100ms under load)
+        server = None
+        for _ in range(20):
+            time.sleep(0.05)
+            server = store.get_server(poller.server_id)
+            if server is not None:
+                break
         assert server is not None
         assert "handlers.AddOne" in server.handlers
 

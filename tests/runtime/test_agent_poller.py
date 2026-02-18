@@ -422,10 +422,13 @@ class TestAgentPollerLifecycle:
         t = threading.Thread(target=run_poller, daemon=True)
         t.start()
 
-        # Wait for server registration
-        time.sleep(0.1)
-
-        server = store.get_server(poller.server_id)
+        # Poll for server registration (may take >100ms under load)
+        server = None
+        for _ in range(20):
+            time.sleep(0.05)
+            server = store.get_server(poller.server_id)
+            if server is not None:
+                break
         assert server is not None
         assert server.state == ServerState.RUNNING
         assert server.service_name == "afl-agent"

@@ -15,6 +15,53 @@
 """Root pytest configuration for AFL tests."""
 
 
+def _patch_mongomock_objectid():
+    """Add ordering support to mongomock ObjectId for Python 3.14+.
+
+    mongomock's ObjectId only defines __eq__/__ne__/__hash__ but not
+    comparison operators.  Python 3.14 no longer falls back gracefully
+    when __lt__ is missing, so sorted() on ObjectId values raises
+    TypeError.  Patch in the missing operators so .sort("_id", …)
+    works correctly.
+    """
+    try:
+        from mongomock.object_id import ObjectId
+    except ImportError:
+        return
+
+    if hasattr(ObjectId, "_cmp_patched"):
+        return
+
+    def _lt(self, other):
+        if not isinstance(other, ObjectId):
+            return NotImplemented
+        return str(self._id) < str(other._id)
+
+    def _le(self, other):
+        if not isinstance(other, ObjectId):
+            return NotImplemented
+        return str(self._id) <= str(other._id)
+
+    def _gt(self, other):
+        if not isinstance(other, ObjectId):
+            return NotImplemented
+        return str(self._id) > str(other._id)
+
+    def _ge(self, other):
+        if not isinstance(other, ObjectId):
+            return NotImplemented
+        return str(self._id) >= str(other._id)
+
+    ObjectId.__lt__ = _lt
+    ObjectId.__le__ = _le
+    ObjectId.__gt__ = _gt
+    ObjectId.__ge__ = _ge
+    ObjectId._cmp_patched = True
+
+
+_patch_mongomock_objectid()
+
+
 def pytest_addoption(parser):
     """Add custom command-line options."""
     parser.addoption(
