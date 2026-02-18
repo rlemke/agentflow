@@ -22,6 +22,7 @@
         <tr>
             <th>ID</th>
             <th>Step ID</th>
+            <th>Step Name</th>
             <th>Workflow ID</th>
             <th>State</th>
             <th>Event Type</th>
@@ -32,6 +33,7 @@
         <tr>
             <td><a href="/events/{{ event.id }}">{{ event.id[:12] }}...</a></td>
             <td class="mono">{{ event.step_id[:12] }}...</td>
+            <td>{{ step_names.get(event.step_id, '') or '—' }}</td>
             <td class="mono">{{ event.workflow_id[:12] }}...</td>
             <td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td>
             <td>{{ event.event_type }}</td>

@@ -57,8 +57,10 @@ def _resolve_step_names(step, store) -> dict:
     if step.facet_name:
         names["facet"] = step.facet_name
 
-    # Statement name: resolve from the flow's compiled AST
-    if step.statement_id and runner:
+    # Statement name: prefer persisted statement_name, fall back to AST resolution
+    if step.statement_name:
+        names["statement"] = step.statement_name
+    elif step.statement_id and runner:
         try:
             stmt_name = _resolve_statement_name(step.statement_id, runner, store)
             if stmt_name:

@@ -30,10 +30,18 @@ def event_list(request: Request, state: str | None = None, store=Depends(get_sto
         events = store.get_events_by_state(state)
     else:
         events = store.get_all_events()
+
+    step_names: dict[str, str] = {}
+    for event in events:
+        if event.step_id and event.step_id not in step_names:
+            step = store.get_step(event.step_id)
+            if step:
+                step_names[event.step_id] = step.statement_name or step.facet_name or ""
+
     return request.app.state.templates.TemplateResponse(
         request,
         "events/list.html",
-        {"events": events, "filter_state": state},
+        {"events": events, "filter_state": state, "step_names": step_names},
     )
 
 
@@ -41,8 +49,13 @@ def event_list(request: Request, state: str | None = None, store=Depends(get_sto
 def event_detail(event_id: str, request: Request, store=Depends(get_store)):
     """Show event detail."""
     event = store.get_event(event_id)
+    step_name = ""
+    if event and event.step_id:
+        step = store.get_step(event.step_id)
+        if step:
+            step_name = step.statement_name or step.facet_name or ""
     return request.app.state.templates.TemplateResponse(
         request,
         "events/detail.html",
-        {"event": event},
+        {"event": event, "step_name": step_name},
     )

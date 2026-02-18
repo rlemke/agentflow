@@ -14,6 +14,7 @@
             <table>
                 <tr><th>ID</th><td class="mono">{{ event.id }}</td></tr>
                 <tr><th>Step ID</th><td class="mono">{{ event.step_id }}</td></tr>
+                <tr><th>Step Name</th><td>{{ step_name or "—" }}</td></tr>
                 <tr><th>Workflow ID</th><td class="mono">{{ event.workflow_id }}</td></tr>
                 <tr><th>State</th><td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td></tr>
                 <tr><th>Event Type</th><td>{{ event.event_type }}</td></tr>

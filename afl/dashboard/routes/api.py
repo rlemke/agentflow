@@ -320,11 +320,20 @@ def api_events(state: str | None = None, store=Depends(get_store)):
         events = store.get_events_by_state(state)
     else:
         events = store.get_all_events()
+
+    step_names: dict[str, str] = {}
+    for e in events:
+        if e.step_id and e.step_id not in step_names:
+            step = store.get_step(e.step_id)
+            if step:
+                step_names[e.step_id] = step.statement_name or step.facet_name or ""
+
     return JSONResponse(
         [
             {
                 "id": e.id,
                 "step_id": e.step_id,
+                "step_name": step_names.get(e.step_id, ""),
                 "workflow_id": e.workflow_id,
                 "state": e.state,
                 "event_type": e.event_type,
