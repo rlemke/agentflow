@@ -521,6 +521,15 @@
 - **Setup script** (`scripts/setup`): added `--hdfs-namenode-dir PATH` and `--hdfs-datanode-dir PATH` options; exports the env vars and auto-enables `--hdfs`; prints configured paths in status output
 - **Deployment docs** (`docs/deployment.md`): new "External Storage for HDFS" section with usage examples, env var table, and permissions note
 
+## Completed (v0.12.25) - retry_step() Runtime Operation
+
+- **`Evaluator.retry_step(step_id)`** (`evaluator.py`): resets a step from `STATEMENT_ERROR` back to `EVENT_TRANSMIT` so agents can re-execute it; clears the step error and resets the associated task from `failed` to `pending` — eliminates manual MongoDB manipulation for transient failures (e.g. SSL errors during downloads)
+- **`StepTransition.clear_error()`** (`step.py`): new method to clear the error field on a step's transition
+- **`PersistenceAPI.get_task_for_step(step_id)`** (`persistence.py`): new abstract method to find the most recent task associated with a step; implemented in `MemoryStore` (iterates tasks, returns max by `created`) and `MongoStore` (queries tasks collection sorted by `created` descending, uses existing `task_step_id_index`)
+- **`afl_retry_step` MCP tool** (`server.py`): new tool accepting `step_id`, calls `evaluator.retry_step()`, returns success/error JSON
+- **5 new tests**: 3 evaluator tests (`test_retry_step_not_found`, `test_retry_step_wrong_state`, `test_retry_step_resets_to_event_transmit`) + 2 MCP tests (`test_retry_step_success`, `test_retry_step_not_found`)
+- 2162 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.24) - Generic Download Facet for Arbitrary URLs
 
 - **Download facet signature change** (`osmoperations.afl`): `event facet Download(cache:OSMCache)` → `event facet Download(url:String, path:String, force:Boolean) => (downloadCache:OSMCache)` — Download is now a general-purpose file downloader accepting any URL and any destination path (local or HDFS), decoupled from OSM-specific cache semantics
