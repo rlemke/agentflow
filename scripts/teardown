@@ -48,6 +48,10 @@ cd "$PROJECT_DIR"
 
 # Build the full list of compose files and profiles so that services started
 # with overlay files (HDFS, PostGIS, mirror) are also stopped cleanly.
+# Set dummy values for required env vars so compose can interpolate even when
+# the overlay wasn't used (we're only tearing down, not creating containers).
+export AFL_GEOFABRIK_MIRROR="${AFL_GEOFABRIK_MIRROR:-/dev/null}"
+
 COMPOSE_FILES="-f docker-compose.yml"
 for overlay in docker-compose.hdfs.yml docker-compose.postgis.yml docker-compose.mirror.yml; do
     if [ -f "$overlay" ]; then
