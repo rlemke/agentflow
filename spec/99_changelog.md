@@ -543,6 +543,15 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.35) - Namespace Page Workflow Counts and Run/View Buttons
+
+- **Fix workflow count always zero** (`routes/namespaces.py`): `_aggregate_namespaces()` now also queries `store.get_workflows_by_flow()` for each flow and matches workflows to namespaces by qualified name prefix (longest-prefix-first via `_match_ns_by_name()`) — previously only checked the embedded `flow.workflows` list which was always empty for seeded flows
+- **Deduplicate workflows by name**: workflows stored multiple times (from `_collect_workflows` traversing both `workflows` and `declarations` arrays) are deduplicated by qualified name within each namespace
+- **New dataclasses**: `WorkflowEntry` (carries `flow_id`, `uuid`, `short_name` for Run links) and `FacetEntry` (carries `parameters`, `return_type` for display)
+- **Namespace detail template** (`templates/namespaces/detail.html`): rewritten — workflows listed first with **Run** buttons (linking to `/flows/{flow_id}/run/{workflow_id}`), facets second with **Parameters** and **Returns** columns showing type signatures; short names displayed (namespace prefix stripped)
+- **Namespace list page**: workflow counts now correct (e.g. `handlers`: 4 workflows, 3 facets; `chain`: 1 workflow; `parallel`: 1 workflow)
+- 2214 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.34) - Full Dashboard Seed Data
 
 - **Flow structure extraction** (`docker/seed/seed.py`): new `_extract_flow_structure()` helper walks compiled JSON `namespaces[].declarations[]` and populates `NamespaceDefinition`, `FacetDefinition`, `BlockDefinition`, and `StatementDefinition` lists; passed into `FlowDefinition` in both `seed_inline_source()` and `seed_example_directory()` — flow detail page now shows real structural counts (3 namespaces, 3 facets, 6 blocks, 19 statements for inline-examples)
