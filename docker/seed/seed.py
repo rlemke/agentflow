@@ -3,28 +3,23 @@
 Seed script - Populates MongoDB with example workflows.
 
 This script:
-1. Parses example AFL files
-2. Stores compiled workflows in the flows collection
-3. Creates sample tasks that can be executed by the runner
+1. Seeds inline example workflows (addone, chain, parallel)
+2. Discovers and seeds AFL files from examples/ directories
+3. Creates proper FlowDefinition + WorkflowDefinition entities
+   so the Dashboard "Run" button works
 
-Run with: docker compose run seed
+Run with: docker compose --profile seed run --rm seed
 """
 
+import glob
 import json
 import logging
 import os
 import sys
-import uuid
-from datetime import datetime
+import time
 
 # Add parent to path for afl imports
 sys.path.insert(0, "/app")
-
-from pymongo import MongoClient
-
-from afl.parser import parse
-from afl.emitter import emit_dict
-from afl.validator import validate
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,8 +27,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("seed")
 
-# Example AFL sources to seed
-EXAMPLE_SOURCES = {
+SEED_PATH = "docker:seed"
+
+# Inline example AFL sources
+INLINE_SOURCES = {
     "addone-example": '''
 // Simple AddOne workflow for testing
 namespace handlers {
@@ -97,128 +94,230 @@ namespace parallel {
 }
 
 
+def _collect_workflows(node: dict, prefix: str = "") -> list[tuple[str, dict]]:
+    """Collect all (qualified_name, workflow_dict) from compiled JSON."""
+    results: list[tuple[str, dict]] = []
+
+    for w in node.get("workflows", []):
+        qname = f"{prefix}{w['name']}" if prefix else w["name"]
+        results.append((qname, w))
+
+    for decl in node.get("declarations", []):
+        if decl.get("type") == "WorkflowDecl":
+            qname = f"{prefix}{decl['name']}" if prefix else decl["name"]
+            results.append((qname, decl))
+        elif decl.get("type") == "Namespace":
+            ns_prefix = f"{prefix}{decl['name']}."
+            results.extend(_collect_workflows(decl, ns_prefix))
+
+    for ns in node.get("namespaces", []):
+        ns_prefix = f"{prefix}{ns['name']}."
+        results.extend(_collect_workflows(ns, ns_prefix))
+
+    return results
+
+
+def seed_inline_source(name: str, source: str, store) -> int:
+    """Seed a single inline AFL source. Returns workflow count."""
+    from afl.emitter import JSONEmitter
+    from afl.parser import AFLParser
+    from afl.runtime.entities import (
+        FlowDefinition,
+        FlowIdentity,
+        SourceText,
+        WorkflowDefinition,
+    )
+    from afl.runtime.types import generate_id
+
+    parser = AFLParser()
+    ast = parser.parse(source, filename=f"{name}.afl")
+
+    emitter = JSONEmitter(include_locations=False)
+    program_json = emitter.emit(ast)
+    program_dict = json.loads(program_json)
+
+    workflows = _collect_workflows(program_dict)
+    if not workflows:
+        return 0
+
+    now_ms = int(time.time() * 1000)
+    flow_id = generate_id()
+
+    flow = FlowDefinition(
+        uuid=flow_id,
+        name=FlowIdentity(name=name, path=SEED_PATH, uuid=flow_id),
+        compiled_sources=[SourceText(name=f"{name}.afl", content=source)],
+    )
+    store.save_flow(flow)
+
+    for qname, _wf_dict in workflows:
+        wf_id = generate_id()
+        workflow = WorkflowDefinition(
+            uuid=wf_id,
+            name=qname,
+            namespace_id=SEED_PATH,
+            facet_id=wf_id,
+            flow_id=flow_id,
+            starting_step="",
+            version="1.0",
+            date=now_ms,
+        )
+        store.save_workflow(workflow)
+
+    return len(workflows)
+
+
+def seed_example_directory(name: str, afl_files: list[str], store) -> int:
+    """Seed an example directory's AFL files. Returns workflow count."""
+    from afl.ast import Program
+    from afl.emitter import JSONEmitter
+    from afl.parser import AFLParser
+    from afl.runtime.entities import (
+        FlowDefinition,
+        FlowIdentity,
+        SourceText,
+        WorkflowDefinition,
+    )
+    from afl.runtime.types import generate_id
+
+    parser = AFLParser()
+    programs = []
+    source_parts = []
+
+    for path in afl_files:
+        with open(path) as f:
+            text = f.read()
+        source_parts.append(text)
+        programs.append(parser.parse(text, filename=path))
+
+    merged = Program.merge(programs)
+
+    emitter = JSONEmitter(include_locations=False)
+    program_json = emitter.emit(merged)
+    program_dict = json.loads(program_json)
+
+    workflows = _collect_workflows(program_dict)
+    if not workflows:
+        return 0
+
+    now_ms = int(time.time() * 1000)
+    flow_id = generate_id()
+    combined_source = "\n".join(source_parts)
+
+    flow = FlowDefinition(
+        uuid=flow_id,
+        name=FlowIdentity(name=name, path=SEED_PATH, uuid=flow_id),
+        compiled_sources=[SourceText(name="source.afl", content=combined_source)],
+    )
+    store.save_flow(flow)
+
+    for qname, _wf_dict in workflows:
+        wf_id = generate_id()
+        workflow = WorkflowDefinition(
+            uuid=wf_id,
+            name=qname,
+            namespace_id=SEED_PATH,
+            facet_id=wf_id,
+            flow_id=flow_id,
+            starting_step="",
+            version="1.0",
+            date=now_ms,
+        )
+        store.save_workflow(workflow)
+
+    return len(workflows)
+
+
+def clean_seeds(store) -> tuple[int, int]:
+    """Remove all previously seeded flows and their workflows."""
+    db = store._db
+    flow_docs = list(db.flows.find({"name.path": SEED_PATH}, {"uuid": 1}))
+    flow_ids = [doc["uuid"] for doc in flow_docs]
+
+    workflows_deleted = 0
+    if flow_ids:
+        result = db.workflows.delete_many({"flow_id": {"$in": flow_ids}})
+        workflows_deleted = result.deleted_count
+
+    result = db.flows.delete_many({"name.path": SEED_PATH})
+    flows_deleted = result.deleted_count
+
+    # Also clean up legacy seed documents (from old seed.py format)
+    legacy = db.flows.delete_many({"name": {"$regex": "^seed-"}})
+    flows_deleted += legacy.deleted_count
+
+    return flows_deleted, workflows_deleted
+
+
 def seed_database():
     """Seed the database with example workflows."""
+    from afl.runtime.mongo_store import MongoStore
+
     mongodb_url = os.environ.get("AFL_MONGODB_URL", "mongodb://localhost:27017")
     database = os.environ.get("AFL_MONGODB_DATABASE", "afl")
 
-    logger.info(f"Connecting to {mongodb_url}/{database}")
-    client = MongoClient(mongodb_url)
-    db = client[database]
+    logger.info("Connecting to %s/%s", mongodb_url, database)
+    store = MongoStore(connection_string=mongodb_url, database_name=database)
 
-    # Collections
-    flows_col = db["flows"]
-    workflows_col = db["workflows"]
-    runners_col = db["runners"]
-    tasks_col = db["tasks"]
+    # Clean existing seed data first
+    flows_del, wfs_del = clean_seeds(store)
+    if flows_del > 0 or wfs_del > 0:
+        logger.info("Cleaned %d flow(s) and %d workflow(s)", flows_del, wfs_del)
 
-    # Clear existing seed data (optional - comment out to preserve)
-    # logger.info("Clearing existing seed data...")
-    # flows_col.delete_many({"name": {"$regex": "^seed-"}})
+    total_flows = 0
+    total_workflows = 0
 
-    seeded_count = 0
+    # 1. Seed inline examples
+    logger.info("Seeding inline examples...")
+    # chain-example and parallel-example depend on addone-example's namespace,
+    # so combine all inline sources into a single compilation unit
+    combined_source = "\n".join(INLINE_SOURCES.values())
+    try:
+        wf_count = seed_inline_source("inline-examples", combined_source, store)
+        total_flows += 1
+        total_workflows += wf_count
+        logger.info("  inline-examples: %d workflows", wf_count)
+    except Exception as e:
+        logger.error("  inline-examples: ERROR: %s", e)
 
-    for name, source in EXAMPLE_SOURCES.items():
-        logger.info(f"Processing: {name}")
-
-        # Parse and validate
-        try:
-            ast = parse(source, filename=f"{name}.afl")
-            result = validate(ast)
-
-            if not result.is_valid:
-                logger.error(f"  Validation failed: {result.errors}")
+    # 2. Seed examples/ directories
+    examples_dir = "/app/examples"
+    if os.path.isdir(examples_dir):
+        logger.info("Seeding example directories...")
+        for entry in sorted(os.listdir(examples_dir)):
+            afl_dir = os.path.join(examples_dir, entry, "afl")
+            if not os.path.isdir(afl_dir):
                 continue
 
-            # Emit to dict
-            compiled = emit_dict(ast)
+            afl_files = sorted(glob.glob(os.path.join(afl_dir, "*.afl")))
+            if not afl_files:
+                continue
 
-        except Exception as e:
-            logger.error(f"  Parse error: {e}")
-            continue
+            try:
+                wf_count = seed_example_directory(entry, afl_files, store)
+                if wf_count > 0:
+                    total_flows += 1
+                    total_workflows += wf_count
+                    logger.info("  %-20s %2d files  %3d workflows   OK",
+                                entry, len(afl_files), wf_count)
+                else:
+                    logger.info("  %-20s %2d files    0 workflows   SKIP",
+                                entry, len(afl_files))
+            except Exception as e:
+                logger.warning("  %-20s ERROR: %s", entry, e)
 
-        # Create flow document
-        flow_id = str(uuid.uuid4())
-        flow_doc = {
-            "uuid": flow_id,
-            "name": f"seed-{name}",
-            "path": f"/seed/{name}.afl",
-            "sources": [
-                {
-                    "name": f"{name}.afl",
-                    "content": source,
-                    "language": "afl",
-                }
-            ],
-            "compiled": compiled,
-            "created": datetime.utcnow().isoformat(),
-            "seeded": True,
-        }
-
-        # Extract workflow names
-        workflow_names = []
-        for ns in compiled.get("namespaces", []):
-            for wf in ns.get("workflows", []):
-                workflow_names.append(f"{ns['name']}.{wf['name']}")
-        for wf in compiled.get("workflows", []):
-            workflow_names.append(wf["name"])
-
-        flow_doc["workflows"] = workflow_names
-
-        # Upsert flow
-        flows_col.update_one(
-            {"name": flow_doc["name"]},
-            {"$set": flow_doc},
-            upsert=True
-        )
-        logger.info(f"  Stored flow: {flow_doc['name']} ({len(workflow_names)} workflows)")
-        seeded_count += 1
-
-    logger.info(f"Seeded {seeded_count} example flows")
-
-    # Create a sample ready-to-run task
-    logger.info("Creating sample executable task...")
-
-    # Find the addone flow
-    addone_flow = flows_col.find_one({"name": "seed-addone-example"})
-    if addone_flow:
-        task_id = str(uuid.uuid4())
-        task_doc = {
-            "uuid": task_id,
-            "name": "afl:execute",
-            "flow_id": addone_flow["uuid"],
-            "workflow_id": "",
-            "workflow_name": "handlers.AddOneWorkflow",
-            "runner_id": "",
-            "step_id": "",
-            "state": "pending",
-            "created": datetime.utcnow().isoformat(),
-            "updated": datetime.utcnow().isoformat(),
-            "data": {
-                "inputs": {"input": 41},
-            },
-            "data_type": "execute",
-            "task_list_name": "afl:execute",
-            "seeded": True,
-        }
-
-        tasks_col.update_one(
-            {"uuid": task_id},
-            {"$set": task_doc},
-            upsert=True
-        )
-        logger.info(f"  Created task: AddOneWorkflow(input=41) -> expecting output=42")
-
-    # Show summary
+    # Summary
     logger.info("")
     logger.info("=" * 60)
     logger.info("Seed Complete!")
     logger.info("=" * 60)
-    logger.info(f"Flows: {flows_col.count_documents({})}")
-    logger.info(f"Tasks: {tasks_col.count_documents({})}")
+    logger.info("Flows:     %d", total_flows)
+    logger.info("Workflows: %d", total_workflows)
     logger.info("")
     logger.info("View the dashboard at: http://localhost:8080")
     logger.info("=" * 60)
+
+    store.close()
 
 
 if __name__ == "__main__":
