@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/_doc_comment.html" import render_doc %}
 {% block title %}Flow {{ flow.name.name if flow else "Not Found" }} — AgentFlow{% endblock %}
 {% block content %}
 {% if not flow %}
@@ -47,13 +48,14 @@
 <figure>
 <table>
     <thead>
-        <tr><th>Name</th><th>UUID</th></tr>
+        <tr><th>Name</th><th>UUID</th><th>Documentation</th></tr>
     </thead>
     <tbody>
         {% for ns in flow.namespaces %}
         <tr>
             <td><a href="/namespaces/{{ ns.name }}">{{ ns.name }}</a></td>
             <td class="mono">{{ ns.uuid }}</td>
+            <td>{% if ns.documentation %}{{ render_doc(ns.documentation) }}{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -66,7 +68,7 @@
 <figure>
 <table>
     <thead>
-        <tr><th>Name</th><th>Namespace ID</th><th>UUID</th></tr>
+        <tr><th>Name</th><th>Namespace ID</th><th>UUID</th><th>Documentation</th></tr>
     </thead>
     <tbody>
         {% for facet in flow.facets %}
@@ -74,6 +76,7 @@
             <td>{{ facet.name }}</td>
             <td class="mono">{{ facet.namespace_id }}</td>
             <td class="mono">{{ facet.uuid }}</td>
+            <td>{% if facet.documentation %}{{ render_doc(facet.documentation) }}{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>

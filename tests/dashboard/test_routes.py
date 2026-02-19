@@ -1608,3 +1608,209 @@ class TestApiExpansion:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["name"] == "TestFlow"
+
+
+# =============================================================================
+# v0.12.38 — Doc comments display & facets in namespace view
+# =============================================================================
+
+
+def _make_flow_with_docs(flow_id="flow-doc"):
+    """Create a flow with doc comments on namespace, facets, and workflows."""
+    from afl.runtime.entities import (
+        FacetDefinition,
+        FlowDefinition,
+        FlowIdentity,
+        NamespaceDefinition,
+        Parameter,
+        SourceText,
+        WorkflowDefinition,
+    )
+
+    ns_doc = {"description": "Core handlers namespace.", "params": [], "returns": []}
+    facet_doc = {"description": "Increments a value.", "params": [{"name": "value", "description": "The input value."}], "returns": []}
+    wf_doc = {
+        "description": "Adds one twice.",
+        "params": [{"name": "input", "description": "The starting value."}],
+        "returns": [{"name": "output", "description": "The input plus two."}],
+    }
+
+    return FlowDefinition(
+        uuid=flow_id,
+        name=FlowIdentity(name="DocFlow", path="/test", uuid=flow_id),
+        namespaces=[NamespaceDefinition(uuid="ns-doc", name="handlers", documentation=ns_doc)],
+        facets=[
+            FacetDefinition(
+                uuid="f-doc",
+                name="handlers.AddOne",
+                namespace_id="ns-doc",
+                parameters=[Parameter(name="value", value=None, type_hint="Long")],
+                return_type="result",
+                documentation=facet_doc,
+            ),
+        ],
+        workflows=[
+            WorkflowDefinition(
+                uuid="wf-doc",
+                name="handlers.DoubleAddOne",
+                namespace_id="ns-doc",
+                facet_id="f-doc",
+                flow_id=flow_id,
+                starting_step="s-1",
+                version="1.0",
+                documentation=wf_doc,
+            )
+        ],
+        compiled_sources=[
+            SourceText(
+                name="main.afl",
+                content="""
+namespace handlers {
+    /**
+     * Increments a value.
+     * @param value The input value.
+     */
+    event facet AddOne(value: Long) => (result: Long)
+
+    /**
+     * Adds one twice.
+     * @param input The starting value.
+     * @return output The input plus two.
+     */
+    workflow DoubleAddOne(input: Long) => (output: Long) andThen {
+        first = AddOne(value = $.input)
+        second = AddOne(value = first.result)
+        yield DoubleAddOne(output = second.result)
+    }
+}
+""",
+                language="afl",
+            )
+        ],
+    )
+
+
+class TestDocCommentDisplay:
+    def test_flow_detail_shows_namespace_doc(self, client):
+        """Namespaces table on flow detail page shows documentation."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+
+        resp = tc.get("/flows/flow-doc")
+        assert resp.status_code == 200
+        assert "Core handlers namespace" in resp.text
+
+    def test_flow_detail_shows_facet_doc(self, client):
+        """Facets table on flow detail page shows documentation."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+
+        resp = tc.get("/flows/flow-doc")
+        assert resp.status_code == 200
+        assert "Increments a value" in resp.text
+
+    def test_flow_namespace_shows_facets(self, client):
+        """Flow namespace page shows a facets section."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+        store.save_workflow(flow.workflows[0])
+
+        resp = tc.get("/flows/flow-doc/ns/handlers")
+        assert resp.status_code == 200
+        assert "Facets" in resp.text
+        assert "AddOne" in resp.text
+        assert "Increments a value" in resp.text
+
+    def test_flow_namespace_shows_workflow_doc(self, client):
+        """Flow namespace page shows workflow documentation."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+        store.save_workflow(flow.workflows[0])
+
+        resp = tc.get("/flows/flow-doc/ns/handlers")
+        assert resp.status_code == 200
+        assert "Adds one twice" in resp.text
+
+    def test_flow_run_shows_workflow_doc(self, client):
+        """Run page shows workflow documentation above parameters."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+        store.save_workflow(flow.workflows[0])
+
+        resp = tc.get("/flows/flow-doc/run/wf-doc")
+        assert resp.status_code == 200
+        assert "Adds one twice" in resp.text
+
+    def test_flow_run_shows_param_descriptions(self, client):
+        """Run page shows parameter descriptions from @param tags."""
+        tc, store = client
+        flow = _make_flow_with_docs()
+        store.save_flow(flow)
+        store.save_workflow(flow.workflows[0])
+
+        resp = tc.get("/flows/flow-doc/run/wf-doc")
+        assert resp.status_code == 200
+        assert "Description" in resp.text
+        assert "The starting value" in resp.text
+
+
+class TestSeedWorkflowDocumentation:
+    def test_collect_workflows_includes_doc(self):
+        """_collect_workflows returns workflow dicts that include 'doc' field."""
+        import json as json_mod
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
+        source = '''
+namespace test_ns {
+    /** Adds one to a value.
+     * @param v The value.
+     * @return r The result.
+     */
+    workflow AddOne(v: Long) => (r: Long) andThen {
+        yield AddOne(r = $.v)
+    }
+}
+'''
+        parser = AFLParser()
+        ast = parser.parse(source)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json_mod.loads(emitter.emit(ast))
+
+        # Import _collect_workflows from seed
+        import sys
+        sys.path.insert(0, "/Users/ralph_lemke/agentflow")
+        from docker.seed.seed import _collect_workflows
+
+        workflows = _collect_workflows(program_dict)
+        assert len(workflows) >= 1
+        # Find our specific workflow
+        match = [(q, d) for q, d in workflows if q == "test_ns.AddOne"]
+        assert len(match) >= 1
+        qname, wf_dict = match[0]
+        assert wf_dict.get("doc") is not None
+        assert "Adds one" in wf_dict["doc"]["description"]
+
+    def test_workflow_definition_accepts_dict_doc(self):
+        """WorkflowDefinition.documentation accepts dict values."""
+        from afl.runtime.entities import WorkflowDefinition
+
+        doc = {"description": "Test doc", "params": [], "returns": []}
+        wf = WorkflowDefinition(
+            uuid="wf-1",
+            name="TestWF",
+            namespace_id="ns-1",
+            facet_id="f-1",
+            flow_id="flow-1",
+            starting_step="s-1",
+            version="1.0",
+            documentation=doc,
+        )
+        assert wf.documentation == doc
+        assert isinstance(wf.documentation, dict)

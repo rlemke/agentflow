@@ -150,6 +150,17 @@ def flow_namespace(
         short_name = wf.name.rsplit(".", 1)[1] if "." in wf.name else wf.name
         ns_workflows.append({"wf": wf, "short_name": short_name})
 
+    # Filter facets by namespace prefix
+    ns_facets = []
+    if flow:
+        for facet in flow.facets:
+            if namespace_name == "_top":
+                if "." not in facet.name:
+                    ns_facets.append({"facet": facet, "short_name": facet.name})
+            elif "." in facet.name and facet.name.rsplit(".", 1)[0] == namespace_name:
+                short_name = facet.name.rsplit(".", 1)[1]
+                ns_facets.append({"facet": facet, "short_name": short_name})
+
     return request.app.state.templates.TemplateResponse(
         request,
         "flows/namespace.html",
@@ -157,6 +168,7 @@ def flow_namespace(
             "flow": flow,
             "namespace_name": display_name,
             "ns_workflows": ns_workflows,
+            "ns_facets": ns_facets,
         },
     )
 
@@ -182,6 +194,7 @@ def flow_run_form(
     workflow_name = workflow_def.name if workflow_def else "Unknown"
     params: list[dict] = []
     parse_error = None
+    workflow_doc = None
 
     if flow.compiled_sources:
         try:
@@ -198,6 +211,14 @@ def flow_run_form(
 
             wf_ast = _find_workflow_in_program(program_dict, workflow_name)
             if wf_ast:
+                workflow_doc = wf_ast.get("doc")
+
+                # Build param description lookup from @param tags
+                param_descs: dict[str, str] = {}
+                if workflow_doc and isinstance(workflow_doc, dict):
+                    for pd in workflow_doc.get("params", []):
+                        param_descs[pd.get("name", "")] = pd.get("description", "")
+
                 for p in wf_ast.get("params", []):
                     default_val = p.get("default")
                     if isinstance(default_val, dict) and "value" in default_val:
@@ -207,6 +228,7 @@ def flow_run_form(
                             "name": p.get("name", ""),
                             "type": p.get("type", ""),
                             "default": default_val,
+                            "description": param_descs.get(p.get("name", ""), ""),
                         }
                     )
         except Exception as exc:
@@ -221,6 +243,7 @@ def flow_run_form(
             "workflow_name": workflow_name,
             "params": params,
             "parse_error": parse_error,
+            "workflow_doc": workflow_doc,
         },
     )
 

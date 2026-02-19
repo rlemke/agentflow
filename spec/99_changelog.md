@@ -543,6 +543,17 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.38) - Doc Comments on All Dashboard Pages & Docker Seed Fix
+
+- **Seed** (`docker/seed/seed.py`): both `seed_inline_source()` and `seed_example_directory()` now populate `WorkflowDefinition.documentation` from the compiled JSON `"doc"` field (was always `None`)
+- **Runtime** (`entities.py`): widened `WorkflowDefinition.documentation` type from `str | None` to `dict | str | None` (matching `NamespaceDefinition` and `FacetDefinition`)
+- **Dashboard — flow detail** (`flows/detail.html`): imports `render_doc` macro; Namespaces table and Facets table now show a Documentation column with rendered doc comments
+- **Dashboard — namespace** (`flows/namespace.html`, `routes/flows.py`): added Facets section below Workflows table showing Name, Parameters, Returns, and Documentation columns; `flow_namespace()` route now filters and passes `ns_facets` to template
+- **Dashboard — run page** (`flows/run.html`, `routes/flows.py`): shows workflow documentation (from compiled JSON `@param`/`@return` tags) above the parameters form; parameters table gains a Description column populated from `@param` tag descriptions; `flow_run_form()` route extracts `workflow_doc` and per-parameter descriptions from compiled AST
+- **Docker** (`Dockerfile.dashboard`): added `markdown` to fallback pip install line
+- **Tests**: 8 new tests — `TestDocCommentDisplay` (6 route tests for namespace/facet/workflow doc display, facets section, run page doc and param descriptions) and `TestSeedWorkflowDocumentation` (2 tests for `_collect_workflows` doc propagation and `WorkflowDefinition` dict doc acceptance)
+- 2256 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.37) - Structured Doc Comments (`@param`/`@return`)
 
 - **AST** (`ast.py`): new `DocParam(name, description)` and `DocComment(description, params, returns)` dataclasses; changed `doc` field type from `str | None` to `DocComment | None` on all 5 node types (`FacetDecl`, `EventFacetDecl`, `WorkflowDecl`, `SchemaDecl`, `Namespace`)

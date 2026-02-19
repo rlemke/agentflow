@@ -34,6 +34,27 @@
 </table>
 </figure>
 
+{% if ns_facets %}
+<h2>Facets ({{ ns_facets|length }})</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Name</th><th>Parameters</th><th>Returns</th><th>Documentation</th></tr>
+    </thead>
+    <tbody>
+        {% for item in ns_facets %}
+        <tr>
+            <td>{{ item.short_name }}</td>
+            <td>{% if item.facet.parameters %}{% for p in item.facet.parameters %}{{ p.name }}: {{ p.type_hint }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
+            <td>{{ item.facet.return_type if item.facet.return_type else "—" }}</td>
+            <td>{% if item.facet.documentation %}{{ render_doc(item.facet.documentation) }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+
 <p><a href="/flows/{{ flow.uuid }}">Back to flow</a></p>
 {% endif %}
 {% endblock %}

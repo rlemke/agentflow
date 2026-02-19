@@ -265,7 +265,7 @@ class WorkflowDefinition:
     starting_step: str
     version: str
     metadata: WorkflowMetaData | None = None
-    documentation: str | None = None
+    documentation: dict | str | None = None
     date: int = 0  # Creation timestamp (milliseconds)
 
 

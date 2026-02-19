@@ -256,7 +256,7 @@ def seed_inline_source(name: str, source: str, store) -> tuple[str, int]:
     )
     store.save_flow(flow)
 
-    for qname, _wf_dict in workflows:
+    for qname, wf_dict in workflows:
         wf_id = generate_id()
         workflow = WorkflowDefinition(
             uuid=wf_id,
@@ -267,6 +267,7 @@ def seed_inline_source(name: str, source: str, store) -> tuple[str, int]:
             starting_step="",
             version="1.0",
             date=now_ms,
+            documentation=wf_dict.get("doc"),
         )
         store.save_workflow(workflow)
 
@@ -323,7 +324,7 @@ def seed_example_directory(name: str, afl_files: list[str], store) -> int:
     )
     store.save_flow(flow)
 
-    for qname, _wf_dict in workflows:
+    for qname, wf_dict in workflows:
         wf_id = generate_id()
         workflow = WorkflowDefinition(
             uuid=wf_id,
@@ -334,6 +335,7 @@ def seed_example_directory(name: str, afl_files: list[str], store) -> int:
             starting_step="",
             version="1.0",
             date=now_ms,
+            documentation=wf_dict.get("doc"),
         )
         store.save_workflow(workflow)
 
