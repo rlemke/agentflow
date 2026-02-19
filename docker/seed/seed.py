@@ -7,6 +7,9 @@ This script:
 2. Discovers and seeds AFL files from examples/ directories
 3. Creates proper FlowDefinition + WorkflowDefinition entities
    so the Dashboard "Run" button works
+4. Seeds handler registrations, a sample runner execution trace,
+   a server registration, and a published source so every
+   dashboard page shows meaningful data out of the box.
 
 Run with: docker compose --profile seed run --rm seed
 """
@@ -117,8 +120,91 @@ def _collect_workflows(node: dict, prefix: str = "") -> list[tuple[str, dict]]:
     return results
 
 
-def seed_inline_source(name: str, source: str, store) -> int:
-    """Seed a single inline AFL source. Returns workflow count."""
+def _extract_flow_structure(program_dict: dict):
+    """Extract structural definitions from compiled JSON for FlowDefinition.
+
+    Returns (namespaces, facets, blocks, statements) lists.
+    """
+    from afl.runtime.entities import (
+        BlockDefinition,
+        FacetDefinition,
+        NamespaceDefinition,
+        Parameter,
+        StatementDefinition,
+    )
+    from afl.runtime.types import generate_id
+
+    namespaces = []
+    facets = []
+    blocks = []
+    statements = []
+
+    def _walk_namespace(ns: dict, prefix: str = "") -> None:
+        ns_id = generate_id()
+        ns_name = f"{prefix}{ns['name']}" if prefix else ns["name"]
+        namespaces.append(NamespaceDefinition(uuid=ns_id, name=ns_name))
+
+        # Walk declarations only (superset of eventFacets + workflows)
+        for decl in ns.get("declarations", []):
+            decl_type = decl.get("type", "")
+            if decl_type in ("EventFacetDecl", "FacetDecl"):
+                params = [
+                    Parameter(name=p["name"], value=None, type_hint=p.get("type", "Any"))
+                    for p in decl.get("params", [])
+                ]
+                ret_type = None
+                if decl.get("returns"):
+                    ret_names = [r.get("name", "") for r in decl["returns"]]
+                    ret_type = ", ".join(ret_names)
+                facets.append(FacetDefinition(
+                    uuid=decl.get("id", generate_id()),
+                    name=f"{ns_name}.{decl['name']}",
+                    namespace_id=ns_id,
+                    parameters=params,
+                    return_type=ret_type,
+                ))
+            elif decl_type == "WorkflowDecl":
+                _walk_workflow_body(decl, ns_name)
+            elif decl_type == "Namespace":
+                _walk_namespace(decl, f"{ns_name}.")
+
+    def _walk_workflow_body(wf: dict, ns_name: str) -> None:
+        body = wf.get("body")
+        if not body or not isinstance(body, dict):
+            return
+        blk_type = body.get("type", "")
+        if blk_type in ("AndThenBlock", "AndMapBlock", "AndMatchBlock"):
+            blk_id = generate_id()
+            blocks.append(BlockDefinition(
+                uuid=blk_id,
+                name=f"{ns_name}.{wf['name']}.body",
+                block_type=blk_type.replace("Block", ""),
+            ))
+            for step in body.get("steps", []):
+                statements.append(StatementDefinition(
+                    uuid=step.get("id", generate_id()),
+                    name=step.get("name", ""),
+                    statement_type="VariableAssignment",
+                    block_id=blk_id,
+                ))
+            if body.get("yield"):
+                y = body["yield"]
+                statements.append(StatementDefinition(
+                    uuid=y.get("id", generate_id()),
+                    name="yield",
+                    statement_type="YieldAssignment",
+                    block_id=blk_id,
+                ))
+
+    # Use only 'namespaces' at top level (avoids duplicates with 'declarations')
+    for ns in program_dict.get("namespaces", []):
+        _walk_namespace(ns)
+
+    return namespaces, facets, blocks, statements
+
+
+def seed_inline_source(name: str, source: str, store) -> tuple[str, int]:
+    """Seed a single inline AFL source. Returns (flow_id, workflow_count)."""
     from afl.emitter import JSONEmitter
     from afl.parser import AFLParser
     from afl.runtime.entities import (
@@ -138,15 +224,21 @@ def seed_inline_source(name: str, source: str, store) -> int:
 
     workflows = _collect_workflows(program_dict)
     if not workflows:
-        return 0
+        return ("", 0)
 
     now_ms = int(time.time() * 1000)
     flow_id = generate_id()
+
+    ns_defs, facet_defs, block_defs, stmt_defs = _extract_flow_structure(program_dict)
 
     flow = FlowDefinition(
         uuid=flow_id,
         name=FlowIdentity(name=name, path=SEED_PATH, uuid=flow_id),
         compiled_sources=[SourceText(name=f"{name}.afl", content=source)],
+        namespaces=ns_defs,
+        facets=facet_defs,
+        blocks=block_defs,
+        statements=stmt_defs,
     )
     store.save_flow(flow)
 
@@ -164,7 +256,7 @@ def seed_inline_source(name: str, source: str, store) -> int:
         )
         store.save_workflow(workflow)
 
-    return len(workflows)
+    return (flow_id, len(workflows))
 
 
 def seed_example_directory(name: str, afl_files: list[str], store) -> int:
@@ -204,10 +296,16 @@ def seed_example_directory(name: str, afl_files: list[str], store) -> int:
     flow_id = generate_id()
     combined_source = "\n".join(source_parts)
 
+    ns_defs, facet_defs, block_defs, stmt_defs = _extract_flow_structure(program_dict)
+
     flow = FlowDefinition(
         uuid=flow_id,
         name=FlowIdentity(name=name, path=SEED_PATH, uuid=flow_id),
         compiled_sources=[SourceText(name="source.afl", content=combined_source)],
+        namespaces=ns_defs,
+        facets=facet_defs,
+        blocks=block_defs,
+        statements=stmt_defs,
     )
     store.save_flow(flow)
 
@@ -228,16 +326,275 @@ def seed_example_directory(name: str, afl_files: list[str], store) -> int:
     return len(workflows)
 
 
+def seed_handler_registrations(store) -> int:
+    """Seed handler registrations for inline event facets. Returns count."""
+    from afl.runtime.entities import HandlerRegistration
+
+    now_ms = int(time.time() * 1000)
+    handlers = [
+        HandlerRegistration(
+            facet_name="handlers.AddOne",
+            module_uri="agents.addone_agent",
+            entrypoint="handle_addone",
+            metadata={"seeded_by": SEED_PATH},
+            created=now_ms,
+            updated=now_ms,
+        ),
+        HandlerRegistration(
+            facet_name="handlers.Multiply",
+            module_uri="agents.addone_agent",
+            entrypoint="handle_multiply",
+            metadata={"seeded_by": SEED_PATH},
+            created=now_ms,
+            updated=now_ms,
+        ),
+        HandlerRegistration(
+            facet_name="handlers.Greet",
+            module_uri="agents.addone_agent",
+            entrypoint="handle_greet",
+            metadata={"seeded_by": SEED_PATH},
+            created=now_ms,
+            updated=now_ms,
+        ),
+    ]
+    for h in handlers:
+        store.save_handler_registration(h)
+    return len(handlers)
+
+
+def seed_sample_runner(flow_id: str, store) -> tuple[str, list[str]]:
+    """Seed a completed sample runner for AddOneWorkflow(input=5).
+
+    Returns (runner_id, [workflow_id_used]).
+    """
+    from afl.runtime.entities import (
+        LogDefinition,
+        Parameter,
+        RunnerDefinition,
+        TaskDefinition,
+        WorkflowDefinition,
+    )
+    from afl.runtime.persistence import EventDefinition
+    from afl.runtime.states import EventState, StepState
+    from afl.runtime.step import StepDefinition
+    from afl.runtime.types import (
+        AttributeValue,
+        FacetAttributes,
+        ObjectType,
+        StepId,
+        WorkflowId,
+        event_id,
+        generate_id,
+        step_id,
+    )
+
+    now_ms = int(time.time() * 1000)
+
+    # Find the AddOneWorkflow definition
+    db = store._db
+    wf_doc = db.workflows.find_one({"name": "handlers.AddOneWorkflow", "flow_id": flow_id})
+    if not wf_doc:
+        logger.warning("  Could not find handlers.AddOneWorkflow for sample runner")
+        return ("", [])
+
+    wf_id = wf_doc["uuid"]
+    workflow = WorkflowDefinition(
+        uuid=wf_id,
+        name="handlers.AddOneWorkflow",
+        namespace_id=SEED_PATH,
+        facet_id=wf_id,
+        flow_id=flow_id,
+        starting_step="",
+        version="1.0",
+        date=wf_doc.get("date", now_ms),
+    )
+
+    runner_id = generate_id()
+    start_time = now_ms - 142
+    end_time = now_ms
+
+    # -- Runner --
+    runner = RunnerDefinition(
+        uuid=runner_id,
+        workflow_id=wf_id,
+        workflow=workflow,
+        parameters=[Parameter(name="input", value=5, type_hint="Long")],
+        start_time=start_time,
+        end_time=end_time,
+        duration=142,
+        state="completed",
+    )
+    store.save_runner(runner)
+
+    # -- Steps --
+    added_step_id = step_id()
+    added_step = StepDefinition(
+        id=added_step_id,
+        object_type=ObjectType.VARIABLE_ASSIGNMENT,
+        workflow_id=WorkflowId(wf_id),
+        statement_name="added",
+        facet_name="handlers.AddOne",
+        state=StepState.STATEMENT_COMPLETE,
+        attributes=FacetAttributes(
+            params={"value": AttributeValue(name="value", value=5, type_hint="Long")},
+            returns={"result": AttributeValue(name="result", value=6, type_hint="Long")},
+        ),
+        start_time=start_time,
+        last_modified=start_time + 100,
+    )
+    store.save_step(added_step)
+
+    yield_step_id = step_id()
+    yield_step = StepDefinition(
+        id=yield_step_id,
+        object_type=ObjectType.YIELD_ASSIGNMENT,
+        workflow_id=WorkflowId(wf_id),
+        statement_name="yield",
+        facet_name="handlers.AddOneWorkflow",
+        state=StepState.STATEMENT_COMPLETE,
+        attributes=FacetAttributes(
+            params={"output": AttributeValue(name="output", value=6, type_hint="Long")},
+        ),
+        start_time=start_time + 100,
+        last_modified=end_time,
+    )
+    store.save_step(yield_step)
+
+    # -- Event --
+    evt_id = event_id()
+    event = EventDefinition(
+        id=evt_id,
+        step_id=added_step_id,
+        workflow_id=WorkflowId(wf_id),
+        state=EventState.COMPLETED,
+        event_type="handlers.AddOne",
+        payload={"value": 5},
+    )
+    store.save_event(event)
+
+    # -- Task --
+    task = TaskDefinition(
+        uuid=generate_id(),
+        name="handlers.AddOne",
+        runner_id=runner_id,
+        workflow_id=wf_id,
+        flow_id=flow_id,
+        step_id=str(added_step_id),
+        state="completed",
+        created=start_time,
+        updated=end_time,
+    )
+    store.save_task(task)
+
+    # -- Logs --
+    logs = [
+        LogDefinition(
+            uuid=generate_id(),
+            order=1,
+            runner_id=runner_id,
+            message="Workflow handlers.AddOneWorkflow started with input=5",
+            note_type="info",
+            state="running",
+            time=start_time,
+        ),
+        LogDefinition(
+            uuid=generate_id(),
+            order=2,
+            runner_id=runner_id,
+            step_id=str(added_step_id),
+            message="Step added completed: AddOne(value=5) => {result: 6}",
+            note_type="info",
+            state="completed",
+            time=start_time + 100,
+        ),
+        LogDefinition(
+            uuid=generate_id(),
+            order=3,
+            runner_id=runner_id,
+            message="Workflow handlers.AddOneWorkflow completed with output=6",
+            note_type="info",
+            state="completed",
+            time=end_time,
+        ),
+    ]
+    for log in logs:
+        store.save_log(log)
+
+    return (runner_id, [wf_id])
+
+
+def seed_server(store) -> None:
+    """Seed a server registration for the addone-agent."""
+    from afl.runtime.entities import HandledCount, ServerDefinition
+    from afl.runtime.types import generate_id
+
+    now_ms = int(time.time() * 1000)
+    server = ServerDefinition(
+        uuid=generate_id(),
+        server_group="docker:seed",
+        service_name="addone-agent",
+        server_name="addone-agent-1",
+        server_ips=["172.18.0.4"],
+        start_time=now_ms - 5000,
+        ping_time=now_ms,
+        handlers=["handlers.AddOne", "handlers.Multiply", "handlers.Greet"],
+        handled=[HandledCount(handler="handlers.AddOne", handled=1)],
+        state="running",
+    )
+    store.save_server(server)
+
+
+def seed_published_source(store) -> None:
+    """Seed a published source for the inline examples namespace."""
+    from afl.runtime.entities import PublishedSource
+    from afl.runtime.types import generate_id
+
+    now_ms = int(time.time() * 1000)
+    combined_source = "\n".join(INLINE_SOURCES.values())
+    source = PublishedSource(
+        uuid=generate_id(),
+        namespace_name="handlers",
+        source_text=combined_source,
+        namespaces_defined=["handlers", "chain", "parallel"],
+        version="latest",
+        published_at=now_ms,
+        origin=SEED_PATH,
+    )
+    store.save_published_source(source)
+
+
 def clean_seeds(store) -> tuple[int, int]:
-    """Remove all previously seeded flows and their workflows."""
+    """Remove all previously seeded data."""
     db = store._db
     flow_docs = list(db.flows.find({"name.path": SEED_PATH}, {"uuid": 1}))
     flow_ids = [doc["uuid"] for doc in flow_docs]
 
     workflows_deleted = 0
+    seed_workflow_ids = []
     if flow_ids:
+        wf_docs = list(db.workflows.find(
+            {"flow_id": {"$in": flow_ids}}, {"uuid": 1}
+        ))
+        seed_workflow_ids = [doc["uuid"] for doc in wf_docs]
+
         result = db.workflows.delete_many({"flow_id": {"$in": flow_ids}})
         workflows_deleted = result.deleted_count
+
+    # Clean runners and their dependent data
+    seed_runner_ids = []
+    if seed_workflow_ids:
+        runner_docs = list(db.runners.find(
+            {"workflow_id": {"$in": seed_workflow_ids}}, {"uuid": 1}
+        ))
+        seed_runner_ids = [doc["uuid"] for doc in runner_docs]
+
+        db.steps.delete_many({"workflow_id": {"$in": seed_workflow_ids}})
+        db.events.delete_many({"workflow_id": {"$in": seed_workflow_ids}})
+
+    if seed_runner_ids:
+        db.runners.delete_many({"uuid": {"$in": seed_runner_ids}})
+        db.tasks.delete_many({"runner_id": {"$in": seed_runner_ids}})
+        db.logs.delete_many({"runner_id": {"$in": seed_runner_ids}})
 
     result = db.flows.delete_many({"name.path": SEED_PATH})
     flows_deleted = result.deleted_count
@@ -245,6 +602,15 @@ def clean_seeds(store) -> tuple[int, int]:
     # Also clean up legacy seed documents (from old seed.py format)
     legacy = db.flows.delete_many({"name": {"$regex": "^seed-"}})
     flows_deleted += legacy.deleted_count
+
+    # Clean handler registrations
+    db.handler_registrations.delete_many({"metadata.seeded_by": SEED_PATH})
+
+    # Clean servers
+    db.servers.delete_many({"server_group": "docker:seed"})
+
+    # Clean published sources
+    db.afl_sources.delete_many({"origin": SEED_PATH})
 
     return flows_deleted, workflows_deleted
 
@@ -266,6 +632,7 @@ def seed_database():
 
     total_flows = 0
     total_workflows = 0
+    inline_flow_id = ""
 
     # 1. Seed inline examples
     logger.info("Seeding inline examples...")
@@ -273,7 +640,9 @@ def seed_database():
     # so combine all inline sources into a single compilation unit
     combined_source = "\n".join(INLINE_SOURCES.values())
     try:
-        wf_count = seed_inline_source("inline-examples", combined_source, store)
+        inline_flow_id, wf_count = seed_inline_source(
+            "inline-examples", combined_source, store,
+        )
         total_flows += 1
         total_workflows += wf_count
         logger.info("  inline-examples: %d workflows", wf_count)
@@ -305,6 +674,43 @@ def seed_database():
                                 entry, len(afl_files))
             except Exception as e:
                 logger.warning("  %-20s ERROR: %s", entry, e)
+
+    # 3. Seed handler registrations
+    logger.info("Seeding handler registrations...")
+    try:
+        handler_count = seed_handler_registrations(store)
+        logger.info("  %d handler registrations", handler_count)
+    except Exception as e:
+        logger.error("  Handler registrations ERROR: %s", e)
+
+    # 4. Seed sample runner execution trace
+    runner_id = ""
+    if inline_flow_id:
+        logger.info("Seeding sample runner...")
+        try:
+            runner_id, _wf_ids = seed_sample_runner(inline_flow_id, store)
+            if runner_id:
+                logger.info("  1 runner, 2 steps, 1 event, 1 task, 3 logs")
+            else:
+                logger.warning("  Skipped (workflow not found)")
+        except Exception as e:
+            logger.error("  Sample runner ERROR: %s", e)
+
+    # 5. Seed server registration
+    logger.info("Seeding server registration...")
+    try:
+        seed_server(store)
+        logger.info("  1 server (addone-agent)")
+    except Exception as e:
+        logger.error("  Server registration ERROR: %s", e)
+
+    # 6. Seed published source
+    logger.info("Seeding published source...")
+    try:
+        seed_published_source(store)
+        logger.info("  1 published source (handlers)")
+    except Exception as e:
+        logger.error("  Published source ERROR: %s", e)
 
     # Summary
     logger.info("")
