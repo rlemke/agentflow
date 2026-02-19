@@ -543,6 +543,12 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.29) - Geofabrik Mirror Prefetch Script and Local Mirror Mode
+
+- **`scripts/osm-prefetch`** (NEW): Bash shell script that delegates to inline Python to prefetch all ~258 unique Geofabrik region files into a local mirror directory; imports `REGION_REGISTRY` from `cache_handlers.py`, deduplicates paths, and downloads `{path}-latest.osm.pbf` (and/or `.free.shp.zip`) files; writes `manifest.json` with URL-to-relative-path mapping; supports `--mirror-dir`, `--fmt` (pbf/shp/all), `--dry-run`, `--delay`, `--include`/`--exclude` regex filters, and `--resume` (skip existing files); follows existing script conventions (`set -euo pipefail`, `.venv` Python detection, `REPO_ROOT` anchoring)
+- **`AFL_GEOFABRIK_MIRROR` env var** (`handlers/downloader.py`): new `GEOFABRIK_MIRROR` module-level variable read from `AFL_GEOFABRIK_MIRROR`; `download()` checks the mirror directory between the cache check and HTTP download — if `{mirror_dir}/{region_path}-latest.{ext}` exists, returns a cache hit directly (read-only, no lock needed); avoids hammering `download.geofabrik.de` during test runs when a local mirror is available
+- **4 new tests** (`test_downloader.py`): `TestDownloadMirror` class — mirror hit returns `wasInCache=True` with mirror path and no HTTP request, mirror miss falls through to HTTP download, mirror not set skips `os.path.isfile` check entirely, mirror path structure verified for both pbf and shp formats
+
 ## Completed (v0.12.26) - Descriptive Step Variable Names in Cache Facets
 
 - **`osmcache.afl`**: renamed single-letter `c` step variable to camelCase facet name in all 225 cache facets (e.g. `c = Cache(region = "Africa")` → `africa = Cache(region = "Africa")`, `c.cache` → `africa.cache`)
