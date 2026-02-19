@@ -543,6 +543,13 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.30) - Seed Examples Script
+
+- **`scripts/seed-examples`** (NEW): Bash shell script that compiles all example AFL directories and pushes `FlowDefinition` + `WorkflowDefinition` entities to MongoDB so they appear in the Dashboard Flow UI; for each example, parses all `afl/*.afl` files via `AFLParser.parse()`, merges ASTs via `Program.merge()`, emits JSON via `JSONEmitter`, recursively collects workflow qualified names from compiled JSON (handles both nested and flat emitter formats), then creates one `FlowDefinition` (path=`cli:seed`) and one `WorkflowDefinition` per workflow; only creates Flow + Workflow entities (no Runner/Task — those are created at execution time); validation errors are treated as non-fatal warnings since some examples (`continental-lz`, `volcano-query`) depend on types from `osm-geocoder`
+- **Options**: `--dry-run` (show what would be seeded without writing), `--include PATTERN` / `--exclude PATTERN` (regex filters on example names), `--clean` (remove existing `cli:seed` flows and their workflows before seeding), `--config FILE` (custom AFL config path)
+- **Coverage**: discovers 7 example directories (aws-lambda, continental-lz, genomics, jenkins, maven, osm-geocoder, volcano-query); seeds 6 flows with 328 workflows (maven skipped — event facets only, no workflows)
+- 2183 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.29) - Geofabrik Mirror Prefetch Script and Local Mirror Mode
 
 - **`scripts/osm-prefetch`** (NEW): Bash shell script that delegates to inline Python to prefetch all ~258 unique Geofabrik region files into a local mirror directory; imports `REGION_REGISTRY` from `cache_handlers.py`, deduplicates paths, and downloads `{path}-latest.osm.pbf` (and/or `.free.shp.zip`) files; writes `manifest.json` with URL-to-relative-path mapping; supports `--mirror-dir`, `--fmt` (pbf/shp/all), `--dry-run`, `--delay`, `--include`/`--exclude` regex filters, and `--resume` (skip existing files); follows existing script conventions (`set -euo pipefail`, `.venv` Python detection, `REPO_ROOT` anchoring)
