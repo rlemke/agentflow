@@ -543,6 +543,16 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.37) - Structured Doc Comments (`@param`/`@return`)
+
+- **AST** (`ast.py`): new `DocParam(name, description)` and `DocComment(description, params, returns)` dataclasses; changed `doc` field type from `str | None` to `DocComment | None` on all 5 node types (`FacetDecl`, `EventFacetDecl`, `WorkflowDecl`, `SchemaDecl`, `Namespace`)
+- **Transformer** (`transformer.py`): rewrote `_clean_doc_comment()` to parse `@param name desc` and `@return name desc` tags into `DocParam` objects; non-tag lines become the `description` field; return type of `_extract_doc_comment()` changed to `DocComment | None`
+- **Emitter** (`emitter.py`): new `_doc_comment()` helper emits structured `{"description": ..., "params": [...], "returns": [...]}` dicts; changed all 5 doc guards from `if node.doc:` to `if node.doc is not None:` (empty description with tags is valid)
+- **Runtime** (`entities.py`): widened `documentation` type to `dict | str | None` on `NamespaceDefinition` and `FacetDefinition` for backward compatibility
+- **Dashboard**: added `markdown>=3.5` to dashboard deps in `pyproject.toml`; 3 new Jinja2 filters (`doc_description`, `doc_params`, `doc_returns`) in `filters.py` with `str | dict` backward compatibility; new `partials/_doc_comment.html` macro renders description as markdown HTML with parameter/return `<dl>` tables; updated `namespaces/detail.html` and `flows/namespace.html` to use the macro; widened type hints in `routes/namespaces.py`; added CSS styles for `.doc-comment`, `.doc-section`
+- **Tests**: updated all 12 existing parser assertions to use `DocComment` fields; added 3 new parser tests (`test_doc_comment_multiple_params`, `test_doc_comment_description_with_markdown`, `test_doc_comment_params_no_description`); updated 5 emitter assertions to structured dict format; added `test_doc_with_tags_emits_structured`; added 13 new filter tests (`TestDocDescription`, `TestDocParams`, `TestDocReturns`)
+- 2248 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.36) - Doc Comments (`/** ... */`)
 
 - **Grammar** (`afl.lark`): new `DOC_COMMENT.3` terminal with priority 3 (higher than `BLOCK_COMMENT`); regex consumes trailing whitespace and newlines to avoid LALR conflicts; attached as optional prefix to `namespace_block`, `facet_decl`, `event_facet_decl`, `workflow_decl`, and `schema_decl` rules
