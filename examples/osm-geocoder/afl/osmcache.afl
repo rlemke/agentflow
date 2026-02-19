@@ -579,7 +579,7 @@ namespace osm.geo.cache.Europe {
         yield Greece(cache = greece.cache)
     }
     facet Georgia() => (cache: OSMCache) andThen {
-        georgia = Cache(region = "Georgia")
+        georgia = Cache(region = "GeorgiaEU")
         yield Georgia(cache = georgia.cache)
     }
     facet Hungary() => (cache: OSMCache) andThen {
@@ -977,7 +977,7 @@ namespace osm.geo.cache.UnitedStates {
         yield Florida(cache = florida.cache)
     }
     facet Georgia() => (cache: OSMCache) andThen {
-        georgia = Cache(region = "Georgia")
+        georgia = Cache(region = "GeorgiaUS")
         yield Georgia(cache = georgia.cache)
     }
     facet Hawaii() => (cache: OSMCache) andThen {

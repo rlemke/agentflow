@@ -20,6 +20,7 @@ from afl.runtime.storage import get_storage_backend
 
 CACHE_DIR = os.environ.get("AFL_CACHE_DIR", os.path.join(tempfile.gettempdir(), "osm-cache"))
 _storage = get_storage_backend(CACHE_DIR)
+_local_storage = get_storage_backend("/tmp")  # always local, used for mirror paths
 GEOFABRIK_BASE = "https://download.geofabrik.de"
 GEOFABRIK_MIRROR = os.environ.get("AFL_GEOFABRIK_MIRROR")
 USER_AGENT = "AgentFlow-OSM-Example/1.0"
@@ -114,7 +115,7 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
         ext = FORMAT_EXTENSIONS[fmt]
         mirror_path = os.path.join(GEOFABRIK_MIRROR, f"{region_path}-latest.{ext}")
         if os.path.isfile(mirror_path):
-            return _cache_hit(url, mirror_path)
+            return _cache_hit(url, mirror_path, storage=_local_storage)
 
     with _get_path_lock(local_path):
         # Re-check after acquiring lock

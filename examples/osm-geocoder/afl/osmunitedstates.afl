@@ -16,7 +16,7 @@ namespace osm.geo.UnitedStates.cache {
     delaware = Delaware()
     districtOfColumbia = DistrictOfColumbia()
     florida = Florida()
-    georgia = Georgia()
+    georgia = osm.geo.cache.UnitedStates.Georgia()
     hawaii = Hawaii()
     idaho = Idaho()
     illinois = Illinois()

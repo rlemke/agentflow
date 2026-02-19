@@ -13,7 +13,7 @@ namespace osm.geo.UnitedStates.sample {
     colorado = Colorado()
     connecticut = Connecticut()
     florida = Florida()
-    georgia = Georgia()
+    georgia = osm.geo.cache.UnitedStates.Georgia()
     idaho = Idaho()
     illinois = Illinois()
     indiana = Indiana()
