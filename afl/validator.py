@@ -425,6 +425,15 @@ class AFLValidator:
             return None
 
         if len(candidates) == 1:
+            all_matches = self._facets_by_short_name.get(short_name, [])
+            if len(all_matches) > 1:
+                self._result.add_error(
+                    f"Ambiguous facet reference '{short_name}': could be "
+                    f"{', '.join(sorted(all_matches))}. "
+                    f"Use fully qualified name to disambiguate.",
+                    location,
+                )
+                return None
             return self._facets[candidates[0]]
 
         # Not found in current scope or imports - try global lookup

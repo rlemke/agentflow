@@ -6,18 +6,18 @@ namespace osm.geo.CentralAmerica.cache {
   /** Caches each Central American and Caribbean country individually in parallel. */
   facet CentralAmericaIndividually () => (cache: [OSMCache]) andThen {
 
-    bahamas = Bahamas()
-    belize = Belize()
-    costaRica = CostaRica()
-    cuba = Cuba()
-    elSalvador = ElSalvador()
-    dominicanRepublic = DominicanRepublic()
-    guatemala = Guatemala()
-    haiti = Haiti()
-    honduras = Honduras()
-    jamaica = Jamaica()
-    nicaragua = Nicaragua()
-    panama = Panama()
+    bahamas = osm.geo.cache.CentralAmerica.Bahamas()
+    belize = osm.geo.cache.CentralAmerica.Belize()
+    costaRica = osm.geo.cache.CentralAmerica.CostaRica()
+    cuba = osm.geo.cache.CentralAmerica.Cuba()
+    elSalvador = osm.geo.cache.CentralAmerica.ElSalvador()
+    dominicanRepublic = osm.geo.cache.CentralAmerica.DominicanRepublic()
+    guatemala = osm.geo.cache.CentralAmerica.Guatemala()
+    haiti = osm.geo.cache.CentralAmerica.Haiti()
+    honduras = osm.geo.cache.CentralAmerica.Honduras()
+    jamaica = osm.geo.cache.CentralAmerica.Jamaica()
+    nicaragua = osm.geo.cache.CentralAmerica.Nicaragua()
+    panama = osm.geo.cache.CentralAmerica.Panama()
 
     yield CentralAmericaIndividually( cache =
       bahamas.cache ++

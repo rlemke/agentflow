@@ -174,10 +174,34 @@ namespace app {
 }
 ```
 
+#### Global Ambiguity Detection
+Even when only one imported namespace contains a facet name, the validator checks whether
+the same short name exists in **any other namespace globally**. If it does, the reference
+is flagged as ambiguous and the developer must use a fully qualified name:
+```afl
+namespace europe {
+    facet Georgia() => (cache: [OSMCache])
+}
+namespace us.states {
+    facet Georgia() => (cache: [OSMCache])
+}
+namespace app {
+    use europe
+    facet Run() => (cache: [OSMCache]) andThen {
+        g = Georgia()                   // ERROR: globally ambiguous
+        g = europe.Georgia()            // OK: fully qualified
+        yield Run(cache = g.cache)
+    }
+}
+```
+
+**Exception:** A facet defined in the *current* namespace always takes precedence
+(step 2 below), so local definitions are never ambiguous against global duplicates.
+
 #### Resolution Order
 1. Fully qualified name (exact match)
-2. Current namespace (takes precedence)
-3. Imported namespaces (ambiguity check)
+2. Current namespace (takes precedence — no global ambiguity check)
+3. Imported namespaces (ambiguity check among imports **and** global duplicates)
 4. Top-level declarations
 
 ---

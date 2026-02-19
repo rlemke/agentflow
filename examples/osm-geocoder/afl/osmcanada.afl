@@ -6,17 +6,17 @@ namespace osm.geo.Canada.cache {
   /** Caches each Canadian province and territory individually in parallel. */
   facet CanadaIndividually () => (cache: [OSMCache]) andThen {
 
-    alberta = Alberta()
-    britishColumbia = BritishColumbia()
-    manitoba = Manitoba()
-    newBrunswick = NewBrunswick()
-    newfoundlandAndLabrador = NewfoundlandAndLabrador()
-    novaScotia = NovaScotia()
-    ontario = Ontario()
-    princeEdwardIsland = PrinceEdwardIsland()
-    quebec = Quebec()
-    saskatchewan = Saskatchewan()
-    yukon = Yukon()
+    alberta = osm.geo.cache.Canada.Alberta()
+    britishColumbia = osm.geo.cache.Canada.BritishColumbia()
+    manitoba = osm.geo.cache.Canada.Manitoba()
+    newBrunswick = osm.geo.cache.Canada.NewBrunswick()
+    newfoundlandAndLabrador = osm.geo.cache.Canada.NewfoundlandAndLabrador()
+    novaScotia = osm.geo.cache.Canada.NovaScotia()
+    ontario = osm.geo.cache.Canada.Ontario()
+    princeEdwardIsland = osm.geo.cache.Canada.PrinceEdwardIsland()
+    quebec = osm.geo.cache.Canada.Quebec()
+    saskatchewan = osm.geo.cache.Canada.Saskatchewan()
+    yukon = osm.geo.cache.Canada.Yukon()
 
     yield CanadaIndividually(cache = alberta.cache ++
                              britishColumbia.cache ++

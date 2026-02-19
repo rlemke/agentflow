@@ -6,18 +6,18 @@ namespace osm.geo.SouthAmerica.cache {
   /** Caches each South American country individually in parallel. */
   facet SouthAmericaIndividually () => (cache: [OSMCache]) andThen {
 
-    argentina = Argentina()
-    bolivia = Bolivia()
-    brazil = Brazil()
-    chile = Chile()
-    colombia = Colombia()
-    ecuador = Ecuador()
-    guyana = Guyana()
-    paraguay = Paraguay()
-    peru = Peru()
-    suriname = Suriname()
-    uruguay = Uruguay()
-    venezuela = Venezuela()
+    argentina = osm.geo.cache.SouthAmerica.Argentina()
+    bolivia = osm.geo.cache.SouthAmerica.Bolivia()
+    brazil = osm.geo.cache.SouthAmerica.Brazil()
+    chile = osm.geo.cache.SouthAmerica.Chile()
+    colombia = osm.geo.cache.SouthAmerica.Colombia()
+    ecuador = osm.geo.cache.SouthAmerica.Ecuador()
+    guyana = osm.geo.cache.SouthAmerica.Guyana()
+    paraguay = osm.geo.cache.SouthAmerica.Paraguay()
+    peru = osm.geo.cache.SouthAmerica.Peru()
+    suriname = osm.geo.cache.SouthAmerica.Suriname()
+    uruguay = osm.geo.cache.SouthAmerica.Uruguay()
+    venezuela = osm.geo.cache.SouthAmerica.Venezuela()
 
     yield SouthAmericaIndividually(cache = argentina.cache ++
                                    bolivia.cache ++

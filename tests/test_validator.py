@@ -578,6 +578,69 @@ class TestFacetNameResolution:
         assert not result.is_valid
         assert any("Unknown facet 'nonexistent.namespace.Facet'" in str(e) for e in result.errors)
 
+    def test_ambiguous_import_vs_non_imported_namespace(self, validator):
+        """Facet in imported ns + non-imported ns should error on unqualified call."""
+        ast = parse("""
+        namespace a.b {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace c.d {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace app {
+            use a.b
+            facet App(input: String) => (output: String) andThen {
+                s = Shared(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Ambiguous facet reference 'Shared'" in str(e) for e in result.errors)
+        assert any("a.b.Shared" in str(e) and "c.d.Shared" in str(e) for e in result.errors)
+
+    def test_qualified_resolves_global_ambiguity(self, validator):
+        """Qualified call should resolve global ambiguity even with only one import."""
+        ast = parse("""
+        namespace a.b {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace c.d {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace app {
+            use a.b
+            facet App(input: String) => (output: String) andThen {
+                s = a.b.Shared(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
+    def test_local_definition_overrides_global_ambiguity(self, validator):
+        """Local facet in current namespace should override global duplicates."""
+        ast = parse("""
+        namespace a.b {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace c.d {
+            facet Shared(input: String) => (result: String)
+        }
+        namespace app {
+            use a.b
+            facet Shared(input: String) => (result: String)
+            facet App(input: String) => (output: String) andThen {
+                s = Shared(input = $.input)
+                yield App(output = s.result)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid
+
 
 class TestSchemaValidation:
     """Test schema declaration validation."""

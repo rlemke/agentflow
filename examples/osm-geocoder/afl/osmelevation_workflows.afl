@@ -49,7 +49,7 @@ namespace osm.geo.Elevation.Workflows {
         route_type: String = "hiking",
         min_gain_ft: Long = 1000
     ) => (result: ElevatedRouteResult) andThen {
-        routes = ExtractRoutes(cache = $.cache, route_type = $.route_type)
+        routes = osm.geo.Routes.ExtractRoutes(cache = $.cache, route_type = $.route_type)
         enriched = EnrichWithElevation(input_path = routes.result.output_path)
         filtered = FilterByElevationGain(
             input_path = enriched.result.output_path,
@@ -65,7 +65,7 @@ namespace osm.geo.Elevation.Workflows {
         min_elevation_ft: Long = 8000,
         max_elevation_ft: Long = 14500
     ) => (result: ElevatedRouteResult) andThen {
-        routes = ExtractRoutes(cache = $.cache, route_type = $.route_type)
+        routes = osm.geo.Routes.ExtractRoutes(cache = $.cache, route_type = $.route_type)
         enriched = EnrichWithElevation(input_path = routes.result.output_path)
         filtered = FilterByElevationRange(
             input_path = enriched.result.output_path,
