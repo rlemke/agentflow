@@ -12,4 +12,5 @@ RUN pip install --no-cache-dir -e ".[mongodb]" || \
 COPY afl/ ./afl/
 COPY docker/agents/ ./agents/
 
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "agents.addone_agent"]

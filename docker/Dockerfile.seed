@@ -13,4 +13,5 @@ COPY afl/ ./afl/
 COPY docker/seed/ ./seed/
 COPY examples/ ./examples/
 
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "/app/seed/seed.py"]

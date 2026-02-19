@@ -44,6 +44,7 @@ COPY afl/ ./afl/
 COPY examples/osm-geocoder/ ./examples/osm-geocoder/
 
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 WORKDIR /app/examples/osm-geocoder
 
 CMD ["python", "agent.py"]

@@ -7,17 +7,25 @@ enabling handlers to work with both local paths and hdfs:// URIs transparently.
 from __future__ import annotations
 
 import builtins
+import logging
 import os
 import shutil
+import time
 from typing import IO, Iterator, Protocol, runtime_checkable
 from urllib.parse import urlparse
 
+logger = logging.getLogger(__name__)
+
 try:
     import requests as _requests
+    from requests.exceptions import ConnectionError as _ReqConnectionError
+    from requests.exceptions import HTTPError as _ReqHTTPError
 
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
+    _ReqConnectionError = None  # type: ignore[assignment,misc]
+    _ReqHTTPError = None  # type: ignore[assignment,misc]
 
 
 @runtime_checkable
@@ -86,6 +94,38 @@ class LocalStorageBackend:
         return os.path.basename(path)
 
 
+# Retry configuration for transient HDFS/WebHDFS errors
+_HDFS_MAX_RETRIES = int(os.environ.get("AFL_HDFS_MAX_RETRIES", "3"))
+_HDFS_RETRY_BASE_DELAY = float(os.environ.get("AFL_HDFS_RETRY_DELAY", "1.0"))
+
+
+def _hdfs_retry(func, *, max_retries: int = _HDFS_MAX_RETRIES, base_delay: float = _HDFS_RETRY_BASE_DELAY):
+    """Execute *func* with retries on transient HTTP errors (404, 502, 503, 504, ConnectionError)."""
+    last_exc: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as exc:
+            retryable = False
+            if HAS_REQUESTS:
+                if isinstance(exc, _ReqConnectionError):
+                    retryable = True
+                elif isinstance(exc, _ReqHTTPError):
+                    status = getattr(exc.response, "status_code", None)
+                    if status in (404, 502, 503, 504):
+                        retryable = True
+            if not retryable or attempt >= max_retries:
+                raise
+            last_exc = exc
+            delay = base_delay * (2 ** attempt)
+            logger.warning(
+                "HDFS request failed (attempt %d/%d): %s — retrying in %.1fs",
+                attempt + 1, max_retries + 1, exc, delay,
+            )
+            time.sleep(delay)
+    raise last_exc  # pragma: no cover
+
+
 class HDFSStorageBackend:
     """Storage backend for HDFS via WebHDFS REST API.
 
@@ -149,13 +189,18 @@ class HDFSStorageBackend:
         hdfs_path = self._strip_uri(path)
         if "w" in mode:
             return _WebHDFSWriteStream(self, hdfs_path)
-        # Read: OPEN with redirect follow
-        r = _requests.get(
-            self._url(hdfs_path),
-            params=self._params(op="OPEN"),
-            allow_redirects=True,
-        )
-        r.raise_for_status()
+
+        # Read: OPEN with redirect follow and retry
+        def _do_open():
+            r = _requests.get(
+                self._url(hdfs_path),
+                params=self._params(op="OPEN"),
+                allow_redirects=True,
+            )
+            r.raise_for_status()
+            return r
+
+        r = _hdfs_retry(_do_open)
         import io
         if "b" in mode:
             return io.BytesIO(r.content)
@@ -283,16 +328,20 @@ class _WebHDFSWriteStream:
 
     def close(self):
         data = self._buffer.getvalue()
-        r = _requests.put(
-            self._backend._url(self._hdfs_path),
-            params=self._backend._params(op="CREATE", overwrite="true"),
-            allow_redirects=False,
-        )
-        r.raise_for_status()
-        if r.status_code in (301, 307):
-            location = r.headers["Location"]
-            r2 = _requests.put(location, data=data)
-            r2.raise_for_status()
+
+        def _do_create():
+            r = _requests.put(
+                self._backend._url(self._hdfs_path),
+                params=self._backend._params(op="CREATE", overwrite="true"),
+                allow_redirects=False,
+            )
+            r.raise_for_status()
+            if r.status_code in (301, 307):
+                location = r.headers["Location"]
+                r2 = _requests.put(location, data=data)
+                r2.raise_for_status()
+
+        _hdfs_retry(_do_create)
 
     def __enter__(self):
         return self

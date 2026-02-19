@@ -8,6 +8,7 @@ import pytest
 from afl.runtime.storage import (
     HDFSStorageBackend,
     LocalStorageBackend,
+    _hdfs_retry,
     get_storage_backend,
 )
 
@@ -282,6 +283,109 @@ class TestHDFSStorageBackend:
         mock_resp.raise_for_status = MagicMock()
         mock_req.get.return_value = mock_resp
         assert backend.listdir("/data") == ["a.txt", "b.txt"]
+
+
+# ---------------------------------------------------------------------------
+# TestHDFSRetry
+# ---------------------------------------------------------------------------
+
+class TestHDFSRetry:
+    """Tests for the _hdfs_retry helper."""
+
+    def test_success_no_retry(self):
+        calls = []
+        def fn():
+            calls.append(1)
+            return "ok"
+        assert _hdfs_retry(fn, max_retries=3, base_delay=0) == "ok"
+        assert len(calls) == 1
+
+    def test_retries_on_404(self):
+        import requests
+        calls = []
+        def fn():
+            calls.append(1)
+            if len(calls) < 3:
+                resp = MagicMock(status_code=404)
+                raise requests.exceptions.HTTPError(response=resp)
+            return "recovered"
+        assert _hdfs_retry(fn, max_retries=3, base_delay=0) == "recovered"
+        assert len(calls) == 3
+
+    def test_retries_on_connection_error(self):
+        import requests
+        calls = []
+        def fn():
+            calls.append(1)
+            if len(calls) < 2:
+                raise requests.exceptions.ConnectionError("refused")
+            return "ok"
+        assert _hdfs_retry(fn, max_retries=2, base_delay=0) == "ok"
+        assert len(calls) == 2
+
+    def test_raises_after_max_retries(self):
+        import requests
+        def fn():
+            resp = MagicMock(status_code=404)
+            raise requests.exceptions.HTTPError(response=resp)
+        with pytest.raises(requests.exceptions.HTTPError):
+            _hdfs_retry(fn, max_retries=2, base_delay=0)
+
+    def test_no_retry_on_non_retryable_status(self):
+        import requests
+        calls = []
+        def fn():
+            calls.append(1)
+            resp = MagicMock(status_code=403)
+            raise requests.exceptions.HTTPError(response=resp)
+        with pytest.raises(requests.exceptions.HTTPError):
+            _hdfs_retry(fn, max_retries=3, base_delay=0)
+        assert len(calls) == 1
+
+    def test_no_retry_on_value_error(self):
+        calls = []
+        def fn():
+            calls.append(1)
+            raise ValueError("not retryable")
+        with pytest.raises(ValueError):
+            _hdfs_retry(fn, max_retries=3, base_delay=0)
+        assert len(calls) == 1
+
+    @patch("afl.runtime.storage._requests")
+    def test_write_stream_retries(self, mock_req):
+        """_WebHDFSWriteStream.close() retries on transient datanode 404."""
+        import afl.runtime.storage as mod
+        import requests
+
+        orig = mod.HAS_REQUESTS
+        mod.HAS_REQUESTS = True
+        try:
+            backend = HDFSStorageBackend(host="namenode", port=8020)
+        finally:
+            mod.HAS_REQUESTS = orig
+
+        stream = backend.open("hdfs://namenode:8020/data/file.bin", "wb")
+        stream.write(b"test data")
+
+        # First call: namenode returns 307 redirect
+        redirect_resp = MagicMock(status_code=307, headers={"Location": "http://datanode:9864/webhdfs/v1/data/file.bin?op=CREATE"})
+        redirect_resp.raise_for_status = MagicMock()
+
+        # First attempt: datanode returns 404
+        error_resp = MagicMock(status_code=404)
+        error_404 = requests.exceptions.HTTPError(response=error_resp)
+
+        # Second attempt: success
+        success_resp = MagicMock(status_code=201)
+        success_resp.raise_for_status = MagicMock()
+
+        mock_req.put.side_effect = [
+            redirect_resp, error_404,   # attempt 1: namenode OK, datanode 404
+            redirect_resp, success_resp, # attempt 2: both OK
+        ]
+
+        stream.close()  # should succeed after retry
+        assert mock_req.put.call_count == 4
 
 
 # ---------------------------------------------------------------------------
