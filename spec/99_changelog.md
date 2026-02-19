@@ -543,6 +543,14 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.39) - Geofabrik Mirror Support for Docker OSM Agents
+
+- **Docker Compose override** (`docker-compose.mirror.yml`): new override file mounts a host directory read-only at `/data/osm-mirror` in `agent-osm-geocoder` and `agent-osm-geocoder-lite` containers; sets `AFL_GEOFABRIK_MIRROR=/data/osm-mirror` env var; uses `${AFL_GEOFABRIK_MIRROR:?...}` for clear error on missing var
+- **Setup script** (`scripts/setup`): added `--mirror PATH` flag; exports `AFL_GEOFABRIK_MIRROR`, sets `MIRROR=true`, appends `-f docker-compose.mirror.yml` to compose files; prints mirror path and mount point in status output
+- **Run script** (`examples/osm-geocoder/tests/real/scripts/run_30states.sh`): refactored setup invocation to use bash array `SETUP_ARGS`; conditionally appends `--mirror "$GEOFABRIK_MIRROR"` when `AFL_GEOFABRIK_MIRROR` is set; reads env var at script start
+- **Dashboard formatting** (`namespaces/detail.html`, `flows/detail.html`, `flows/namespace.html`): bold facet/workflow names with inline documentation below (replaces separate Documentation column)
+- 2277 passed, 68 skipped (without `--hdfs`/`--mongodb`/`--postgis`)
+
 ## Completed (v0.12.38) - Doc Comments on All Dashboard Pages & Docker Seed Fix
 
 - **Seed** (`docker/seed/seed.py`): both `seed_inline_source()` and `seed_example_directory()` now populate `WorkflowDefinition.documentation` from the compiled JSON `"doc"` field (was always `None`)
