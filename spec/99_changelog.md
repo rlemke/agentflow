@@ -543,6 +543,16 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.42) - Inline Retry Buttons for Failed Steps in Dashboard
+
+- **Fix retry backend** (`afl/dashboard/routes/steps.py`): `POST /steps/{step_id}/retry` now resets step to `EVENT_TRANSMIT` (was incorrectly resetting to `initialization.Begin`); matches `evaluator.retry_step()` logic — sets `transition.current_state`, clears error, sets `request_transition = False`, marks `changed = True`; also resets the associated task to `pending` with `error = None` via `store.get_task_for_step()`
+- **Retry button in flat step table** (`partials/step_row.html`, `steps/list.html`): new "Actions" column header; failed/error steps show an HTMX retry button (`hx-post` + `hx-confirm`); non-failed steps show dash
+- **Retry button in tree view** (`partials/step_tree.html`): inline retry button after facet/duration spans for failed steps; uses `event.stopPropagation()` to prevent toggling the details node
+- **`.btn-retry-inline` CSS** (`static/style.css`): compact inline button style for table rows and tree summaries
+- **Updated detail page** (`steps/detail.html`): confirmation message updated from "initialization" to "EventTransmit"
+- **2 test changes** (`tests/dashboard/test_routes.py`): `test_retry_step` updated to assert `state.EventTransmit`; new `test_retry_step_resets_task` verifies associated task reset to `pending` with `error = None`
+- 2269 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.41) - Copy Mirror Data to Cache Instead of Serving Directly
 
 - **Mirror as seed source** (`handlers/downloader.py`): when `AFL_GEOFABRIK_MIRROR` is set and a mirror file exists, the data is now copied into the configured cache directory (local or HDFS) instead of returning the mirror path directly; downstream handlers always see the real cache location (`AFL_CACHE_DIR`) regardless of whether data came from the mirror
