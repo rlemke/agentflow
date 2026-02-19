@@ -48,14 +48,13 @@
 <figure>
 <table>
     <thead>
-        <tr><th>Name</th><th>UUID</th><th>Documentation</th></tr>
+        <tr><th>Name</th><th>UUID</th></tr>
     </thead>
     <tbody>
         {% for ns in flow.namespaces %}
         <tr>
-            <td><a href="/namespaces/{{ ns.name }}">{{ ns.name }}</a></td>
+            <td><a href="/namespaces/{{ ns.name }}"><strong>{{ ns.name }}</strong></a>{% if ns.documentation %}{{ render_doc(ns.documentation) }}{% endif %}</td>
             <td class="mono">{{ ns.uuid }}</td>
-            <td>{% if ns.documentation %}{{ render_doc(ns.documentation) }}{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -68,15 +67,14 @@
 <figure>
 <table>
     <thead>
-        <tr><th>Name</th><th>Namespace ID</th><th>UUID</th><th>Documentation</th></tr>
+        <tr><th>Name</th><th>Namespace ID</th><th>UUID</th></tr>
     </thead>
     <tbody>
         {% for facet in flow.facets %}
         <tr>
-            <td>{{ facet.name }}</td>
+            <td><strong>{{ facet.name }}</strong>{% if facet.documentation %}{{ render_doc(facet.documentation) }}{% endif %}</td>
             <td class="mono">{{ facet.namespace_id }}</td>
             <td class="mono">{{ facet.uuid }}</td>
-            <td>{% if facet.documentation %}{{ render_doc(facet.documentation) }}{% else %}—{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>
