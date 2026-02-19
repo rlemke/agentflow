@@ -1,0 +1,31 @@
+{% macro render_doc(doc) %}
+{% if doc %}
+<div class="doc-comment">
+    <div class="doc-description">{{ doc|doc_description }}</div>
+    {% set params = doc|doc_params %}
+    {% if params %}
+    <div class="doc-section">
+        <strong>Parameters</strong>
+        <dl>
+        {% for p in params %}
+            <dt><code>{{ p.name }}</code></dt>
+            <dd>{{ p.description }}</dd>
+        {% endfor %}
+        </dl>
+    </div>
+    {% endif %}
+    {% set rets = doc|doc_returns %}
+    {% if rets %}
+    <div class="doc-section">
+        <strong>Returns</strong>
+        <dl>
+        {% for r in rets %}
+            <dt><code>{{ r.name }}</code></dt>
+            <dd>{{ r.description }}</dd>
+        {% endfor %}
+        </dl>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}

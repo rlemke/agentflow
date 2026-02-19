@@ -34,7 +34,7 @@ class WorkflowEntry:
     uuid: str
     flow_id: str
     version: str = ""
-    documentation: str | None = None
+    documentation: dict | str | None = None
 
 
 @dataclass
@@ -45,7 +45,7 @@ class FacetEntry:
     short_name: str
     parameters: list = field(default_factory=list)
     return_type: str | None = None
-    documentation: str | None = None
+    documentation: dict | str | None = None
 
 
 @dataclass

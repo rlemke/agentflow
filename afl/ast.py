@@ -270,6 +270,24 @@ class FacetSig(ASTNode):
     mixins: list[MixinSig] = field(default_factory=list)
 
 
+# Doc comments
+@dataclass
+class DocParam:
+    """Documented parameter or return value from a doc comment tag."""
+
+    name: str
+    description: str
+
+
+@dataclass
+class DocComment:
+    """Structured doc comment with description and @param/@return tags."""
+
+    description: str
+    params: list[DocParam] = field(default_factory=list)
+    returns: list[DocParam] = field(default_factory=list)
+
+
 # Declarations
 @dataclass
 class FacetDecl(ASTNode):
@@ -277,7 +295,7 @@ class FacetDecl(ASTNode):
 
     sig: FacetSig
     body: "list[AndThenBlock] | AndThenBlock | ScriptBlock | None" = None
-    doc: str | None = field(default=None, kw_only=True)
+    doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
 @dataclass
@@ -286,7 +304,7 @@ class EventFacetDecl(ASTNode):
 
     sig: FacetSig
     body: "list[AndThenBlock] | AndThenBlock | PromptBlock | ScriptBlock | None" = None
-    doc: str | None = field(default=None, kw_only=True)
+    doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
 @dataclass
@@ -295,7 +313,7 @@ class WorkflowDecl(ASTNode):
 
     sig: FacetSig
     body: "list[AndThenBlock] | AndThenBlock | None" = None
-    doc: str | None = field(default=None, kw_only=True)
+    doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
 @dataclass
@@ -328,7 +346,7 @@ class SchemaDecl(ASTNode):
 
     name: str
     fields: list[SchemaField] = field(default_factory=list)
-    doc: str | None = field(default=None, kw_only=True)
+    doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
 # Namespace
@@ -343,7 +361,7 @@ class Namespace(ASTNode):
     workflows: list[WorkflowDecl] = field(default_factory=list)
     implicits: list[ImplicitDecl] = field(default_factory=list)
     schemas: list[SchemaDecl] = field(default_factory=list)
-    doc: str | None = field(default=None, kw_only=True)
+    doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
 # Program (root)

@@ -26,6 +26,7 @@ from .ast import (
     Block,
     CallExpr,
     ConcatExpr,
+    DocComment,
     EventFacetDecl,
     FacetDecl,
     FacetSig,
@@ -276,14 +277,22 @@ class JSONEmitter:
 
         return self._add_metadata(data, node)
 
+    def _doc_comment(self, doc: DocComment) -> dict:
+        """Convert DocComment to structured dict."""
+        return {
+            "description": doc.description,
+            "params": [{"name": p.name, "description": p.description} for p in doc.params],
+            "returns": [{"name": r.name, "description": r.description} for r in doc.returns],
+        }
+
     def _namespace(self, node: Namespace) -> dict:
         """Convert Namespace node."""
         data = {
             "type": "Namespace",
             "name": node.name,
         }
-        if node.doc:
-            data["doc"] = node.doc
+        if node.doc is not None:
+            data["doc"] = self._doc_comment(node.doc)
 
         if node.uses:
             data["uses"] = [u.name for u in node.uses]
@@ -335,8 +344,8 @@ class JSONEmitter:
             "type": "FacetDecl",
             "name": node.sig.name,
         }
-        if node.doc:
-            data["doc"] = node.doc
+        if node.doc is not None:
+            data["doc"] = self._doc_comment(node.doc)
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -355,8 +364,8 @@ class JSONEmitter:
             "type": "EventFacetDecl",
             "name": node.sig.name,
         }
-        if node.doc:
-            data["doc"] = node.doc
+        if node.doc is not None:
+            data["doc"] = self._doc_comment(node.doc)
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -375,8 +384,8 @@ class JSONEmitter:
             "type": "WorkflowDecl",
             "name": node.sig.name,
         }
-        if node.doc:
-            data["doc"] = node.doc
+        if node.doc is not None:
+            data["doc"] = self._doc_comment(node.doc)
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -562,8 +571,8 @@ class JSONEmitter:
             "type": "SchemaDecl",
             "name": node.name,
         }
-        if node.doc:
-            data["doc"] = node.doc
+        if node.doc is not None:
+            data["doc"] = self._doc_comment(node.doc)
         data["fields"] = self._convert(node.fields)
         return self._add_metadata(data, node)
 

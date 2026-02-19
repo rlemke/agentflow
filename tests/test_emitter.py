@@ -1180,7 +1180,7 @@ class TestDocCommentEmission:
     """Tests for doc comment emission in JSON output."""
 
     def test_doc_on_namespace(self):
-        """Namespace doc comment appears in JSON."""
+        """Namespace doc comment appears as structured dict in JSON."""
         ast = parse("""
         /** NS doc. */
         namespace ns {
@@ -1189,10 +1189,14 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        assert data["namespaces"][0]["doc"] == "NS doc."
+        assert data["namespaces"][0]["doc"] == {
+            "description": "NS doc.",
+            "params": [],
+            "returns": [],
+        }
 
     def test_doc_on_facet(self):
-        """Facet doc comment appears in JSON."""
+        """Facet doc comment appears as structured dict in JSON."""
         ast = parse("""
         namespace ns {
             /** Facet doc. */
@@ -1202,7 +1206,11 @@ class TestDocCommentEmission:
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
         facet = data["namespaces"][0]["facets"][0]
-        assert facet["doc"] == "Facet doc."
+        assert facet["doc"] == {
+            "description": "Facet doc.",
+            "params": [],
+            "returns": [],
+        }
 
     def test_doc_on_event_facet_and_workflow(self):
         """Event facet and workflow doc comments in JSON."""
@@ -1219,11 +1227,11 @@ class TestDocCommentEmission:
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
         decls = {d["name"]: d for d in data["namespaces"][0]["declarations"]}
-        assert decls["EF"]["doc"] == "EF doc."
-        assert decls["WF"]["doc"] == "WF doc."
+        assert decls["EF"]["doc"]["description"] == "EF doc."
+        assert decls["WF"]["doc"]["description"] == "WF doc."
 
     def test_doc_on_schema(self):
-        """Schema doc comment appears in JSON."""
+        """Schema doc comment appears as structured dict in JSON."""
         ast = parse("""
         namespace ns {
             /** Schema doc. */
@@ -1233,7 +1241,11 @@ class TestDocCommentEmission:
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
         schema = data["namespaces"][0]["schemas"][0]
-        assert schema["doc"] == "Schema doc."
+        assert schema["doc"] == {
+            "description": "Schema doc.",
+            "params": [],
+            "returns": [],
+        }
 
     def test_no_doc_key_when_absent(self):
         """No doc key emitted when declaration has no doc comment."""
@@ -1246,3 +1258,22 @@ class TestDocCommentEmission:
         data = emitter.emit_dict(ast)
         assert "doc" not in data["namespaces"][0]
         assert "doc" not in data["namespaces"][0]["facets"][0]
+
+    def test_doc_with_tags_emits_structured(self):
+        """Doc comment with @param/@return tags emits full structured output."""
+        ast = parse("""
+        namespace ns {
+            /**
+             * Adds one to the input.
+             * @param value The input value.
+             * @return result The incremented value.
+             */
+            event facet AddOne(value: Long) => (result: Long)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        doc = data["namespaces"][0]["eventFacets"][0]["doc"]
+        assert doc["description"] == "Adds one to the input."
+        assert doc["params"] == [{"name": "value", "description": "The input value."}]
+        assert doc["returns"] == [{"name": "result", "description": "The incremented value."}]

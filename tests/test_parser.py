@@ -1510,7 +1510,10 @@ class TestDocComments:
             facet F(x: String)
         }
         """)
-        assert ast.namespaces[0].facets[0].doc == "Facet documentation."
+        doc = ast.namespaces[0].facets[0].doc
+        assert doc.description == "Facet documentation."
+        assert doc.params == []
+        assert doc.returns == []
 
     def test_doc_comment_on_event_facet(self, parser):
         """Doc comment attached to an event facet declaration."""
@@ -1520,7 +1523,10 @@ class TestDocComments:
             event facet EF(x: String) => (y: String)
         }
         """)
-        assert ast.namespaces[0].event_facets[0].doc == "Event facet documentation."
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert doc.description == "Event facet documentation."
+        assert doc.params == []
+        assert doc.returns == []
 
     def test_doc_comment_on_workflow(self, parser):
         """Doc comment attached to a workflow declaration."""
@@ -1536,7 +1542,8 @@ class TestDocComments:
         # The workflow doesn't have a doc comment
         assert ast.namespaces[0].workflows[0].doc is None
         # The event facet has one
-        assert ast.namespaces[0].event_facets[0].doc == "Workflow documentation."
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert doc.description == "Workflow documentation."
 
     def test_doc_comment_on_workflow_direct(self, parser):
         """Doc comment directly on a workflow."""
@@ -1549,7 +1556,7 @@ class TestDocComments:
             }
         }
         """)
-        assert ast.namespaces[0].workflows[0].doc == "Run the workflow."
+        assert ast.namespaces[0].workflows[0].doc.description == "Run the workflow."
 
     def test_doc_comment_on_namespace(self, parser):
         """Doc comment attached to a namespace."""
@@ -1559,7 +1566,7 @@ class TestDocComments:
             facet F(x: String)
         }
         """)
-        assert ast.namespaces[0].doc == "Namespace documentation."
+        assert ast.namespaces[0].doc.description == "Namespace documentation."
 
     def test_doc_comment_on_schema(self, parser):
         """Doc comment attached to a schema declaration."""
@@ -1572,7 +1579,7 @@ class TestDocComments:
             }
         }
         """)
-        assert ast.namespaces[0].schemas[0].doc == "Schema documentation."
+        assert ast.namespaces[0].schemas[0].doc.description == "Schema documentation."
 
     def test_multiline_doc_comment(self, parser):
         """Multi-line doc comment with * prefix cleaning."""
@@ -1585,10 +1592,10 @@ class TestDocComments:
             facet F(x: String)
         }
         """)
-        assert ast.namespaces[0].facets[0].doc == "Multi-line documentation.\nSecond line."
+        assert ast.namespaces[0].facets[0].doc.description == "Multi-line documentation.\nSecond line."
 
     def test_doc_comment_with_tags(self, parser):
-        """Doc comment with @param and @return tags preserved."""
+        """Doc comment with @param and @return tags parsed into structured form."""
         ast = parser.parse("""
         namespace ns {
             /**
@@ -1600,8 +1607,13 @@ class TestDocComments:
         }
         """)
         doc = ast.namespaces[0].event_facets[0].doc
-        assert "@param value The input value." in doc
-        assert "@return result The incremented value." in doc
+        assert doc.description == "Adds one to the input."
+        assert len(doc.params) == 1
+        assert doc.params[0].name == "value"
+        assert doc.params[0].description == "The input value."
+        assert len(doc.returns) == 1
+        assert doc.returns[0].name == "result"
+        assert doc.returns[0].description == "The incremented value."
 
     def test_no_doc_comment_is_none(self, parser):
         """Declarations without doc comments have doc=None."""
@@ -1634,9 +1646,9 @@ class TestDocComments:
             facet B(y: Long)
         }
         """)
-        assert ast.namespaces[0].doc == "NS doc."
-        assert ast.namespaces[0].facets[0].doc == "Facet A doc."
-        assert ast.namespaces[0].facets[1].doc == "Facet B doc."
+        assert ast.namespaces[0].doc.description == "NS doc."
+        assert ast.namespaces[0].facets[0].doc.description == "Facet A doc."
+        assert ast.namespaces[0].facets[1].doc.description == "Facet B doc."
 
     def test_top_level_doc_comment(self, parser):
         """Doc comment on a top-level (non-namespace) facet."""
@@ -1644,4 +1656,58 @@ class TestDocComments:
         /** Top-level facet doc. */
         facet TopF(x: String)
         """)
-        assert ast.facets[0].doc == "Top-level facet doc."
+        assert ast.facets[0].doc.description == "Top-level facet doc."
+
+    def test_doc_comment_multiple_params(self, parser):
+        """Doc comment with multiple @param tags parsed correctly."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Compute something.
+             * @param graph_path Path to the edge graph
+             * @param anchors_path Path to anchor node set
+             * @param zoom_level Target zoom level
+             */
+            event facet Compute(graph_path: String, anchors_path: String, zoom_level: Long)
+        }
+        """)
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert doc.description == "Compute something."
+        assert len(doc.params) == 3
+        assert doc.params[0].name == "graph_path"
+        assert doc.params[1].name == "anchors_path"
+        assert doc.params[2].name == "zoom_level"
+        assert doc.params[2].description == "Target zoom level"
+
+    def test_doc_comment_description_with_markdown(self, parser):
+        """Markdown formatting preserved in description text."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Computes **betweenness** sampling.
+             *
+             * Uses `shortest-path` routing between pairs.
+             */
+            facet F(x: String)
+        }
+        """)
+        doc = ast.namespaces[0].facets[0].doc
+        assert "**betweenness**" in doc.description
+        assert "`shortest-path`" in doc.description
+
+    def test_doc_comment_params_no_description(self, parser):
+        """Doc comment with only @param tags and no description."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * @param x The x value
+             * @param y The y value
+             */
+            facet F(x: String, y: Long)
+        }
+        """)
+        doc = ast.namespaces[0].facets[0].doc
+        assert doc.description == ""
+        assert len(doc.params) == 2
+        assert doc.params[0].name == "x"
+        assert doc.params[1].name == "y"

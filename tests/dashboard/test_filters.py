@@ -15,6 +15,9 @@
 """Tests for Jinja2 template filters."""
 
 from afl.dashboard.filters import (
+    doc_description,
+    doc_params,
+    doc_returns,
     duration_fmt,
     state_color,
     state_label,
@@ -160,3 +163,71 @@ class TestStateColorEdgeCases:
 
     def test_empty_string_returns_secondary(self):
         assert state_color("") == "secondary"
+
+
+# =============================================================================
+# v0.12.37 — Doc comment filter tests
+# =============================================================================
+
+
+class TestDocDescription:
+    def test_none_returns_empty(self):
+        assert doc_description(None) == ""
+
+    def test_plain_string(self):
+        result = doc_description("Hello world")
+        assert "Hello world" in result
+
+    def test_dict_with_description(self):
+        result = doc_description({"description": "Hello **bold**", "params": [], "returns": []})
+        assert "Hello" in result
+        assert "<strong>bold</strong>" in result or "**bold**" in result
+
+    def test_dict_empty_description(self):
+        result = doc_description({"description": "", "params": [], "returns": []})
+        assert result == ""
+
+    def test_non_string_non_dict_returns_empty(self):
+        assert doc_description(42) == ""
+
+
+class TestDocParams:
+    def test_none_returns_empty_list(self):
+        assert doc_params(None) == []
+
+    def test_string_returns_empty_list(self):
+        assert doc_params("some doc") == []
+
+    def test_dict_with_params(self):
+        doc = {
+            "description": "desc",
+            "params": [{"name": "x", "description": "The x"}],
+            "returns": [],
+        }
+        result = doc_params(doc)
+        assert len(result) == 1
+        assert result[0]["name"] == "x"
+
+    def test_dict_without_params_key(self):
+        assert doc_params({"description": "desc"}) == []
+
+
+class TestDocReturns:
+    def test_none_returns_empty_list(self):
+        assert doc_returns(None) == []
+
+    def test_string_returns_empty_list(self):
+        assert doc_returns("some doc") == []
+
+    def test_dict_with_returns(self):
+        doc = {
+            "description": "desc",
+            "params": [],
+            "returns": [{"name": "result", "description": "The result"}],
+        }
+        result = doc_returns(doc)
+        assert len(result) == 1
+        assert result[0]["name"] == "result"
+
+    def test_dict_without_returns_key(self):
+        assert doc_returns({"description": "desc"}) == []

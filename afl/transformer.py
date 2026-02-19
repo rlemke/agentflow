@@ -24,6 +24,8 @@ from .ast import (
     Block,
     CallExpr,
     ConcatExpr,
+    DocComment,
+    DocParam,
     EventFacetDecl,
     FacetDecl,
     FacetSig,
@@ -55,8 +57,13 @@ from .ast import (
 )
 
 
-def _clean_doc_comment(raw: str) -> str:
-    """Strip /** */ delimiters and leading * from each line."""
+import re
+
+_TAG_RE = re.compile(r"^@(param|return)\s+(\w+)\s+(.*)")
+
+
+def _clean_doc_comment(raw: str) -> DocComment:
+    """Strip /** */ delimiters, leading *, and parse @param/@return tags."""
     # Remove trailing whitespace/newlines consumed by the regex
     raw = raw.rstrip()
     # Remove /** and */
@@ -70,10 +77,27 @@ def _clean_doc_comment(raw: str) -> str:
             if stripped.startswith(" "):
                 stripped = stripped[1:]
         cleaned.append(stripped)
-    return "\n".join(cleaned).strip()
+
+    # Split into description lines vs @param/@return tags
+    desc_lines: list[str] = []
+    params: list[DocParam] = []
+    returns: list[DocParam] = []
+    for line in cleaned:
+        m = _TAG_RE.match(line)
+        if m:
+            tag, name, desc = m.group(1), m.group(2), m.group(3).strip()
+            if tag == "param":
+                params.append(DocParam(name=name, description=desc))
+            else:
+                returns.append(DocParam(name=name, description=desc))
+        else:
+            desc_lines.append(line)
+
+    description = "\n".join(desc_lines).strip()
+    return DocComment(description=description, params=params, returns=returns)
 
 
-def _extract_doc_comment(items: list) -> str | None:
+def _extract_doc_comment(items: list) -> DocComment | None:
     """Extract and remove optional DOC_COMMENT from the beginning of items."""
     if items and isinstance(items[0], Token) and items[0].type == "DOC_COMMENT":
         return _clean_doc_comment(str(items.pop(0)))

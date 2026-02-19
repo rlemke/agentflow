@@ -84,6 +84,47 @@ def truncate_uuid(value: str | None, length: int = 8) -> str:
     return value[:length]
 
 
+def doc_description(doc: dict | str | None) -> str:
+    """Render the description portion of a doc comment as HTML.
+
+    Accepts both structured dict (new format) and plain string (legacy).
+    """
+    if doc is None:
+        return ""
+    if isinstance(doc, str):
+        text = doc
+    elif isinstance(doc, dict):
+        text = doc.get("description", "")
+    else:
+        return ""
+    if not text:
+        return ""
+    try:
+        import markdown as md
+        from markupsafe import Markup
+
+        return Markup(md.markdown(text))
+    except ImportError:
+        # Fallback: escape and convert newlines to <br>
+        from markupsafe import Markup, escape
+
+        return Markup(str(escape(text)).replace("\n", "<br>"))
+
+
+def doc_params(doc: dict | str | None) -> list[dict]:
+    """Extract params list from a doc comment."""
+    if isinstance(doc, dict):
+        return doc.get("params", [])
+    return []
+
+
+def doc_returns(doc: dict | str | None) -> list[dict]:
+    """Extract returns list from a doc comment."""
+    if isinstance(doc, dict):
+        return doc.get("returns", [])
+    return []
+
+
 def register_filters(env: Environment) -> None:
     """Register all custom filters on a Jinja2 environment."""
     env.filters["timestamp"] = timestamp_fmt
@@ -91,3 +132,6 @@ def register_filters(env: Environment) -> None:
     env.filters["state_color"] = state_color
     env.filters["state_label"] = state_label
     env.filters["truncate_uuid"] = truncate_uuid
+    env.filters["doc_description"] = doc_description
+    env.filters["doc_params"] = doc_params
+    env.filters["doc_returns"] = doc_returns
