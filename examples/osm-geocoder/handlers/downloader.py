@@ -10,6 +10,7 @@ the cache file is always either absent or complete (never partial).
 """
 
 import os
+import shutil
 import tempfile
 import threading
 from datetime import UTC, datetime
@@ -20,7 +21,6 @@ from afl.runtime.storage import get_storage_backend
 
 CACHE_DIR = os.environ.get("AFL_CACHE_DIR", os.path.join(tempfile.gettempdir(), "osm-cache"))
 _storage = get_storage_backend(CACHE_DIR)
-_local_storage = get_storage_backend("/tmp")  # always local, used for mirror paths
 GEOFABRIK_BASE = "https://download.geofabrik.de"
 GEOFABRIK_MIRROR = os.environ.get("AFL_GEOFABRIK_MIRROR")
 USER_AGENT = "AgentFlow-OSM-Example/1.0"
@@ -78,6 +78,28 @@ def _stream_to_file(url: str, path: str, storage) -> None:
             f.write(chunk)
 
 
+def _copy_to_cache(src_path: str, dst_path: str) -> None:
+    """Copy a local file to the configured cache location (local or HDFS)."""
+    _storage.makedirs(_storage.dirname(dst_path), exist_ok=True)
+    is_local = not CACHE_DIR.startswith("hdfs://")
+    if is_local:
+        tmp_path = dst_path + f".tmp.{os.getpid()}.{threading.get_ident()}"
+        try:
+            shutil.copy2(src_path, tmp_path)
+            os.replace(tmp_path, dst_path)
+        except BaseException:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
+    else:
+        # HDFS: stream from local mirror file to HDFS
+        with open(src_path, "rb") as src:
+            with _storage.open(dst_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+
 def geofabrik_url(region_path: str, fmt: str = "pbf") -> str:
     """Build the full Geofabrik download URL for a region path."""
     ext = FORMAT_EXTENSIONS[fmt]
@@ -92,6 +114,10 @@ def cache_path(region_path: str, fmt: str = "pbf") -> str:
 
 def download(region_path: str, fmt: str = "pbf") -> dict:
     """Download an OSM region file, using the local cache if available.
+
+    When ``AFL_GEOFABRIK_MIRROR`` is set, mirror files act as a seed source:
+    data is copied from the mirror into the configured cache directory, and the
+    cache path is returned (not the mirror path).
 
     Args:
         region_path: Geofabrik region path (e.g. "africa/algeria").
@@ -110,12 +136,16 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
     if _storage.exists(local_path):
         return _cache_hit(url, local_path)
 
-    # Check local mirror (read-only, no lock needed)
+    # Check local mirror — seed source, not the cache itself
     if GEOFABRIK_MIRROR:
         ext = FORMAT_EXTENSIONS[fmt]
         mirror_path = os.path.join(GEOFABRIK_MIRROR, f"{region_path}-latest.{ext}")
         if os.path.isfile(mirror_path):
-            return _cache_hit(url, mirror_path, storage=_local_storage)
+            with _get_path_lock(local_path):
+                if _storage.exists(local_path):
+                    return _cache_hit(url, local_path)
+                _copy_to_cache(mirror_path, local_path)
+            return _cache_miss(url, local_path)
 
     with _get_path_lock(local_path):
         # Re-check after acquiring lock
