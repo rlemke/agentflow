@@ -39,7 +39,7 @@ def flow_list(request: Request, q: str | None = None, store=Depends(get_store)):
 
 @router.get("/{flow_id}")
 def flow_detail(flow_id: str, request: Request, store=Depends(get_store)):
-    """Show flow detail with workflows."""
+    """Show flow detail with namespace-grouped workflows."""
     flow = store.get_flow(flow_id)
     workflows = store.get_workflows_by_flow(flow_id) if flow else []
     runners = []
@@ -48,10 +48,33 @@ def flow_detail(flow_id: str, request: Request, store=Depends(get_store)):
             runners.extend(store.get_runners_by_workflow(wf.uuid))
         runners.sort(key=lambda r: r.start_time, reverse=True)
         runners = runners[:20]
+
+    # Group workflows by namespace prefix derived from qualified names
+    ns_groups: dict[str, list] = {}
+    for wf in workflows:
+        if "." in wf.name:
+            ns_prefix, _short = wf.name.rsplit(".", 1)
+        else:
+            ns_prefix = ""
+        ns_groups.setdefault(ns_prefix, []).append(wf)
+
+    namespace_list = sorted(
+        [
+            {"name": ns or "(top-level)", "prefix": ns or "_top", "count": len(wfs)}
+            for ns, wfs in ns_groups.items()
+        ],
+        key=lambda x: x["name"],
+    )
+
     return request.app.state.templates.TemplateResponse(
         request,
         "flows/detail.html",
-        {"flow": flow, "workflows": workflows, "runners": runners},
+        {
+            "flow": flow,
+            "workflows": workflows,
+            "namespace_list": namespace_list,
+            "runners": runners,
+        },
     )
 
 
@@ -94,6 +117,46 @@ def flow_json(flow_id: str, request: Request, store=Depends(get_store)):
             "flow": flow,
             "json_output": json_output,
             "parse_error": parse_error,
+        },
+    )
+
+
+@router.get("/{flow_id}/ns/{namespace_name:path}")
+def flow_namespace(
+    flow_id: str,
+    namespace_name: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """Show workflows within a specific namespace of a flow."""
+    flow = store.get_flow(flow_id)
+    all_workflows = store.get_workflows_by_flow(flow_id) if flow else []
+
+    # Filter workflows by namespace prefix
+    if namespace_name == "_top":
+        filtered = [wf for wf in all_workflows if "." not in wf.name]
+        display_name = "(top-level)"
+    else:
+        filtered = [
+            wf
+            for wf in all_workflows
+            if "." in wf.name and wf.name.rsplit(".", 1)[0] == namespace_name
+        ]
+        display_name = namespace_name
+
+    # Build display list with short names
+    ns_workflows = []
+    for wf in filtered:
+        short_name = wf.name.rsplit(".", 1)[1] if "." in wf.name else wf.name
+        ns_workflows.append({"wf": wf, "short_name": short_name})
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "flows/namespace.html",
+        {
+            "flow": flow,
+            "namespace_name": display_name,
+            "ns_workflows": ns_workflows,
         },
     )
 

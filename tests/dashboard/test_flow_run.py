@@ -114,10 +114,15 @@ def _seed_flow(store, source=VALID_AFL_SOURCE, workflow_name="SimpleWF"):
 class TestFlowDetailRunButton:
     """Tests for the Run button in the flow detail page."""
 
-    def test_run_link_appears_in_detail(self, client):
+    def test_run_link_appears_in_namespace_view(self, client):
         tc, store = client
         flow, wf = _seed_flow(store)
+        # Detail page now shows namespace groups — navigate to namespace page
         resp = tc.get(f"/flows/{flow.uuid}")
+        assert resp.status_code == 200
+        assert f"/flows/{flow.uuid}/ns/_top" in resp.text
+        # Run link appears on the namespace sub-page
+        resp = tc.get(f"/flows/{flow.uuid}/ns/_top")
         assert resp.status_code == 200
         assert f"/flows/{flow.uuid}/run/{wf.uuid}" in resp.text
         assert "Run</a>" in resp.text

@@ -25,19 +25,17 @@
 </p>
 {% endif %}
 
-<h2>Workflows</h2>
+<h2>Workflows ({{ workflows|length }})</h2>
 <figure>
 <table>
     <thead>
-        <tr><th>Name</th><th>Version</th><th>Documentation</th>{% if flow.compiled_sources %}<th></th>{% endif %}</tr>
+        <tr><th>Namespace</th><th>Workflows</th></tr>
     </thead>
     <tbody>
-        {% for wf in workflows %}
+        {% for ns in namespace_list %}
         <tr>
-            <td>{{ wf.name }}</td>
-            <td>{{ wf.version }}</td>
-            <td>{{ wf.documentation or "—" }}</td>
-            {% if flow.compiled_sources %}<td><a href="/flows/{{ flow.uuid }}/run/{{ wf.uuid }}" role="button" class="outline">Run</a></td>{% endif %}
+            <td><a href="/flows/{{ flow.uuid }}/ns/{{ ns.prefix }}">{{ ns.name }}</a></td>
+            <td>{{ ns.count }}</td>
         </tr>
         {% endfor %}
     </tbody>
