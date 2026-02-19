@@ -543,6 +543,15 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.31) - Run Workflow from Flow Detail Page
+
+- **Run button on flow detail** (`templates/flows/detail.html`): each workflow row now shows a "Run" button linking to `/flows/{flow_id}/run/{workflow_id}` — only displayed when `flow.compiled_sources` exists (seeded flows have sources; flows without sources show no button)
+- **Parameter input form** (`templates/flows/run.html`, NEW): shows flow/workflow metadata header, parameter table with Name/Type/Default/Value columns, and JS that collects inputs into a hidden `inputs_json` field on submit; follows the same pattern as `workflows/compile.html`
+- **GET `/flows/{flow_id}/run/{workflow_id}`** (`routes/flows.py`): compiles the flow's AFL source via `AFLParser` + `JSONEmitter`, finds the workflow via `_find_workflow_in_program()` (from `afl/runtime/submit.py`), extracts params with defaults, and renders the form; returns "Flow not found" for missing flows
+- **POST `/flows/{flow_id}/run/{workflow_id}`** (`routes/flows.py`): creates only `RunnerDefinition` + `TaskDefinition` (reuses existing `FlowDefinition` + `WorkflowDefinition`), merges AST defaults with user-provided `inputs_json`, and redirects to `/runners/{runner_id}` (303)
+- **14 new tests** (`tests/dashboard/test_flow_run.py`): Run link visibility (with/without compiled sources), GET form rendering (params, defaults, back link, missing flow), POST execution (runner creation, task creation, redirect, flow/workflow reuse, input override, defaults, missing flow)
+- 2197 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.30) - Seed Examples Script
 
 - **`scripts/seed-examples`** (NEW): Bash shell script that compiles all example AFL directories and pushes `FlowDefinition` + `WorkflowDefinition` entities to MongoDB so they appear in the Dashboard Flow UI; for each example, parses all `afl/*.afl` files via `AFLParser.parse()`, merges ASTs via `Program.merge()`, emits JSON via `JSONEmitter`, recursively collects workflow qualified names from compiled JSON (handles both nested and flat emitter formats), then creates one `FlowDefinition` (path=`cli:seed`) and one `WorkflowDefinition` per workflow; only creates Flow + Workflow entities (no Runner/Task — those are created at execution time); validation errors are treated as non-fatal warnings since some examples (`continental-lz`, `volcano-query`) depend on types from `osm-geocoder`
