@@ -543,6 +543,16 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.33) - Namespace-Level Navigation on Flow Detail Page
+
+- **Namespace grouping on flow detail** (`routes/flows.py`): `flow_detail()` now groups workflows by namespace prefix derived from qualified names (`wf.name.rsplit('.', 1)`) and passes a `namespace_list` to the template — each entry has `name`, `prefix`, and `count`; unqualified workflows grouped under `(top-level)` with prefix `_top`
+- **New route `GET /flows/{flow_id}/ns/{namespace_name:path}`** (`routes/flows.py`): `flow_namespace()` filters workflows by namespace prefix, builds display list with short names (last segment of qualified name), and renders `flows/namespace.html`; uses `:path` converter for dotted namespace names (same pattern as `/namespaces/{namespace_name:path}` and `/handlers/{facet_name:path}`)
+- **Flow detail template** (`templates/flows/detail.html`): replaced flat workflow table with namespace list table — columns: Namespace (linked to `/ns/` route), Workflows (count); heading shows total workflow count (`Workflows (N)`)
+- **Namespace template** (`templates/flows/namespace.html`, NEW): shows workflows within a specific namespace — header with flow name and namespace, source/JSON links, workflow table with short names/version/documentation/Run button, back link to flow detail
+- **17 new tests** (`tests/dashboard/test_flow_namespaces.py`): `TestFlowDetailNamespaces` (6 tests: namespace list shown, links to `/ns/`, total count, per-namespace counts, top-level group, no flat workflow names) and `TestFlowNamespaceView` (11 tests: correct filtering, short names, nested namespace paths, exclusion, Run buttons, back link, source/JSON links, missing flow, empty namespace, `_top` prefix, heading)
+- **Updated existing test** (`tests/dashboard/test_flow_run.py`): `test_run_link_appears_in_detail` → `test_run_link_appears_in_namespace_view` — navigates through namespace sub-page to verify Run link
+- 2214 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.32) - Docker Seed Rewrite and Dashboard Health Check Fix
 
 - **Docker seed rewrite** (`docker/seed/seed.py`): replaced raw pymongo document creation with proper `MongoStore` + runtime entity classes (`FlowDefinition`, `FlowIdentity`, `SourceText`, `WorkflowDefinition`); seeded flows now have `compiled_sources` so the Dashboard "Run" button works; also discovers and seeds all `examples/` directories (7 flows, 352 workflows: inline-examples 24, aws-lambda 16, continental-lz 80, genomics 20, jenkins 16, osm-geocoder 192, volcano-query 4); cleans legacy seed documents on each run; uses `docker:seed` as path identifier
