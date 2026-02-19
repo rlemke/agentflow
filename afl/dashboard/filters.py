@@ -125,6 +125,21 @@ def doc_returns(doc: dict | str | None) -> list[dict]:
     return []
 
 
+_STEP_LOG_COLORS: dict[str, str] = {
+    "info": "primary",
+    "warning": "warning",
+    "error": "danger",
+    "success": "success",
+}
+
+
+def step_log_color(level: str | None) -> str:
+    """Return a CSS colour class for a step log level."""
+    if not level:
+        return "secondary"
+    return _STEP_LOG_COLORS.get(level.lower(), "secondary")
+
+
 def register_filters(env: Environment) -> None:
     """Register all custom filters on a Jinja2 environment."""
     env.filters["timestamp"] = timestamp_fmt
@@ -135,3 +150,4 @@ def register_filters(env: Environment) -> None:
     env.filters["doc_description"] = doc_description
     env.filters["doc_params"] = doc_params
     env.filters["doc_returns"] = doc_returns
+    env.filters["step_log_color"] = step_log_color

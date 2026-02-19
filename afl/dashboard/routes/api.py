@@ -79,16 +79,17 @@ def api_runner_steps(
 
     if partial:
         templates = request.app.state.templates
+        step_log_counts = _build_step_log_counts(store, runner.workflow_id)
         if view == "tree":
             tree = build_step_tree(list(steps))
             html = templates.get_template("partials/step_tree.html").render(
-                tree=tree, request=request
+                tree=tree, request=request, step_log_counts=step_log_counts
             )
             return HTMLResponse(html)
         html = ""
         for step in steps:
             html += templates.get_template("partials/step_row.html").render(
-                step=step, request=request
+                step=step, request=request, step_log_counts=step_log_counts
             )
         return HTMLResponse(html)
 
@@ -96,6 +97,29 @@ def api_runner_steps(
 
 
 # -- Steps -------------------------------------------------------------------
+
+
+@router.get("/steps/{step_id}/logs")
+def api_step_logs(step_id: str, store=Depends(get_store)):
+    """Return step log entries as JSON array."""
+    logs = store.get_step_logs_by_step(step_id)
+    return JSONResponse(
+        [
+            {
+                "uuid": log.uuid,
+                "step_id": log.step_id,
+                "workflow_id": log.workflow_id,
+                "runner_id": log.runner_id,
+                "facet_name": log.facet_name,
+                "source": log.source,
+                "level": log.level,
+                "message": log.message,
+                "details": log.details,
+                "time": log.time,
+            }
+            for log in logs
+        ]
+    )
 
 
 @router.get("/steps/{step_id}")
@@ -353,6 +377,18 @@ def api_events(state: str | None = None, store=Depends(get_store)):
 
 
 # -- Helpers -----------------------------------------------------------------
+
+
+def _build_step_log_counts(store, workflow_id: str) -> dict[str, int]:
+    """Build a dict mapping step_id -> log count for a workflow."""
+    counts: dict[str, int] = {}
+    try:
+        step_logs = store.get_step_logs_by_workflow(workflow_id)
+        for log in step_logs:
+            counts[log.step_id] = counts.get(log.step_id, 0) + 1
+    except Exception:
+        pass
+    return counts
 
 
 def _runner_dict(runner) -> dict:

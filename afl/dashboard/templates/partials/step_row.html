@@ -3,6 +3,7 @@
     <td>{% if step.facet_name %}{{ step.facet_name.split('.')[-1] }}{% else %}{{ step.object_type }}{% endif %}</td>
     <td><span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span></td>
     <td>{% if step.start_time %}{{ (step.last_modified - step.start_time)|duration }}{% else %}&mdash;{% endif %}</td>
+    <td>{% if step_log_counts is defined and step_log_counts.get(step.id, 0) > 0 %}<a href="/steps/{{ step.id }}#step-logs" class="badge badge-primary">{{ step_log_counts[step.id] }}</a>{% else %}&mdash;{% endif %}</td>
     <td>
         {% if step.attributes and (step.attributes.params or step.attributes.returns) %}
         <details>

@@ -1853,3 +1853,82 @@ namespace test_ns {
         )
         assert wf.documentation == doc
         assert isinstance(wf.documentation, dict)
+
+
+class TestStepLogs:
+    """Tests for step log API and dashboard display."""
+
+    def test_api_step_logs_returns_entries(self, client):
+        """GET /api/steps/{step_id}/logs returns step log entries."""
+        tc, store = client
+        from afl.runtime.entities import StepLogEntry
+        from afl.runtime.types import generate_id
+
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(),
+            step_id="step-log-1",
+            workflow_id="wf-log-1",
+            runner_id="runner-1",
+            facet_name="ns.Test",
+            source="framework",
+            level="info",
+            message="Task claimed: ns.Test",
+            time=1000,
+        ))
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(),
+            step_id="step-log-1",
+            workflow_id="wf-log-1",
+            source="handler",
+            level="success",
+            message="Download complete",
+            time=2000,
+        ))
+
+        resp = tc.get("/api/steps/step-log-1/logs")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert data[0]["message"] == "Task claimed: ns.Test"
+        assert data[0]["source"] == "framework"
+        assert data[1]["message"] == "Download complete"
+        assert data[1]["source"] == "handler"
+
+    def test_api_step_logs_empty_for_unknown(self, client):
+        """GET /api/steps/{step_id}/logs returns empty array for unknown step."""
+        tc, store = client
+        resp = tc.get("/api/steps/nonexistent/logs")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_step_detail_shows_logs_section(self, client):
+        """Step detail page shows 'Step Logs' section when logs exist."""
+        tc, store = client
+        from afl.runtime.entities import StepLogEntry
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import generate_id, step_id, workflow_id
+
+        sid = step_id()
+        wid = workflow_id()
+        step = StepDefinition(
+            id=sid,
+            workflow_id=wid,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+        )
+        store.save_step(step)
+
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(),
+            step_id=sid,
+            workflow_id=wid,
+            source="framework",
+            level="info",
+            message="Task claimed: ns.Test",
+            time=1000,
+        ))
+
+        resp = tc.get(f"/steps/{sid}")
+        assert resp.status_code == 200
+        assert "Step Logs" in resp.text
+        assert "Task claimed: ns.Test" in resp.text

@@ -26,6 +26,7 @@ from .entities import (
     LogDefinition,
     RunnerDefinition,
     ServerDefinition,
+    StepLogEntry,
     TaskDefinition,
 )
 from .persistence import EventDefinition, IterationChanges, PersistenceAPI
@@ -67,6 +68,7 @@ class MemoryStore(PersistenceAPI):
         self._locks: dict[str, LockDefinition] = {}
         self._servers: dict[str, ServerDefinition] = {}
         self._handler_registrations: dict[str, HandlerRegistration] = {}
+        self._step_logs: list[StepLogEntry] = []
 
         # Lock for atomic task claiming
         self._claim_lock = threading.Lock()
@@ -234,6 +236,7 @@ class MemoryStore(PersistenceAPI):
         self._locks.clear()
         self._servers.clear()
         self._handler_registrations.clear()
+        self._step_logs.clear()
 
     def step_count(self) -> int:
         """Get total number of steps."""
@@ -316,6 +319,28 @@ class MemoryStore(PersistenceAPI):
     def get_logs_by_runner(self, runner_id: str) -> Sequence["LogDefinition"]:
         """Get logs for a runner."""
         return [log for log in self._logs if log.runner_id == runner_id]
+
+    # =========================================================================
+    # Step Log Operations
+    # =========================================================================
+
+    def save_step_log(self, entry: StepLogEntry) -> None:
+        """Save a step log entry."""
+        self._step_logs.append(entry)
+
+    def get_step_logs_by_step(self, step_id: str) -> Sequence[StepLogEntry]:
+        """Get step logs for a step, ordered by time ascending."""
+        return sorted(
+            [e for e in self._step_logs if e.step_id == step_id],
+            key=lambda e: e.time,
+        )
+
+    def get_step_logs_by_workflow(self, workflow_id: str) -> Sequence[StepLogEntry]:
+        """Get step logs for a workflow, ordered by time ascending."""
+        return sorted(
+            [e for e in self._step_logs if e.workflow_id == workflow_id],
+            key=lambda e: e.time,
+        )
 
     # =========================================================================
     # Server Operations

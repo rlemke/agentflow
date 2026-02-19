@@ -65,6 +65,7 @@ from .entities import (
     PublishedSource,
     RunnerDefinition,
     ServerDefinition,
+    StepLogEntry,
     TaskDefinition,
     WorkflowDefinition,
 )
@@ -234,6 +235,12 @@ class MongoStore(PersistenceAPI):
             name="source_namespace_version_index",
         )
         sources.create_index("namespaces_defined", name="source_namespaces_defined_index")
+
+        # Step logs collection
+        step_logs = self._db.step_logs
+        step_logs.create_index("uuid", unique=True, name="step_log_uuid_index")
+        step_logs.create_index("step_id", name="step_log_step_id_index")
+        step_logs.create_index("workflow_id", name="step_log_workflow_id_index")
 
         # Handler registrations collection
         handler_regs = self._db.handler_registrations
@@ -517,6 +524,25 @@ class MongoStore(PersistenceAPI):
         """Save a log entry."""
         doc = self._log_to_doc(log)
         self._db.logs.insert_one(doc)
+
+    # =========================================================================
+    # Step Log Operations
+    # =========================================================================
+
+    def save_step_log(self, entry: StepLogEntry) -> None:
+        """Save a step log entry."""
+        doc = self._step_log_to_doc(entry)
+        self._db.step_logs.insert_one(doc)
+
+    def get_step_logs_by_step(self, step_id: str) -> Sequence[StepLogEntry]:
+        """Get step logs for a step, ordered by time ascending."""
+        docs = self._db.step_logs.find({"step_id": step_id}).sort("time", ASCENDING)
+        return [self._doc_to_step_log(doc) for doc in docs]
+
+    def get_step_logs_by_workflow(self, workflow_id: str) -> Sequence[StepLogEntry]:
+        """Get step logs for a workflow, ordered by time ascending."""
+        docs = self._db.step_logs.find({"workflow_id": workflow_id}).sort("time", ASCENDING)
+        return [self._doc_to_step_log(doc) for doc in docs]
 
     # =========================================================================
     # Lock Operations
@@ -1070,6 +1096,36 @@ class MongoStore(PersistenceAPI):
             state=doc.get("state", ""),
             line=doc.get("line", 0),
             file=doc.get("file", ""),
+            details=doc.get("details", {}),
+            time=doc.get("time", 0),
+        )
+
+    def _step_log_to_doc(self, entry: StepLogEntry) -> dict:
+        """Convert StepLogEntry to MongoDB document."""
+        return {
+            "uuid": entry.uuid,
+            "step_id": entry.step_id,
+            "workflow_id": entry.workflow_id,
+            "runner_id": entry.runner_id,
+            "facet_name": entry.facet_name,
+            "source": entry.source,
+            "level": entry.level,
+            "message": entry.message,
+            "details": entry.details,
+            "time": entry.time,
+        }
+
+    def _doc_to_step_log(self, doc: dict) -> StepLogEntry:
+        """Convert MongoDB document to StepLogEntry."""
+        return StepLogEntry(
+            uuid=doc["uuid"],
+            step_id=doc["step_id"],
+            workflow_id=doc["workflow_id"],
+            runner_id=doc.get("runner_id", ""),
+            facet_name=doc.get("facet_name", ""),
+            source=doc.get("source", "framework"),
+            level=doc.get("level", "info"),
+            message=doc.get("message", ""),
             details=doc.get("details", {}),
             time=doc.get("time", 0),
         )

@@ -53,11 +53,18 @@ def runner_detail(runner_id: str, request: Request, store=Depends(get_store)):
 
     steps = store.get_steps_by_workflow(runner.workflow_id)
     logs = store.get_logs_by_runner(runner_id)
+    step_log_counts = _build_step_log_counts(store, runner.workflow_id)
 
     return request.app.state.templates.TemplateResponse(
         request,
         "runners/detail.html",
-        {"runner": runner, "steps": steps, "tree": build_step_tree(list(steps)), "logs": logs},
+        {
+            "runner": runner,
+            "steps": steps,
+            "tree": build_step_tree(list(steps)),
+            "logs": logs,
+            "step_log_counts": step_log_counts,
+        },
     )
 
 
@@ -66,10 +73,16 @@ def runner_steps(runner_id: str, request: Request, store=Depends(get_store)):
     """Steps list for a runner's workflow."""
     runner = store.get_runner(runner_id)
     steps = store.get_steps_by_workflow(runner.workflow_id) if runner else []
+    step_log_counts = _build_step_log_counts(store, runner.workflow_id) if runner else {}
     return request.app.state.templates.TemplateResponse(
         request,
         "steps/list.html",
-        {"steps": steps, "tree": build_step_tree(list(steps)), "runner": runner},
+        {
+            "steps": steps,
+            "tree": build_step_tree(list(steps)),
+            "runner": runner,
+            "step_log_counts": step_log_counts,
+        },
     )
 
 
@@ -83,6 +96,18 @@ def runner_logs(runner_id: str, request: Request, store=Depends(get_store)):
         "logs/list.html",
         {"logs": logs, "runner": runner},
     )
+
+
+def _build_step_log_counts(store, workflow_id: str) -> dict[str, int]:
+    """Build a dict mapping step_id → log count for a workflow."""
+    counts: dict[str, int] = {}
+    try:
+        step_logs = store.get_step_logs_by_workflow(workflow_id)
+        for log in step_logs:
+            counts[log.step_id] = counts.get(log.step_id, 0) + 1
+    except Exception:
+        pass
+    return counts
 
 
 # --- Action endpoints ---

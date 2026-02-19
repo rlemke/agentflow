@@ -59,5 +59,28 @@
     {% endif %}
 </div>
 
+{% if step_logs %}
+<div id="step-logs">
+<h2>Step Logs</h2>
+<figure>
+<table>
+    <thead>
+        <tr><th>Time</th><th>Source</th><th>Level</th><th>Message</th></tr>
+    </thead>
+    <tbody>
+        {% for log in step_logs %}
+        <tr>
+            <td>{{ log.time|timestamp }}</td>
+            <td>{{ log.source }}</td>
+            <td><span class="badge badge-{{ log.level|step_log_color }}">{{ log.level }}</span></td>
+            <td>{{ log.message }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+</div>
+{% endif %}
+
 {% endif %}
 {% endblock %}

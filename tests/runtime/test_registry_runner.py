@@ -603,8 +603,9 @@ class TestRegistryRunnerPollOnce:
             "import json\n"
             f"CAPTURE_PATH = {str(capture_file)!r}\n"
             "def handle(payload):\n"
+            "    serializable = {k: v for k, v in payload.items() if not callable(v)}\n"
             "    with open(CAPTURE_PATH, 'w') as fp:\n"
-            "        json.dump(payload, fp)\n"
+            "        json.dump(serializable, fp)\n"
             "    return {'output': payload.get('input', 0) * 2}\n"
         )
 
@@ -711,8 +712,9 @@ class TestRegistryRunnerPollOnce:
             "import json\n"
             f"CAPTURE_PATH = {str(capture_file)!r}\n"
             "def handle(payload):\n"
+            "    serializable = {k: v for k, v in payload.items() if not callable(v)}\n"
             "    with open(CAPTURE_PATH, 'w') as fp:\n"
-            "        json.dump(payload, fp)\n"
+            "        json.dump(serializable, fp)\n"
             "    return {'output': 42}\n"
         )
 
@@ -777,8 +779,9 @@ class TestRegistryRunnerPollOnce:
             "import json\n"
             f"CAPTURE_PATH = {str(capture_file)!r}\n"
             "def handle(payload):\n"
+            "    serializable = {k: v for k, v in payload.items() if not callable(v)}\n"
             "    with open(CAPTURE_PATH, 'w') as fp:\n"
-            "        json.dump(payload, fp)\n"
+            "        json.dump(serializable, fp)\n"
             "    return {'output': 42}\n"
         )
 
@@ -1195,3 +1198,133 @@ class TestRegistryRunnerTopics:
         assert server is not None
         assert sorted(server.topics) == ["ns.X.Bar", "ns.X.Foo"]
         assert sorted(server.handlers) == ["ns.X.Bar", "ns.X.Foo"]
+
+
+# =========================================================================
+# TestStepLogEmission
+# =========================================================================
+
+
+class TestStepLogEmission:
+    """Tests for step log emission during event processing."""
+
+    def test_step_logs_on_success(
+        self, store, evaluator, workflow_ast, program_ast, handler_file
+    ):
+        """Successful dispatch emits claimed, dispatching, and completed logs."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        assert len(blocked) >= 1
+        step = blocked[0]
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{handler_file}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        runner.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        messages = [l.message for l in logs]
+
+        # Should have at least: claimed, dispatching, completed
+        assert any("Task claimed" in m for m in messages)
+        assert any("Dispatching handler" in m for m in messages)
+        assert any("Handler completed" in m for m in messages)
+
+        # Check levels
+        levels = {l.message: l.level for l in logs}
+        completed_key = [k for k in levels if "Handler completed" in k][0]
+        assert levels[completed_key] == "success"
+
+    def test_step_logs_on_failure(
+        self, store, evaluator, workflow_ast, program_ast, tmp_path
+    ):
+        """Handler exception emits an error step log."""
+        _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        f = tmp_path / "failing_handler.py"
+        f.write_text("def handle(payload):\n    raise ValueError('boom')\n")
+
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(
+            store.get_steps_by_state(StepState.EVENT_TRANSMIT)[0].workflow_id
+            if store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            else step.workflow_id,
+            workflow_ast,
+        )
+
+        runner.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        error_logs = [l for l in logs if l.level == "error"]
+        assert len(error_logs) >= 1
+        assert any("Handler error" in l.message for l in error_logs)
+
+    def test_step_log_callback_injection(
+        self, store, evaluator, workflow_ast, program_ast, tmp_path
+    ):
+        """Handler receives _step_log callback and can emit handler-level logs."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        # Write a handler that uses the _step_log callback
+        f = tmp_path / "logging_handler.py"
+        f.write_text(
+            "def handle(payload):\n"
+            "    log = payload.get('_step_log')\n"
+            "    if log:\n"
+            "        log('Fetching data from API')\n"
+            "        log('Download complete', level='success')\n"
+            "    return {'output': 42}\n"
+        )
+
+        reg = HandlerRegistration(
+            facet_name="CountDocuments",
+            module_uri=f"file://{f}",
+            entrypoint="handle",
+        )
+        store.save_handler_registration(reg)
+
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        runner.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        handler_logs = [l for l in logs if l.source == "handler"]
+        assert len(handler_logs) == 2
+        assert handler_logs[0].message == "Fetching data from API"
+        assert handler_logs[0].level == "info"
+        assert handler_logs[1].message == "Download complete"
+        assert handler_logs[1].level == "success"

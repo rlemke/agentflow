@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         LockMetaData,
         LogDefinition,
         RunnerDefinition,
+        StepLogEntry,
         TaskDefinition,
     )
 
@@ -387,6 +388,41 @@ class PersistenceAPI(Protocol):
 
         Returns:
             All logs for the runner
+        """
+        ...
+
+    # Step log operations
+
+    @abstractmethod
+    def save_step_log(self, entry: "StepLogEntry") -> None:
+        """Save a step log entry.
+
+        Args:
+            entry: The step log entry to save
+        """
+        ...
+
+    @abstractmethod
+    def get_step_logs_by_step(self, step_id: str) -> Sequence["StepLogEntry"]:
+        """Get step logs for a step, ordered by time ascending.
+
+        Args:
+            step_id: The step's unique identifier
+
+        Returns:
+            All step log entries for the step
+        """
+        ...
+
+    @abstractmethod
+    def get_step_logs_by_workflow(self, workflow_id: str) -> Sequence["StepLogEntry"]:
+        """Get step logs for a workflow, ordered by time ascending.
+
+        Args:
+            workflow_id: The workflow's unique identifier
+
+        Returns:
+            All step log entries for the workflow
         """
         ...
 

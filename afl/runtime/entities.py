@@ -397,6 +397,50 @@ class LogDefinition:
 
 
 # =============================================================================
+# Step Log Definition
+# =============================================================================
+
+
+class StepLogLevel:
+    """Step log level constants."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    SUCCESS = "success"
+
+
+class StepLogSource:
+    """Step log source constants."""
+
+    FRAMEWORK = "framework"
+    HANDLER = "handler"
+
+
+@dataclass
+class StepLogEntry:
+    """Step-level lifecycle log entry.
+
+    Captures key milestones during event facet handler execution,
+    such as task claimed, handler dispatching, handler completed,
+    and handler-emitted messages.
+
+    Stored in the ``step_logs`` collection.
+    """
+
+    uuid: str
+    step_id: str
+    workflow_id: str
+    runner_id: str = ""
+    facet_name: str = ""
+    source: str = StepLogSource.FRAMEWORK
+    level: str = StepLogLevel.INFO
+    message: str = ""
+    details: dict = field(default_factory=dict)
+    time: int = 0
+
+
+# =============================================================================
 # Server Definition
 # =============================================================================
 

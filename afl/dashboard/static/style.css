@@ -130,6 +130,12 @@ pre code {
 .tree-children {
     margin-left: 0.25rem;
 }
+.tree-log-badge {
+    font-size: 0.7em;
+    margin-left: 0.5em;
+    vertical-align: middle;
+    text-decoration: none;
+}
 
 /* Inline retry button for step rows and tree nodes */
 .btn-retry-inline {

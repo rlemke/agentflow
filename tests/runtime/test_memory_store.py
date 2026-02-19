@@ -21,7 +21,11 @@ from afl.runtime import (
     MemoryStore,
     ObjectType,
     StepDefinition,
+    StepLogEntry,
+    StepLogLevel,
+    StepLogSource,
     block_id,
+    generate_id,
     workflow_id,
 )
 
@@ -190,3 +194,87 @@ class TestMemoryStore:
 
         store.clear()
         assert store.step_count() == 0
+
+
+class TestStepLogOperations:
+    """Tests for step log persistence operations."""
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    def test_save_and_get_by_step(self, store):
+        """Save a step log and retrieve by step_id."""
+        entry = StepLogEntry(
+            uuid=generate_id(),
+            step_id="step-1",
+            workflow_id="wf-1",
+            runner_id="runner-1",
+            facet_name="ns.Facet",
+            source=StepLogSource.FRAMEWORK,
+            level=StepLogLevel.INFO,
+            message="Task claimed",
+            time=1000,
+        )
+        store.save_step_log(entry)
+
+        logs = store.get_step_logs_by_step("step-1")
+        assert len(logs) == 1
+        assert logs[0].message == "Task claimed"
+        assert logs[0].step_id == "step-1"
+
+    def test_get_by_workflow(self, store):
+        """Retrieve step logs by workflow_id."""
+        for i, step_id in enumerate(["step-1", "step-2"]):
+            store.save_step_log(StepLogEntry(
+                uuid=generate_id(),
+                step_id=step_id,
+                workflow_id="wf-1",
+                message=f"Log {i}",
+                time=1000 + i,
+            ))
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(),
+            step_id="step-3",
+            workflow_id="wf-other",
+            message="Other workflow",
+            time=2000,
+        ))
+
+        logs = store.get_step_logs_by_workflow("wf-1")
+        assert len(logs) == 2
+        assert all(log.workflow_id == "wf-1" for log in logs)
+
+    def test_ordering_by_time(self, store):
+        """Logs are returned ordered by time ascending."""
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(), step_id="s1", workflow_id="w1",
+            message="Third", time=3000,
+        ))
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(), step_id="s1", workflow_id="w1",
+            message="First", time=1000,
+        ))
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(), step_id="s1", workflow_id="w1",
+            message="Second", time=2000,
+        ))
+
+        logs = store.get_step_logs_by_step("s1")
+        assert [l.message for l in logs] == ["First", "Second", "Third"]
+
+    def test_empty_results(self, store):
+        """Querying for non-existent step/workflow returns empty list."""
+        assert store.get_step_logs_by_step("nonexistent") == []
+        assert store.get_step_logs_by_workflow("nonexistent") == []
+
+    def test_clear_removes_step_logs(self, store):
+        """clear() removes step logs too."""
+        store.save_step_log(StepLogEntry(
+            uuid=generate_id(), step_id="s1", workflow_id="w1",
+            message="Test", time=1000,
+        ))
+        assert len(store.get_step_logs_by_step("s1")) == 1
+
+        store.clear()
+        assert len(store.get_step_logs_by_step("s1")) == 0

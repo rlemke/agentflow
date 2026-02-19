@@ -60,6 +60,9 @@ from .entities import (
     RunnerState,
     ServerDefinition,
     ServerState,
+    StepLogEntry,
+    StepLogLevel,
+    StepLogSource,
     TaskState,
 )
 from .evaluator import Evaluator, ExecutionStatus
@@ -538,6 +541,38 @@ class RegistryRunner:
             self._active_futures.append(future)
 
     # =========================================================================
+    # Step Log Emission
+    # =========================================================================
+
+    def _emit_step_log(
+        self,
+        step_id: str,
+        workflow_id: str,
+        message: str,
+        source: str = StepLogSource.FRAMEWORK,
+        level: str = StepLogLevel.INFO,
+        facet_name: str = "",
+        details: dict | None = None,
+    ) -> None:
+        """Create and save a step log entry."""
+        entry = StepLogEntry(
+            uuid=generate_id(),
+            step_id=step_id,
+            workflow_id=workflow_id,
+            runner_id=self._server_id,
+            facet_name=facet_name,
+            source=source,
+            level=level,
+            message=message,
+            details=details or {},
+            time=_current_time_ms(),
+        )
+        try:
+            self._persistence.save_step_log(entry)
+        except Exception:
+            logger.debug("Could not save step log for step %s", step_id, exc_info=True)
+
+    # =========================================================================
     # Event Processing
     # =========================================================================
 
@@ -551,8 +586,22 @@ class RegistryRunner:
         try:
             payload = dict(task.data or {})  # shallow copy to avoid mutating task.data
 
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                message=f"Task claimed: {task.name}",
+                facet_name=task.name,
+            )
+
             if not self._dispatcher.can_dispatch(task.name):
                 error_msg = f"No handler registration for event task '{task.name}'"
+                self._emit_step_log(
+                    step_id=task.step_id,
+                    workflow_id=task.workflow_id,
+                    message=f"Handler error: {error_msg}",
+                    level=StepLogLevel.ERROR,
+                    facet_name=task.name,
+                )
                 self._evaluator.fail_step(task.step_id, error_msg)
                 task.state = TaskState.FAILED
                 task.error = {"message": error_msg}
@@ -565,11 +614,40 @@ class RegistryRunner:
                 )
                 return
 
+            # Inject _step_log callback for handler-level logging
+            def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
+                self._emit_step_log(
+                    step_id=task.step_id,
+                    workflow_id=task.workflow_id,
+                    message=message,
+                    source=StepLogSource.HANDLER,
+                    level=level,
+                    facet_name=task.name,
+                    details=details,
+                )
+
+            payload["_step_log"] = _step_log_callback
+
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                message=f"Dispatching handler: {task.name}",
+                facet_name=task.name,
+            )
+            dispatch_start = _current_time_ms()
+
             # Dispatch via shared dispatcher (handles module loading + async detection)
             try:
                 result = self._dispatcher.dispatch(task.name, payload)
             except (ImportError, AttributeError, TypeError) as exc:
                 error_msg = f"Failed to load handler for '{task.name}': {exc}"
+                self._emit_step_log(
+                    step_id=task.step_id,
+                    workflow_id=task.workflow_id,
+                    message=f"Handler error: {error_msg}",
+                    level=StepLogLevel.ERROR,
+                    facet_name=task.name,
+                )
                 self._evaluator.fail_step(task.step_id, error_msg)
                 task.state = TaskState.FAILED
                 task.error = {"message": error_msg}
@@ -581,6 +659,15 @@ class RegistryRunner:
                     task.step_id,
                 )
                 return
+
+            dispatch_duration = _current_time_ms() - dispatch_start
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                message=f"Handler completed: {task.name} ({dispatch_duration}ms)",
+                level=StepLogLevel.SUCCESS,
+                facet_name=task.name,
+            )
 
             # Continue the step with the result
             self._evaluator.continue_step(task.step_id, result)
@@ -602,6 +689,13 @@ class RegistryRunner:
 
         except Exception as exc:
             # Fail the step and mark task as failed
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                message=f"Handler error: {exc}",
+                level=StepLogLevel.ERROR,
+                facet_name=task.name,
+            )
             try:
                 self._evaluator.fail_step(task.step_id, str(exc))
             except Exception:

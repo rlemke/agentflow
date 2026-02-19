@@ -5,6 +5,7 @@
         <a href="/steps/{{ node.step.id }}">{{ node.step.statement_name or node.step.id|truncate_uuid }}</a>
         {% if node.step.facet_name %}<span class="tree-facet">{{ node.step.facet_name.split('.')[-1] }}</span>{% endif %}
         {% if node.step.start_time %}<span class="tree-duration">{{ (node.step.last_modified - node.step.start_time)|duration }}</span>{% endif %}
+        {% if step_log_counts is defined and step_log_counts.get(node.step.id, 0) > 0 %}<a href="/steps/{{ node.step.id }}#step-logs" class="tree-log-badge badge badge-primary">{{ step_log_counts[node.step.id] }}</a>{% endif %}
         {% if "fail" in node.step.state.lower() or "error" in node.step.state.lower() %}
         <button hx-post="/steps/{{ node.step.id }}/retry"
                 hx-confirm="Retry this step? This will reset it to EventTransmit."

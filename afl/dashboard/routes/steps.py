@@ -29,10 +29,11 @@ def step_detail(step_id: str, request: Request, store=Depends(get_store)):
     """Show step detail: state, attributes, retry action."""
     step = store.get_step(step_id)
     names = _resolve_step_names(step, store) if step else {}
+    step_logs = store.get_step_logs_by_step(step_id) if step else []
     return request.app.state.templates.TemplateResponse(
         request,
         "steps/detail.html",
-        {"step": step, "names": names},
+        {"step": step, "names": names, "step_logs": step_logs},
     )
 
 
