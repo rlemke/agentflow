@@ -131,6 +131,16 @@ pre code {
     margin-left: 0.25rem;
 }
 
+/* Inline retry button for step rows and tree nodes */
+.btn-retry-inline {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    font-size: 0.75em;
+    margin-left: 0.5em;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
 /* Doc comment rendering */
 .doc-comment { margin-top: 0.5rem; font-size: 0.9em; color: var(--muted-color); }
 .doc-description p { margin: 0.25rem 0; }

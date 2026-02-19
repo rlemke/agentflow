@@ -380,7 +380,46 @@ class TestStepRoutes:
         assert resp.status_code == 303
 
         updated = store.get_step(sid)
-        assert updated.state == "state.facet.initialization.Begin"
+        assert updated.state == "state.EventTransmit"
+
+    def test_retry_step_resets_task(self, client):
+        tc, store = client
+        from afl.runtime.entities import TaskDefinition
+        from afl.runtime.step import StepDefinition
+        from afl.runtime.types import step_id, workflow_id
+
+        sid = step_id()
+        wid = workflow_id()
+        step = StepDefinition(
+            id=sid,
+            workflow_id=wid,
+            object_type="VariableAssignment",
+            state="state.statement.Error",
+        )
+        store.save_step(step)
+
+        task = TaskDefinition(
+            uuid="task-retry-1",
+            name="TestTask",
+            runner_id="r-1",
+            workflow_id=wid,
+            flow_id="flow-1",
+            step_id=sid,
+            task_list_name="default",
+            state="failed",
+            error={"message": "Connection timeout"},
+        )
+        store.save_task(task)
+
+        resp = tc.post(f"/steps/{sid}/retry", follow_redirects=False)
+        assert resp.status_code == 303
+
+        updated_step = store.get_step(sid)
+        assert updated_step.state == "state.EventTransmit"
+
+        updated_task = store.get_task_for_step(sid)
+        assert updated_task.state == "pending"
+        assert updated_task.error is None
 
 
 class TestLogRoutes:

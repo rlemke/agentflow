@@ -153,9 +153,23 @@ def _find_statement_in_block(statement_id: str, block: dict) -> str | None:
 
 @router.post("/{step_id}/retry")
 def retry_step(step_id: str, store=Depends(get_store)):
-    """Retry a failed step by resetting its state."""
+    """Retry a failed step by resetting it to EVENT_TRANSMIT."""
+    from afl.runtime.states import StepState
+
     step = store.get_step(step_id)
     if step:
-        step.state = "state.facet.initialization.Begin"
+        # Reset step state to EVENT_TRANSMIT (matches evaluator.retry_step logic)
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
+        step.transition.clear_error()
+        step.transition.request_transition = False
+        step.transition.changed = True
         store.save_step(step)
+
+        # Reset associated task to pending
+        task = store.get_task_for_step(step_id)
+        if task is not None:
+            task.state = "pending"
+            task.error = None
+            store.save_task(task)
     return RedirectResponse(url=f"/steps/{step_id}", status_code=303)

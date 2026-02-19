@@ -5,6 +5,12 @@
         <a href="/steps/{{ node.step.id }}">{{ node.step.statement_name or node.step.id|truncate_uuid }}</a>
         {% if node.step.facet_name %}<span class="tree-facet">{{ node.step.facet_name.split('.')[-1] }}</span>{% endif %}
         {% if node.step.start_time %}<span class="tree-duration">{{ (node.step.last_modified - node.step.start_time)|duration }}</span>{% endif %}
+        {% if "fail" in node.step.state.lower() or "error" in node.step.state.lower() %}
+        <button hx-post="/steps/{{ node.step.id }}/retry"
+                hx-confirm="Retry this step? This will reset it to EventTransmit."
+                class="btn-retry-inline outline"
+                onclick="event.stopPropagation()">Retry</button>
+        {% endif %}
     </summary>
     {% if node.children %}
     <div class="tree-children">

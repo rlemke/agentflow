@@ -26,4 +26,11 @@
         </details>
         {% else %}&mdash;{% endif %}
     </td>
+    <td>
+        {% if "fail" in step.state.lower() or "error" in step.state.lower() %}
+        <button hx-post="/steps/{{ step.id }}/retry"
+                hx-confirm="Retry this step? This will reset it to EventTransmit."
+                class="btn-retry-inline outline">Retry</button>
+        {% else %}&mdash;{% endif %}
+    </td>
 </tr>
