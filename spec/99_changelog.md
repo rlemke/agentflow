@@ -543,6 +543,23 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.41) - Copy Mirror Data to Cache Instead of Serving Directly
+
+- **Mirror as seed source** (`handlers/downloader.py`): when `AFL_GEOFABRIK_MIRROR` is set and a mirror file exists, the data is now copied into the configured cache directory (local or HDFS) instead of returning the mirror path directly; downstream handlers always see the real cache location (`AFL_CACHE_DIR`) regardless of whether data came from the mirror
+- **`_copy_to_cache()` helper** (`handlers/downloader.py`): new function copies a local file to the cache using atomic temp-file + `os.replace` for local paths and `shutil.copyfileobj` streaming for HDFS; follows the same concurrent-safety pattern as the download path (per-path lock, double-check after lock acquisition)
+- **Removed `_local_storage`** (`handlers/downloader.py`): the dedicated local storage backend for mirror paths is no longer needed since mirror hits now go through `_storage` (the configured cache backend)
+- **Updated mirror tests** (`test_downloader.py`): `test_mirror_hit_returns_cached` → `test_mirror_hit_copies_to_cache` (expects `wasInCache=False` and cache path); `test_mirror_path_structure` now asserts cache path instead of mirror path
+- **2 new tests** (`test_downloader.py`): `test_mirror_copies_to_cache` verifies physical file copy from mirror to cache using real files; `test_mirror_skips_copy_when_cache_exists` verifies fast-path cache hit when cache already has the file
+- 2261 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
+## Completed (v0.12.40) - Validate Globally Ambiguous Unqualified Facet Calls
+
+- **Validator rule** (`afl/validator.py`): unqualified facet calls are now flagged as ambiguous when the short name exists in more than one namespace globally, even if only one namespace is imported; local definitions (current namespace) still take precedence without error; prevents the runtime from silently resolving to the wrong namespace
+- **Qualified colliding calls** (13 OSM example `.afl` files): all ambiguous unqualified calls across Africa, Asia, Australia, Canada, Central America, Europe, North America, South America, United States, shapefiles, elevation, and region workflow files were updated to use fully-qualified names
+- **Spec update** (`spec/12_validation.md`): documented the global ambiguity rule with examples
+- **5 new tests** (`tests/test_validator.py`): globally ambiguous short name error, qualified call passes, local definition takes precedence, single-namespace short name passes, different-name facets not ambiguous
+- 2259 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.39) - Geofabrik Mirror Support for Docker OSM Agents
 
 - **Docker Compose override** (`docker-compose.mirror.yml`): new override file mounts a host directory read-only at `/data/osm-mirror` in `agent-osm-geocoder` and `agent-osm-geocoder-lite` containers; sets `AFL_GEOFABRIK_MIRROR=/data/osm-mirror` env var; uses `${AFL_GEOFABRIK_MIRROR:?...}` for clear error on missing var
