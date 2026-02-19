@@ -543,6 +543,11 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.32) - Docker Seed Rewrite and Dashboard Health Check Fix
+
+- **Docker seed rewrite** (`docker/seed/seed.py`): replaced raw pymongo document creation with proper `MongoStore` + runtime entity classes (`FlowDefinition`, `FlowIdentity`, `SourceText`, `WorkflowDefinition`); seeded flows now have `compiled_sources` so the Dashboard "Run" button works; also discovers and seeds all `examples/` directories (7 flows, 352 workflows: inline-examples 24, aws-lambda 16, continental-lz 80, genomics 20, jenkins 16, osm-geocoder 192, volcano-query 4); cleans legacy seed documents on each run; uses `docker:seed` as path identifier
+- **Dashboard health check fix** (`docker-compose.yml`, `Dockerfile.dashboard`): replaced `curl -f` (not available in `python:3.12-slim`) with `python -c "import urllib.request; urllib.request.urlopen(...)"` — dashboard container now reports `healthy` status correctly
+
 ## Completed (v0.12.31) - Run Workflow from Flow Detail Page
 
 - **Run button on flow detail** (`templates/flows/detail.html`): each workflow row now shows a "Run" button linking to `/flows/{flow_id}/run/{workflow_id}` — only displayed when `flow.compiled_sources` exists (seeded flows have sources; flows without sources show no button)
