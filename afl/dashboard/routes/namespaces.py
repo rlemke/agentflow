@@ -34,6 +34,7 @@ class WorkflowEntry:
     uuid: str
     flow_id: str
     version: str = ""
+    documentation: str | None = None
 
 
 @dataclass
@@ -44,6 +45,7 @@ class FacetEntry:
     short_name: str
     parameters: list = field(default_factory=list)
     return_type: str | None = None
+    documentation: str | None = None
 
 
 @dataclass
@@ -86,6 +88,7 @@ def _aggregate_namespaces(store) -> dict[str, NamespaceSummary]:
                     short_name=short,
                     parameters=list(facet.parameters),
                     return_type=facet.return_type,
+                    documentation=getattr(facet, "documentation", None),
                 ))
 
         # Collect embedded workflows (from flow.workflows field)
@@ -123,6 +126,7 @@ def _add_workflow(ns: NamespaceSummary, wf, flow_id: str) -> None:
         uuid=wf.uuid,
         flow_id=flow_id,
         version=getattr(wf, "version", ""),
+        documentation=getattr(wf, "documentation", None),
     ))
 
 

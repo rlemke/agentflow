@@ -1174,3 +1174,75 @@ class TestWorkflowInDeclarations:
         assert "FacetDecl" in decl_types
         assert "EventFacetDecl" in decl_types
         assert "WorkflowDecl" in decl_types
+
+
+class TestDocCommentEmission:
+    """Tests for doc comment emission in JSON output."""
+
+    def test_doc_on_namespace(self):
+        """Namespace doc comment appears in JSON."""
+        ast = parse("""
+        /** NS doc. */
+        namespace ns {
+            facet F(x: String)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        assert data["namespaces"][0]["doc"] == "NS doc."
+
+    def test_doc_on_facet(self):
+        """Facet doc comment appears in JSON."""
+        ast = parse("""
+        namespace ns {
+            /** Facet doc. */
+            facet F(x: String)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        facet = data["namespaces"][0]["facets"][0]
+        assert facet["doc"] == "Facet doc."
+
+    def test_doc_on_event_facet_and_workflow(self):
+        """Event facet and workflow doc comments in JSON."""
+        ast = parse("""
+        namespace ns {
+            /** EF doc. */
+            event facet EF(x: String) => (y: String)
+            /** WF doc. */
+            workflow WF(input: String) andThen {
+                s = EF(x = $.input)
+            }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        decls = {d["name"]: d for d in data["namespaces"][0]["declarations"]}
+        assert decls["EF"]["doc"] == "EF doc."
+        assert decls["WF"]["doc"] == "WF doc."
+
+    def test_doc_on_schema(self):
+        """Schema doc comment appears in JSON."""
+        ast = parse("""
+        namespace ns {
+            /** Schema doc. */
+            schema S { f1: String }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        schema = data["namespaces"][0]["schemas"][0]
+        assert schema["doc"] == "Schema doc."
+
+    def test_no_doc_key_when_absent(self):
+        """No doc key emitted when declaration has no doc comment."""
+        ast = parse("""
+        namespace ns {
+            facet F(x: String)
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        assert "doc" not in data["namespaces"][0]
+        assert "doc" not in data["namespaces"][0]["facets"][0]

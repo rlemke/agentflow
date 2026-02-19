@@ -282,6 +282,8 @@ class JSONEmitter:
             "type": "Namespace",
             "name": node.name,
         }
+        if node.doc:
+            data["doc"] = node.doc
 
         if node.uses:
             data["uses"] = [u.name for u in node.uses]
@@ -333,6 +335,8 @@ class JSONEmitter:
             "type": "FacetDecl",
             "name": node.sig.name,
         }
+        if node.doc:
+            data["doc"] = node.doc
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -351,6 +355,8 @@ class JSONEmitter:
             "type": "EventFacetDecl",
             "name": node.sig.name,
         }
+        if node.doc:
+            data["doc"] = node.doc
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -369,6 +375,8 @@ class JSONEmitter:
             "type": "WorkflowDecl",
             "name": node.sig.name,
         }
+        if node.doc:
+            data["doc"] = node.doc
 
         if node.sig.params:
             data["params"] = self._convert(node.sig.params)
@@ -553,8 +561,10 @@ class JSONEmitter:
         data = {
             "type": "SchemaDecl",
             "name": node.name,
-            "fields": self._convert(node.fields),
         }
+        if node.doc:
+            data["doc"] = node.doc
+        data["fields"] = self._convert(node.fields)
         return self._add_metadata(data, node)
 
     def _schema_field(self, node: SchemaField) -> dict:

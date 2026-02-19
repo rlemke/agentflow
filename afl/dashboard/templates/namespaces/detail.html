@@ -23,7 +23,7 @@
     <tbody>
         {% for wf in namespace.workflows %}
         <tr>
-            <td>{{ wf.short_name }}</td>
+            <td>{{ wf.short_name }}{% if wf.documentation %}<br><small style="color:var(--muted-color)">{{ wf.documentation }}</small>{% endif %}</td>
             <td>{{ wf.version }}</td>
             <td><a href="/flows/{{ wf.flow_id }}/run/{{ wf.uuid }}" role="button" class="outline">Run</a></td>
         </tr>
@@ -47,7 +47,7 @@
     <tbody>
         {% for f in namespace.facets %}
         <tr>
-            <td>{{ f.short_name }}</td>
+            <td>{{ f.short_name }}{% if f.documentation %}<br><small style="color:var(--muted-color)">{{ f.documentation }}</small>{% endif %}</td>
             <td>{% if f.parameters %}{% for p in f.parameters %}{{ p.name }}: {{ p.type_hint }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
             <td>{{ f.return_type or "—" }}</td>
         </tr>

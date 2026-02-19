@@ -1493,3 +1493,155 @@ class TestUnaryNegation:
         assert param.default.operator == "-"
         assert isinstance(param.default.operand, Literal)
         assert param.default.operand.value == 90.0
+
+
+class TestDocComments:
+    """Tests for /** ... */ doc comments."""
+
+    @pytest.fixture
+    def parser(self):
+        return AFLParser()
+
+    def test_doc_comment_on_facet(self, parser):
+        """Doc comment attached to a facet declaration."""
+        ast = parser.parse("""
+        namespace ns {
+            /** Facet documentation. */
+            facet F(x: String)
+        }
+        """)
+        assert ast.namespaces[0].facets[0].doc == "Facet documentation."
+
+    def test_doc_comment_on_event_facet(self, parser):
+        """Doc comment attached to an event facet declaration."""
+        ast = parser.parse("""
+        namespace ns {
+            /** Event facet documentation. */
+            event facet EF(x: String) => (y: String)
+        }
+        """)
+        assert ast.namespaces[0].event_facets[0].doc == "Event facet documentation."
+
+    def test_doc_comment_on_workflow(self, parser):
+        """Doc comment attached to a workflow declaration."""
+        ast = parser.parse("""
+        namespace ns {
+            /** Workflow documentation. */
+            event facet DoWork(x: String)
+            workflow WF(input: String) andThen {
+                s = DoWork(x = $.input)
+            }
+        }
+        """)
+        # The workflow doesn't have a doc comment
+        assert ast.namespaces[0].workflows[0].doc is None
+        # The event facet has one
+        assert ast.namespaces[0].event_facets[0].doc == "Workflow documentation."
+
+    def test_doc_comment_on_workflow_direct(self, parser):
+        """Doc comment directly on a workflow."""
+        ast = parser.parse("""
+        namespace ns {
+            event facet DoWork(x: String)
+            /** Run the workflow. */
+            workflow WF(input: String) andThen {
+                s = DoWork(x = $.input)
+            }
+        }
+        """)
+        assert ast.namespaces[0].workflows[0].doc == "Run the workflow."
+
+    def test_doc_comment_on_namespace(self, parser):
+        """Doc comment attached to a namespace."""
+        ast = parser.parse("""
+        /** Namespace documentation. */
+        namespace ns {
+            facet F(x: String)
+        }
+        """)
+        assert ast.namespaces[0].doc == "Namespace documentation."
+
+    def test_doc_comment_on_schema(self, parser):
+        """Doc comment attached to a schema declaration."""
+        ast = parser.parse("""
+        namespace ns {
+            /** Schema documentation. */
+            schema MySchema {
+                field1: String,
+                field2: Long
+            }
+        }
+        """)
+        assert ast.namespaces[0].schemas[0].doc == "Schema documentation."
+
+    def test_multiline_doc_comment(self, parser):
+        """Multi-line doc comment with * prefix cleaning."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Multi-line documentation.
+             * Second line.
+             */
+            facet F(x: String)
+        }
+        """)
+        assert ast.namespaces[0].facets[0].doc == "Multi-line documentation.\nSecond line."
+
+    def test_doc_comment_with_tags(self, parser):
+        """Doc comment with @param and @return tags preserved."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Adds one to the input.
+             * @param value The input value.
+             * @return result The incremented value.
+             */
+            event facet AddOne(value: Long) => (result: Long)
+        }
+        """)
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert "@param value The input value." in doc
+        assert "@return result The incremented value." in doc
+
+    def test_no_doc_comment_is_none(self, parser):
+        """Declarations without doc comments have doc=None."""
+        ast = parser.parse("""
+        namespace ns {
+            facet F(x: String)
+        }
+        """)
+        assert ast.namespaces[0].facets[0].doc is None
+        assert ast.namespaces[0].doc is None
+
+    def test_regular_block_comment_not_doc(self, parser):
+        """Regular /* */ comments are still ignored, not treated as doc."""
+        ast = parser.parse("""
+        namespace ns {
+            /* This is a regular comment. */
+            facet F(x: String)
+        }
+        """)
+        assert ast.namespaces[0].facets[0].doc is None
+
+    def test_multiple_documented_declarations(self, parser):
+        """Multiple declarations each with their own doc comment."""
+        ast = parser.parse("""
+        /** NS doc. */
+        namespace ns {
+            /** Facet A doc. */
+            facet A(x: String)
+            /** Facet B doc. */
+            facet B(y: Long)
+        }
+        """)
+        assert ast.namespaces[0].doc == "NS doc."
+        assert ast.namespaces[0].facets[0].doc == "Facet A doc."
+        assert ast.namespaces[0].facets[1].doc == "Facet B doc."
+
+    def test_top_level_doc_comment(self, parser):
+        """Doc comment on a top-level (non-namespace) facet."""
+        ast = parser.parse("""
+        /** Top-level facet doc. */
+        facet TopF(x: String)
+        """)
+        assert ast.facets[0].doc == "Top-level facet doc."

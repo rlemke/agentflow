@@ -24,6 +24,7 @@ Semantic rules (e.g., dependency scheduling, single-writer, yield merge semantic
 ### 1.2 Comments
 - Line comment: `//` to end of line
 - Block comment: `/* ... */` (non-nested)
+- Doc comment: `/** ... */` — Javadoc-style documentation comment. Preserved in the AST and emitted as `"doc"` in JSON output. May be attached to `namespace`, `facet`, `event facet`, `workflow`, and `schema` declarations. Leading `*` prefixes on each line are stripped. Tags like `@param` and `@return` are preserved as-is in the doc string.
 
 ### 1.3 Identifiers
 - `ident` matches: `[A-Za-z_][A-Za-z0-9_]*`

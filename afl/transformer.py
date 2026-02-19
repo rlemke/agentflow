@@ -55,6 +55,31 @@ from .ast import (
 )
 
 
+def _clean_doc_comment(raw: str) -> str:
+    """Strip /** */ delimiters and leading * from each line."""
+    # Remove trailing whitespace/newlines consumed by the regex
+    raw = raw.rstrip()
+    # Remove /** and */
+    text = raw[3:-2]
+    lines = text.split("\n")
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("*"):
+            stripped = stripped[1:]
+            if stripped.startswith(" "):
+                stripped = stripped[1:]
+        cleaned.append(stripped)
+    return "\n".join(cleaned).strip()
+
+
+def _extract_doc_comment(items: list) -> str | None:
+    """Extract and remove optional DOC_COMMENT from the beginning of items."""
+    if items and isinstance(items[0], Token) and items[0].type == "DOC_COMMENT":
+        return _clean_doc_comment(str(items.pop(0)))
+    return None
+
+
 def _get_location(meta, source_id: str | None = None) -> SourceLocation | None:
     """Extract source location from Lark meta."""
     if meta and hasattr(meta, "line"):
@@ -467,21 +492,24 @@ class AFLTransformer(Transformer):
     # Declarations
     @v_args(meta=True)
     def facet_decl(self, meta, items: list) -> FacetDecl:
+        doc = _extract_doc_comment(items)
         sig = items[0]
         body = items[1] if len(items) > 1 else None
-        return FacetDecl(sig=sig, body=body, location=self._loc(meta))
+        return FacetDecl(sig=sig, body=body, doc=doc, location=self._loc(meta))
 
     @v_args(meta=True)
     def event_facet_decl(self, meta, items: list) -> EventFacetDecl:
+        doc = _extract_doc_comment(items)
         sig = items[0]
         body = items[1] if len(items) > 1 else None
-        return EventFacetDecl(sig=sig, body=body, location=self._loc(meta))
+        return EventFacetDecl(sig=sig, body=body, doc=doc, location=self._loc(meta))
 
     @v_args(meta=True)
     def workflow_decl(self, meta, items: list) -> WorkflowDecl:
+        doc = _extract_doc_comment(items)
         sig = items[0]
         body = items[1] if len(items) > 1 else None
-        return WorkflowDecl(sig=sig, body=body, location=self._loc(meta))
+        return WorkflowDecl(sig=sig, body=body, doc=doc, location=self._loc(meta))
 
     @v_args(meta=True, inline=True)
     def implicit_decl(self, meta, name: str, call: CallExpr) -> ImplicitDecl:
@@ -501,9 +529,10 @@ class AFLTransformer(Transformer):
 
     @v_args(meta=True)
     def schema_decl(self, meta, items: list) -> SchemaDecl:
+        doc = _extract_doc_comment(items)
         name = items[0]
         fields = items[1] if len(items) > 1 else []
-        return SchemaDecl(name=name, fields=fields, location=self._loc(meta))
+        return SchemaDecl(name=name, fields=fields, doc=doc, location=self._loc(meta))
 
     # Namespace
     @v_args(meta=True)
@@ -533,6 +562,7 @@ class AFLTransformer(Transformer):
 
     @v_args(meta=True)
     def namespace_block(self, meta, items: list) -> Namespace:
+        doc = _extract_doc_comment(items)
         name = items[0]
         body = items[1] if len(items) > 1 else {}
         return Namespace(
@@ -543,6 +573,7 @@ class AFLTransformer(Transformer):
             workflows=body.get("workflows", []),
             implicits=body.get("implicits", []),
             schemas=body.get("schemas", []),
+            doc=doc,
             location=self._loc(meta),
         )
 

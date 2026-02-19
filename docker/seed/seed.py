@@ -35,29 +35,40 @@ SEED_PATH = "docker:seed"
 # Inline example AFL sources
 INLINE_SOURCES = {
     "addone-example": '''
-// Simple AddOne workflow for testing
+/** Core handler namespace with arithmetic and greeting facets. */
 namespace handlers {
+    /** Increments a value by one. */
     event facet AddOne(value: Long) => (result: Long)
+    /** Multiplies two values together. */
     event facet Multiply(a: Long, b: Long) => (result: Long)
+    /** Generates a greeting message for the given name. */
     event facet Greet(name: String) => (message: String)
 
+    /** Simple workflow that adds one to the input value. */
     workflow AddOneWorkflow(input: Long) => (output: Long) andThen {
         added = AddOne(value = $.input)
         yield AddOneWorkflow(output = added.result)
     }
 
+    /**
+     * Adds one twice in sequence.
+     * @param input The starting value.
+     * @return output The input plus two.
+     */
     workflow DoubleAddOne(input: Long) => (output: Long) andThen {
         first = AddOne(value = $.input)
         second = AddOne(value = first.result)
         yield DoubleAddOne(output = second.result)
     }
 
+    /** Multiplies two values and then increments the product. */
     workflow MultiplyAndAdd(a: Long, b: Long) => (result: Long) andThen {
         product = Multiply(a = $.a, b = $.b)
         incremented = AddOne(value = product.result)
         yield MultiplyAndAdd(result = incremented.result)
     }
 
+    /** Greets a user and returns a counter starting at one. */
     workflow GreetAndCount(name: String) => (greeting: String, count: Long) andThen {
         hello = Greet(name = $.name)
         one = AddOne(value = 0)
@@ -142,7 +153,9 @@ def _extract_flow_structure(program_dict: dict):
     def _walk_namespace(ns: dict, prefix: str = "") -> None:
         ns_id = generate_id()
         ns_name = f"{prefix}{ns['name']}" if prefix else ns["name"]
-        namespaces.append(NamespaceDefinition(uuid=ns_id, name=ns_name))
+        namespaces.append(NamespaceDefinition(
+            uuid=ns_id, name=ns_name, documentation=ns.get("doc"),
+        ))
 
         # Walk declarations only (superset of eventFacets + workflows)
         for decl in ns.get("declarations", []):
@@ -162,6 +175,7 @@ def _extract_flow_structure(program_dict: dict):
                     namespace_id=ns_id,
                     parameters=params,
                     return_type=ret_type,
+                    documentation=decl.get("doc"),
                 ))
             elif decl_type == "WorkflowDecl":
                 _walk_workflow_body(decl, ns_name)

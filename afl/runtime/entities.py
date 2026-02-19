@@ -140,6 +140,7 @@ class NamespaceDefinition:
     uuid: str
     name: str
     path: str = ""
+    documentation: str | None = None
 
 
 @dataclass
@@ -151,6 +152,7 @@ class FacetDefinition:
     namespace_id: str
     parameters: list[Parameter] = field(default_factory=list)
     return_type: str | None = None
+    documentation: str | None = None
 
 
 @dataclass

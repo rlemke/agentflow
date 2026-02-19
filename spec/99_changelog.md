@@ -543,6 +543,19 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.36) - Doc Comments (`/** ... */`)
+
+- **Grammar** (`afl.lark`): new `DOC_COMMENT.3` terminal with priority 3 (higher than `BLOCK_COMMENT`); regex consumes trailing whitespace and newlines to avoid LALR conflicts; attached as optional prefix to `namespace_block`, `facet_decl`, `event_facet_decl`, `workflow_decl`, and `schema_decl` rules
+- **AST** (`ast.py`): added `doc: str | None = None` keyword-only field to `FacetDecl`, `EventFacetDecl`, `WorkflowDecl`, `SchemaDecl`, and `Namespace` dataclasses
+- **Transformer** (`transformer.py`): new `_clean_doc_comment()` strips `/** */` delimiters and leading `*` from each line; `_extract_doc_comment()` pops optional `DOC_COMMENT` token from items; applied in all 5 declaration methods
+- **Emitter** (`emitter.py`): emits `"doc"` key in JSON output for all documented declarations; key omitted when `doc` is `None`
+- **Entities** (`runtime/entities.py`): added `documentation: str | None = None` to `NamespaceDefinition` and `FacetDefinition` (`WorkflowDefinition` already had it)
+- **Seed** (`docker/seed/seed.py`): inline AFL sources updated with doc comments on namespace, event facets, and workflows; `_extract_flow_structure()` passes `documentation=decl.get("doc")` for namespaces and facets
+- **Dashboard** (`routes/namespaces.py`, `templates/namespaces/detail.html`): `WorkflowEntry` and `FacetEntry` gain `documentation` field; namespace detail template shows documentation below each workflow/facet name
+- **Spec** (`spec/10_language.md`): section 1.2 updated with doc comment syntax
+- **Tests**: 12 parser tests (`TestDocComments`), 5 emitter tests (`TestDocCommentEmission`)
+- 2231 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.35) - Namespace Page Workflow Counts and Run/View Buttons
 
 - **Fix workflow count always zero** (`routes/namespaces.py`): `_aggregate_namespaces()` now also queries `store.get_workflows_by_flow()` for each flow and matches workflows to namespaces by qualified name prefix (longest-prefix-first via `_match_ns_by_name()`) — previously only checked the embedded `flow.workflows` list which was always empty for seeded flows
