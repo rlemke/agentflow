@@ -9,6 +9,7 @@
 #   scripts/setup --osm-agents 2           # Include OSM geocoder agents
 #   scripts/setup --check-only             # Just verify Docker is available
 #   scripts/setup --build                  # Force rebuild before starting
+#   scripts/setup --clean                  # Drop MongoDB + clean HDFS caches
 #
 set -euo pipefail
 
@@ -26,6 +27,7 @@ POSTGIS=false
 MIRROR=false
 CHECK_ONLY=false
 FORCE_BUILD=false
+CLEAN=false
 
 usage() {
     cat <<'EOF'
@@ -50,6 +52,7 @@ Options:
   --jenkins-home-dir PATH   Use external directory for Jenkins home
   --graphhopper-data-dir PATH  Use external directory for GraphHopper data
   --mirror PATH        Use a local Geofabrik mirror directory (read-only)
+  --clean              Drop MongoDB database and clean HDFS cache files
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -75,6 +78,7 @@ while [[ $# -gt 0 ]]; do
         --mongodb-data-dir) export MONGODB_DATA_DIR="$2"; shift 2 ;;
         --graphhopper-data-dir) export GRAPHHOPPER_DATA_DIR="$2"; shift 2 ;;
         --mirror)        export AFL_GEOFABRIK_MIRROR="$2"; MIRROR=true; shift 2 ;;
+        --clean)         CLEAN=true;            shift ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -183,6 +187,45 @@ echo ""
 
 if [ "$CHECK_ONLY" = true ]; then
     echo "Docker is ready. Exiting (--check-only)."
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Clean phase (--clean): drop MongoDB and remove HDFS cache directories
+# ---------------------------------------------------------------------------
+if [ "$CLEAN" = true ]; then
+    echo "=== Cleaning AgentFlow data ==="
+    echo ""
+
+    # Drop MongoDB database
+    if docker compose ps --status running 2>/dev/null | grep -q mongodb; then
+        echo "Dropping MongoDB 'afl' database..."
+        docker compose exec -T mongodb mongosh --quiet --eval 'db.getSiblingDB("afl").dropDatabase()'
+        echo "  MongoDB: done"
+    else
+        echo "  MongoDB: container not running, skipping"
+    fi
+
+    # Clean HDFS cache directories (if namenode is running)
+    if docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
+        ps --status running 2>/dev/null | grep -q namenode; then
+        echo "Cleaning HDFS cache directories..."
+        for dir in /osm-cache /graphhopper /gtfs-cache; do
+            if docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
+                exec -T namenode hdfs dfs -test -d "$dir" 2>/dev/null; then
+                docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
+                    exec -T namenode hdfs dfs -rm -r -f "$dir"
+                echo "  HDFS: removed $dir"
+            else
+                echo "  HDFS: $dir not present"
+            fi
+        done
+    else
+        echo "  HDFS: namenode not running, skipping"
+    fi
+
+    echo ""
+    echo "Clean complete."
     exit 0
 fi
 
@@ -300,6 +343,7 @@ echo "Useful commands:"
 echo "  docker compose ps          # List running services"
 echo "  docker compose logs -f     # Follow logs"
 echo "  docker compose down        # Stop everything"
+echo "  scripts/setup --clean      # Drop MongoDB + clean HDFS caches"
 echo ""
 echo "To seed example workflows:"
 echo "  docker compose --profile seed run --rm seed"
