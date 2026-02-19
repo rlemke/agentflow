@@ -1,7 +1,9 @@
+/** Aggregates individual African country OSM data downloads. */
 namespace osm.geo.Africa.cache {
   use osm.types
   use osm.geo.cache.Africa
 
+  /** Caches each African country individually in parallel. */
   facet AfricaIndividually() => (cache: [OSMCache]) andThen {
     algeria = Algeria()
     angola = Angola()

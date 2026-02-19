@@ -7,14 +7,20 @@
 // BWA indices (supports all 5 references)
 // -----------------------------------------------------------------------
 
+/** Builds and caches BWA-MEM2 indices for all supported reference genomes. */
 namespace genomics.cache.index.bwa {
 
     use genomics.cache.types
 
+    /** Builds a BWA index for the GRCh38 reference genome. */
     event facet GRCh38(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a BWA index for the GRCh37 reference genome. */
     event facet GRCh37(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a BWA index for the T2T-CHM13 reference genome. */
     event facet T2TCHM13(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a BWA index for the UCSC hg19 reference genome. */
     event facet Hg19(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a BWA index for the GRCm39 mouse reference genome. */
     event facet GRCm39(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
 }
 
@@ -22,12 +28,16 @@ namespace genomics.cache.index.bwa {
 // STAR indices (RNA-seq aligner, needs annotation)
 // -----------------------------------------------------------------------
 
+/** Builds and caches STAR splice-aware indices for RNA-seq alignment. */
 namespace genomics.cache.index.star {
 
     use genomics.cache.types
 
+    /** Builds a STAR index for GRCh38 using the provided gene annotation. */
     event facet GRCh38(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a STAR index for GRCh37 using the provided gene annotation. */
     event facet GRCh37(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a STAR index for T2T-CHM13 using the provided gene annotation. */
     event facet T2TCHM13(cache: GenomicsCache, annotation: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
 }
 
@@ -35,10 +45,13 @@ namespace genomics.cache.index.star {
 // Bowtie2 indices
 // -----------------------------------------------------------------------
 
+/** Builds and caches Bowtie2 indices for short-read alignment. */
 namespace genomics.cache.index.bowtie2 {
 
     use genomics.cache.types
 
+    /** Builds a Bowtie2 index for the GRCh38 reference genome. */
     event facet GRCh38(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
+    /** Builds a Bowtie2 index for the GRCh37 reference genome. */
     event facet GRCh37(cache: GenomicsCache, recreate: Boolean = false) => (index: IndexCache)
 }

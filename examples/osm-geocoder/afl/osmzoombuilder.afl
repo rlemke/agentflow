@@ -7,14 +7,11 @@
 // via sampled routing → apply adaptive cell budgets → detect bypasses/rings
 // → enforce monotonic reveal → export.
 
+/** Low-zoom road infrastructure builder for progressive map rendering at zoom levels 2-7. */
 namespace osm.geo.Roads.ZoomBuilder {
     use osm.types
 
-    // =========================================================================
-    // Schemas
-    // =========================================================================
-
-    // One merged road segment between decision nodes
+    /** Merged road segment between decision nodes with classification attributes. */
     schema LogicalEdge {
         edgeId: String,
         fromNode: String,
@@ -33,7 +30,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         surfaceUnpaved: Boolean
     }
 
-    // Per-edge output with per-zoom scores and flags
+    /** Per-edge output with zoom scores and structural flags. */
     schema ZoomEdgeResult {
         edgeId: String,
         fromNode: String,
@@ -51,7 +48,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         isBridgeOrTunnel: Boolean
     }
 
-    // Top-level pipeline result
+    /** Top-level pipeline result with zoom distribution and output paths. */
     schema ZoomBuilderResult {
         output_dir: String,
         total_logical_edges: Long,
@@ -66,7 +63,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         extraction_date: String
     }
 
-    // Pipeline diagnostics
+    /** Pipeline diagnostics with edge counts and timing. */
     schema ZoomBuilderMetrics {
         total_logical_edges: Long,
         selected_edges: Long,
@@ -83,7 +80,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         processing_seconds: Double
     }
 
-    // Tunable parameters
+    /** Tunable parameters for the zoom builder pipeline. */
     schema ZoomBuilderConfig {
         min_zoom: Long,
         max_zoom: Long,
@@ -93,7 +90,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         hair_max_length_km: Double
     }
 
-    // Per-cell budget info
+    /** Per-cell budget allocation with density factor. */
     schema CellBudget {
         cell_id: String,
         zoom: Long,
@@ -102,18 +99,14 @@ namespace osm.geo.Roads.ZoomBuilder {
         density_factor: Double
     }
 
-    // =========================================================================
-    // Event Facets
-    // =========================================================================
-
-    // Build logical edge graph from PBF data
+    /** Builds a logical edge graph from PBF data. */
     event facet BuildLogicalGraph(cache: OSMCache) => (
         edge_count: Long,
         node_count: Long,
         graph_path: String
     )
 
-    // Build anchor node sets for a given zoom level
+    /** Builds anchor node sets for a given zoom level. */
     event facet BuildAnchors(
         graph_path: String,
         cities_path: String,
@@ -123,7 +116,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         anchor_count: Long
     )
 
-    // Compute structural betweenness sampling for a zoom level
+    /** Computes structural betweenness sampling for a zoom level. */
     event facet ComputeSBS(
         graph_path: String,
         anchors_path: String,
@@ -135,7 +128,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         route_count: Long
     )
 
-    // Compute per-zoom scores from SBS data
+    /** Computes per-zoom scores from SBS data. */
     event facet ComputeScores(
         graph_path: String,
         sbs_paths: String
@@ -143,7 +136,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         scores_path: String
     )
 
-    // Detect bypass roads around settlements
+    /** Detects bypass roads around settlements. */
     event facet DetectBypasses(
         graph_path: String,
         cities_path: String,
@@ -153,7 +146,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         bypass_count: Long
     )
 
-    // Detect ring roads around large settlements
+    /** Detects ring roads around large settlements. */
     event facet DetectRings(
         graph_path: String,
         cities_path: String,
@@ -163,7 +156,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         ring_count: Long
     )
 
-    // Select edges with budgeted greedy selection and backbone repair
+    /** Selects edges with budgeted greedy selection and backbone repair. */
     event facet SelectEdges(
         graph_path: String,
         scores_path: String,
@@ -175,7 +168,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         selected_count: Long
     )
 
-    // Export final zoom layer assignments
+    /** Exports final zoom layer assignments. */
     event facet ExportZoomLayers(
         assignments_path: String,
         graph_path: String,
@@ -184,7 +177,7 @@ namespace osm.geo.Roads.ZoomBuilder {
         result: ZoomBuilderResult
     )
 
-    // Full pipeline orchestrator
+    /** Orchestrates the full zoom builder pipeline end-to-end. */
     event facet BuildZoomLayers(
         cache: OSMCache,
         graph: GraphHopperCache,

@@ -16,9 +16,11 @@
 
 // --- New event facet: compute pairwise driving routes via GraphHopper ---
 
+/** Pairwise driving-route computation between cities using a GraphHopper routing graph. */
 namespace osm.geo.Routing {
     use osm.types
 
+    /** Aggregate result of all-pairs shortest-path routing between cities. */
     schema PairwiseRoutingResult {
         output_path: String,
         route_count: Long,
@@ -31,9 +33,7 @@ namespace osm.geo.Routing {
         format: String
     }
 
-    // Compute all-pairs shortest-path driving routes between cities in a GeoJSON
-    // using a pre-built GraphHopper routing graph.
-    // Returns a GeoJSON with LineString geometries for each route segment.
+    /** Computes all-pairs shortest-path routes between cities and returns LineString geometries. */
     event facet ComputePairwiseRoutes(
         cities_path: String,
         graph: GraphHopperCache
@@ -42,6 +42,7 @@ namespace osm.geo.Routing {
 
 // --- Workflow: full pipeline from region name to rendered route map ---
 
+/** End-to-end city routing: resolves a region, builds a graph, filters cities by population, routes pairwise, and renders. */
 namespace osm.geo.CityRouting {
     use osm.types
     use osm.geo.Region
@@ -51,6 +52,7 @@ namespace osm.geo.CityRouting {
     use osm.geo.Routing
     use osm.geo.Visualization
 
+    /** Resolves a region, builds a routing graph, selects cities by population, computes pairwise driving routes, and renders a two-layer map. */
     workflow CityRouteMap(
         region: String,
         min_population: Long = 1000000,

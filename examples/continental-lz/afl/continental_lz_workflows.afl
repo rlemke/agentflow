@@ -8,6 +8,7 @@
 // Each region follows the pattern:
 //   OSM cache -> GraphHopper build -> BuildZoomLayers
 
+/** Builds low-zoom road tile layers from OSM data across US, Canada, and Europe. */
 namespace continental.lz {
     use osm.types
     use continental.types
@@ -19,6 +20,7 @@ namespace continental.lz {
 
     // ── United States LZ ──────────────────────────────────────────────
 
+    /** Builds low-zoom road layers for the entire United States. */
     workflow BuildUSLowZoom(output_base: String = "/data/lz-output") => (
         result: RegionLZResult
     ) andThen {
@@ -43,6 +45,7 @@ namespace continental.lz {
 
     // ── Canada LZ ─────────────────────────────────────────────────────
 
+    /** Builds low-zoom road layers for all of Canada. */
     workflow BuildCanadaLowZoom(output_base: String = "/data/lz-output") => (
         result: RegionLZResult
     ) andThen {
@@ -67,6 +70,7 @@ namespace continental.lz {
 
     // ── Europe LZ (12 countries in parallel) ──────────────────────────
 
+    /** Builds low-zoom road layers for 12 European countries in parallel. */
     workflow BuildEuropeLowZoom(output_base: String = "/data/lz-output") => (
         results: [RegionLZResult]
     ) andThen {
@@ -154,6 +158,7 @@ namespace continental.lz {
 
     // ── Continental Orchestrator ──────────────────────────────────────
 
+    /** Orchestrates LZ road layer builds across all three continental regions in parallel. */
     workflow BuildContinentalLZ(output_base: String = "/data/lz-output") => (
         summary: ContinentalLZSummary
     ) andThen {

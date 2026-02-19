@@ -3,7 +3,9 @@
 // Downloads and processes electoral boundary data from the US Census Bureau.
 // Supports Congressional Districts, State Legislative Districts, and Voting Precincts.
 
+/** Shared type definitions for US Census TIGER/Line electoral boundary data. */
 namespace census.types {
+    /** Cached TIGER/Line shapefile download metadata. */
     schema TIGERCache {
         url: String,
         path: String,
@@ -15,6 +17,7 @@ namespace census.types {
         state_fips: String
     }
 
+    /** Result of a voting-district extraction or conversion operation. */
     schema VotingDistrictResult {
         output_path: String,
         feature_count: Long,
@@ -26,64 +29,63 @@ namespace census.types {
     }
 }
 
+/** Event facets for downloading TIGER/Line electoral boundary shapefiles from the US Census Bureau. */
 namespace census.tiger.Districts {
     use census.types
-    // Download Congressional District boundaries (nationwide)
-    // congress_number: e.g., 118 for 118th Congress (2023-2025)
+    /** Downloads nationwide Congressional District boundaries for a given congress. */
     event facet CongressionalDistricts(year: Long = 2023,
         congress_number: Long = 118) => (cache: TIGERCache)
 
-    // Download State Legislative Districts - Upper Chamber (Senate)
-    // state_fips: 2-digit FIPS code (e.g., "06" for California, "48" for Texas)
+    /** Downloads state senate (upper chamber) district boundaries by FIPS code. */
     event facet StateSenateDistricts(state_fips: String,
         year: Long = 2023) => (cache: TIGERCache)
 
-    // Download State Legislative Districts - Lower Chamber (House/Assembly)
+    /** Downloads state house/assembly (lower chamber) district boundaries by FIPS code. */
     event facet StateHouseDistricts(state_fips: String,
         year: Long = 2023) => (cache: TIGERCache)
 
-    // Download Voting Districts/Precincts
-    // Note: VTD data is from decennial census (2020, 2010)
+    /** Downloads voting precinct boundaries (available from decennial census years). */
     event facet VotingPrecincts(state_fips: String,
         year: Long = 2020) => (cache: TIGERCache)
 
-    // Download all district types for a state
+    /** Downloads senate, house, and precinct boundaries for a state in one call. */
     event facet AllStateDistricts(state_fips: String,
         year: Long = 2023) => (senate: TIGERCache, house: TIGERCache, precincts: TIGERCache)
 }
 
+/** Processing facets for converting and filtering TIGER/Line shapefiles. */
 namespace census.tiger.Processing {
     use census.types
 
-    // Convert TIGER shapefile to GeoJSON
+    /** Converts a downloaded TIGER shapefile to GeoJSON format. */
     event facet ShapefileToGeoJSON(cache: TIGERCache) => (result: VotingDistrictResult)
 
-    // Join voting districts with OSM administrative boundaries
-    // Performs spatial intersection to find which OSM boundaries contain each district
+    /** Spatially joins voting districts with OSM administrative boundaries. */
     event facet JoinWithOSMBoundaries(districts: VotingDistrictResult,
         osm_boundaries_path: String) => (result: VotingDistrictResult)
 
-    // Filter districts by attribute (e.g., by district number or name)
+    /** Filters districts by a named attribute (e.g., district number or name). */
     event facet FilterDistricts(input_path: String,
         attribute: String, value: String) => (result: VotingDistrictResult)
 }
 
 // Convenience workflows for common use cases
 
+/** Convenience workflows for common electoral boundary retrieval tasks. */
 namespace census.tiger.Workflows {
     use census.types
 
-    // State FIPS code reference facet
+    /** Looks up the 2-digit FIPS code for a state name. */
     facet StateFIPS(state: String) => (fips: String)
 
-    // Complete workflow: Download and convert Congressional Districts to GeoJSON
+    /** Downloads Congressional District boundaries and converts them to GeoJSON. */
     workflow GetCongressionalDistricts(year: Long = 2023, congress_number: Long = 118) => (result: VotingDistrictResult) andThen {
         download = census.tiger.Districts.CongressionalDistricts(year = $.year, congress_number = $.congress_number)
         convert = census.tiger.Processing.ShapefileToGeoJSON(cache = download.cache)
         yield GetCongressionalDistricts(result = convert.result)
     }
 
-    // Complete workflow: Get all voting boundaries for a state
+    /** Downloads and converts senate, house, and precinct boundaries for a state to GeoJSON. */
     workflow GetStateVotingBoundaries(state_fips: String, year: Long = 2023) => (senate: VotingDistrictResult, house: VotingDistrictResult, precincts: VotingDistrictResult) andThen {
         senate_dl = census.tiger.Districts.StateSenateDistricts(state_fips = $.state_fips, year = $.year)
         house_dl = census.tiger.Districts.StateHouseDistricts(state_fips = $.state_fips, year = $.year)

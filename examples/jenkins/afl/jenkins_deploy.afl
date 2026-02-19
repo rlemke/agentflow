@@ -1,16 +1,20 @@
+/** Deployment operations for traditional environments and Kubernetes clusters. */
 namespace jenkins.deploy {
     use jenkins.types
 
+    /** Deploys an artifact to a named environment using rolling or blue-green strategy. */
     event facet DeployToEnvironment(artifact_path: String,
         environment: String = "staging",
         strategy: String = "rolling",
         version: String = "") => (result: DeployResult)
 
+    /** Deploys a container image to a Kubernetes cluster with replica scaling. */
     event facet DeployToK8s(artifact_path: String,
         k8s_namespace: String = "default", cluster: String = "default",
         replicas: Int = 2,
         image_tag: String = "") => (result: DeployResult)
 
+    /** Rolls back a previous deployment by deploy ID and environment. */
     event facet RollbackDeploy(deploy_id: String,
         environment: String) => (result: DeployResult)
 }

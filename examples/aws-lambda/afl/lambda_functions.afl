@@ -1,28 +1,36 @@
+/** Core Lambda function lifecycle operations: create, invoke, update, delete, and list. */
 namespace aws.lambda {
     use aws.lambda.types
 
+    /** Creates a new Lambda function with the specified runtime and resource configuration. */
     event facet CreateFunction(function_name: String, runtime: String = "python3.12",
         handler: String = "lambda_function.lambda_handler",
         memory_mb: Int = 128,
         timeout_seconds: Int = 30,
         environment_vars: String = "") => (config: FunctionConfig)
 
+    /** Invokes a Lambda function synchronously or asynchronously with a JSON payload. */
     event facet InvokeFunction(function_name: String,
         input_payload: String = "{}",
         invocation_type: String = "RequestResponse") => (result: InvokeResult)
 
+    /** Updates a function's deployment package from a local zip or S3 location. */
     event facet UpdateFunctionCode(function_name: String,
         zip_file_path: String = "",
         s3_bucket: String = "",
         s3_key: String = "") => (config: FunctionConfig)
 
+    /** Permanently removes a Lambda function and all associated versions. */
     event facet DeleteFunction(function_name: String) => (config: FunctionConfig)
 
+    /** Lists Lambda functions in the account with optional pagination. */
     event facet ListFunctions(max_items: Int = 50,
         marker: String = "") => (config: FunctionConfig)
 
+    /** Retrieves detailed runtime and configuration info for a specific function. */
     event facet GetFunctionInfo(function_name: String) => (info: FunctionInfo)
 
+    /** Publishes a new Lambda layer version with compatible runtime specifications. */
     event facet PublishLayer(layer_name: String,
         compatible_runtimes: String = "python3.12",
         description: String = "") => (layer: LayerInfo)

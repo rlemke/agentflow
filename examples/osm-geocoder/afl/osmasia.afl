@@ -1,7 +1,9 @@
+/** Aggregates individual Asian country OSM data downloads. */
 namespace osm.geo.Asia.cache {
   use osm.types
   use osm.geo.cache.Asia
 
+  /** Caches each Asian country individually in parallel. */
   facet AsiaIndividually() => (cache: [OSMCache]) andThen {
 
     afghanistan = Afghanistan()

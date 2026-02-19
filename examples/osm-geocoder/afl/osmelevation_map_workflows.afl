@@ -5,13 +5,14 @@
 //
 // Prerequisites: Compile with osmtypes.afl, osmroutes.afl, osmelevation.afl, osmvisualization.afl
 
+/** End-to-end pipelines that extract routes, enrich with SRTM elevation data, filter, and render maps. */
 namespace osm.geo.ElevationMap {
     use osm.types
     use osm.geo.Routes
     use osm.geo.Elevation
     use osm.geo.Visualization
 
-    // Extract bicycle routes, filter by max elevation, and render an interactive map
+    /** Filters bicycle routes by peak elevation and renders the survivors on an interactive map. */
     workflow BicycleElevationMap(
         cache: OSMCache,
         min_elevation_ft: Long = 4000,
@@ -45,7 +46,7 @@ namespace osm.geo.ElevationMap {
         )
     }
 
-    // Extract hiking trails, filter by max elevation, and render an interactive map
+    /** Filters hiking trails by peak elevation and renders them on an interactive map. */
     workflow HikingElevationMap(
         cache: OSMCache,
         min_elevation_ft: Long = 2000,
@@ -71,7 +72,7 @@ namespace osm.geo.ElevationMap {
         )
     }
 
-    // Extract any route type, filter by max elevation, and render a map
+    /** Generic elevation map: accepts any route type, filters by peak elevation, and renders. */
     workflow ElevationRouteMap(
         cache: OSMCache,
         route_type: String,
@@ -102,7 +103,7 @@ namespace osm.geo.ElevationMap {
         )
     }
 
-    // Extract routes, filter by elevation gain (climbing), and render a map
+    /** Selects routes with significant elevation gain and renders them on an interactive map. */
     workflow ClimbingRoutesMap(
         cache: OSMCache,
         route_type: String = "bicycle",
@@ -133,7 +134,7 @@ namespace osm.geo.ElevationMap {
         )
     }
 
-    // Full pipeline with statistics: bicycle routes + elevation + filter + stats + map
+    /** Full five-stage pipeline: bicycle routes, elevation enrichment, filter, statistics, and map. */
     workflow BicycleElevationStatsMap(
         cache: OSMCache,
         min_elevation_ft: Long = 4000,

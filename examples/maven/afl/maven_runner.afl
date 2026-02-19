@@ -1,6 +1,8 @@
+/** Executes Maven artifacts and plugins as workflow steps. */
 namespace maven.runner {
     use maven.types
 
+    /** Runs a Maven artifact by GAV coordinates with optional JVM args and entrypoint. */
     event facet RunMavenArtifact(step_id: String,
         group_id: String, artifact_id: String, version: String,
         classifier: String = "",
@@ -9,6 +11,7 @@ namespace maven.runner {
         workflow_id: String = "",
         runner_id: String = "") => (result: ExecutionResult)
 
+    /** Executes a specific Maven plugin goal within a workspace. */
     event facet RunMavenPlugin(workspace_path: String,
         plugin_group_id: String, plugin_artifact_id: String,
         plugin_version: String,

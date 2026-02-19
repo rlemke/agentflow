@@ -3,12 +3,13 @@
 // Compose resolution, caching, and indexing into high-level workflows
 // that can be used as entry points for the genomics pipeline.
 
+/** High-level workflows that combine resource resolution, caching, and pipeline execution. */
 namespace genomics.cache.workflows {
 
     use genomics.cache.types
     use genomics.cache.Operations
 
-    // Resolve a reference genome by name, then build an aligner index
+    /** Resolves a reference genome by name and builds an aligner index for it. */
     workflow PrepareReference(
         reference_name: String,
         aligner: String = "bwa"
@@ -21,7 +22,7 @@ namespace genomics.cache.workflows {
         )
     }
 
-    // Resolve an SRA sample accession and prepare for processing
+    /** Downloads an SRA sample by accession and stages it for pipeline processing. */
     workflow PrepareSample(
         accession: String,
         sample_id: String = ""
@@ -34,7 +35,7 @@ namespace genomics.cache.workflows {
         )
     }
 
-    // Full cache-aware cohort analysis pipeline
+    /** End-to-end cohort analysis with automatic resource resolution, caching, and indexing. */
     workflow CachedCohortAnalysis(
         dataset_id: String,
         reference_name: String = "hg38",

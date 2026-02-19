@@ -6,9 +6,11 @@
 // Type/tag filtering supports OSM element types (node, way, relation) and tags.
 // Optional dependency inclusion provides complete geometries for ways/relations.
 
+/** Spatial and tag-based filtering of OSM features by radius, type, and element tags. */
 namespace osm.geo.Filters {
     use osm.types
 
+    /** Filtered GeoJSON output with feature counts and applied filter metadata. */
     schema FilterResult {
         output_path: String,
         feature_count: Long,
@@ -19,6 +21,7 @@ namespace osm.geo.Filters {
         extraction_date: String
     }
 
+    /** Filtered OSM output including dependency resolution metadata. */
     schema OSMFilterResult {
         output_path: String,
         feature_count: Long,
@@ -31,39 +34,33 @@ namespace osm.geo.Filters {
         extraction_date: String
     }
 
-    // Filter GeoJSON features by equivalent radius
-    // Operator: gt, gte, lt, lte, eq, ne
+    /** Filters GeoJSON features by equivalent circular radius with comparison operator. */
     event facet FilterByRadius(input_path: String, radius: Double,
         unit: String = "kilometers", operator: String = "gte") => (result: FilterResult)
 
-    // Filter GeoJSON features by radius range (inclusive)
+    /** Filters GeoJSON features by inclusive radius range. */
     event facet FilterByRadiusRange(input_path: String, min_radius: Double,
         max_radius: Double, unit: String = "kilometers") => (result: FilterResult)
 
-    // Filter GeoJSON features by boundary type and radius
+    /** Filters GeoJSON features by boundary type combined with radius threshold. */
     event facet FilterByTypeAndRadius(input_path: String, boundary_type: String,
         radius: Double, unit: String = "kilometers", operator: String = "gte") => (result: FilterResult)
 
-    // Extract boundaries from PBF and filter by radius in one step
+    /** Extracts boundaries from PBF and filters by radius in a single operation. */
     event facet ExtractAndFilterByRadius(cache: OSMCache, admin_levels: [Long],
         natural_types: [String], radius: Double, unit: String = "kilometers",
         operator: String = "gte") => (result: FilterResult)
 
-    // --- OSM Type and Tag Filtering ---
-
-    // Filter PBF by OSM element type (node, way, relation, or * for all)
-    // include_dependencies: if true, includes referenced nodes for ways
+    /** Filters PBF by OSM element type (node, way, relation) with optional dependency inclusion. */
     event facet FilterByOSMType(input_path: String, osm_type: String,
         include_dependencies: Boolean = false) => (result: OSMFilterResult)
 
-    // Filter PBF by OSM tag key/value
-    // tag_value: use "*" to match any value for the key
-    // osm_type: filter by element type, or "*" for all types
+    /** Filters PBF by OSM tag key/value pair, optionally restricted to an element type. */
     event facet FilterByOSMTag(input_path: String, tag_key: String,
         tag_value: String = "*", osm_type: String = "*",
         include_dependencies: Boolean = false) => (result: OSMFilterResult)
 
-    // Filter GeoJSON (already extracted) by OSM type stored in properties
+    /** Filters pre-extracted GeoJSON by OSM type stored in feature properties. */
     event facet FilterGeoJSONByOSMType(input_path: String, osm_type: String,
         tag_key: String = "", tag_value: String = "*") => (result: OSMFilterResult)
 }

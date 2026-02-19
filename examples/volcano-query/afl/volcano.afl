@@ -6,6 +6,7 @@
 //   osm.geo.Elevation (FilterByMaxElevation)
 //   osm.geo.Visualization (RenderMap, FormatGeoJSON)
 
+/** Cross-namespace composition that finds volcanoes in OSM data by tag and elevation. */
 namespace volcano {
     use osm.types
     use osm.geo.Operations
@@ -13,12 +14,14 @@ namespace volcano {
     use osm.geo.Elevation
     use osm.geo.Visualization
 
+    /** Downloads and caches OSM data for a given region. */
     facet LoadVolcanoData(region: String = "US") => (cache: OSMCache) andThen {
         loadVolcanoData = Cache(region = $.region)
         d = osm.geo.Operations.Download(cache = loadVolcanoData.cache)
         yield LoadVolcanoData(cache = d.downloadCache)
     }
 
+    /** Filters OSM data for volcanoes above a minimum elevation and renders map output. */
     workflow FindVolcanoes(state: String, min_elevation_ft: Long) => (map: MapResult, text: FormatResult) andThen {
         data = LoadVolcanoData(region = $.state)
         filtered = FilterByOSMTag(input_path = data.cache.path,

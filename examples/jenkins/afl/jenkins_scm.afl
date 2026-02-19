@@ -1,11 +1,13 @@
+/** Source control operations for Git checkout and branch merging. */
 namespace jenkins.scm {
     use jenkins.types
 
-    // Signature-level mixin: checkout always gets a timeout
+    /** Clones a Git repository at the specified branch with an automatic 10-minute timeout. */
     event facet GitCheckout(repo: String, branch: String = "main",
         depth: Int = 0,
         submodules: Boolean = false) => (info: ScmInfo) with jenkins.mixins.Timeout(minutes = 10)
 
+    /** Merges a source branch into a target branch within an existing workspace. */
     event facet GitMerge(workspace_path: String,
         source_branch: String,
         target_branch: String = "main") => (info: ScmInfo)

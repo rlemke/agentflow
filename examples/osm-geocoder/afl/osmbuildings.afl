@@ -5,9 +5,11 @@
 // - Building height/levels for 3D visualization
 // - Building attributes (name, address, etc.)
 
+/** Building footprint extraction with classification and 3D height data. */
 namespace osm.geo.Buildings {
     use osm.types
 
+    /** Extracted building data with type, area, and height metadata. */
     schema BuildingResult {
         output_path: String,
         feature_count: Long,
@@ -18,6 +20,7 @@ namespace osm.geo.Buildings {
         extraction_date: String
     }
 
+    /** Aggregate building statistics by type with height and level data. */
     schema BuildingStats {
         total_buildings: Long,
         total_area_km2: Double,
@@ -30,33 +33,33 @@ namespace osm.geo.Buildings {
         with_height: Long
     }
 
-    // Extract all buildings from a region
+    /** Extracts all buildings from a region, optionally filtered by type. */
     event facet ExtractBuildings(cache: OSMCache,
         building_type: String = "all") => (result: BuildingResult)
 
-    // Extract residential buildings
+    /** Extracts residential buildings. */
     event facet ResidentialBuildings(cache: OSMCache) => (result: BuildingResult)
 
-    // Extract commercial buildings
+    /** Extracts commercial buildings. */
     event facet CommercialBuildings(cache: OSMCache) => (result: BuildingResult)
 
-    // Extract industrial buildings
+    /** Extracts industrial buildings. */
     event facet IndustrialBuildings(cache: OSMCache) => (result: BuildingResult)
 
-    // Extract retail buildings (shops, malls)
+    /** Extracts retail buildings (shops, malls). */
     event facet RetailBuildings(cache: OSMCache) => (result: BuildingResult)
 
-    // Extract buildings with height data (for 3D)
+    /** Extracts buildings with height/levels data for 3D visualization. */
     event facet Buildings3D(cache: OSMCache) => (result: BuildingResult)
 
-    // Filter buildings by area
+    /** Extracts buildings above a minimum area threshold. */
     event facet LargeBuildings(cache: OSMCache,
         min_area_m2: Double = 1000) => (result: BuildingResult)
 
-    // Get building statistics
+    /** Computes aggregate building statistics. */
     event facet BuildingStatistics(input_path: String) => (stats: BuildingStats)
 
-    // Filter existing GeoJSON by building type
+    /** Filters pre-extracted GeoJSON by building type. */
     event facet FilterBuildingsByType(input_path: String,
         building_type: String) => (result: BuildingResult)
 }

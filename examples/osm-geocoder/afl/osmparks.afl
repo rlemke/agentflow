@@ -6,9 +6,11 @@
 // - Nature reserves (leisure=nature_reserve)
 // - All protected areas (boundary=protected_area)
 
+/** National parks, state parks, nature reserves, and protected area extraction. */
 namespace osm.geo.Parks {
     use osm.types
 
+    /** Extracted park data with protection class and total area. */
     schema ParkResult {
         output_path: String,
         feature_count: Long,
@@ -19,6 +21,7 @@ namespace osm.geo.Parks {
         extraction_date: String
     }
 
+    /** Aggregate park statistics by category. */
     schema ParkStats {
         total_parks: Long,
         total_area_km2: Double,
@@ -29,6 +32,7 @@ namespace osm.geo.Parks {
         park_type: String
     }
 
+    /** Individual park feature with designation and operator details. */
     schema ParkFeature {
         osm_id: Long,
         name: String,
@@ -39,33 +43,31 @@ namespace osm.geo.Parks {
         area_km2: Double
     }
 
-    // Extract national parks (boundary=national_park or protect_class=2)
+    /** Extracts national parks (boundary=national_park or protect_class=2). */
     event facet NationalParks(cache: OSMCache) => (result: ParkResult)
 
-    // Extract state/regional parks (protect_class=5 or state-designated)
+    /** Extracts state and regional parks (protect_class=5). */
     event facet StateParks(cache: OSMCache) => (result: ParkResult)
 
-    // Extract nature reserves (leisure=nature_reserve)
+    /** Extracts nature reserves (leisure=nature_reserve). */
     event facet NatureReserves(cache: OSMCache) => (result: ParkResult)
 
-    // Extract all protected areas with optional protect_class filter
-    // protect_classes: comma-separated list like "1a,1b,2" or "*" for all
+    /** Extracts all protected areas, optionally filtered by protect_class. */
     event facet ProtectedAreas(cache: OSMCache,
         protect_classes: String = "*") => (result: ParkResult)
 
-    // Extract parks by type
-    // park_type: "national", "state", "nature_reserve", "protected_area", "all"
+    /** Extracts parks by configurable type and protection class. */
     event facet ExtractParks(cache: OSMCache, park_type: String = "all",
         protect_classes: String = "*") => (result: ParkResult)
 
-    // Filter existing GeoJSON by park type
+    /** Filters pre-extracted GeoJSON by park type. */
     event facet FilterParksByType(input_path: String, park_type: String,
         protect_classes: String = "*") => (result: ParkResult)
 
-    // Get park statistics
+    /** Computes aggregate park statistics. */
     event facet ParkStatistics(input_path: String) => (stats: ParkStats)
 
-    // Extract parks with minimum area threshold (in km²)
+    /** Extracts parks above a minimum area threshold. */
     event facet LargeParks(cache: OSMCache, min_area_km2: Double = 100,
         park_type: String = "all") => (result: ParkResult)
 }

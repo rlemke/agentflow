@@ -1,15 +1,17 @@
 // Population pipeline integration test workflow
 //
-// A 4-step pipeline: ResolveRegion → ExtractPlacesWithPopulation →
-// FilterByPopulationRange → PopulationStatistics
+// A 4-step pipeline: ResolveRegion -> ExtractPlacesWithPopulation ->
+// FilterByPopulationRange -> PopulationStatistics
 //
 // Prerequisites: Compile with osmtypes.afl, osmregion.afl, osmfilters_population.afl
 
+/** Integration test for the end-to-end population analysis pipeline. */
 namespace test.population {
     use osm.types
     use osm.geo.Region
     use osm.geo.Population
 
+    /** Resolves a region, extracts cities, filters by population range, and computes statistics. */
     workflow PopulationPipeline(
         region: String,
         min_population: Long = 0,

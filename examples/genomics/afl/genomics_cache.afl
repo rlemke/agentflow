@@ -9,14 +9,20 @@
 // Reference genome downloads
 // -----------------------------------------------------------------------
 
+/** Downloads and caches reference genome FASTA files for supported assemblies. */
 namespace genomics.cache.reference {
 
     use genomics.cache.types
 
+    /** Downloads the GRCh38 (hg38) primary human reference assembly. */
     event facet GRCh38() => (cache: GenomicsCache)
+    /** Downloads the GRCh37 (hg19-compatible) human reference assembly. */
     event facet GRCh37() => (cache: GenomicsCache)
+    /** Downloads the T2T-CHM13 telomere-to-telomere human reference. */
     event facet T2TCHM13() => (cache: GenomicsCache)
+    /** Downloads the UCSC hg19 human reference assembly. */
     event facet Hg19() => (cache: GenomicsCache)
+    /** Downloads the GRCm39 mouse reference assembly. */
     event facet GRCm39() => (cache: GenomicsCache)
 }
 
@@ -24,16 +30,24 @@ namespace genomics.cache.reference {
 // Annotation database downloads
 // -----------------------------------------------------------------------
 
+/** Downloads and caches variant annotation databases (dbSNP, ClinVar, gnomAD, VEP, GENCODE). */
 namespace genomics.cache.annotation {
 
     use genomics.cache.types
 
+    /** Downloads dbSNP build 156 for variant ID annotation. */
     event facet DbSNP156() => (cache: GenomicsCache)
+    /** Downloads dbSNP build 155 for legacy variant ID annotation. */
     event facet DbSNP155() => (cache: GenomicsCache)
+    /** Downloads the ClinVar database for clinical significance annotation. */
     event facet ClinVar() => (cache: GenomicsCache)
+    /** Downloads gnomAD v4 population allele frequencies. */
     event facet GnomAD4() => (cache: GenomicsCache)
+    /** Downloads gnomAD v3 population allele frequencies. */
     event facet GnomAD3() => (cache: GenomicsCache)
+    /** Downloads VEP cache release 112 for variant effect prediction. */
     event facet VepCache112() => (cache: GenomicsCache)
+    /** Downloads GENCODE v46 gene annotation models. */
     event facet Gencode46() => (cache: GenomicsCache)
 }
 
@@ -41,13 +55,19 @@ namespace genomics.cache.annotation {
 // SRA read archive downloads
 // -----------------------------------------------------------------------
 
+/** Downloads and caches paired-end FASTQ data from the Sequence Read Archive. */
 namespace genomics.cache.sra {
 
     use genomics.cache.types
 
+    /** Downloads 1000 Genomes sample SRR622461 (high-coverage WGS). */
     event facet SRR622461() => (cache: GenomicsCache)
+    /** Downloads 1000 Genomes sample SRR622458 (high-coverage WGS). */
     event facet SRR622458() => (cache: GenomicsCache)
+    /** Downloads 1000 Genomes sample SRR622459 (high-coverage WGS). */
     event facet SRR622459() => (cache: GenomicsCache)
+    /** Downloads 1000 Genomes sample ERR009378 (low-coverage WGS). */
     event facet ERR009378() => (cache: GenomicsCache)
+    /** Downloads 1000 Genomes sample SRR13604789 (high-coverage WGS). */
     event facet SRR13604789() => (cache: GenomicsCache)
 }

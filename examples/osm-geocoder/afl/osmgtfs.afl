@@ -12,11 +12,11 @@
 // - Coverage gap detection (OSM features without nearby transit)
 // - Route density heatmaps
 
+/** GTFS transit feed extraction, OSM integration, and coverage analysis. */
 namespace osm.geo.Transit.GTFS {
     use osm.types
 
-    // ── Result schemas ──────────────────────────────────────────────────
-
+    /** Extracted transit stop locations with bounding box. */
     schema StopResult {
         output_path: String,
         stop_count: Long,
@@ -28,6 +28,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Extracted transit route geometries. */
     schema RouteResult {
         output_path: String,
         route_count: Long,
@@ -37,6 +38,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Per-stop service frequency data. */
     schema FrequencyResult {
         output_path: String,
         stop_count: Long,
@@ -47,6 +49,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Aggregate transit statistics by route type. */
     schema TransitStats {
         agency_name: String,
         stop_count: Long,
@@ -57,6 +60,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Result of matching OSM features to their nearest transit stops. */
     schema NearestStopResult {
         output_path: String,
         feature_count: Long,
@@ -67,6 +71,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Walk-distance accessibility bands around transit stops. */
     schema AccessibilityResult {
         output_path: String,
         total_features: Long,
@@ -79,6 +84,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Grid-based transit coverage gap analysis. */
     schema CoverageResult {
         output_path: String,
         total_cells: Long,
@@ -89,6 +95,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Route density heatmap per grid cell. */
     schema DensityResult {
         output_path: String,
         total_cells: Long,
@@ -98,6 +105,7 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
+    /** Consolidated transit analysis report with all output paths. */
     schema TransitReport {
         feed_agency: String,
         stop_count: Long,
@@ -115,49 +123,41 @@ namespace osm.geo.Transit.GTFS {
         extraction_date: String
     }
 
-    // ── Core extraction facets ──────────────────────────────────────────
-
-    // Download and extract a GTFS static feed (ZIP)
+    /** Downloads and extracts a GTFS static feed from a URL. */
     event facet DownloadFeed(url: String) => (feed: GTFSFeed)
 
-    // Extract stop locations to GeoJSON points
+    /** Extracts stop locations to GeoJSON points. */
     event facet ExtractStops(feed: GTFSFeed) => (result: StopResult)
 
-    // Extract route geometries to GeoJSON linestrings (shapes.txt or stop sequence)
+    /** Extracts route geometries to GeoJSON linestrings. */
     event facet ExtractRoutes(feed: GTFSFeed) => (result: RouteResult)
 
-    // Compute trips-per-stop-per-day from stop_times.txt + calendar.txt
+    /** Computes trips-per-stop-per-day from stop_times and calendar. */
     event facet ServiceFrequency(feed: GTFSFeed) => (result: FrequencyResult)
 
-    // Aggregate counts by route type
+    /** Computes aggregate transit statistics by route type. */
     event facet TransitStatistics(feed: GTFSFeed) => (stats: TransitStats)
 
-    // ── OSM integration facets ──────────────────────────────────────────
-
-    // Find nearest transit stop for each OSM feature
+    /** Finds the nearest transit stop for each OSM feature. */
     event facet NearestStops(osm_geojson_path: String,
         stops_geojson_path: String,
         max_distance_m: Long = 2000) => (result: NearestStopResult)
 
-    // Classify OSM features into walk-distance bands (400 m / 800 m / beyond)
+    /** Classifies OSM features into walk-distance bands around transit stops. */
     event facet StopAccessibility(osm_geojson_path: String,
         stops_geojson_path: String,
         walk_threshold_m: Long = 400) => (result: AccessibilityResult)
 
-    // ── Coverage analysis facets ────────────────────────────────────────
-
-    // Grid-based coverage gap detection
+    /** Detects grid-based transit coverage gaps. */
     event facet CoverageGaps(stops_geojson_path: String,
         osm_geojson_path: String,
         cell_size_m: Long = 500) => (result: CoverageResult)
 
-    // Route density per grid cell
+    /** Computes route density per grid cell. */
     event facet RouteDensity(routes_geojson_path: String,
         cell_size_m: Long = 500) => (result: DensityResult)
 
-    // ── Report facet ────────────────────────────────────────────────────
-
-    // Run all analyses and produce a consolidated transit report
+    /** Runs all analyses and produces a consolidated transit report. */
     event facet GenerateReport(feed: GTFSFeed,
         osm_geojson_path: String = "") => (report: TransitReport)
 }

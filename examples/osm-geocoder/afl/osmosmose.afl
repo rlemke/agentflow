@@ -12,10 +12,12 @@
 //   2 (warning) — missing name on named features, unclosed polygons
 //   3 (info)    — empty tag values
 
+/** Standalone local PBF/GeoJSON quality analysis with severity-graded issue detection. */
 namespace osm.geo.Operations.OSMOSE {
 
     use osm.types
 
+    /** Verification output file with element counts. */
     schema VerifyResult {
         output_path: String,
         issue_count: Long,
@@ -26,6 +28,7 @@ namespace osm.geo.Operations.OSMOSE {
         verify_date: String
     }
 
+    /** Aggregate issue counts by category and severity level. */
     schema VerifySummary {
         total_issues: Long,
         geometry_issues: Long,
@@ -41,7 +44,7 @@ namespace osm.geo.Operations.OSMOSE {
         verify_date: String
     }
 
-    // Full verification of a PBF cache with all check categories enabled
+    /** Runs all verification checks on a PBF cache. */
     event facet VerifyAll(
         cache: OSMCache,
         output_dir: String = "/tmp",
@@ -52,23 +55,23 @@ namespace osm.geo.Operations.OSMOSE {
         check_duplicates: Boolean = true
     ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Geometry-only verification (degenerate ways, unclosed polygons)
+    /** Verifies geometry only (degenerate ways, unclosed polygons). */
     event facet VerifyGeometry(
         cache: OSMCache
     ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Tag-only verification with optional required-tag list
+    /** Verifies tag completeness with optional required-tag list. */
     event facet VerifyTags(
         cache: OSMCache,
         required_tags: String = "name"
     ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Verify an existing GeoJSON file for structure, geometry, coordinates
+    /** Verifies an existing GeoJSON file for structure, geometry, and coordinates. */
     event facet VerifyGeoJSON(
         input_path: String
     ) => (result: VerifyResult, summary: VerifySummary)
 
-    // Read verification GeoJSON and compute aggregate statistics
+    /** Reads verification output and computes aggregate statistics. */
     event facet ComputeVerifySummary(
         input_path: String
     ) => (summary: VerifySummary)

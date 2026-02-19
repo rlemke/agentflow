@@ -1,5 +1,7 @@
+/** Shared type definitions for all Jenkins CI/CD pipeline operations. */
 namespace jenkins.types {
 
+    /** Source control metadata returned after a Git checkout or merge operation. */
     schema ScmInfo {
         repo: String,
         branch: String,
@@ -10,6 +12,7 @@ namespace jenkins.types {
         clone_duration_ms: Long
     }
 
+    /** Outcome of a build step including artifact path, timing, and error counts. */
     schema BuildResult {
         artifact_path: String,
         build_tool: String,
@@ -20,6 +23,7 @@ namespace jenkins.types {
         errors: Long
     }
 
+    /** Test execution results with pass/fail counts, timing, and coverage percentage. */
     schema TestReport {
         total: Long,
         passed: Long,
@@ -30,6 +34,7 @@ namespace jenkins.types {
         coverage_pct: Double
     }
 
+    /** Results from a code quality or security scanning tool. */
     schema QualityReport {
         tool: String,
         issues: Long,
@@ -40,6 +45,7 @@ namespace jenkins.types {
         passed: Boolean
     }
 
+    /** Build artifact with location, size, checksum, and registry metadata. */
     schema Artifact {
         name: String,
         path: String,
@@ -49,6 +55,7 @@ namespace jenkins.types {
         tag: String
     }
 
+    /** Outcome of a deployment including health status and rollback identifier. */
     schema DeployResult {
         environment: String,
         strategy: String,
@@ -59,6 +66,7 @@ namespace jenkins.types {
         deploy_id: String
     }
 
+    /** Overall status of a Jenkins pipeline execution. */
     schema PipelineStatus {
         pipeline_name: String,
         build_number: Long,

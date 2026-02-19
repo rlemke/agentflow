@@ -5,6 +5,7 @@
 //
 // Per-agency pipeline: DownloadFeed -> TransitStatistics -> ExtractStops -> ExtractRoutes
 
+/** Analyzes GTFS transit feeds for agencies across the US, Canada, and Europe. */
 namespace continental.transit {
     use osm.types
     use continental.types
@@ -14,7 +15,7 @@ namespace continental.transit {
     // United States Agencies (4)
     // ══════════════════════════════════════════════════════════════════
 
-    // Amtrak (national rail)
+    /** Downloads and analyzes the Amtrak national rail GTFS feed. */
     workflow AnalyzeAmtrak() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://content.amtrak.com/content/gtfs/GTFS.zip"
@@ -25,7 +26,7 @@ namespace continental.transit {
         yield AnalyzeAmtrak(result = stats.stats)
     }
 
-    // MBTA (Boston)
+    /** Downloads and analyzes the MBTA (Boston) GTFS feed. */
     workflow AnalyzeMBTA() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://cdn.mbta.com/MBTA_GTFS.zip"
@@ -36,7 +37,7 @@ namespace continental.transit {
         yield AnalyzeMBTA(result = stats.stats)
     }
 
-    // CTA (Chicago)
+    /** Downloads and analyzes the CTA (Chicago) GTFS feed. */
     workflow AnalyzeCTA() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://www.transitchicago.com/downloads/sch_data/google_transit.zip"
@@ -47,7 +48,7 @@ namespace continental.transit {
         yield AnalyzeCTA(result = stats.stats)
     }
 
-    // MTA (New York City Subway)
+    /** Downloads and analyzes the MTA (New York City Subway) GTFS feed. */
     workflow AnalyzeMTA() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "http://web.mta.info/developers/data/nyct/subway/google_transit.zip"
@@ -62,7 +63,7 @@ namespace continental.transit {
     // Canada Agencies (3)
     // ══════════════════════════════════════════════════════════════════
 
-    // TransLink (Vancouver)
+    /** Downloads and analyzes the TransLink (Vancouver) GTFS feed. */
     workflow AnalyzeTransLink() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://gtfs.translink.ca/static/latest"
@@ -73,7 +74,7 @@ namespace continental.transit {
         yield AnalyzeTransLink(result = stats.stats)
     }
 
-    // TTC (Toronto)
+    /** Downloads and analyzes the TTC (Toronto) GTFS feed. */
     workflow AnalyzeTTC() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "http://opendata.toronto.ca/toronto.transit.commission/ttc-routes-and-schedules/OpenData_TTC_Schedules.zip"
@@ -84,7 +85,7 @@ namespace continental.transit {
         yield AnalyzeTTC(result = stats.stats)
     }
 
-    // OC Transpo (Ottawa)
+    /** Downloads and analyzes the OC Transpo (Ottawa) GTFS feed. */
     workflow AnalyzeOCTranspo() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://www.octranspo.com/files/google_transit.zip"
@@ -99,7 +100,7 @@ namespace continental.transit {
     // Europe Agencies (4)
     // ══════════════════════════════════════════════════════════════════
 
-    // Deutsche Bahn (Germany)
+    /** Downloads and analyzes the Deutsche Bahn (Germany) GTFS feed. */
     workflow AnalyzeDeutscheBahn() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://download.gtfs.de/germany/fv/latest.zip"
@@ -110,7 +111,7 @@ namespace continental.transit {
         yield AnalyzeDeutscheBahn(result = stats.stats)
     }
 
-    // SNCF TER (France regional)
+    /** Downloads and analyzes the SNCF TER (France regional rail) GTFS feed. */
     workflow AnalyzeSNCF() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://eu.ftp.opendatasoft.com/sncf/gtfs/export-ter-gtfs-last.zip"
@@ -121,7 +122,7 @@ namespace continental.transit {
         yield AnalyzeSNCF(result = stats.stats)
     }
 
-    // Renfe (Spain)
+    /** Downloads and analyzes the Renfe (Spain) GTFS feed. */
     workflow AnalyzeRenfe() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://ssl.renfe.com/ftransit/Fichero_CER_FEVE/feve.zip"
@@ -132,7 +133,7 @@ namespace continental.transit {
         yield AnalyzeRenfe(result = stats.stats)
     }
 
-    // Trenitalia (Italy)
+    /** Downloads and analyzes the Trenitalia (Italy) GTFS feed. */
     workflow AnalyzeTrenitalia() => (result: TransitAgencyResult) andThen {
         feed = osm.geo.Transit.GTFS.DownloadFeed(
             url = "https://www.trenitalia.com/content/dam/tcom/google-transit/google_transit.zip"
@@ -147,6 +148,7 @@ namespace continental.transit {
     // Continental Aggregators
     // ══════════════════════════════════════════════════════════════════
 
+    /** Aggregates transit analysis results for all four US agencies. */
     workflow AnalyzeUSTransit() => (results: [TransitAgencyResult]) andThen {
         amtrak = AnalyzeAmtrak()
         mbta = AnalyzeMBTA()
@@ -157,6 +159,7 @@ namespace continental.transit {
         )
     }
 
+    /** Aggregates transit analysis results for all three Canadian agencies. */
     workflow AnalyzeCanadaTransit() => (results: [TransitAgencyResult]) andThen {
         translink = AnalyzeTransLink()
         ttc = AnalyzeTTC()
@@ -166,6 +169,7 @@ namespace continental.transit {
         )
     }
 
+    /** Aggregates transit analysis results for all four European agencies. */
     workflow AnalyzeEuropeTransit() => (results: [TransitAgencyResult]) andThen {
         db = AnalyzeDeutscheBahn()
         sncf = AnalyzeSNCF()
@@ -176,6 +180,7 @@ namespace continental.transit {
         )
     }
 
+    /** Runs all regional transit analyses and produces a continental summary. */
     workflow ContinentalTransitAnalysis() => (
         summary: ContinentalTransitSummary
     ) andThen {

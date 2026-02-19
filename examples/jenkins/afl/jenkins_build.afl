@@ -1,19 +1,24 @@
+/** Build step definitions for Maven, Gradle, npm, and Docker. */
 namespace jenkins.build {
     use jenkins.types
 
+    /** Executes a Maven build with configurable goals, JDK version, and profiles. */
     event facet MavenBuild(workspace_path: String,
         goals: String = "clean package", profiles: String = "",
         jdk_version: String = "17",
         skip_tests: Boolean = false) => (result: BuildResult)
 
+    /** Executes a Gradle build with configurable tasks and JDK version. */
     event facet GradleBuild(workspace_path: String,
         tasks: String = "build",
         jdk_version: String = "17") => (result: BuildResult)
 
+    /** Runs an npm build script with a configurable Node.js version. */
     event facet NpmBuild(workspace_path: String,
         build_script: String = "build",
         node_version: String = "20") => (result: BuildResult)
 
+    /** Builds a Docker image from a Dockerfile with optional build arguments. */
     event facet DockerBuild(workspace_path: String,
         dockerfile: String = "Dockerfile",
         image_tag: String,

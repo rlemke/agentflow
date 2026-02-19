@@ -1,5 +1,7 @@
+/** Shared type definitions for AWS Lambda and Step Functions operations. */
 namespace aws.lambda.types {
 
+    /** Lambda function configuration including ARN, runtime, and resource limits. */
     schema FunctionConfig {
         function_name: String,
         function_arn: String,
@@ -12,6 +14,7 @@ namespace aws.lambda.types {
         last_modified: String
     }
 
+    /** Result of invoking a Lambda function, including response payload and timing. */
     schema InvokeResult {
         function_name: String,
         status_code: Long,
@@ -21,6 +24,7 @@ namespace aws.lambda.types {
         duration_ms: Long
     }
 
+    /** Read-only function metadata for monitoring and introspection. */
     schema FunctionInfo {
         function_name: String,
         function_arn: String,
@@ -31,6 +35,7 @@ namespace aws.lambda.types {
         last_modified: String
     }
 
+    /** Lambda layer version details including compatible runtimes. */
     schema LayerInfo {
         layer_name: String,
         layer_arn: String,
@@ -39,6 +44,7 @@ namespace aws.lambda.types {
         compatible_runtimes: String
     }
 
+    /** Step Functions state machine configuration and status. */
     schema StateMachineConfig {
         state_machine_arn: String,
         state_machine_name: String,
@@ -48,6 +54,7 @@ namespace aws.lambda.types {
         status: String
     }
 
+    /** Result of a Step Functions execution including input/output payloads. */
     schema ExecutionResult {
         execution_arn: String,
         state_machine_arn: String,
@@ -58,6 +65,7 @@ namespace aws.lambda.types {
         output_payload: String
     }
 
+    /** Summary info for a Step Functions execution listing entry. */
     schema ExecutionInfo {
         execution_arn: String,
         state_machine_arn: String,

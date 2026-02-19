@@ -9,6 +9,7 @@
 //
 // This demonstrates the power of facet-based workflow composition.
 
+/** Multi-stage composition patterns demonstrating cache, extraction, filtering, statistics, and visualization. */
 namespace examples.composed {
 
     // ==========================================================================
@@ -16,6 +17,7 @@ namespace examples.composed {
     // Basic three-stage pipeline for quick visualization
     // ==========================================================================
 
+    /** Caches a region, extracts bicycle routes, and renders them on a map (three-stage pipeline). */
     workflow VisualizeBicycleRoutes(region: String = "Liechtenstein") => (map_path: String, route_count: Long) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -38,6 +40,7 @@ namespace examples.composed {
     // Analysis pipeline without visualization
     // ==========================================================================
 
+    /** Extracts all parks from a region and computes aggregate statistics without visualization. */
     workflow AnalyzeParks(region: String = "Liechtenstein") => (total_parks: Long, total_area: Double, national: Long, state: Long) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -61,6 +64,7 @@ namespace examples.composed {
     // Four-stage pipeline with filtering
     // ==========================================================================
 
+    /** Extracts cities, filters by minimum population, and renders the qualifying cities on a map. */
     workflow LargeCitiesMap(region: String = "Liechtenstein", min_pop: Long = 10000) => (map_path: String, city_count: Long) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -91,6 +95,7 @@ namespace examples.composed {
     // Parallel extraction with aggregated analysis
     // ==========================================================================
 
+    /** Extracts bicycle, hiking, train, and bus routes in parallel and aggregates length statistics. */
     workflow TransportOverview(region: String = "Liechtenstein") => (bicycle_km: Double, hiking_km: Double, train_km: Double, bus_routes: Long) andThen {
         // Stage 1: Get cached region data (shared)
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -120,6 +125,7 @@ namespace examples.composed {
     // Full five-stage pipeline
     // ==========================================================================
 
+    /** Extracts parks, filters to national parks, computes area statistics, and renders a map. */
     workflow NationalParksAnalysis(region: String = "Liechtenstein") => (map_path: String, park_count: Long, total_area: Double, avg_area: Double) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -156,6 +162,7 @@ namespace examples.composed {
     // Demonstrating parameterized workflows
     // ==========================================================================
 
+    /** Extracts German cities with population over 100k, computes statistics, and renders a map. */
     workflow GermanyCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
         // Use Germany cache
         cache = osm.geo.cache.Europe.Germany()
@@ -183,6 +190,7 @@ namespace examples.composed {
         )
     }
 
+    /** Extracts French cities with population over 100k, computes statistics, and renders a map. */
     workflow FranceCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
         // Use France cache
         cache = osm.geo.cache.Europe.France()
@@ -215,6 +223,7 @@ namespace examples.composed {
     // Combining multiple extractions into one visual output
     // ==========================================================================
 
+    /** Extracts bicycle and hiking routes and renders the bicycle layer on a map. */
     workflow TransportMap(region: String = "Liechtenstein") => (map_path: String) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -238,6 +247,7 @@ namespace examples.composed {
     // Administrative boundary extraction with filtering
     // ==========================================================================
 
+    /** Extracts state-level administrative boundaries and renders them on a map with counts. */
     workflow StateBoundariesWithStats(region: String = "Liechtenstein") => (map_path: String, state_count: Long) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -263,6 +273,7 @@ namespace examples.composed {
     // Find and visualize points of interest
     // ==========================================================================
 
+    /** Discovers cities, towns, and villages in a region and renders cities on a map. */
     workflow DiscoverCitiesAndTowns(region: String = "Liechtenstein") => (map_path: String, cities: Long, towns: Long, villages: Long) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -292,6 +303,7 @@ namespace examples.composed {
     // Comprehensive analysis combining multiple feature types
     // ==========================================================================
 
+    /** Comprehensive analysis extracting parks, routes, and cities with statistics and a park map overlay. */
     workflow RegionalAnalysis(region: String = "Liechtenstein") => (parks_count: Long, parks_area: Double, routes_km: Double, cities_count: Long, map_path: String) andThen {
         // Stage 1: Get cached region data (shared across all extractions)
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -330,6 +342,7 @@ namespace examples.composed {
     // Data quality validation pipeline
     // ==========================================================================
 
+    /** Validates a cached region's OSM data and produces a summary of valid/invalid entries. */
     workflow ValidateAndSummarize(region: String = "Liechtenstein", output_dir: String = "/tmp") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
         // Stage 1: Get cached region data
         cache = osm.geo.Operations.Cache(region = $.region)
@@ -359,6 +372,7 @@ namespace examples.composed {
     // Standalone local PBF quality analysis via OSMOSE verifier
     // ==========================================================================
 
+    /** Runs OSMOSE local verification on a region's PBF and summarizes geometry/tag/reference issues. */
     workflow OsmoseQualityCheck(
         region: String = "Liechtenstein",
         output_dir: String = "/tmp"
@@ -399,6 +413,7 @@ namespace examples.composed {
     // Download feed → parallel extract stops + routes → statistics
     // ==========================================================================
 
+    /** Downloads a GTFS feed, extracts stops and routes in parallel, and computes transit statistics. */
     workflow TransitAnalysis(
         gtfs_url: String
     ) => (
@@ -436,6 +451,7 @@ namespace examples.composed {
     // OSM cache + GTFS feed → extract buildings + stops → accessibility → gaps
     // ==========================================================================
 
+    /** Measures transit accessibility by computing walk-distance bands and detecting coverage gaps. */
     workflow TransitAccessibility(
         gtfs_url: String,
         region: String = "Liechtenstein"
@@ -484,6 +500,7 @@ namespace examples.composed {
     // Cache → Build GraphHopper → Build Zoom Layers (minZoom per edge z2–z7)
     // ==========================================================================
 
+    /** Builds a routing graph and assigns minimum zoom levels to road edges for low-zoom tile rendering. */
     workflow RoadZoomBuilder(
         region: String = "Liechtenstein",
         output_dir: String = "/tmp/zoom-builder",

@@ -1,21 +1,22 @@
+/** Reusable cross-cutting concerns for AWS Lambda operations. */
 namespace aws.lambda.mixins {
 
-    // Retry failed invocations with configurable backoff
+    /** Retries failed invocations with configurable backoff interval. */
     facet Retry(maxAttempts: Int = 3, backoffMs: Int = 1000)
 
-    // Maximum execution timeout for a step
+    /** Enforces a maximum execution timeout for a Lambda workflow step. */
     facet Timeout(seconds: Int = 300)
 
-    // Dead letter queue for failed invocations
+    /** Routes failed invocations to a dead letter queue for later inspection. */
     facet DLQ(dlq_arn: String)
 
-    // VPC configuration for Lambda functions
+    /** Places the Lambda function inside a VPC with specified subnets and security groups. */
     facet VpcConfig(subnet_ids: String, security_group_ids: String)
 
-    // X-Ray tracing mode
+    /** Enables AWS X-Ray distributed tracing for a Lambda invocation. */
     facet Tracing(mode: String = "Active")
 
-    // Memory size override
+    /** Overrides the default memory allocation for a Lambda function. */
     facet MemorySize(mb: Int = 128)
 
     // Namespace-level defaults

@@ -1,10 +1,9 @@
-// GraphHopper routing graph cache facets
-// Each facet takes an OSM cache and builds/returns a routing graph
-
+/** GraphHopper routing graph cache facets for African countries. */
 namespace osm.geo.cache.GraphHopper.Africa {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all African countries combined. */
     facet AllAfrica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allAfrica = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllAfrica(graph = allAfrica.graph)
@@ -227,10 +226,12 @@ namespace osm.geo.cache.GraphHopper.Africa {
     }
 }
 
+/** GraphHopper routing graph cache facets for Asian countries. */
 namespace osm.geo.cache.GraphHopper.Asia {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all Asian countries combined. */
     facet AllAsia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allAsia = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllAsia(graph = allAsia.graph)
@@ -405,10 +406,12 @@ namespace osm.geo.cache.GraphHopper.Asia {
     }
 }
 
+/** GraphHopper routing graph cache facets for Australia and Oceania. */
 namespace osm.geo.cache.GraphHopper.Australia {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all Australia/Oceania regions combined. */
     facet AllAustralia(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allAustralia = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllAustralia(graph = allAustralia.graph)
@@ -475,10 +478,12 @@ namespace osm.geo.cache.GraphHopper.Australia {
     }
 }
 
+/** GraphHopper routing graph cache facets for European countries. */
 namespace osm.geo.cache.GraphHopper.Europe {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all European countries combined. */
     facet AllEurope(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allEurope = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllEurope(graph = allEurope.graph)
@@ -681,10 +686,12 @@ namespace osm.geo.cache.GraphHopper.Europe {
     }
 }
 
+/** GraphHopper routing graph cache facets for North American countries. */
 namespace osm.geo.cache.GraphHopper.NorthAmerica {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all North American countries combined. */
     facet AllNorthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allNorthAmerica = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllNorthAmerica(graph = allNorthAmerica.graph)
@@ -711,10 +718,12 @@ namespace osm.geo.cache.GraphHopper.NorthAmerica {
     }
 }
 
+/** GraphHopper routing graph cache facets for South American countries. */
 namespace osm.geo.cache.GraphHopper.SouthAmerica {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all South American countries combined. */
     facet AllSouthAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allSouthAmerica = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllSouthAmerica(graph = allSouthAmerica.graph)
@@ -773,10 +782,12 @@ namespace osm.geo.cache.GraphHopper.SouthAmerica {
     }
 }
 
+/** GraphHopper routing graph cache facets for Central American and Caribbean countries. */
 namespace osm.geo.cache.GraphHopper.CentralAmerica {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all Central American and Caribbean countries combined. */
     facet AllCentralAmerica(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allCentralAmerica = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllCentralAmerica(graph = allCentralAmerica.graph)
@@ -827,10 +838,12 @@ namespace osm.geo.cache.GraphHopper.CentralAmerica {
     }
 }
 
+/** GraphHopper routing graph cache facets for US states. */
 namespace osm.geo.cache.GraphHopper.UnitedStates {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all US states combined. */
     facet AllUnitedStates(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allUnitedStates = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllUnitedStates(graph = allUnitedStates.graph)
@@ -1041,10 +1054,12 @@ namespace osm.geo.cache.GraphHopper.UnitedStates {
     }
 }
 
+/** GraphHopper routing graph cache facets for Canadian provinces and territories. */
 namespace osm.geo.cache.GraphHopper.Canada {
     use osm.types
     use osm.geo.Operations.GraphHopper
 
+    /** Builds a routing graph for all Canadian provinces and territories combined. */
     facet AllCanada(cache: OSMCache, profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         allCanada = BuildGraph(cache = $.cache, profile = $.profile, recreate = $.recreate)
         yield AllCanada(graph = allCanada.graph)

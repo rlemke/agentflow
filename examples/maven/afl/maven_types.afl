@@ -1,5 +1,7 @@
+/** Shared type definitions for Maven artifact and plugin execution results. */
 namespace maven.types {
 
+    /** Outcome of running a Maven artifact including exit code, stdout/stderr, and timing. */
     schema ExecutionResult {
         exit_code: Long,
         success: Boolean,
@@ -9,6 +11,7 @@ namespace maven.types {
         artifact_path: String
     }
 
+    /** Outcome of running a Maven plugin goal with phase and output details. */
     schema PluginExecutionResult {
         plugin_key: String,
         goal: String,

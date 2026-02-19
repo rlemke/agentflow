@@ -3,8 +3,10 @@
 // Types used across LZ road infrastructure and GTFS transit analysis
 // for United States, Canada, and Europe.
 
+/** Shared type definitions for continental road and transit analysis pipelines. */
 namespace continental.types {
 
+    /** Summary of LZ processing results for a single geographic region. */
     schema RegionLZResult {
         region: String,
         total_edges: Long,
@@ -12,6 +14,7 @@ namespace continental.types {
         output_dir: String
     }
 
+    /** Statistics gathered from analyzing a single transit agency's GTFS feed. */
     schema TransitAgencyResult {
         agency_name: String,
         stop_count: Long,
@@ -20,6 +23,7 @@ namespace continental.types {
         has_shapes: Boolean
     }
 
+    /** Aggregated road infrastructure statistics across all continental regions. */
     schema ContinentalLZSummary {
         us_total_edges: Long,
         us_selected_edges: Long,
@@ -30,6 +34,7 @@ namespace continental.types {
         total_regions: Long
     }
 
+    /** Aggregated transit agency counts across US, Canada, and Europe. */
     schema ContinentalTransitSummary {
         us_agencies: Long,
         canada_agencies: Long,

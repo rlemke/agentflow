@@ -3,24 +3,29 @@
 // Resolves human-friendly names (e.g. "hg38", "dbsnp", "clinvar")
 // to their canonical cache entries and download facets.
 
+/** Resolves user-supplied names and accessions to canonical cached resources. */
 namespace genomics.cache.Resolve {
 
     use genomics.cache.types
 
+    /** Maps a reference genome alias (e.g. "hg38") to its canonical cache entry. */
     event facet ResolveReference(
         name: String,
         prefer_source: String = ""
     ) => (cache: GenomicsCache, resolution: ResourceResolution)
 
+    /** Maps an annotation database name and version to its canonical cache entry. */
     event facet ResolveAnnotation(
         name: String,
         version: String = "latest"
     ) => (cache: GenomicsCache, resolution: ResourceResolution)
 
+    /** Resolves an SRA accession to its cached FASTQ download. */
     event facet ResolveSample(
         accession: String
     ) => (cache: GenomicsCache, resolution: ResourceResolution)
 
+    /** Enumerates available genomics resources, optionally filtered by category. */
     event facet ListResources(
         category: String = ""
     ) => (result: ResourceListResult)

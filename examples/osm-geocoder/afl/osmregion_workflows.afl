@@ -6,6 +6,7 @@
 // Prerequisites: Compile with osmtypes.afl, osmregion.afl, osmroutes.afl,
 //   osmelevation.afl, osmvisualization.afl
 
+/** Region-name-driven pipelines that resolve a name, extract routes, filter by elevation, and render maps. */
 namespace osm.geo.RegionMap {
     use osm.types
     use osm.geo.Region
@@ -13,7 +14,7 @@ namespace osm.geo.RegionMap {
     use osm.geo.Elevation
     use osm.geo.Visualization
 
-    // Resolve a region name, extract bicycle routes, filter by elevation, and render a map
+    /** Resolves a region name, extracts bicycle routes, filters by elevation, and renders a map. */
     workflow BicycleElevationMapByRegion(
         region: String,
         min_elevation_ft: Long = 4000,
@@ -47,7 +48,7 @@ namespace osm.geo.RegionMap {
         )
     }
 
-    // Resolve a region name, extract hiking trails, filter by elevation, and render a map
+    /** Resolves a region name, extracts hiking trails, filters by elevation, and renders a map. */
     workflow HikingElevationMapByRegion(
         region: String,
         min_elevation_ft: Long = 2000,
@@ -81,7 +82,7 @@ namespace osm.geo.RegionMap {
         )
     }
 
-    // Resolve a region name, extract routes by type, filter by elevation, and render a map
+    /** Resolves a region name, extracts routes of any type, filters by elevation, and renders a map. */
     workflow RouteMapByRegion(
         region: String,
         route_type: String,

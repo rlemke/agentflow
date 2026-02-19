@@ -1,8 +1,9 @@
+/** Aggregates individual Canadian province and territory OSM data downloads. */
 namespace osm.geo.Canada.cache {
-// Canada
   use osm.types
   use osm.geo.cache.Canada
 
+  /** Caches each Canadian province and territory individually in parallel. */
   facet CanadaIndividually () => (cache: [OSMCache]) andThen {
 
     alberta = Alberta()

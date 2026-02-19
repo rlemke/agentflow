@@ -1,8 +1,9 @@
+/** Aggregates individual European country OSM data downloads. */
 namespace osm.geo.Europe.cache {
-// Europe
   use osm.types
   use osm.geo.cache.Europe
 
+  /** Caches each European country individually in parallel. */
   facet EuropeIndividually () => (cache: [OSMCache]) andThen {
 
     albania = Albania()

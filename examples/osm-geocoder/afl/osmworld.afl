@@ -1,3 +1,4 @@
+/** Aggregates all continental OSM caches into a single world-level dataset. */
 namespace osm.geo.World.cache {
     use osm.types
     use osm.geo.Africa.cache
@@ -10,6 +11,7 @@ namespace osm.geo.World.cache {
     use osm.geo.UnitedStates.cache
 
 
+    /** Downloads and caches OSM data for every continent, returning the combined result. */
     facet World() => (cache: [OSMCache]) andThen {
 
         // These broadcast the requests to the download services

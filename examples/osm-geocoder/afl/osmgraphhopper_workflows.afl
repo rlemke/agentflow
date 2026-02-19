@@ -1,12 +1,13 @@
 // GraphHopper workflow compositions
 // Builds routing graphs from OSM caches for entire regions
 
+/** Batch GraphHopper routing graph construction for European countries. */
 namespace osm.geo.GraphHopper.Europe {
     use osm.types
     uses osm.geo.cache.Europe
     uses osm.geo.cache.GraphHopper.Europe
 
-    // Build routing graphs for major European countries
+    /** Builds routing graphs for ten major European countries in parallel. */
     workflow BuildMajorEuropeGraphs(profile: String = "car", recreate: Boolean = false) => (graphs: [GraphHopperCache]) andThen {
 
         // Step 1: Get OSM caches (parallel)
@@ -37,7 +38,7 @@ namespace osm.geo.GraphHopper.Europe {
         yield BuildMajorEuropeGraphs(graphs = germany_gh.graph ++ france_gh.graph ++ spain_gh.graph ++ italy_gh.graph ++ uk_gh.graph ++ poland_gh.graph ++ netherlands_gh.graph ++ belgium_gh.graph ++ austria_gh.graph ++ switzerland_gh.graph)
     }
 
-    // Build a single country graph
+    /** Builds a single routing graph for Germany. */
     workflow BuildGermanyGraph(profile: String = "car", recreate: Boolean = false) => (graph: GraphHopperCache) andThen {
         osm = osm.geo.cache.Europe.Germany()
         gh = osm.geo.cache.GraphHopper.Europe.Germany(cache = osm.cache, profile = $.profile, recreate = $.recreate)
@@ -45,12 +46,13 @@ namespace osm.geo.GraphHopper.Europe {
     }
 }
 
+/** Batch GraphHopper routing graph construction for North American countries. */
 namespace osm.geo.GraphHopper.NorthAmerica {
     use osm.types
     uses osm.geo.cache.NorthAmerica
     uses osm.geo.cache.GraphHopper.NorthAmerica
 
-    // Build routing graphs for North America
+    /** Builds routing graphs for the US, Canada, and Mexico in parallel. */
     workflow BuildNorthAmericaGraphs(profile: String = "car", recreate: Boolean = false) => (graphs: [GraphHopperCache]) andThen {
         // Get OSM caches
         usa_osm = osm.geo.cache.NorthAmerica.UnitedStates()
@@ -66,12 +68,13 @@ namespace osm.geo.GraphHopper.NorthAmerica {
     }
 }
 
+/** Batch GraphHopper routing graph construction for individual US states. */
 namespace osm.geo.GraphHopper.UnitedStates {
     use osm.types
     uses osm.geo.cache.UnitedStates
     uses osm.geo.cache.GraphHopper.UnitedStates
 
-    // Build routing graphs for US West Coast states
+    /** Builds routing graphs for California, Oregon, and Washington in parallel. */
     workflow BuildWestCoastGraphs(profile: String = "car", recreate: Boolean = false) => (graphs: [GraphHopperCache]) andThen {
         ca_osm = osm.geo.cache.UnitedStates.California()
         or_osm = osm.geo.cache.UnitedStates.Oregon()
@@ -84,7 +87,7 @@ namespace osm.geo.GraphHopper.UnitedStates {
         yield BuildWestCoastGraphs(graphs = ca_gh.graph ++ or_gh.graph ++ wa_gh.graph)
     }
 
-    // Build routing graphs for US East Coast states
+    /** Builds routing graphs for NY, NJ, MA, PA, and FL in parallel. */
     workflow BuildEastCoastGraphs(profile: String = "car", recreate: Boolean = false) => (graphs: [GraphHopperCache]) andThen {
         ny_osm = osm.geo.cache.UnitedStates.NewYork()
         nj_osm = osm.geo.cache.UnitedStates.NewJersey()

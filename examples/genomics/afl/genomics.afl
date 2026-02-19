@@ -8,8 +8,10 @@
 // Shared type schemas
 // -----------------------------------------------------------------------
 
+/** Core data types for genomics pipeline stages, from raw QC through final packaging. */
 namespace genomics.types {
 
+    /** Quality-control metrics and cleaned FASTQ output for a single sample. */
     schema QcReport {
         sample_id: String,
         total_reads: Long,
@@ -20,6 +22,7 @@ namespace genomics.types {
         tool_version: String
     }
 
+    /** Read-alignment statistics and BAM location for a single sample. */
     schema AlignmentResult {
         sample_id: String,
         bam_path: String,
@@ -30,6 +33,7 @@ namespace genomics.types {
         mean_coverage: Double
     }
 
+    /** Per-sample variant calling output including SNP and indel tallies. */
     schema VariantResult {
         sample_id: String,
         gvcf_path: String,
@@ -38,6 +42,7 @@ namespace genomics.types {
         indel_count: Long
     }
 
+    /** Paths and metadata for a downloaded reference genome bundle. */
     schema ReferenceBundle {
         fasta_path: String,
         annotation_path: String,
@@ -45,6 +50,7 @@ namespace genomics.types {
         size_bytes: Long
     }
 
+    /** Joint-called and filtered cohort VCF with summary statistics. */
     schema CohortVariantResult {
         cohort_vcf_path: String,
         filtered_vcf_path: String,
@@ -53,6 +59,7 @@ namespace genomics.types {
         pass_rate: Double
     }
 
+    /** Functional annotation results mapping variants to genes. */
     schema AnnotationResult {
         variant_table_path: String,
         variant_count: Long,
@@ -60,6 +67,7 @@ namespace genomics.types {
         gene_count: Long
     }
 
+    /** Aggregate QC and depth statistics across all cohort samples. */
     schema CohortStatsResult {
         qc_report_path: String,
         stats_path: String,
@@ -68,6 +76,7 @@ namespace genomics.types {
         variant_count: Long
     }
 
+    /** Final deliverable bundle containing annotated variants, QC, and manifest. */
     schema AnalysisPackage {
         package_path: String,
         manifest_path: String,
@@ -82,53 +91,63 @@ namespace genomics.types {
 // Event facets (agent-handled processing steps)
 // -----------------------------------------------------------------------
 
+/** Agent-handled processing steps for each stage of the genomics pipeline. */
 namespace genomics.Facets {
 
     use genomics.types
 
+    /** Downloads and indexes a reference genome for a given assembly build. */
     event facet IngestReference(
         reference_build: String
     ) => (result: ReferenceBundle)
 
+    /** Trims adapters and filters low-quality reads from paired-end FASTQ inputs. */
     event facet QcReads(
         sample_id: String,
         r1_uri: String,
         r2_uri: String
     ) => (result: QcReport)
 
+    /** Aligns cleaned reads to a reference genome, producing a sorted BAM. */
     event facet AlignReads(
         sample_id: String,
         clean_fastq_path: String,
         reference_build: String
     ) => (result: AlignmentResult)
 
+    /** Runs haplotype-based variant calling on a single sample BAM. */
     event facet CallVariants(
         sample_id: String,
         bam_path: String,
         reference_build: String
     ) => (result: VariantResult)
 
+    /** Merges per-sample gVCFs into a joint-called cohort VCF. */
     event facet JointGenotype(
         gvcf_dir: String,
         reference_build: String,
         sample_count: Long
     ) => (result: CohortVariantResult)
 
+    /** Left-aligns, decomposes, and quality-filters cohort variants. */
     event facet NormalizeFilter(
         vcf_path: String,
         reference_build: String
     ) => (result: CohortVariantResult)
 
+    /** Adds gene, consequence, and population-frequency annotations to variants. */
     event facet Annotate(
         vcf_path: String,
         annotation_path: String
     ) => (result: AnnotationResult)
 
+    /** Computes summary statistics and QC metrics across the full cohort. */
     event facet CohortAnalytics(
         variant_table_path: String,
         dataset_id: String
     ) => (result: CohortStatsResult)
 
+    /** Packages annotated variants, QC reports, and statistics for delivery. */
     event facet Publish(
         variant_table_path: String,
         qc_report_path: String,
@@ -141,10 +160,12 @@ namespace genomics.Facets {
 // Workflows
 // -----------------------------------------------------------------------
 
+/** Entry-point workflows that orchestrate per-sample and cohort-level analysis. */
 namespace genomics.pipeline {
 
     use genomics.types
 
+    /** Fans out QC, alignment, and variant calling across samples in parallel. */
     // Per-sample fan-out: QC -> Align -> Call Variants for each sample
     workflow SamplePipeline(
         samples: Json,
@@ -172,6 +193,7 @@ namespace genomics.pipeline {
         )
     }
 
+    /** Performs joint genotyping, annotation, and publishing for a complete cohort. */
     // Cohort fan-in: joint genotyping, annotation, and publishing
     workflow CohortAnalysis(
         dataset_id: String,

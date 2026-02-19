@@ -1,8 +1,10 @@
+/** Downloads OSM PBF caches for 30 US states in parallel. */
 namespace osm.geo.UnitedStates.sample {
   use osm.types
   use osm.geo.Operations
   use osm.geo.cache.UnitedStates
 
+  /** Fetches and aggregates OSM cache data for a representative set of 30 US states. */
   workflow Download30States() => (cache: [OSMCache]) andThen {
 
     alaska = Alaska()

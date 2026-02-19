@@ -5,8 +5,9 @@
 //
 // Prerequisites: Compile with osmtypes.afl, osmroutes.afl, osmvisualization.afl, osmcache.afl
 
+/** Example pipelines combining cache, route extraction, and map rendering. */
 namespace examples.routes {
-    // Download a region and extract bicycle routes with visualization
+    /** Extracts bicycle routes from a cached region and renders them on a green interactive map. */
     workflow BicycleRoutesMap(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file for the region
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -24,7 +25,7 @@ namespace examples.routes {
         yield BicycleRoutesMap(map_path = map.result.output_path, feature_count = routes.result.feature_count)
     }
 
-    // Download a region and extract hiking trails with visualization
+    /** Extracts hiking trails from a cached region and renders them on an orange interactive map. */
     workflow HikingTrailsMap(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file for the region
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -42,7 +43,7 @@ namespace examples.routes {
         yield HikingTrailsMap(map_path = map.result.output_path, feature_count = trails.result.feature_count)
     }
 
-    // Download a region and extract train routes with visualization
+    /** Extracts train routes and stations from a cached region and renders them on a blue map. */
     workflow TrainRoutesMap(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file for the region
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -60,7 +61,7 @@ namespace examples.routes {
         yield TrainRoutesMap(map_path = map.result.output_path, feature_count = routes.result.feature_count)
     }
 
-    // Download a region and extract bus routes with visualization
+    /** Extracts bus routes and stops from a cached region and renders them on a red map. */
     workflow BusRoutesMap(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file for the region
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -78,7 +79,7 @@ namespace examples.routes {
         yield BusRoutesMap(map_path = map.result.output_path, feature_count = routes.result.feature_count)
     }
 
-    // Extract all public transport and visualize
+    /** Extracts all public transport modes (trains, buses, trams) and renders a unified purple map. */
     workflow PublicTransportMap(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -96,7 +97,7 @@ namespace examples.routes {
         yield PublicTransportMap(map_path = map.result.output_path, feature_count = routes.result.feature_count)
     }
 
-    // Extract routes with statistics
+    /** Extracts bicycle routes with infrastructure, computes length/count statistics, and renders a map. */
     workflow BicycleRoutesWithStats(region_name: String = "Liechtenstein") => (map_path: String, route_count: Long, total_length_km: Double, infrastructure_count: Long) andThen {
         // Step 1: Get the cached PBF file
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -122,7 +123,7 @@ namespace examples.routes {
         )
     }
 
-    // Extract hiking trails with statistics
+    /** Extracts hiking trails with infrastructure, computes length/count statistics, and renders a map. */
     workflow HikingTrailsWithStats(region_name: String = "Liechtenstein") => (map_path: String, route_count: Long, total_length_km: Double, infrastructure_count: Long) andThen {
         // Step 1: Get the cached PBF file
         cache = osm.geo.cache.Europe.Liechtenstein()
@@ -148,7 +149,7 @@ namespace examples.routes {
         )
     }
 
-    // National cycle network routes only
+    /** Filters to national cycle network (ncn) routes only and renders a dark-green map. */
     workflow NationalCycleNetwork(region_name: String = "Liechtenstein") => (map_path: String, feature_count: Long) andThen {
         // Step 1: Get the cached PBF file
         cache = osm.geo.cache.Europe.Liechtenstein()

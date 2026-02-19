@@ -1,9 +1,9 @@
+/** Aggregates individual North American country OSM data downloads. */
 namespace osm.geo.NorthAmerica.cache {
-// NorthAmerica
   use osm.types
   use osm.geo.cache.NorthAmerica
 
-
+  /** Caches each North American country individually in parallel. */
   facet NorthAmericaIndividually () => (cache: [OSMCache]) andThen {
 
     canada = Canada()

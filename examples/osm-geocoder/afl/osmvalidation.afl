@@ -8,9 +8,11 @@
 //
 // Produces good/bad statistics and writes invalid entries to output file.
 
+/** OSM data quality validation: tag completeness, geometry, bounds, and duplicates. */
 namespace osm.geo.Operations.Validation {
     use osm.types
 
+    /** Validation summary with counts by error category. */
     schema ValidationStats {
         total_entries: Long,
         valid_entries: Long,
@@ -22,6 +24,7 @@ namespace osm.geo.Operations.Validation {
         validation_date: String
     }
 
+    /** Output file containing invalid entries. */
     schema ValidationResult {
         output_path: String,
         feature_count: Long,
@@ -29,25 +32,25 @@ namespace osm.geo.Operations.Validation {
         validation_date: String
     }
 
-    // Full validation: checks tags, geometry, bounds, and duplicates
+    /** Runs all validation checks on a cached OSM dataset. */
     event facet ValidateCache(cache: OSMCache,
         output_dir: String = "/tmp",
         use_hdfs: Boolean = false) => (stats: ValidationStats, result: ValidationResult)
 
-    // Focused validation: only geometry correctness checks
+    /** Validates geometry correctness only. */
     event facet ValidateGeometry(cache: OSMCache) => (stats: ValidationStats, result: ValidationResult)
 
-    // Focused validation: checks for missing or malformed tags
+    /** Validates tag completeness against required tags. */
     event facet ValidateTags(cache: OSMCache,
         required_tags: String = "name") => (stats: ValidationStats, result: ValidationResult)
 
-    // Checks coordinate bounds, useful for regional bounding-box constraints
+    /** Validates coordinate bounds against a bounding box. */
     event facet ValidateBounds(cache: OSMCache,
         min_lat: Double = -90.0,
         max_lat: Double = 90.0,
         min_lon: Double = -180.0,
         max_lon: Double = 180.0) => (stats: ValidationStats, result: ValidationResult)
 
-    // Read a validation result file and compute summary statistics
+    /** Reads a validation result file and computes summary statistics. */
     event facet ValidationSummary(input_path: String) => (stats: ValidationStats)
 }

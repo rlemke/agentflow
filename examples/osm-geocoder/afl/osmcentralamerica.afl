@@ -1,9 +1,9 @@
+/** Aggregates individual Central American and Caribbean country OSM data downloads. */
 namespace osm.geo.CentralAmerica.cache {
-// CentralAmerica
   use osm.types
   use osm.geo.cache.CentralAmerica
 
-
+  /** Caches each Central American and Caribbean country individually in parallel. */
   facet CentralAmericaIndividually () => (cache: [OSMCache]) andThen {
 
     bahamas = Bahamas()

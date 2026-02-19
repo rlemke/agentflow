@@ -1,12 +1,14 @@
+/** End-to-end CI/CD pipeline workflows demonstrating mixin composition patterns. */
 namespace jenkins.pipeline {
 
     use jenkins.types
     use jenkins.mixins
 
     // -----------------------------------------------------------------------
-    // Pipeline 1: Java Maven CI — call-time mixin composition
+    // Pipeline 1: Java Maven CI -- call-time mixin composition
     // Shows: with Timeout(), with Retry(), with Credentials(), with Notification()
     // -----------------------------------------------------------------------
+    /** Builds, tests, and deploys a Java Maven project with credential and retry mixins. */
     workflow JavaMavenCI(repo: String, branch: String = "main",
         environment: String = "staging") => (deploy_url: String,
             test_passed: Long, test_total: Long,
@@ -38,9 +40,10 @@ namespace jenkins.pipeline {
     }
 
     // -----------------------------------------------------------------------
-    // Pipeline 2: Docker Kubernetes Deploy — credentials + agent labels
+    // Pipeline 2: Docker Kubernetes Deploy -- credentials + agent labels
     // Shows: with AgentLabel(), with Credentials()
     // -----------------------------------------------------------------------
+    /** Builds a Docker image, scans for vulnerabilities, and deploys to Kubernetes. */
     workflow DockerK8sDeploy(repo: String, branch: String = "main",
         image_tag: String, registry_url: String,
         k8s_namespace: String = "default",
@@ -75,9 +78,10 @@ namespace jenkins.pipeline {
     }
 
     // -----------------------------------------------------------------------
-    // Pipeline 3: Multi-Module Build — foreach + stash mixins
+    // Pipeline 3: Multi-Module Build -- foreach + stash mixins
     // Shows: andThen foreach with per-iteration mixins
     // -----------------------------------------------------------------------
+    /** Builds and tests each module in a multi-module project using foreach iteration. */
     workflow MultiModuleBuild(repo: String, branch: String = "main",
         modules: Json) => (artifact_path: String,
             module_name: String,
@@ -102,9 +106,10 @@ namespace jenkins.pipeline {
     }
 
     // -----------------------------------------------------------------------
-    // Pipeline 4: Full CI with Quality Gates — comprehensive composition
+    // Pipeline 4: Full CI with Quality Gates -- comprehensive composition
     // Shows: parallel stages, quality gates, conditional notification
     // -----------------------------------------------------------------------
+    /** Runs a full CI pipeline with parallel quality gates, security scanning, and deployment. */
     workflow FullCIPipeline(repo: String, branch: String = "main",
         deploy_env: String = "staging",
         notify_channel: String = "#ci") => (deploy_url: String,

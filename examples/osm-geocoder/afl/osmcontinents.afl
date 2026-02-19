@@ -1,9 +1,9 @@
+/** Aggregates continent-level OSM data downloads. */
 namespace osm.geo.Continents.cache {
-// Continents
   use osm.types
   use osm.geo.cache.Continents
 
-
+  /** Caches each continent individually in parallel. */
   facet ContinentsIndividually() => (cache: [OSMCache]) andThen {
     /*
     planet = Planet()

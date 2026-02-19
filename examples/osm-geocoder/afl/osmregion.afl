@@ -5,9 +5,11 @@
 //
 // Prerequisites: Compile with osmtypes.afl
 
+/** Resolves human-friendly region names to Geofabrik download URLs and OSMCache structures. */
 namespace osm.geo.Region {
     use osm.types
 
+    /** Single region match with continent and Geofabrik path info. */
     schema RegionResolution {
         query: String,
         matched_name: String,
@@ -18,6 +20,7 @@ namespace osm.geo.Region {
         disambiguation: String
     }
 
+    /** Multi-region match for geographic features spanning multiple downloads. */
     schema MultiRegionResolution {
         query: String,
         match_count: Long,
@@ -25,6 +28,7 @@ namespace osm.geo.Region {
         regions: Json
     }
 
+    /** Listing of all available regions and geographic features. */
     schema RegionListResult {
         region_count: Long,
         regions: Json,
@@ -32,16 +36,14 @@ namespace osm.geo.Region {
         geographic_features: Json
     }
 
-    // Resolve a single region name to an OSMCache download
-    // Returns the best match; use prefer_continent to disambiguate (e.g. "NorthAmerica" for Georgia the state)
+    /** Resolves a region name to a single best-match OSMCache download. */
     event facet ResolveRegion(name: String,
         prefer_continent: String = "") => (cache: OSMCache, resolution: RegionResolution)
 
-    // Resolve a region name that may match multiple regions (e.g. "Alps", "Scandinavia")
-    // Returns all matching caches for geographic features
+    /** Resolves a name that may span multiple regions (e.g. "Alps", "Scandinavia"). */
     event facet ResolveRegions(name: String,
         prefer_continent: String = "") => (caches: Json, resolution: MultiRegionResolution)
 
-    // List all available regions and geographic features
+    /** Lists all available regions and geographic features, optionally filtered by continent. */
     event facet ListRegions(continent: String = "") => (result: RegionListResult)
 }

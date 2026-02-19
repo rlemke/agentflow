@@ -1,18 +1,24 @@
+/** AWS Step Functions state machine lifecycle and execution management. */
 namespace aws.stepfunctions {
     use aws.lambda.types
 
+    /** Creates a new Step Functions state machine with an ASL definition and IAM role. */
     event facet CreateStateMachine(state_machine_name: String,
         definition: String = "",
         role_arn: String = "") => (config: StateMachineConfig)
 
+    /** Starts a new execution of a state machine with optional input payload. */
     event facet StartExecution(state_machine_arn: String,
         input_payload: String = "{}",
         execution_name: String = "") => (result: ExecutionResult)
 
+    /** Retrieves the current status and output of a running or completed execution. */
     event facet DescribeExecution(execution_arn: String) => (result: ExecutionResult)
 
+    /** Permanently deletes a state machine and stops all running executions. */
     event facet DeleteStateMachine(state_machine_arn: String) => (config: StateMachineConfig)
 
+    /** Lists executions for a state machine filtered by status. */
     event facet ListExecutions(state_machine_arn: String,
         status_filter: String = "",
         max_results: Int = 100) => (info: ExecutionInfo)

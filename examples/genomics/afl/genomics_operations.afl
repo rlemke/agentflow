@@ -3,19 +3,28 @@
 // Configuration facets and operational event facets for managing
 // the genomics cache (download, index, validate, status, checksum).
 
+/** Default configuration values for cache download behavior. */
 namespace genomics.cache.Operations.Data {
 
+    /** Specifies the target date for cached resource retrieval. */
     facet CacheDate(date: String = "latest") => (date: String)
+    /** Controls whether to force re-download of already-cached resources. */
     facet CacheForce(force: Boolean = false) => (force: Boolean)
 }
 
+/** Operational primitives for downloading, indexing, and verifying cached resources. */
 namespace genomics.cache.Operations {
 
     use genomics.cache.types
 
+    /** Fetches a remote genomics resource into the local cache. */
     event facet Download(cache: GenomicsCache) => (cache: GenomicsCache)
+    /** Builds an aligner-specific index from a cached reference genome. */
     event facet Index(cache: GenomicsCache, aligner: String) => (cache: IndexCache)
+    /** Verifies the integrity of a cached resource against its checksum. */
     event facet Validate(cache: GenomicsCache) => (valid: Boolean, message: String)
+    /** Reports the current on-disk status, size, and date of a cached resource. */
     event facet Status(cache: GenomicsCache) => (status: String, size: Long, date: String)
+    /** Computes a cryptographic checksum for a cached resource file. */
     event facet Checksum(cache: GenomicsCache) => (checksum: String, algorithm: String)
 }

@@ -1,8 +1,9 @@
-
+/** OSM data cache facets for African countries and the continent. */
 namespace osm.geo.cache.Africa {
     use osm.types
     use osm.geo.Operations
 
+    /** Caches all African countries as a single combined dataset. */
     facet AllAfrica() => (cache: OSMCache) andThen {
         allAfrica = Cache(region = "AllAfrica")
         yield AllAfrica(cache = allAfrica.cache)
@@ -226,12 +227,12 @@ namespace osm.geo.cache.Africa {
 
 }
 
+/** OSM data cache facets for Asian countries and the continent. */
 namespace osm.geo.cache.Asia {
     use osm.types
     use osm.geo.Operations
 
-    // Asia
-
+    /** Caches all Asian countries as a single combined dataset. */
     facet AllAsia() => (cache: OSMCache) andThen {
         allAsia = Cache(region = "AllAsia")
         yield AllAsia(cache = allAsia.cache)
@@ -407,12 +408,12 @@ namespace osm.geo.cache.Asia {
 
 }
 
+/** OSM data cache facets for Australia, Oceania, and Pacific island nations. */
 namespace osm.geo.cache.Australia {
     use osm.types
     use osm.geo.Operations
 
-    // Autralia
-
+    /** Caches all Australia/Oceania regions as a single combined dataset. */
     facet AllAustralia() => (cache: OSMCache) andThen {
         allAustralia = Cache(region = "AllAustralia")
         yield AllAustralia(cache = allAustralia.cache)
@@ -499,12 +500,12 @@ namespace osm.geo.cache.Australia {
     }
 }
 
+/** OSM data cache facets for European countries and the continent. */
 namespace osm.geo.cache.Europe {
     use osm.types
     use osm.geo.Operations
 
-// Europe
-
+    /** Caches all European countries as a single combined dataset. */
     facet AllEurope() => (cache: OSMCache) andThen {
         allEurope = Cache(region = "AllEurope")
         yield AllEurope(cache = allEurope.cache)
@@ -700,12 +701,12 @@ namespace osm.geo.cache.Europe {
 
 }
 
+/** OSM data cache facets for North American countries and the continent. */
 namespace osm.geo.cache.NorthAmerica {
     use osm.types
     use osm.geo.Operations
 
-    // North America
-
+    /** Caches all North American countries as a single combined dataset. */
     facet AllNorthAmerica() => (cache: OSMCache) andThen {
         allNorthAmerica = Cache(region = "AllNorthAmerica")
         yield AllNorthAmerica(cache = allNorthAmerica.cache)
@@ -733,12 +734,12 @@ namespace osm.geo.cache.NorthAmerica {
 
 }
 
+/** OSM data cache facets for Canadian provinces and territories. */
 namespace osm.geo.cache.Canada {
     use osm.types
     use osm.geo.Operations
 
-    // Canada
-
+    /** Caches all Canadian provinces and territories as a single combined dataset. */
     facet AllCanada() => (cache: OSMCache) andThen {
         allCanada = Cache(region = "AllCanada")
         yield AllCanada(cache = allCanada.cache)
@@ -793,10 +794,12 @@ namespace osm.geo.cache.Canada {
     }
 }
 
+/** OSM data cache facets for Central American and Caribbean countries. */
 namespace osm.geo.cache.CentralAmerica {
     use osm.types
     use osm.geo.Operations
 
+    /** Caches all Central American and Caribbean countries as a single combined dataset. */
     facet AllCentralAmerica() => (cache: OSMCache) andThen {
         allCentralAmerica = Cache(region = "AllCentralAmerica")
         yield AllCentralAmerica(cache = allCentralAmerica.cache)
@@ -855,10 +858,12 @@ namespace osm.geo.cache.CentralAmerica {
     }
 }
 
+/** OSM data cache facets for South American countries and the continent. */
 namespace osm.geo.cache.SouthAmerica {
     use osm.types
     use osm.geo.Operations
 
+    /** Caches all South American countries as a single combined dataset. */
     facet AllSouthAmerica() => (cache: OSMCache) andThen {
         allSouthAmerica = Cache(region = "AllSouthAmerica")
         yield AllSouthAmerica(cache = allSouthAmerica.cache)
@@ -917,12 +922,12 @@ namespace osm.geo.cache.SouthAmerica {
     }
 }
 
+/** OSM data cache facets for US states and territories. */
 namespace osm.geo.cache.UnitedStates {
     use osm.types
     use osm.geo.Operations
 
-    /* USA States */
-
+    /** Caches all US states and territories as a single combined dataset. */
     facet AllUnitedStates() => (cache: OSMCache) andThen {
         allUnitedStates = Cache(region = "AllUnitedStates")
         yield AllUnitedStates(cache = allUnitedStates.cache)
@@ -1139,10 +1144,12 @@ namespace osm.geo.cache.UnitedStates {
 }
 
 
+/** OSM data cache facets for Antarctica. */
 namespace osm.geo.cache.Antarctica {
     use osm.types
     use osm.geo.Operations
 
+    /** Caches all Antarctic regions as a single combined dataset. */
     facet AllAntarctica() => (cache: OSMCache) andThen {
         allAntarctica = Cache(region = "AllAntarctica")
         yield AllAntarctica(cache = allAntarctica.cache)
@@ -1153,10 +1160,12 @@ namespace osm.geo.cache.Antarctica {
     }
 }
 
+/** OSM data cache facets for continent-level and planetary extracts. */
 namespace osm.geo.cache.Continents {
     use osm.types
     use osm.geo.Operations
 
+    /** Caches all continents as a single combined dataset. */
     facet AllContinents() => (cache: OSMCache) andThen {
         allContinents = Cache(region = "AllContinents")
         yield AllContinents(cache = allContinents.cache)

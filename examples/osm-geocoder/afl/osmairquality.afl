@@ -1,13 +1,4 @@
-// Air quality + schools exposure pipeline
-//
-// Mixes OSM school data with OpenAQ air quality readings to compute
-// per-school PM2.5 exposure levels and render a color-coded map.
-//
-// This is the first cross-dataset pipeline combining OSM with a non-OSM API.
-//
-// Prerequisites: Compile with osmtypes.afl, osmregion.afl, osmamenities.afl,
-//   osmvisualization.afl
-
+/** Air quality data schemas and event facets for OpenAQ integration. */
 namespace osm.geo.AirQuality {
     schema AirQualityResult {
         output_path: String,
@@ -58,8 +49,7 @@ namespace osm.geo.AirQuality {
     event facet ExposureStatistics(input_path: String) => (stats: ExposureStats)
 }
 
-// --- Workflow: region -> schools + air quality -> correlation -> map ---
-
+/** School air quality exposure pipeline combining OSM schools with OpenAQ sensor data. */
 namespace osm.geo.SchoolAirQuality {
     use osm.types
     use osm.geo.Region

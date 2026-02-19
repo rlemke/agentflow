@@ -1,7 +1,9 @@
+/** Aggregates individual Australia/Oceania region OSM data downloads. */
 namespace osm.geo.Australia.cache {
   use osm.types
   use osm.geo.cache.Australia
 
+  /** Caches each Australia/Oceania region individually in parallel. */
   facet AustraliaIndividually() => (cache: [OSMCache]) andThen {
 
     americanOceania = AmericanOceania()

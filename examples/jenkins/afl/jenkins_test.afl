@@ -1,14 +1,18 @@
+/** Test execution and quality analysis operations. */
 namespace jenkins.test {
     use jenkins.types
 
+    /** Runs a test suite using the specified framework and reports results with coverage. */
     event facet RunTests(workspace_path: String,
         framework: String = "junit", suite: String = "unit",
         parallel: Boolean = true) => (report: TestReport)
 
+    /** Runs static code quality analysis using tools like SonarQube. */
     event facet CodeQuality(workspace_path: String,
         tool: String = "sonarqube",
         config_path: String = "sonar-project.properties") => (report: QualityReport)
 
+    /** Scans the workspace for security vulnerabilities at a given severity threshold. */
     event facet SecurityScan(workspace_path: String,
         scanner: String = "trivy",
         severity_threshold: String = "HIGH") => (report: QualityReport)

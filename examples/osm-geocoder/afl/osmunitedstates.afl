@@ -1,9 +1,9 @@
+/** Aggregates individual US state OSM data downloads. */
 namespace osm.geo.UnitedStates.cache {
-// UnitedStates
   use osm.types
   use osm.geo.cache.UnitedStates
 
-
+  /** Caches each US state individually in parallel. */
   facet UnitedStatesIndividually () => (cache: [OSMCache]) andThen {
 
     alabama = Alabama()

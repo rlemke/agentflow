@@ -1,9 +1,9 @@
+/** Aggregates individual South American country OSM data downloads. */
 namespace osm.geo.SouthAmerica.cache {
-// SouthAmerica
   use osm.types
   use osm.geo.cache.SouthAmerica
 
-
+  /** Caches each South American country individually in parallel. */
   facet SouthAmericaIndividually () => (cache: [OSMCache]) andThen {
 
     argentina = Argentina()

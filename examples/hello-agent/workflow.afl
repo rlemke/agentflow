@@ -5,12 +5,13 @@
 // 2. Agent processes the event and returns a greeting
 // 3. Workflow completes with the result
 
+/** Minimal agent example demonstrating the event facet boundary. */
 namespace hello {
-    // Event facet: processed by an external agent
+    /** Sends a name to an external agent and receives a greeting message. */
     event facet Greet(name: String) => (message: String)
 }
 
-// Workflow: entry point for execution
+/** Greets a person by dispatching to the hello.Greet agent. */
 workflow SayHello(name: String) => (greeting: String) andThen {
     result = hello.Greet(name = $.name)
     yield SayHello(greeting = result.message)

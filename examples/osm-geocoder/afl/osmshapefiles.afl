@@ -1,8 +1,10 @@
+/** Downloads OSM-derived shapefiles for all European countries. */
 namespace osm.geo.Europe.shapefiles {
   use osm.types
   use osm.geo.Operations
   use osm.geo.cache.Europe
 
+  /** Caches each European country and downloads its shapefile in parallel. */
   facet EuropeShapefiles () => (cache: [OSMCache]) andThen {
 
     albania = Albania()

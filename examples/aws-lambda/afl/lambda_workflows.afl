@@ -1,12 +1,14 @@
+/** End-to-end Lambda deployment workflows demonstrating mixin composition and Step Functions integration. */
 namespace aws.lambda.workflows {
 
     use aws.lambda.types
     use aws.lambda.mixins
 
     // -----------------------------------------------------------------------
-    // Workflow 1: Deploy and Invoke — pure andThen chain
+    // Workflow 1: Deploy and Invoke -- pure andThen chain
     // Creates a Lambda function, invokes it, and verifies the result
     // -----------------------------------------------------------------------
+    /** Creates a Lambda function, invokes it, and retrieves its runtime info. */
     workflow DeployAndInvoke(function_name: String, runtime: String = "python3.12",
         input_payload: String = "{}") => (function_arn: String,
             status_code: Long, response_payload: String,
@@ -28,9 +30,10 @@ namespace aws.lambda.workflows {
     }
 
     // -----------------------------------------------------------------------
-    // Workflow 2: Blue-Green Deploy — andThen + call-time mixins
+    // Workflow 2: Blue-Green Deploy -- andThen + call-time mixins
     // Updates function code with tracing, invokes with retry+timeout, verifies
     // -----------------------------------------------------------------------
+    /** Performs a blue-green deployment by updating code from S3 and verifying the new version. */
     workflow BlueGreenDeploy(function_name: String,
         s3_bucket: String, s3_key: String,
         input_payload: String = "{}") => (function_arn: String,
@@ -54,9 +57,10 @@ namespace aws.lambda.workflows {
     }
 
     // -----------------------------------------------------------------------
-    // Workflow 3: Step Function Pipeline — cross-namespace andThen + mixins
+    // Workflow 3: Step Function Pipeline -- cross-namespace andThen + mixins
     // Creates Lambda, creates state machine, starts and monitors execution
     // -----------------------------------------------------------------------
+    /** Provisions a Lambda and Step Functions state machine, then starts and monitors execution. */
     workflow StepFunctionPipeline(function_name: String,
         state_machine_name: String,
         input_payload: String = "{}") => (function_arn: String,
@@ -80,9 +84,10 @@ namespace aws.lambda.workflows {
     }
 
     // -----------------------------------------------------------------------
-    // Workflow 4: Batch Processor — foreach + per-iteration mixins
+    // Workflow 4: Batch Processor -- foreach + per-iteration mixins
     // Invokes a Lambda function for each item in a batch
     // -----------------------------------------------------------------------
+    /** Invokes a Lambda function for each item in a batch with per-item retry and timeout. */
     workflow BatchProcessor(function_name: String,
         items: Json) => (function_name: String,
             status_code: Long, response_payload: String,

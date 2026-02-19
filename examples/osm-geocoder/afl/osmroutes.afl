@@ -6,9 +6,11 @@
 // - train: Railway lines, stations
 // - bus: Bus routes, stops
 
+/** Route extraction for bicycle, hiking, train, and bus transport modes. */
 namespace osm.geo.Routes {
     use osm.types
 
+    /** Extracted route data with type, network level, and infrastructure flags. */
     schema RouteResult {
         output_path: String,
         feature_count: Long,
@@ -19,6 +21,7 @@ namespace osm.geo.Routes {
         extraction_date: String
     }
 
+    /** Aggregate statistics for extracted routes including total length. */
     schema RouteStats {
         route_count: Long,
         total_length_km: Double,
@@ -26,38 +29,33 @@ namespace osm.geo.Routes {
         route_type: String
     }
 
-    // Extract routes by transport type
-    // route_type: "bicycle", "hiking", "train", "bus"
-    // network: filter by network level (e.g., "ncn", "rcn", "lcn" for bicycle)
-    // include_infrastructure: also extract related POIs (stations, parking, etc.)
+    /** Extracts routes by transport type with optional network and infrastructure filtering. */
     event facet ExtractRoutes(cache: OSMCache, route_type: String,
         network: String = "*", include_infrastructure: Boolean = true) => (result: RouteResult)
 
-    // Extract routes from GeoJSON (already extracted OSM data)
+    /** Filters pre-extracted GeoJSON routes by transport type and network. */
     event facet FilterRoutesByType(input_path: String, route_type: String,
         network: String = "*") => (result: RouteResult)
 
-    // Get route statistics
+    /** Computes aggregate statistics for extracted routes. */
     event facet RouteStatistics(input_path: String) => (stats: RouteStats)
 
-    // --- Convenience facets for specific route types ---
-
-    // Bicycle routes and infrastructure
+    /** Extracts bicycle routes and cycling infrastructure. */
     event facet BicycleRoutes(cache: OSMCache, network: String = "*",
         include_infrastructure: Boolean = true) => (result: RouteResult)
 
-    // Hiking and walking trails
+    /** Extracts hiking and walking trails. */
     event facet HikingTrails(cache: OSMCache, network: String = "*",
         include_infrastructure: Boolean = true) => (result: RouteResult)
 
-    // Train/railway lines and stations
+    /** Extracts railway lines and stations. */
     event facet TrainRoutes(cache: OSMCache,
         include_infrastructure: Boolean = true) => (result: RouteResult)
 
-    // Bus routes and stops
+    /** Extracts bus routes and stops. */
     event facet BusRoutes(cache: OSMCache,
         include_infrastructure: Boolean = true) => (result: RouteResult)
 
-    // Multi-modal: extract all public transport
+    /** Extracts all public transport routes across modes. */
     event facet PublicTransport(cache: OSMCache) => (result: RouteResult)
 }
