@@ -543,6 +543,18 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.34) - Full Dashboard Seed Data
+
+- **Flow structure extraction** (`docker/seed/seed.py`): new `_extract_flow_structure()` helper walks compiled JSON `namespaces[].declarations[]` and populates `NamespaceDefinition`, `FacetDefinition`, `BlockDefinition`, and `StatementDefinition` lists; passed into `FlowDefinition` in both `seed_inline_source()` and `seed_example_directory()` — flow detail page now shows real structural counts (3 namespaces, 3 facets, 6 blocks, 19 statements for inline-examples)
+- **Handler registrations**: seeds 3 `HandlerRegistration` entries (`handlers.AddOne`, `handlers.Multiply`, `handlers.Greet`) with `metadata.seeded_by` for cleanup identification — populates the Handlers dashboard page
+- **Sample runner execution trace**: creates a completed `RunnerDefinition` for `AddOneWorkflow(input=5)` with 142ms duration, 2 `StepDefinition`s (AddOne step + yield), 1 `EventDefinition` (completed), 1 `TaskDefinition` (completed), and 3 `LogDefinition`s — populates Runners, Steps, Events, Tasks pages
+- **Server registration**: seeds 1 `ServerDefinition` (`server_group="docker:seed"`, `service_name="addone-agent"`) with 3 handlers and 1 handled count — populates the Servers dashboard page
+- **Published source**: seeds 1 `PublishedSource` for the `handlers` namespace with `origin=SEED_PATH` — populates the Sources dashboard page
+- **Cleanup cascade** (`clean_seeds()`): extended to remove runners, steps, events, tasks, logs (by workflow/runner ID), handler registrations (by `metadata.seeded_by`), servers (by `server_group`), and published sources (by `origin`) — idempotent re-run cleans all seed entities
+- **Return type change**: `seed_inline_source()` returns `(flow_id, workflow_count)` instead of just `workflow_count` to pass flow_id to downstream seed functions
+- All 10 dashboard pages (Home, Flows, Runners, Steps, Events, Tasks, Handlers, Servers, Sources, Locks) now show non-zero data out of the box after `docker compose --profile seed run --rm seed`
+- 2214 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.33) - Namespace-Level Navigation on Flow Detail Page
 
 - **Namespace grouping on flow detail** (`routes/flows.py`): `flow_detail()` now groups workflows by namespace prefix derived from qualified names (`wf.name.rsplit('.', 1)`) and passes a `namespace_list` to the template — each entry has `name`, `prefix`, and `count`; unqualified workflows grouped under `(top-level)` with prefix `_top`
