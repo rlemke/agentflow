@@ -167,6 +167,134 @@ The `download()` function returns an `OSMCache`-compatible dict:
 }
 ```
 
+## Local Geofabrik Mirror
+
+In CI, test, or air-gapped environments you may want to avoid hitting `download.geofabrik.de` on every run. The downloader supports a **local mirror** that is checked before any network request.
+
+### Setting up the mirror
+
+Use the `scripts/osm-prefetch` script to populate a mirror directory:
+
+```bash
+# Download all ~250 region PBFs (be patient — this is ~50 GB)
+scripts/osm-prefetch --mirror-dir /data/osm-mirror
+
+# Preview what would be downloaded
+scripts/osm-prefetch --dry-run
+
+# Download only European regions
+scripts/osm-prefetch --include "europe/" --mirror-dir /data/osm-mirror
+
+# Skip regions you don't need
+scripts/osm-prefetch --exclude "planet|antarctica" --mirror-dir /data/osm-mirror
+
+# Resume an interrupted download (skips existing files)
+scripts/osm-prefetch --resume --mirror-dir /data/osm-mirror
+
+# Download shapefiles instead of PBFs
+scripts/osm-prefetch --fmt shp --mirror-dir /data/osm-mirror
+```
+
+Key options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--mirror-dir` | `./osm-mirror` | Target directory for downloaded files |
+| `--dry-run` | — | List files without downloading |
+| `--include` | — | Only download paths matching this regex |
+| `--exclude` | — | Skip paths matching this regex |
+| `--resume` | — | Skip files that already exist in the mirror |
+| `--fmt` | `pbf` | Format: `pbf`, `shp`, or `all` |
+| `--delay` | `2.0` | Seconds to wait between downloads (rate limiting) |
+
+The script writes a `manifest.json` into the mirror directory listing every downloaded file.
+
+### Activating the mirror
+
+Set the `AFL_GEOFABRIK_MIRROR` environment variable to the mirror directory:
+
+```bash
+export AFL_GEOFABRIK_MIRROR=/data/osm-mirror
+```
+
+### Check order
+
+When `download()` is called, the downloader checks in this order:
+
+1. **Cache** — if the file exists under `/tmp/osm-cache/`, return immediately (no lock)
+2. **Mirror** — if `AFL_GEOFABRIK_MIRROR` is set and the file exists there, return immediately (no lock, read-only)
+3. **Lock + download** — acquire a per-path lock, re-check the cache, then download from Geofabrik
+
+Mirror reads are lock-free because the mirror directory is treated as read-only — the downloader never writes to it.
+
+### Mirror directory structure
+
+The mirror layout matches Geofabrik's path structure:
+
+```
+/data/osm-mirror/
+├── africa/
+│   ├── algeria-latest.osm.pbf
+│   └── angola-latest.osm.pbf
+├── europe/
+│   ├── albania-latest.osm.pbf
+│   └── austria-latest.osm.pbf
+├── manifest.json
+└── ...
+```
+
+## Concurrency Control
+
+The downloader is safe for concurrent use from multiple threads. It uses per-path locks with a double-checked locking pattern and atomic file writes.
+
+### Per-path locks
+
+Each cache file path gets its own `threading.Lock`. The `_get_path_lock()` function uses a double-checked pattern to create locks without races:
+
+```python
+_path_locks: dict[str, threading.Lock] = {}
+_path_locks_guard = threading.Lock()
+
+def _get_path_lock(path: str) -> threading.Lock:
+    if path not in _path_locks:          # fast check (no lock)
+        with _path_locks_guard:          # global guard for creation
+            if path not in _path_locks:  # re-check under guard
+                _path_locks[path] = threading.Lock()
+    return _path_locks[path]
+```
+
+Different region paths are downloaded in parallel without contention. Only requests for the *same* path serialize.
+
+### Double-checked download
+
+The `download()` function checks the cache twice — once before acquiring the lock (fast path) and once after (to avoid redundant downloads when another thread finished first):
+
+1. Check cache — if file exists, return immediately (no lock)
+2. Check mirror — if mirror file exists, return immediately (no lock)
+3. Acquire per-path lock
+4. Re-check cache — if file appeared while waiting, return (another thread downloaded it)
+5. Download from Geofabrik
+
+### Atomic writes
+
+Downloads go to a temporary file first, then are atomically moved into place:
+
+```python
+tmp_path = local_path + f".tmp.{os.getpid()}.{threading.get_ident()}"
+try:
+    _stream_to_file(url, tmp_path, _storage)
+    os.replace(tmp_path, local_path)       # atomic on POSIX
+except BaseException:
+    _storage.remove(tmp_path)              # clean up partial file
+    raise
+```
+
+The temp file name includes the PID and thread ID to avoid collisions. `os.replace()` is atomic on POSIX systems, so the cache file is always either absent or complete — never a partial download.
+
+### HDFS path
+
+The `download_url()` function handles HDFS paths differently: it streams directly to the destination without atomic rename, because HDFS does not support `os.replace()`. Local paths use the same atomic temp-file pattern.
+
 ## How workflows use operations
 
 Regional workflows compose cache lookups with operations in an `andThen` block:

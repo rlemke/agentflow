@@ -18,6 +18,7 @@ Use this as your starting point if you are:
 4. How to use the `AgentPoller` for a standalone agent service
 5. How to write integration tests for composed workflows
 6. How to **encapsulate low-level operations** behind simple composed facets for library reuse
+7. How to use the **Geofabrik mirror** for offline and CI workflows
 
 ## Overview
 
@@ -145,6 +146,23 @@ for f in examples/osm-geocoder/afl/*.afl; do
     python -m afl.cli "$f" --check && echo "OK: $f"
 done
 ```
+
+### 6. Geofabrik Mirror for Offline Workflows
+
+In CI or air-gapped environments, use the local mirror to avoid network requests:
+
+```bash
+# Prefetch all regions (or a subset) into a mirror directory
+scripts/osm-prefetch --mirror-dir /data/osm-mirror --include "europe/"
+
+# Activate the mirror — the downloader reads from it before hitting the network
+export AFL_GEOFABRIK_MIRROR=/data/osm-mirror
+
+# Run the agent as usual — downloads are served from the mirror
+PYTHONPATH=. python examples/osm-geocoder/agent.py
+```
+
+See [DOWNLOADS.md](DOWNLOADS.md#local-geofabrik-mirror) for all prefetch options and the full check order (cache → mirror → download).
 
 ## Key Concepts
 
