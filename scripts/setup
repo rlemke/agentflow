@@ -23,6 +23,7 @@ OSM_LITE_AGENTS=0
 HDFS=false
 JENKINS=false
 POSTGIS=false
+MIRROR=false
 CHECK_ONLY=false
 FORCE_BUILD=false
 
@@ -48,6 +49,7 @@ Options:
   --mongodb-data-dir PATH   Use external directory for MongoDB data
   --jenkins-home-dir PATH   Use external directory for Jenkins home
   --graphhopper-data-dir PATH  Use external directory for GraphHopper data
+  --mirror PATH        Use a local Geofabrik mirror directory (read-only)
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
@@ -72,6 +74,7 @@ while [[ $# -gt 0 ]]; do
         --postgis-data-dir) export POSTGIS_DATA_DIR="$2"; POSTGIS=true; shift 2 ;;
         --mongodb-data-dir) export MONGODB_DATA_DIR="$2"; shift 2 ;;
         --graphhopper-data-dir) export GRAPHHOPPER_DATA_DIR="$2"; shift 2 ;;
+        --mirror)        export AFL_GEOFABRIK_MIRROR="$2"; MIRROR=true; shift 2 ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
         -h|--help)       usage; exit 0 ;;
@@ -238,6 +241,12 @@ if [ -n "${MONGODB_DATA_DIR:-}" ]; then
 fi
 if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
     echo "GraphHopper external data dir: $GRAPHHOPPER_DATA_DIR"
+    echo ""
+fi
+if [ "$MIRROR" = true ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.mirror.yml"
+    echo "Geofabrik mirror enabled: $AFL_GEOFABRIK_MIRROR"
+    echo "  Mounted read-only at /data/osm-mirror in OSM agent containers"
     echo ""
 fi
 

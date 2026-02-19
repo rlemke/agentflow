@@ -16,6 +16,7 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 
 HDFS_BASE="$HOME/data/hdfs"
 MONGODB_DATA="$HOME/data/mongodb"
+GEOFABRIK_MIRROR="${AFL_GEOFABRIK_MIRROR:-}"
 
 # ---------------------------------------------------------------------------
 # 1. Create data directories
@@ -31,12 +32,17 @@ echo ""
 # 2. Bootstrap Docker stack via scripts/setup
 # ---------------------------------------------------------------------------
 echo "=== Starting AgentFlow stack ==="
-"$PROJECT_DIR/scripts/setup" \
-    --hdfs \
-    --hdfs-namenode-dir "$HDFS_BASE/namenode" \
-    --hdfs-datanode-dir "$HDFS_BASE/datanode" \
-    --mongodb-data-dir "$MONGODB_DATA" \
+SETUP_ARGS=(
+    --hdfs
+    --hdfs-namenode-dir "$HDFS_BASE/namenode"
+    --hdfs-datanode-dir "$HDFS_BASE/datanode"
+    --mongodb-data-dir "$MONGODB_DATA"
     --osm-agents 3
+)
+if [ -n "$GEOFABRIK_MIRROR" ]; then
+    SETUP_ARGS+=(--mirror "$GEOFABRIK_MIRROR")
+fi
+"$PROJECT_DIR/scripts/setup" "${SETUP_ARGS[@]}"
 echo ""
 
 # ---------------------------------------------------------------------------
