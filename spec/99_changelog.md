@@ -543,6 +543,24 @@
 - **6 new tests** (`test_downloader.py`): `TestDownloadLockDeduplication` (5-thread single-fetch, lock re-check returns cache hit, different paths not blocked), `TestDownloadUrlLockDeduplication` (3-thread single-fetch), `TestDownloadAtomicWrite` (partial download cleanup, temp file not visible as cache path)
 - 2179 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
 
+## Completed (v0.12.43) - Step Logs Collection for Event Facet Lifecycle
+
+- **New entity** (`afl/runtime/entities.py`): `StepLogEntry` dataclass with uuid, step_id, workflow_id, runner_id, facet_name, source, level, message, details, time; `StepLogLevel` (info/warning/error/success) and `StepLogSource` (framework/handler) constants
+- **Persistence protocol** (`afl/runtime/persistence.py`): 3 new abstract methods — `save_step_log()`, `get_step_logs_by_step()`, `get_step_logs_by_workflow()`
+- **MemoryStore** (`afl/runtime/memory_store.py`): `_step_logs` list with time-sorted retrieval; cleared in `clear()`
+- **MongoStore** (`afl/runtime/mongo_store.py`): `step_logs` collection with indexes (uuid unique, step_id, workflow_id); `_step_log_to_doc()` / `_doc_to_step_log()` serializers
+- **RegistryRunner** (`afl/runtime/registry_runner.py`): `_emit_step_log()` helper; framework-level logs at 4 points in `_process_event()` — task claimed (info), dispatching handler (info), handler completed with timing (success), handler error (error); `_step_log` callback injected into handler payload for handler-level logging
+- **Dashboard filter** (`afl/dashboard/filters.py`): `step_log_color()` filter mapping info→primary, warning→warning, error→danger, success→success
+- **Step detail** (`routes/steps.py`, `templates/steps/detail.html`): fetches and displays step logs in a table (time, source, level badge, message) anchored at `#step-logs`
+- **Step list views** (`templates/steps/list.html`, `templates/runners/detail.html`): added "Logs" column header to flat tables
+- **Log count badges** (`partials/step_row.html`, `partials/step_tree.html`): clickable badge linking to `/steps/{id}#step-logs` when log count > 0; `step_log_counts` dict computed in runner routes and API partial renders
+- **JSON API** (`routes/api.py`): `GET /api/steps/{step_id}/logs` returns step log entries as JSON array
+- **CSS** (`static/style.css`): `.tree-log-badge` style for inline tree view badges
+- **Public exports** (`afl/runtime/__init__.py`): `StepLogEntry`, `StepLogLevel`, `StepLogSource`
+- **11 new tests**: 5 MemoryStore tests (save/get by step, get by workflow, time ordering, empty results, clear); 3 RegistryRunner tests (success logs, failure logs, `_step_log` callback injection); 3 dashboard tests (JSON API returns entries, empty for unknown, step detail shows section)
+- **3 test fixes**: existing capture-handler tests updated to filter out callable `_step_log` before `json.dump()`
+- 2280 passed, 80 skipped (without `--hdfs`/`--mongodb`/`--postgis`/`--boto3`)
+
 ## Completed (v0.12.42) - Inline Retry Buttons for Failed Steps in Dashboard
 
 - **Fix retry backend** (`afl/dashboard/routes/steps.py`): `POST /steps/{step_id}/retry` now resets step to `EVENT_TRANSMIT` (was incorrectly resetting to `initialization.Begin`); matches `evaluator.retry_step()` logic — sets `transition.current_state`, clears error, sets `request_transition = False`, marks `changed = True`; also resets the associated task to `pending` with `error = None` via `store.get_task_for_step()`
