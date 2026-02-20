@@ -66,6 +66,9 @@ python -m afl.runtime.runner        # runner service
 python -m afl.mcp                   # MCP server (stdio)
 ```
 
+### Environment configuration
+Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, and data directories. All `scripts/` commands source `_env.sh` which loads `.env` without overriding already-set vars. `scripts/easy.sh` runs the full pipeline (teardown → rebuild → setup → seed) from `.env` alone. See `spec/90_nonfunctional.md` for the full variable reference.
+
 ---
 
 ## Key directories

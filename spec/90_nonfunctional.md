@@ -152,6 +152,8 @@ cd agents/scala/afl-agent && sbt package  # package JAR
 ### Convenience scripts
 All scripts are in `scripts/` and are self-contained:
 ```bash
+scripts/_env.sh                                # shared env loader (sourced by other scripts)
+scripts/easy.sh                                # one-command pipeline (teardown → rebuild → setup → seed)
 scripts/setup                                  # bootstrap Docker stack
 scripts/setup --runners 3 --agents 2           # start with scaling
 scripts/compile input.afl -o output.json       # compile AFL
@@ -206,6 +208,48 @@ docker compose down -v                                      # stop + remove volu
 | `--hdfs` | - | Start HDFS namenode + datanode services |
 | `--build` | - | Force image rebuild before starting |
 | `--check-only` | - | Verify Docker availability, then exit |
+
+### Environment Configuration
+
+The `.env` file is the primary way to configure the Docker stack and convenience scripts.
+
+**Setup:**
+```bash
+cp .env.example .env   # one-time copy
+# Edit .env to set MongoDB port, scaling, overlays, data directories
+scripts/easy.sh        # runs the full pipeline using .env values
+```
+
+**How it works:**
+- `scripts/_env.sh` is sourced by every convenience script. It reads `.env` from the project root and exports each variable **only if it is not already set** in the environment.
+- `scripts/easy.sh` translates `.env` variables into `scripts/setup` CLI flags and runs the full pipeline (teardown → rebuild → setup → seed).
+- Precedence: **CLI flags > env vars > `.env` > defaults**
+
+**Variable reference:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| **MongoDB** | | |
+| `MONGODB_PORT` | `27018` | Host port for MongoDB container |
+| `AFL_MONGODB_URL` | `mongodb://localhost:27018` | MongoDB connection URL |
+| `AFL_MONGODB_DATABASE` | `afl` | Database name |
+| `MONGODB_DATA_DIR` | *(Docker volume)* | Host path for MongoDB data |
+| **Scaling** | | |
+| `AFL_RUNNERS` | `1` | Number of runner service instances |
+| `AFL_AGENTS` | `1` | Number of AddOne agent instances |
+| `AFL_OSM_AGENTS` | `0` | Full OSM Geocoder agent instances |
+| `AFL_OSM_LITE_AGENTS` | `0` | Lightweight OSM agent instances |
+| **Overlays** | | |
+| `AFL_HDFS` | `false` | Enable HDFS overlay compose file and profile |
+| `AFL_POSTGIS` | `false` | Enable PostGIS overlay compose file and profile |
+| `AFL_JENKINS` | `false` | Enable Jenkins profile |
+| `AFL_GEOFABRIK_MIRROR` | *(empty)* | Path to local Geofabrik mirror; enables mirror overlay |
+| **Data directories** | | |
+| `HDFS_NAMENODE_DIR` | *(Docker volume)* | Host path for HDFS NameNode data |
+| `HDFS_DATANODE_DIR` | *(Docker volume)* | Host path for HDFS DataNode data |
+| `GRAPHHOPPER_DATA_DIR` | *(Docker volume)* | Host path for GraphHopper data |
+| `POSTGIS_DATA_DIR` | *(Docker volume)* | Host path for PostGIS data |
+| `JENKINS_HOME_DIR` | *(Docker volume)* | Host path for Jenkins home |
 
 ### Configuration
 
