@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# AgentFlow Docker Rebuild Script
+#
+# Rebuilds all Docker images and optionally restarts services.
+#
+# Usage:
+#   scripts/rebuild                # Rebuild all images (no cache)
+#   scripts/rebuild --cached       # Rebuild using Docker layer cache
+#   scripts/rebuild --up           # Rebuild and restart services
+#
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+USE_CACHE=false
+RESTART=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --cached)  USE_CACHE=true ;;
+        --up)      RESTART=true ;;
+        *)         echo "Unknown option: $arg"; echo "Usage: scripts/rebuild [--cached] [--up]"; exit 1 ;;
+    esac
+done
+
+echo "=== Rebuilding AgentFlow Docker images ==="
+
+BUILD_ARGS=()
+if [ "$USE_CACHE" = false ]; then
+    BUILD_ARGS+=(--no-cache)
+    echo "  Cache: disabled"
+else
+    echo "  Cache: enabled"
+fi
+
+docker compose build "${BUILD_ARGS[@]}"
+
+echo ""
+echo "=== All images rebuilt ==="
+
+if [ "$RESTART" = true ]; then
+    echo ""
+    echo "=== Restarting services ==="
+    docker compose up -d
+    echo ""
+    echo "=== Services restarted ==="
+fi
