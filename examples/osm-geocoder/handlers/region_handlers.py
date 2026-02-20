@@ -52,9 +52,10 @@ def handle_resolve_region(params: dict[str, Any]) -> dict[str, Any]:
         }
 
     best = result.matches[0]
-    if step_log:
-        step_log(f"ResolveRegion: '{name}' -> {best.facet_name} ({best.geofabrik_path})")
     cache = download(best.geofabrik_path)
+    source = cache.get("source", "unknown")
+    if step_log:
+        step_log(f"ResolveRegion: '{name}' -> {best.facet_name} ({best.geofabrik_path}, source={source})")
 
     return {
         "cache": cache,
@@ -89,6 +90,9 @@ def handle_resolve_regions(params: dict[str, Any]) -> dict[str, Any]:
     regions = []
     for match in result.matches:
         cache = download(match.geofabrik_path)
+        source = cache.get("source", "unknown")
+        if step_log:
+            step_log(f"ResolveRegions: '{match.facet_name}' ({match.geofabrik_path}, source={source})")
         caches.append(cache)
         regions.append({
             "name": match.facet_name,

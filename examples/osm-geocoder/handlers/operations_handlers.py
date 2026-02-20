@@ -87,12 +87,14 @@ def _make_shapefile_handler(facet_name: str):
         url = cache.get("url", "")
         region_path = _extract_region_path(url)
         step_log = payload.get("_step_log")
-        if step_log:
-            step_log(f"{facet_name}: downloading shapefile for {region_path}")
         log.info("%s downloading shapefile for: %s", facet_name, region_path)
         from .downloader import download
 
-        return download(region_path, fmt="shp")
+        result = download(region_path, fmt="shp")
+        source = result.get("source", "unknown")
+        if step_log:
+            step_log(f"{facet_name}: shapefile for {region_path} (source={source})")
+        return result
 
     return handler
 
@@ -143,10 +145,12 @@ def _cache_handler(payload: dict) -> dict:
         log.warning("Cache: unknown region '%s', using as raw path", region)
         region_path = region.lower()
 
-    if step_log:
-        step_log(f"Cache: resolving region '{region}' -> '{region_path}'")
     log.info("Cache: resolving region '%s' -> '%s'", region, region_path)
-    return {"cache": download(region_path)}
+    cache = download(region_path)
+    source = cache.get("source", "unknown")
+    if step_log:
+        step_log(f"Cache: region '{region}' -> '{region_path}' (source={source})")
+    return {"cache": cache}
 
 
 def register_operations_handlers(poller) -> None:

@@ -17,9 +17,11 @@ def _make_handler(region_path: str):
 
     def handler(payload: dict) -> dict:
         step_log = payload.get("_step_log")
+        cache = download(region_path)
+        source = cache.get("source", "unknown")
         if step_log:
-            step_log(f"Cache: downloading {region_path}")
-        return {"cache": download(region_path)}
+            step_log(f"Cache: {region_path} (source={source})")
+        return {"cache": cache}
 
     return handler
 

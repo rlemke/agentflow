@@ -134,7 +134,9 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
 
     # Fast path — already cached, no lock needed
     if _storage.exists(local_path):
-        return _cache_hit(url, local_path)
+        result = _cache_hit(url, local_path)
+        result["source"] = "cache"
+        return result
 
     # Check local mirror — seed source, not the cache itself
     if GEOFABRIK_MIRROR:
@@ -143,14 +145,20 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
         if os.path.isfile(mirror_path):
             with _get_path_lock(local_path):
                 if _storage.exists(local_path):
-                    return _cache_hit(url, local_path)
+                    result = _cache_hit(url, local_path)
+                    result["source"] = "cache"
+                    return result
                 _copy_to_cache(mirror_path, local_path)
-            return _cache_miss(url, local_path)
+            result = _cache_miss(url, local_path)
+            result["source"] = "mirror"
+            return result
 
     with _get_path_lock(local_path):
         # Re-check after acquiring lock
         if _storage.exists(local_path):
-            return _cache_hit(url, local_path)
+            result = _cache_hit(url, local_path)
+            result["source"] = "cache"
+            return result
 
         # Download to temp file, then atomic rename
         _storage.makedirs(_storage.dirname(local_path), exist_ok=True)
@@ -165,7 +173,9 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
                 pass
             raise
 
-    return _cache_miss(url, local_path)
+    result = _cache_miss(url, local_path)
+    result["source"] = "download"
+    return result
 
 
 def download_url(url: str, path: str, force: bool = False) -> dict:
