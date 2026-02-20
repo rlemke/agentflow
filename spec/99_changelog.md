@@ -1,5 +1,27 @@
 # Implementation Changelog
 
+## Completed (v0.12.50) - AST Format Normalization and Shared find_workflow
+- Added `afl/ast_utils.py` with three public functions:
+  - `normalize_program_ast()`: strips categorized keys (`namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, `schemas`), keeps `declarations` as the single source of truth; builds `declarations` from categorized keys if missing; recursively normalizes namespace nodes; idempotent and non-mutating
+  - `find_workflow()`: finds a WorkflowDecl by simple or qualified name; supports flat namespace match, nested navigation, and recursive search; works on both normalized and unnormalized input
+  - `find_all_workflows()`: collects all WorkflowDecl nodes including inside namespaces; deduplicates when both formats present
+- Exported all three functions from `afl/__init__.py`
+- Replaced 5 duplicate `_find_workflow` implementations (~254 lines removed) with thin wrappers delegating to `afl.ast_utils.find_workflow`:
+  - `afl/mcp/server.py`
+  - `afl/runtime/submit.py` (+ removed `_search_namespace_workflows`)
+  - `afl/runtime/registry_runner.py`
+  - `afl/runtime/agent_poller.py`
+  - `afl/runtime/runner/service.py` (+ removed `_search_namespace_workflows`)
+- Updated dashboard routes to use shared utilities:
+  - `afl/dashboard/routes/flows.py`: imports `find_workflow` from `afl.ast_utils`
+  - `afl/dashboard/routes/workflows.py`: uses `find_all_workflows` and `find_workflow`
+  - `afl/dashboard/routes/steps.py`: uses `find_all_workflows`
+- Updated test helpers to delegate to `afl.ast_utils.find_workflow`:
+  - `tests/test_lifecycle_integration.py`
+  - `examples/jenkins/tests/.../test_jenkins_compilation.py`
+  - `examples/aws-lambda/tests/.../test_aws_lambda_compilation.py`
+- Added `tests/test_ast_utils.py` with 29 tests covering normalize, find_workflow, find_all_workflows, and compile-normalize-find round-trips
+
 ## Completed (v0.12.49) - Add AnalyzeRegion and AnalyzeAllStates Workflows
 - Added `osm_analyze_states.afl` with two workflows in namespace `osm.geo.UnitedStates.analysis`:
   - `AnalyzeRegion(region)`: runs 10 composed workflows (VisualizeBicycleRoutes, AnalyzeParks, LargeCitiesMap, TransportOverview, NationalParksAnalysis, CityAnalysis, TransportMap, StateBoundariesWithStats, DiscoverCitiesAndTowns, RegionalAnalysis) for a single region
