@@ -19,75 +19,29 @@ Usage:
 For Docker mode, environment is configured via docker-compose.yml.
 """
 
-import os
-import signal
-import sys
+from afl.runtime.agent_runner import AgentConfig, run_agent
 
-from afl.runtime import Evaluator, MemoryStore, Telemetry
-from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
-
-
-def _make_store():
-    """Create a persistence store from environment configuration."""
-    mongodb_url = os.environ.get("AFL_MONGODB_URL")
-    mongodb_database = os.environ.get("AFL_MONGODB_DATABASE", "afl_continental_lz")
-
-    if mongodb_url:
-        from afl.runtime.mongo_store import MongoStore
-
-        print(f"Using MongoDB: {mongodb_url}/{mongodb_database}")
-        return MongoStore(connection_string=mongodb_url, database_name=mongodb_database)
-
-    print("Using in-memory store (set AFL_MONGODB_URL for MongoDB)")
-    return MemoryStore()
+config = AgentConfig(
+    service_name="continental-lz",
+    server_group="continental",
+    max_concurrent=4,  # GraphHopper is memory-intensive
+    mongodb_database="afl_continental_lz",
+)
 
 
-def main() -> None:
-    """Start the Continental LZ agent."""
-    store = _make_store()
-    evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
-
-    topics_env = os.environ.get("AFL_RUNNER_TOPICS", "")
-    topics = [t.strip() for t in topics_env.split(",") if t.strip()] if topics_env else []
-
-    config = RegistryRunnerConfig(
-        service_name="continental-lz",
-        server_group="continental",
-        poll_interval_ms=2000,
-        max_concurrent=4,  # GraphHopper is memory-intensive
-        topics=topics,
-    )
-
-    runner = RegistryRunner(persistence=store, evaluator=evaluator, config=config)
-
-    # Register only the handler modules needed for LZ + GTFS pipelines
+def register(poller=None, runner=None):
+    """Register Continental LZ handlers with the active runner."""
     from handlers.cache_handlers import register_handlers as reg_cache
-    from handlers.operations_handlers import register_handlers as reg_operations
     from handlers.graphhopper_handlers import register_handlers as reg_graphhopper
+    from handlers.gtfs_handlers import register_handlers as reg_gtfs
+    from handlers.operations_handlers import register_handlers as reg_operations
     from handlers.population_handlers import register_handlers as reg_population
     from handlers.zoom_handlers import register_handlers as reg_zoom
-    from handlers.gtfs_handlers import register_handlers as reg_gtfs
 
-    reg_cache(runner)
-    reg_operations(runner)
-    reg_graphhopper(runner)
-    reg_population(runner)
-    reg_zoom(runner)
-    reg_gtfs(runner)
-
-    def shutdown(signum, frame):
-        print("\nShutting down...")
-        runner.stop()
-
-    signal.signal(signal.SIGTERM, shutdown)
-    signal.signal(signal.SIGINT, shutdown)
-
-    if topics:
-        print(f"Topic filter: {topics}")
-    print("Continental LZ agent started (RegistryRunner mode). Press Ctrl+C to stop.")
-    print("Handling: cache, operations, graphhopper, population, zoom, gtfs")
-    runner.start()
+    if runner:
+        for reg in [reg_cache, reg_operations, reg_graphhopper, reg_population, reg_zoom, reg_gtfs]:
+            reg(runner)
 
 
 if __name__ == "__main__":
-    main()
+    run_agent(config, register)

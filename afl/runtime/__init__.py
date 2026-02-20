@@ -19,6 +19,7 @@ Executes compiled AFL workflows through iterative evaluation.
 
 from .agent import ClaudeAgentRunner, ToolDefinition, ToolRegistry
 from .agent_poller import AgentPoller, AgentPollerConfig
+from .agent_runner import AgentConfig, make_store, run_agent
 from .block import BlockAnalysis, StatementDefinition, StepAnalysis
 
 # DAO protocols
@@ -192,6 +193,10 @@ __all__ = [
     # Agent Poller
     "AgentPoller",
     "AgentPollerConfig",
+    # Agent Runner helper
+    "AgentConfig",
+    "run_agent",
+    "make_store",
     # Registry Runner
     "RegistryRunner",
     "RegistryRunnerConfig",

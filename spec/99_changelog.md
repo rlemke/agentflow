@@ -1,5 +1,12 @@
 # Implementation Changelog
 
+## Completed (v0.12.54) - Extract run_agent() helper to eliminate example agent.py duplication
+- **New module `afl/runtime/agent_runner.py`** with `AgentConfig` dataclass, `make_store()` public helper, and `run_agent()` bootstrap function that encapsulates store creation, evaluator setup, signal handling, and the RegistryRunner/AgentPoller branching logic
+- **Exported** `AgentConfig`, `make_store`, `run_agent` from `afl/runtime/__init__.py`
+- **Rewrote 5 example `agent.py` files** to use `run_agent()`: `genomics`, `aws-lambda`, `jenkins`, `osm-geocoder`, `continental-lz` — each reduced from ~100 lines to ~20-45 lines
+- **Updated `examples/maven/agent.py`** to use `make_store()` (maven uses a custom `MavenArtifactRunner`, so it keeps its own startup logic)
+- **Added `tests/runtime/test_agent_runner.py`** with 9 tests: `make_store` memory/MongoDB/database-precedence, `AgentConfig` defaults/custom, `run_agent` registry/poller/topics/config-forwarding
+
 ## Completed (v0.12.53) - Remove normalize calls, wire implicit defaults, spec cleanup
 - **Removed 13 no-op `normalize_program_ast()` calls** from all AST entry points: `submit.py`, `service.py` (2 sites), `registry_runner.py`, `agent_poller.py`, `server.py` (3 sites), `steps.py`, `flows.py` (2 sites), `workflows.py` (2 sites). The function itself is preserved in `afl/ast_utils.py` and `afl/__init__.py` for external/legacy JSON consumers.
 - **Wired implicit declaration defaults into the runtime**:

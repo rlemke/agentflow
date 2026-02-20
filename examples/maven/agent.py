@@ -12,27 +12,13 @@ For Docker/MongoDB mode, set environment variables:
 import os
 import signal
 
-from afl.runtime import Evaluator, MemoryStore, Telemetry
-
-
-def _make_store():
-    """Create a persistence store from environment configuration."""
-    mongodb_url = os.environ.get("AFL_MONGODB_URL")
-    mongodb_database = os.environ.get("AFL_MONGODB_DATABASE", "afl")
-
-    if mongodb_url:
-        from afl.runtime.mongo_store import MongoStore
-
-        print(f"Using MongoDB: {mongodb_url}/{mongodb_database}")
-        return MongoStore(connection_string=mongodb_url, database_name=mongodb_database)
-
-    print("Using in-memory store (set AFL_MONGODB_URL for MongoDB)")
-    return MemoryStore()
+from afl.runtime import Evaluator, Telemetry
+from afl.runtime.agent_runner import make_store
 
 
 def main() -> None:
     """Start the Maven artifact runner agent."""
-    store = _make_store()
+    store = make_store()
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
 
     from maven_runner import MavenArtifactRunner, MavenRunnerConfig
