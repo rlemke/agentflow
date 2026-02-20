@@ -1,6 +1,66 @@
+#!/usr/bin/env bash
+# Easy one-command pipeline: teardown, rebuild, setup, seed, run.
+#
+# All configuration comes from .env (copy .env.example to .env and edit).
+# Command-line flags on individual scripts still work as overrides.
+#
+# Usage:
+#   cp .env.example .env   # one-time: edit to set mirror path, scaling, etc.
+#   scripts/easy.sh        # runs the full pipeline
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/_env.sh"
+
+# Build setup args from env vars
+SETUP_ARGS=(--clean --build)
+
+RUNNERS="${AFL_RUNNERS:-1}"
+AGENTS="${AFL_AGENTS:-1}"
+OSM_AGENTS="${AFL_OSM_AGENTS:-0}"
+OSM_LITE_AGENTS="${AFL_OSM_LITE_AGENTS:-0}"
+
+SETUP_ARGS+=(--runners "$RUNNERS" --agents "$AGENTS")
+
+if [ "$OSM_AGENTS" -gt 0 ]; then
+    SETUP_ARGS+=(--osm-agents "$OSM_AGENTS")
+fi
+if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
+    SETUP_ARGS+=(--osm-lite-agents "$OSM_LITE_AGENTS")
+fi
+if [ "${AFL_HDFS:-false}" = true ]; then
+    SETUP_ARGS+=(--hdfs)
+fi
+if [ "${AFL_POSTGIS:-false}" = true ]; then
+    SETUP_ARGS+=(--postgis)
+fi
+if [ "${AFL_JENKINS:-false}" = true ]; then
+    SETUP_ARGS+=(--jenkins)
+fi
+if [ -n "${AFL_GEOFABRIK_MIRROR:-}" ]; then
+    SETUP_ARGS+=(--mirror "$AFL_GEOFABRIK_MIRROR")
+fi
+if [ -n "${HDFS_NAMENODE_DIR:-}" ]; then
+    SETUP_ARGS+=(--hdfs-namenode-dir "$HDFS_NAMENODE_DIR")
+fi
+if [ -n "${HDFS_DATANODE_DIR:-}" ]; then
+    SETUP_ARGS+=(--hdfs-datanode-dir "$HDFS_DATANODE_DIR")
+fi
+if [ -n "${MONGODB_DATA_DIR:-}" ]; then
+    SETUP_ARGS+=(--mongodb-data-dir "$MONGODB_DATA_DIR")
+fi
+if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
+    SETUP_ARGS+=(--graphhopper-data-dir "$GRAPHHOPPER_DATA_DIR")
+fi
+if [ -n "${POSTGIS_DATA_DIR:-}" ]; then
+    SETUP_ARGS+=(--postgis-data-dir "$POSTGIS_DATA_DIR")
+fi
+if [ -n "${JENKINS_HOME_DIR:-}" ]; then
+    SETUP_ARGS+=(--jenkins-home-dir "$JENKINS_HOME_DIR")
+fi
+
 scripts/teardown --all
 scripts/rebuild
-scripts/setup  --clean --build --hdfs --mirror /Volumes/afl_data/osm --runners 3 --osm-agents 4 --agents 1
+scripts/setup "${SETUP_ARGS[@]}"
 scripts/seed-examples --clean
-#scripts/run-workflow
-./examples/osm-geocoder/tests/real/scripts/run_30states.sh

@@ -29,5 +29,9 @@ afl-test.log
 # Compiled AFL output
 examples/osm-geocoder/tests/real/osmstates30.json
 
+# AgentFlow runtime config
+.env
+.afl-active-config
+
 # OS
 .DS_Store

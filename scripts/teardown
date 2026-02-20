@@ -46,6 +46,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# Load shared env (populates AFL_GEOFABRIK_MIRROR from .env if set)
+source "$SCRIPT_DIR/_env.sh"
+
 # Build the full list of compose files and profiles so that services started
 # with overlay files (HDFS, PostGIS, mirror) are also stopped cleanly.
 # Set dummy values for required env vars so compose can interpolate even when
