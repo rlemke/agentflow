@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/_env.sh"
 
 # Build setup args from env vars
-SETUP_ARGS=(--clean --build)
+SETUP_ARGS=(--build)
 
 RUNNERS="${AFL_RUNNERS:-1}"
 AGENTS="${AFL_AGENTS:-1}"
