@@ -1,5 +1,9 @@
 # Implementation Changelog
 
+## Completed (v0.12.56) - Fix easy.sh --clean flag causing setup to exit early
+- **Removed `--clean` from `SETUP_ARGS`** in `scripts/easy.sh`: `scripts/setup --clean` exits after cleaning without starting containers, so `--clean --build` together skipped the build and start phases entirely
+- Since `easy.sh` already runs `scripts/teardown --all` first, the `--clean` flag was redundant
+
 ## Completed (v0.12.55) - Document .env.example and _env.sh configuration workflow
 - **Added "Environment Configuration" section to `spec/90_nonfunctional.md`**: documents the `.env.example` → `.env` → `_env.sh` pipeline, how `scripts/easy.sh` translates env vars to CLI flags, precedence rules (CLI flags > env vars > `.env` > defaults), and a full variable reference table grouped by category (MongoDB, Scaling, Overlays, Data directories)
 - **Updated convenience scripts listing** in `spec/90_nonfunctional.md`: added `scripts/_env.sh` (shared env loader) and `scripts/easy.sh` (one-command pipeline)
