@@ -1,5 +1,8 @@
 # Implementation Changelog
 
+## Completed (v0.12.58) - Fix route visualization workflows to use Cache(region) parameter
+- **Replaced 8 hardcoded `osm.geo.cache.Europe.Liechtenstein()` calls** with `Cache(region = $.region_name)` in `examples/osm-geocoder/afl/example_routes_visualization.afl` — all 8 workflows (`BicycleRoutesMap`, `HikingTrailsMap`, `TrainRoutesMap`, `BusRoutesMap`, `PublicTransportMap`, `BicycleRoutesWithStats`, `HikingTrailsWithStats`, `NationalCycleNetwork`) now use their `region_name` parameter instead of ignoring it
+
 ## Completed (v0.12.57) - Fix genomics.afl parse error
 - **Reordered comments in `examples/genomics/afl/genomics.afl`**: moved `//` line comments before `/** */` doc comments on both `SamplePipeline` and `CohortAnalysis` workflows — doc comments must be immediately followed by a declaration keyword, not separated by other comments
 
