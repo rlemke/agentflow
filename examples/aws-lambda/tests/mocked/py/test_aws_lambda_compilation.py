@@ -45,15 +45,26 @@ def _compile(*filenames: str) -> dict:
     return emit_dict(program_ast, include_locations=False)
 
 
-def _collect_names(program: dict, key: str) -> list[str]:
-    """Recursively collect names from a given node type across all namespaces."""
-    names = []
+_KEY_TO_TYPE = {
+    "schemas": "SchemaDecl",
+    "facets": "FacetDecl",
+    "eventFacets": "EventFacetDecl",
+    "workflows": "WorkflowDecl",
+    "implicits": "ImplicitDecl",
+}
 
-    def _walk(node):
-        for item in node.get(key, []):
-            names.append(item["name"])
-        for ns in node.get("namespaces", []):
-            _walk(ns)
+
+def _collect_names(program: dict, key: str) -> list[str]:
+    """Recursively collect names from a given declaration type across all namespaces."""
+    decl_type = _KEY_TO_TYPE[key]
+    names: list[str] = []
+
+    def _walk(node: dict) -> None:
+        for decl in node.get("declarations", []):
+            if decl.get("type") == decl_type:
+                names.append(decl["name"])
+            elif decl.get("type") == "Namespace":
+                _walk(decl)
 
     _walk(program)
     return names

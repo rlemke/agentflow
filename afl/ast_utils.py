@@ -108,8 +108,7 @@ def find_workflow(program: dict, workflow_name: str) -> dict | None:
     * Simple names — ``"MyWorkflow"``
     * Qualified names — ``"ns.sub.MyWorkflow"``
 
-    Works on both normalized (declarations-only) and unnormalized
-    (categorized keys + declarations) program dicts.
+    Expects a normalized program dict (declarations-only).
     """
     if "." in workflow_name:
         return _find_qualified(program, workflow_name)
@@ -118,18 +117,6 @@ def find_workflow(program: dict, workflow_name: str) -> dict | None:
 
 def _find_simple(program: dict, name: str) -> dict | None:
     """Find an unqualified workflow name at any nesting level."""
-    # Top-level categorized key
-    for w in program.get("workflows", []):
-        if w.get("name") == name:
-            return w
-
-    # Search inside namespaces (categorized key)
-    for ns in program.get("namespaces", []):
-        result = _search_namespace_workflows(ns, name)
-        if result:
-            return result
-
-    # Search declarations list
     for decl in program.get("declarations", []):
         if decl.get("type") == "WorkflowDecl" and decl.get("name") == name:
             return decl
@@ -148,16 +135,8 @@ def _find_qualified(program: dict, qualified_name: str) -> dict | None:
     ns_prefix = ".".join(parts[:-1])
 
     # Strategy 1: flat namespace match (dotted name equals full prefix)
-    for ns in program.get("namespaces", []):
-        if ns.get("name") == ns_prefix:
-            for w in ns.get("workflows", []):
-                if w.get("name") == short_name:
-                    return w
     for decl in program.get("declarations", []):
         if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
-            for w in decl.get("workflows", []):
-                if w.get("name") == short_name:
-                    return w
             for d in decl.get("declarations", []):
                 if d.get("type") == "WorkflowDecl" and d.get("name") == short_name:
                     return d
@@ -167,22 +146,14 @@ def _find_qualified(program: dict, qualified_name: str) -> dict | None:
     current: dict = program
     for ns_name in ns_parts:
         found_ns = None
-        for ns in current.get("namespaces", []):
-            if ns.get("name") == ns_name:
-                found_ns = ns
+        for decl in current.get("declarations", []):
+            if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
+                found_ns = decl
                 break
-        if not found_ns:
-            for decl in current.get("declarations", []):
-                if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
-                    found_ns = decl
-                    break
         if not found_ns:
             return None
         current = found_ns
 
-    for w in current.get("workflows", []):
-        if w.get("name") == short_name:
-            return w
     for decl in current.get("declarations", []):
         if decl.get("type") == "WorkflowDecl" and decl.get("name") == short_name:
             return decl
@@ -192,9 +163,6 @@ def _find_qualified(program: dict, qualified_name: str) -> dict | None:
 
 def _search_namespace_workflows(namespace: dict, workflow_name: str) -> dict | None:
     """Recursively search a namespace for a workflow by name."""
-    for w in namespace.get("workflows", []):
-        if w.get("name") == workflow_name:
-            return w
     for decl in namespace.get("declarations", []):
         if decl.get("type") == "WorkflowDecl" and decl.get("name") == workflow_name:
             return decl
@@ -202,10 +170,6 @@ def _search_namespace_workflows(namespace: dict, workflow_name: str) -> dict | N
             result = _search_namespace_workflows(decl, workflow_name)
             if result:
                 return result
-    for ns in namespace.get("namespaces", []):
-        result = _search_namespace_workflows(ns, workflow_name)
-        if result:
-            return result
     return None
 
 
@@ -223,19 +187,8 @@ def find_all_workflows(program: dict) -> list[dict]:
 
 def _collect_workflows(node: dict, acc: list[dict]) -> None:
     """Recursively collect WorkflowDecl nodes from *node* into *acc*."""
-    # Categorized key
-    for w in node.get("workflows", []):
-        acc.append(w)
-
-    # Declarations list
     for decl in node.get("declarations", []):
         if decl.get("type") == "WorkflowDecl":
-            # Avoid duplicates when both keys are present
-            if decl not in acc:
-                acc.append(decl)
+            acc.append(decl)
         elif decl.get("type") == "Namespace":
             _collect_workflows(decl, acc)
-
-    # Categorized namespaces key
-    for ns in node.get("namespaces", []):
-        _collect_workflows(ns, acc)

@@ -131,11 +131,13 @@ def seed_database() -> None:
     # Step 3: Emit compiled output
     compiled = emit_dict(ast)
 
-    # Extract workflow names
+    # Extract workflow names from declarations
     workflow_names = []
-    for ns in compiled.get("namespaces", []):
-        for wf in ns.get("workflows", []):
-            workflow_names.append(f"{ns['name']}.{wf['name']}")
+    for decl in compiled.get("declarations", []):
+        if decl.get("type") == "Namespace":
+            for inner in decl.get("declarations", []):
+                if inner.get("type") == "WorkflowDecl":
+                    workflow_names.append(f"{decl['name']}.{inner['name']}")
 
     logger.info(f"Compiled {len(workflow_names)} workflows:")
     for w in workflow_names:

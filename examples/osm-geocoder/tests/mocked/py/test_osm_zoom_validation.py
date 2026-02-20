@@ -60,14 +60,14 @@ class TestZoomBuilderCompilation:
         ns_names = []
 
         def _collect_ns(node, prefix=""):
-            name = node.get("name", "")
-            full = f"{prefix}.{name}" if prefix else name
-            ns_names.append(full)
-            for child in node.get("namespaces", []):
-                _collect_ns(child, full)
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "Namespace":
+                    name = decl.get("name", "")
+                    full = f"{prefix}.{name}" if prefix else name
+                    ns_names.append(full)
+                    _collect_ns(decl, full)
 
-        for ns in program.get("namespaces", []):
-            _collect_ns(ns)
+        _collect_ns(program)
 
         assert any("ZoomBuilder" in n for n in ns_names)
 
@@ -78,10 +78,11 @@ class TestZoomBuilderCompilation:
         schema_names = []
 
         def _collect_schemas(node):
-            for s in node.get("schemas", []):
-                schema_names.append(s["name"])
-            for ns in node.get("namespaces", []):
-                _collect_schemas(ns)
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "SchemaDecl":
+                    schema_names.append(decl["name"])
+                elif decl.get("type") == "Namespace":
+                    _collect_schemas(decl)
 
         _collect_schemas(program)
 
@@ -99,10 +100,11 @@ class TestZoomBuilderCompilation:
         facet_names = []
 
         def _collect_facets(node):
-            for f in node.get("eventFacets", []):
-                facet_names.append(f["name"])
-            for ns in node.get("namespaces", []):
-                _collect_facets(ns)
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "EventFacetDecl":
+                    facet_names.append(decl["name"])
+                elif decl.get("type") == "Namespace":
+                    _collect_facets(decl)
 
         _collect_facets(program)
 
@@ -120,18 +122,17 @@ class TestZoomBuilderCompilation:
         """BuildZoomLayers has the expected parameters."""
         program = _compile("osmzoombuilder.afl", "osmtypes.afl")
 
-        facet = None
+        def _find_facet(node, name):
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "EventFacetDecl" and decl["name"] == name:
+                    return decl
+                if decl.get("type") == "Namespace":
+                    found = _find_facet(decl, name)
+                    if found:
+                        return found
+            return None
 
-        def _find_facet(node):
-            nonlocal facet
-            for f in node.get("eventFacets", []):
-                if f["name"] == "BuildZoomLayers":
-                    facet = f
-                    return
-            for ns in node.get("namespaces", []):
-                _find_facet(ns)
-
-        _find_facet(program)
+        facet = _find_facet(program, "BuildZoomLayers")
 
         assert facet is not None
         param_names = [p["name"] for p in facet["params"]]
@@ -145,18 +146,17 @@ class TestZoomBuilderCompilation:
         """BuildZoomLayers has correct default values."""
         program = _compile("osmzoombuilder.afl", "osmtypes.afl")
 
-        facet = None
+        def _find_facet(node, name):
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "EventFacetDecl" and decl["name"] == name:
+                    return decl
+                if decl.get("type") == "Namespace":
+                    found = _find_facet(decl, name)
+                    if found:
+                        return found
+            return None
 
-        def _find_facet(node):
-            nonlocal facet
-            for f in node.get("eventFacets", []):
-                if f["name"] == "BuildZoomLayers":
-                    facet = f
-                    return
-            for ns in node.get("namespaces", []):
-                _find_facet(ns)
-
-        _find_facet(program)
+        facet = _find_facet(program, "BuildZoomLayers")
 
         assert facet is not None
         defaults = {p["name"]: p.get("default") for p in facet["params"] if "default" in p}
@@ -199,18 +199,17 @@ class TestComposedZoomWorkflow:
 
         program = _compile(*filenames)
 
-        workflow = None
+        def _find_wf(node, name):
+            for decl in node.get("declarations", []):
+                if decl.get("type") == "WorkflowDecl" and decl["name"] == name:
+                    return decl
+                if decl.get("type") == "Namespace":
+                    found = _find_wf(decl, name)
+                    if found:
+                        return found
+            return None
 
-        def _find_wf(node):
-            nonlocal workflow
-            for wf in node.get("workflows", []):
-                if wf["name"] == "RoadZoomBuilder":
-                    workflow = wf
-                    return
-            for ns in node.get("namespaces", []):
-                _find_wf(ns)
-
-        _find_wf(program)
+        workflow = _find_wf(program, "RoadZoomBuilder")
 
         assert workflow is not None
         assert workflow["name"] == "RoadZoomBuilder"

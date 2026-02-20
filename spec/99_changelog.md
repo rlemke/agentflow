@@ -1,5 +1,26 @@
 # Implementation Changelog
 
+## Completed (v0.12.52) - Remove Categorized Keys from Emitter and Consumers
+- **Emitter no longer emits categorized keys**: removed `namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, `schemas` from `_program()` and `_namespace()` in `afl/emitter.py`; only the unified `declarations` list is emitted
+- **Implicits now included in declarations**: both `_program()` and `_namespace()` now add `ImplicitDecl` nodes to the `declarations` list (previously omitted from declarations but present in categorized `implicits` key)
+- **Simplified `find_workflow`/`find_all_workflows`** in `afl/ast_utils.py`: removed all categorized-key fallback paths from `_find_simple()`, `_find_qualified()`, `_search_namespace_workflows()`, and `_collect_workflows()`; these functions now only iterate `declarations`
+- **`normalize_program_ast` / `_normalize_node` unchanged**: backward-compat paths for old/external JSON are preserved
+- **Updated 10 test files** to use declarations-based lookups instead of categorized keys:
+  - `tests/test_emitter.py`: added `_decls_by_type()`/`_first_decl()` helpers; replaced ~87 categorized key accesses
+  - `tests/test_ast_utils.py`: converted fixtures to declarations format; removed 7 dead-path tests
+  - `tests/test_cli.py`: 4 accesses updated
+  - `tests/test_source.py`: 3 accesses updated
+  - `examples/jenkins/tests/.../test_jenkins_compilation.py`: rewrote `_collect_names()` helper
+  - `examples/maven/tests/.../test_maven_compilation.py`: rewrote `_collect_names()` and `_find_event_facet()` helpers
+  - `examples/aws-lambda/tests/.../test_aws_lambda_compilation.py`: rewrote `_collect_names()` helper
+  - `examples/osm-geocoder/tests/.../test_osm_composed_workflows.py`: rewrote `_find_wf()` helper
+  - `examples/osm-geocoder/tests/.../test_osm_validation.py`: rewrote all inline search helpers
+  - `examples/osm-geocoder/tests/.../test_osm_zoom_validation.py`: rewrote all inline search helpers
+- **Updated 2 example scripts**:
+  - `examples/hello-agent/run.py`: uses `find_all_workflows()` instead of `compiled["workflows"][0]`
+  - `examples/continental-lz/scripts/seed.py`: iterates `declarations` for workflow extraction
+- Test count: 2290 passed, 79 skipped (7 dead-path tests removed from v0.12.51's 2297)
+
 ## Completed (v0.12.51) - Wire normalize_program_ast at All Entry Points
 - Wired `normalize_program_ast()` at all 13 AST ingestion points so downstream code always receives declarations-only dicts:
   - `afl/runtime/submit.py` (after JSON parse)

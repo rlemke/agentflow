@@ -27,6 +27,7 @@ What you'll see:
 from pathlib import Path
 
 from afl import parse, emit_dict
+from afl.ast_utils import find_all_workflows
 from afl.runtime import Evaluator, MemoryStore, Telemetry, ExecutionStatus
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
@@ -47,10 +48,12 @@ def main():
 
     ast = parse(source)
     compiled = emit_dict(ast)
-    workflow_ast = compiled["workflows"][0]
+    all_wfs = find_all_workflows(compiled)
+    workflow_ast = all_wfs[0]
     program_ast = compiled
 
-    print(f"Compiled to JSON: {len(compiled.get('namespaces', []))} namespace(s), {len(compiled.get('workflows', []))} workflow(s)")
+    ns_count = len([d for d in compiled.get("declarations", []) if d.get("type") == "Namespace"])
+    print(f"Compiled to JSON: {ns_count} namespace(s), {len(all_wfs)} workflow(s)")
     print(f"Workflow: {workflow_ast['name']}")
 
     # -------------------------------------------------------------------------

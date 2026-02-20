@@ -20,7 +20,7 @@ class TestBasicParsing:
         assert result == 0
         data = json.loads(output.read_text())
         assert data["type"] == "Program"
-        assert len(data["facets"]) == 1
+        assert len([d for d in data.get("declarations", []) if d.get("type") == "FacetDecl"]) == 1
 
     def test_parse_file_to_stdout(self, tmp_path, capsys):
         afl_file = tmp_path / "test.afl"
@@ -61,7 +61,8 @@ class TestBasicParsing:
 
         assert result == 0
         data = json.loads(capsys.readouterr().out)
-        assert "location" not in data.get("facets", [{}])[0]
+        facets = [d for d in data.get("declarations", []) if d.get("type") == "FacetDecl"]
+        assert "location" not in facets[0] if facets else True
 
     def test_no_validate(self, tmp_path, capsys):
         afl_file = tmp_path / "test.afl"
@@ -174,7 +175,8 @@ class TestStdinParsing:
 
         assert result == 0
         data = json.loads(capsys.readouterr().out)
-        assert data["facets"][0]["name"] == "FromStdin"
+        facets = [d for d in data.get("declarations", []) if d.get("type") == "FacetDecl"]
+        assert facets[0]["name"] == "FromStdin"
 
 
 class TestMongoMavenSpecs:
@@ -247,7 +249,7 @@ class TestIncludeProvenance:
         assert result == 0
         data = json.loads(capsys.readouterr().out)
         # With provenance enabled, locations should include provenance info
-        facet = data["facets"][0]
+        facet = [d for d in data.get("declarations", []) if d.get("type") == "FacetDecl"][0]
         assert "location" in facet
         loc = facet["location"]
         assert "provenance" in loc

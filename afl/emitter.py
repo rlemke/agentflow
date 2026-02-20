@@ -247,20 +247,6 @@ class JSONEmitter:
         """Convert Program node."""
         data = {"type": "Program"}
 
-        if node.namespaces:
-            data["namespaces"] = self._convert(node.namespaces)
-        if node.facets:
-            data["facets"] = self._convert(node.facets)
-        if node.event_facets:
-            data["eventFacets"] = self._convert(node.event_facets)
-        if node.workflows:
-            data["workflows"] = self._convert(node.workflows)
-        if node.implicits:
-            data["implicits"] = self._convert(node.implicits)
-        if node.schemas:
-            data["schemas"] = self._convert(node.schemas)
-
-        # Also emit unified declarations list for runtime compatibility
         declarations: list = []
         if node.namespaces:
             declarations.extend(self._convert(node.namespaces))
@@ -270,6 +256,8 @@ class JSONEmitter:
             declarations.extend(self._convert(node.event_facets))
         if node.workflows:
             declarations.extend(self._convert(node.workflows))
+        if node.implicits:
+            declarations.extend(self._convert(node.implicits))
         if node.schemas:
             declarations.extend(self._convert(node.schemas))
         if declarations:
@@ -296,18 +284,7 @@ class JSONEmitter:
 
         if node.uses:
             data["uses"] = [u.name for u in node.uses]
-        if node.facets:
-            data["facets"] = self._convert(node.facets)
-        if node.event_facets:
-            data["eventFacets"] = self._convert(node.event_facets)
-        if node.workflows:
-            data["workflows"] = self._convert(node.workflows)
-        if node.implicits:
-            data["implicits"] = self._convert(node.implicits)
-        if node.schemas:
-            data["schemas"] = self._convert(node.schemas)
 
-        # Also emit unified declarations list for runtime compatibility
         declarations: list = []
         if node.facets:
             declarations.extend(self._convert(node.facets))
@@ -315,6 +292,8 @@ class JSONEmitter:
             declarations.extend(self._convert(node.event_facets))
         if node.workflows:
             declarations.extend(self._convert(node.workflows))
+        if node.implicits:
+            declarations.extend(self._convert(node.implicits))
         if node.schemas:
             declarations.extend(self._convert(node.schemas))
         if declarations:

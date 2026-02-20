@@ -189,26 +189,16 @@ class TestFindWorkflow:
     """Tests for find_workflow."""
 
     def test_simple_name_top_level(self):
-        prog = {"type": "Program", "workflows": [_WF_HELLO, _WF_GOODBYE]}
+        prog = {"type": "Program", "declarations": [_WF_HELLO, _WF_GOODBYE]}
         assert find_workflow(prog, "Hello") is _WF_HELLO
         assert find_workflow(prog, "Goodbye") is _WF_GOODBYE
 
-    def test_simple_name_inside_namespace_categorized(self):
-        ns = _ns("myns", workflows=[_WF_HELLO])
-        prog = {"type": "Program", "namespaces": [ns]}
-        assert find_workflow(prog, "Hello") is _WF_HELLO
-
-    def test_simple_name_inside_namespace_declarations(self):
+    def test_simple_name_inside_namespace(self):
         ns = _ns_decl("myns", [_WF_HELLO])
         prog = {"type": "Program", "declarations": [ns]}
         assert find_workflow(prog, "Hello") is _WF_HELLO
 
-    def test_qualified_name_flat_match_namespaces(self):
-        ns = _ns("myns", workflows=[_WF_HELLO])
-        prog = {"type": "Program", "namespaces": [ns]}
-        assert find_workflow(prog, "myns.Hello") is _WF_HELLO
-
-    def test_qualified_name_flat_match_declarations(self):
+    def test_qualified_name_flat_match(self):
         ns = _ns_decl("myns", [_WF_HELLO])
         prog = {"type": "Program", "declarations": [ns]}
         assert find_workflow(prog, "myns.Hello") is _WF_HELLO
@@ -219,46 +209,19 @@ class TestFindWorkflow:
         prog = {"type": "Program", "declarations": [outer_ns]}
         assert find_workflow(prog, "outer.inner.Hello") is _WF_HELLO
 
-    def test_qualified_name_nested_via_namespaces_key(self):
-        inner_ns = _ns("inner", workflows=[_WF_HELLO])
-        outer_ns = {"type": "Namespace", "name": "outer", "namespaces": [inner_ns]}
-        prog = {"type": "Program", "namespaces": [outer_ns]}
-        assert find_workflow(prog, "outer.inner.Hello") is _WF_HELLO
-
     def test_not_found_returns_none(self):
-        prog = {"type": "Program", "workflows": [_WF_HELLO]}
+        prog = {"type": "Program", "declarations": [_WF_HELLO]}
         assert find_workflow(prog, "Missing") is None
         assert find_workflow(prog, "ns.Missing") is None
 
     def test_works_on_normalized_input(self):
         prog = {
             "type": "Program",
-            "workflows": [_WF_HELLO],
             "declarations": [_WF_HELLO],
         }
         normalized = normalize_program_ast(prog)
         assert find_workflow(normalized, "Hello") is not None
         assert find_workflow(normalized, "Hello")["name"] == "Hello"
-
-    def test_works_on_unnormalized_input(self):
-        prog = {
-            "type": "Program",
-            "workflows": [_WF_HELLO],
-            "facets": [_FACET_A],
-            "declarations": [_FACET_A, _WF_HELLO],
-        }
-        assert find_workflow(prog, "Hello") is _WF_HELLO
-
-    def test_qualified_name_flat_ns_with_declarations_key(self):
-        """Namespace has both workflows and declarations keys."""
-        ns = {
-            "type": "Namespace",
-            "name": "myns",
-            "workflows": [_WF_HELLO],
-            "declarations": [_WF_HELLO],
-        }
-        prog = {"type": "Program", "declarations": [ns]}
-        assert find_workflow(prog, "myns.Hello") is _WF_HELLO
 
 
 # ---------------------------------------------------------------------------
@@ -270,33 +233,17 @@ class TestFindAllWorkflows:
     """Tests for find_all_workflows."""
 
     def test_collects_top_level(self):
-        prog = {"type": "Program", "workflows": [_WF_HELLO, _WF_GOODBYE]}
+        prog = {"type": "Program", "declarations": [_WF_HELLO, _WF_GOODBYE]}
         result = find_all_workflows(prog)
         assert len(result) == 2
         assert _WF_HELLO in result
         assert _WF_GOODBYE in result
 
     def test_collects_from_namespaces(self):
-        ns = _ns("myns", workflows=[_WF_HELLO])
-        prog = {"type": "Program", "namespaces": [ns], "workflows": [_WF_GOODBYE]}
-        result = find_all_workflows(prog)
-        assert len(result) == 2
-
-    def test_collects_from_declarations(self):
         ns = _ns_decl("myns", [_WF_HELLO])
         prog = {"type": "Program", "declarations": [_WF_GOODBYE, ns]}
         result = find_all_workflows(prog)
         assert len(result) == 2
-
-    def test_no_duplicates_when_both_formats(self):
-        """When workflows key and declarations both contain the same object, no dups."""
-        prog = {
-            "type": "Program",
-            "workflows": [_WF_HELLO],
-            "declarations": [_WF_HELLO],
-        }
-        result = find_all_workflows(prog)
-        assert len(result) == 1
 
     def test_empty_program(self):
         result = find_all_workflows({"type": "Program"})

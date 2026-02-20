@@ -56,13 +56,13 @@ def _compile_all() -> dict:
 
 def _find_wf(node: dict, name: str) -> Optional[dict]:
     """Recursively search compiled program for a workflow by name."""
-    for wf in node.get("workflows", []):
-        if wf["name"] == name:
-            return wf
-    for ns in node.get("namespaces", []):
-        found = _find_wf(ns, name)
-        if found is not None:
-            return found
+    for decl in node.get("declarations", []):
+        if decl.get("type") == "WorkflowDecl" and decl["name"] == name:
+            return decl
+        if decl.get("type") == "Namespace":
+            found = _find_wf(decl, name)
+            if found is not None:
+                return found
     return None
 
 

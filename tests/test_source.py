@@ -261,7 +261,8 @@ class TestProvenanceEmission:
         output = emitter.emit_dict(program)
 
         # Location should not have sourceId
-        loc = output["facets"][0]["location"]
+        facet = [d for d in output.get("declarations", []) if d.get("type") == "FacetDecl"][0]
+        loc = facet["location"]
         assert "sourceId" not in loc
         assert "provenance" not in loc
 
@@ -275,7 +276,8 @@ class TestProvenanceEmission:
         emitter = JSONEmitter(include_provenance=True, source_registry=registry)
         output = emitter.emit_dict(program)
 
-        loc = output["facets"][0]["location"]
+        facet = [d for d in output.get("declarations", []) if d.get("type") == "FacetDecl"][0]
+        loc = facet["location"]
         assert loc["sourceId"] == "file:///a.afl"
         assert loc["provenance"]["type"] == "file"
         assert loc["provenance"]["path"] == "/a.afl"
@@ -369,8 +371,9 @@ class TestNodeUUIDs:
         uuid.UUID(output["id"])
 
         # Facet should have id
-        assert "id" in output["facets"][0]
-        uuid.UUID(output["facets"][0]["id"])
+        facet = [d for d in output.get("declarations", []) if d.get("type") == "FacetDecl"][0]
+        assert "id" in facet
+        uuid.UUID(facet["id"])
 
     def test_uuid_different_per_parse(self):
         """Parsing the same source twice should produce different UUIDs."""

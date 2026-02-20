@@ -43,18 +43,41 @@ def _compile(*filenames: str) -> dict:
     return emit_dict(program_ast, include_locations=False)
 
 
-def _collect_names(program: dict, key: str) -> list[str]:
-    """Recursively collect names from a given node type across all namespaces."""
-    names = []
+_KEY_TO_TYPE = {
+    "schemas": "SchemaDecl",
+    "facets": "FacetDecl",
+    "eventFacets": "EventFacetDecl",
+    "workflows": "WorkflowDecl",
+    "implicits": "ImplicitDecl",
+}
 
-    def _walk(node):
-        for item in node.get(key, []):
-            names.append(item["name"])
-        for ns in node.get("namespaces", []):
-            _walk(ns)
+
+def _collect_names(program: dict, key: str) -> list[str]:
+    """Recursively collect names from a given declaration type across all namespaces."""
+    decl_type = _KEY_TO_TYPE[key]
+    names: list[str] = []
+
+    def _walk(node: dict) -> None:
+        for decl in node.get("declarations", []):
+            if decl.get("type") == decl_type:
+                names.append(decl["name"])
+            elif decl.get("type") == "Namespace":
+                _walk(decl)
 
     _walk(program)
     return names
+
+
+def _find_decl_by_name(node: dict, decl_type: str, name: str):
+    """Recursively find a declaration by type and name."""
+    for decl in node.get("declarations", []):
+        if decl.get("type") == decl_type and decl.get("name") == name:
+            return decl
+        if decl.get("type") == "Namespace":
+            found = _find_decl_by_name(decl, decl_type, name)
+            if found:
+                return found
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -93,17 +116,7 @@ class TestMavenEventFacets:
     def test_runner_facet_params(self):
         """RunMavenArtifact has expected parameters."""
         program = _compile("maven_runner.afl", "maven_types.afl")
-        # Find the event facet
-        def _find_event_facet(node, name):
-            for ef in node.get("eventFacets", []):
-                if ef["name"] == name:
-                    return ef
-            for ns in node.get("namespaces", []):
-                found = _find_event_facet(ns, name)
-                if found:
-                    return found
-            return None
-        ef = _find_event_facet(program, "RunMavenArtifact")
+        ef = _find_decl_by_name(program, "EventFacetDecl", "RunMavenArtifact")
         assert ef is not None
         param_names = [p["name"] for p in ef["params"]]
         assert "step_id" in param_names
@@ -114,18 +127,7 @@ class TestMavenEventFacets:
     def test_run_maven_plugin_facet(self):
         """RunMavenPlugin event facet is present with expected params."""
         program = _compile("maven_runner.afl", "maven_types.afl")
-
-        def _find_event_facet(node, name):
-            for ef in node.get("eventFacets", []):
-                if ef["name"] == name:
-                    return ef
-            for ns in node.get("namespaces", []):
-                found = _find_event_facet(ns, name)
-                if found:
-                    return found
-            return None
-
-        ef = _find_event_facet(program, "RunMavenPlugin")
+        ef = _find_decl_by_name(program, "EventFacetDecl", "RunMavenPlugin")
         assert ef is not None
         param_names = [p["name"] for p in ef["params"]]
         assert "workspace_path" in param_names

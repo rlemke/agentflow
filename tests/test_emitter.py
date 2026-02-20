@@ -22,6 +22,17 @@ from afl import parse
 from afl.emitter import JSONEmitter, emit_dict, emit_json
 
 
+def _decls_by_type(data, type_name):
+    """Return all declarations of a given type from a program or namespace dict."""
+    return [d for d in data.get("declarations", []) if d.get("type") == type_name]
+
+
+def _first_decl(data, type_name):
+    """Return the first declaration of a given type, or None."""
+    decls = _decls_by_type(data, type_name)
+    return decls[0] if decls else None
+
+
 @pytest.fixture
 def emitter():
     """Create an emitter instance."""
@@ -42,8 +53,9 @@ class TestBasicEmission:
         ast = parse("facet User(name: String)")
         data = emitter.emit_dict(ast)
 
-        assert len(data["facets"]) == 1
-        facet = data["facets"][0]
+        facets = _decls_by_type(data, "FacetDecl")
+        assert len(facets) == 1
+        facet = facets[0]
         assert facet["type"] == "FacetDecl"
         assert facet["name"] == "User"
         assert facet["params"] == [{"name": "name", "type": "String"}]
@@ -53,7 +65,7 @@ class TestBasicEmission:
         ast = parse("facet Transform(input: String) => (output: String)")
         data = emitter.emit_dict(ast)
 
-        facet = data["facets"][0]
+        facet = _first_decl(data, "FacetDecl")
         assert facet["returns"] == [{"name": "output", "type": "String"}]
 
     def test_event_facet(self, emitter):
@@ -61,8 +73,9 @@ class TestBasicEmission:
         ast = parse("event facet Process(input: String) => (output: String)")
         data = emitter.emit_dict(ast)
 
-        assert len(data["eventFacets"]) == 1
-        ef = data["eventFacets"][0]
+        efs = _decls_by_type(data, "EventFacetDecl")
+        assert len(efs) == 1
+        ef = efs[0]
         assert ef["type"] == "EventFacetDecl"
         assert ef["name"] == "Process"
 
@@ -71,8 +84,9 @@ class TestBasicEmission:
         ast = parse("workflow Main(input: String) => (output: String)")
         data = emitter.emit_dict(ast)
 
-        assert len(data["workflows"]) == 1
-        wf = data["workflows"][0]
+        wfs = _decls_by_type(data, "WorkflowDecl")
+        assert len(wfs) == 1
+        wf = wfs[0]
         assert wf["type"] == "WorkflowDecl"
         assert wf["name"] == "Main"
 
@@ -91,7 +105,7 @@ class TestWorkflowBody:
         """)
         data = emitter.emit_dict(ast)
 
-        wf = data["workflows"][0]
+        wf = _first_decl(data, "WorkflowDecl")
         body = wf["body"]
         assert body["type"] == "AndThenBlock"
         assert len(body["steps"]) == 2
@@ -116,7 +130,7 @@ class TestWorkflowBody:
         """)
         data = emitter.emit_dict(ast)
 
-        body = data["workflows"][0]["body"]
+        body = _first_decl(data, "WorkflowDecl")["body"]
         assert body["foreach"]["type"] == "ForeachClause"
         assert body["foreach"]["variable"] == "item"
         assert body["foreach"]["iterable"] == {"type": "InputRef", "path": ["items"]}
@@ -130,7 +144,7 @@ class TestScriptBlockEmission:
         ast = parse('facet Test() script "x = 1"')
         data = emitter.emit_dict(ast)
 
-        f = data["facets"][0]
+        f = _first_decl(data, "FacetDecl")
         body = f["body"]
         assert body["type"] == "ScriptBlock"
         assert body["language"] == "python"
@@ -141,7 +155,7 @@ class TestScriptBlockEmission:
         ast = parse('facet Test() script "pass"')
         data = emitter.emit_dict(ast)
 
-        body = data["facets"][0]["body"]
+        body = _first_decl(data, "FacetDecl")["body"]
         assert "id" in body
 
     def test_script_block_event_facet(self, emitter):
@@ -149,7 +163,7 @@ class TestScriptBlockEmission:
         ast = parse('event facet Test() script "result = {}"')
         data = emitter.emit_dict(ast)
 
-        body = data["eventFacets"][0]["body"]
+        body = _first_decl(data, "EventFacetDecl")["body"]
         assert body["type"] == "ScriptBlock"
 
 
@@ -161,7 +175,7 @@ class TestPromptBlockEmission:
         ast = parse('event facet Test() prompt { template "hello" }')
         data = emitter.emit_dict(ast)
 
-        ef = data["eventFacets"][0]
+        ef = _first_decl(data, "EventFacetDecl")
         body = ef["body"]
         assert body["type"] == "PromptBlock"
         assert body["template"] == "hello"
@@ -179,7 +193,7 @@ prompt {
         ast = parse(source)
         data = emitter.emit_dict(ast)
 
-        body = data["eventFacets"][0]["body"]
+        body = _first_decl(data, "EventFacetDecl")["body"]
         assert body["type"] == "PromptBlock"
         assert body["system"] == "sys"
         assert body["template"] == "tmpl"
@@ -190,7 +204,7 @@ prompt {
         ast = parse('event facet Test() prompt { template "x" }')
         data = emitter.emit_dict(ast)
 
-        body = data["eventFacets"][0]["body"]
+        body = _first_decl(data, "EventFacetDecl")["body"]
         assert "id" in body
 
 
@@ -206,7 +220,7 @@ class TestReferences:
         """)
         data = emitter.emit_dict(ast)
 
-        arg = data["workflows"][0]["body"]["steps"][0]["call"]["args"][0]
+        arg = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]["call"]["args"][0]
         assert arg["value"] == {"type": "InputRef", "path": ["input"]}
 
     def test_step_ref(self, emitter):
@@ -219,7 +233,7 @@ class TestReferences:
         """)
         data = emitter.emit_dict(ast)
 
-        arg = data["workflows"][0]["body"]["steps"][1]["call"]["args"][0]
+        arg = _first_decl(data, "WorkflowDecl")["body"]["steps"][1]["call"]["args"][0]
         assert arg["value"] == {"type": "StepRef", "path": ["step1", "output"]}
 
     def test_nested_ref(self, emitter):
@@ -231,7 +245,7 @@ class TestReferences:
         """)
         data = emitter.emit_dict(ast)
 
-        arg = data["workflows"][0]["body"]["steps"][0]["call"]["args"][0]
+        arg = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]["call"]["args"][0]
         assert arg["value"] == {"type": "InputRef", "path": ["data", "nested", "field"]}
 
 
@@ -243,7 +257,7 @@ class TestLiterals:
         ast = parse('implicit msg = Message(text = "hello")')
         data = emitter.emit_dict(ast)
 
-        arg = data["implicits"][0]["call"]["args"][0]
+        arg = _first_decl(data, "ImplicitDecl")["call"]["args"][0]
         assert arg["value"] == {"type": "String", "value": "hello"}
 
     def test_integer_literal(self, emitter):
@@ -251,7 +265,7 @@ class TestLiterals:
         ast = parse("implicit count = Counter(value = 42)")
         data = emitter.emit_dict(ast)
 
-        arg = data["implicits"][0]["call"]["args"][0]
+        arg = _first_decl(data, "ImplicitDecl")["call"]["args"][0]
         assert arg["value"] == {"type": "Int", "value": 42}
 
     def test_boolean_literal(self, emitter):
@@ -259,7 +273,7 @@ class TestLiterals:
         ast = parse("implicit flag = Config(enabled = true, disabled = false)")
         data = emitter.emit_dict(ast)
 
-        args = data["implicits"][0]["call"]["args"]
+        args = _first_decl(data, "ImplicitDecl")["call"]["args"]
         assert args[0]["value"] == {"type": "Boolean", "value": True}
         assert args[1]["value"] == {"type": "Boolean", "value": False}
 
@@ -268,7 +282,7 @@ class TestLiterals:
         ast = parse("implicit opt = Optional(value = null)")
         data = emitter.emit_dict(ast)
 
-        arg = data["implicits"][0]["call"]["args"][0]
+        arg = _first_decl(data, "ImplicitDecl")["call"]["args"][0]
         assert arg["value"] == {"type": "Null"}
 
     def test_float_literal(self, emitter):
@@ -276,14 +290,14 @@ class TestLiterals:
         ast = parse("implicit pi = Circle(radius = 3.14)")
         data = emitter.emit_dict(ast)
 
-        arg = data["implicits"][0]["call"]["args"][0]
+        arg = _first_decl(data, "ImplicitDecl")["call"]["args"][0]
         assert arg["value"] == {"type": "Double", "value": 3.14}
 
     def test_float_default(self, emitter):
         """Float default value emitted correctly."""
         ast = parse("facet Search(max_distance: Double = 10.5)")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param == {
             "name": "max_distance",
             "type": "Double",
@@ -299,7 +313,7 @@ class TestMixins:
         ast = parse("facet Job(input: String) with Retry(maxAttempts = 3)")
         data = emitter.emit_dict(ast)
 
-        mixins = data["facets"][0]["mixins"]
+        mixins = _first_decl(data, "FacetDecl")["mixins"]
         assert len(mixins) == 1
         assert mixins[0]["target"] == "Retry"
         assert mixins[0]["args"] == [{"name": "maxAttempts", "value": {"type": "Int", "value": 3}}]
@@ -313,7 +327,7 @@ class TestMixins:
         """)
         data = emitter.emit_dict(ast)
 
-        mixins = data["workflows"][0]["body"]["steps"][0]["call"]["mixins"]
+        mixins = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]["call"]["mixins"]
         assert len(mixins) == 1
         assert mixins[0]["target"] == "User"
         assert mixins[0]["alias"] == "user"
@@ -335,12 +349,12 @@ class TestNamespaces:
         """)
         data = emitter.emit_dict(ast)
 
-        ns = data["namespaces"][0]
+        ns = _first_decl(data, "Namespace")
         assert ns["type"] == "Namespace"
         assert ns["name"] == "team.data.processing"
         assert ns["uses"] == ["team.common.utils", "team.other"]
-        assert len(ns["facets"]) == 1
-        assert len(ns["workflows"]) == 1
+        assert len(_decls_by_type(ns, "FacetDecl")) == 1
+        assert len(_decls_by_type(ns, "WorkflowDecl")) == 1
 
 
 class TestImplicits:
@@ -351,7 +365,7 @@ class TestImplicits:
         ast = parse('implicit user = User(name = "system", email = "sys@test.com")')
         data = emitter.emit_dict(ast)
 
-        impl = data["implicits"][0]
+        impl = _first_decl(data, "ImplicitDecl")
         assert impl["type"] == "ImplicitDecl"
         assert impl["name"] == "user"
         assert impl["call"]["target"] == "User"
@@ -366,8 +380,9 @@ class TestLocations:
         ast = parse("facet Test()")
         data = emitter.emit_dict(ast)
 
-        assert "location" in data["facets"][0]
-        loc = data["facets"][0]["location"]
+        facet = _first_decl(data, "FacetDecl")
+        assert "location" in facet
+        loc = facet["location"]
         assert "line" in loc
         assert "column" in loc
 
@@ -377,7 +392,7 @@ class TestLocations:
         ast = parse("facet Test()")
         data = emitter.emit_dict(ast)
 
-        assert "location" not in data["facets"][0]
+        assert "location" not in _first_decl(data, "FacetDecl")
 
 
 class TestConvenienceFunctions:
@@ -436,16 +451,16 @@ class TestComplexExample:
         data = emitter.emit_dict(ast)
 
         # Verify structure
-        ns = data["namespaces"][0]
+        ns = _first_decl(data, "Namespace")
         assert ns["name"] == "team.email"
         assert ns["uses"] == ["team.common.types"]
-        assert len(ns["facets"]) == 1
-        assert len(ns["eventFacets"]) == 1
-        assert len(ns["implicits"]) == 1
-        assert len(ns["workflows"]) == 1
+        assert len(_decls_by_type(ns, "FacetDecl")) == 1
+        assert len(_decls_by_type(ns, "EventFacetDecl")) == 1
+        assert len(_decls_by_type(ns, "ImplicitDecl")) == 1
+        assert len(_decls_by_type(ns, "WorkflowDecl")) == 1
 
         # Verify workflow
-        wf = ns["workflows"][0]
+        wf = _first_decl(ns, "WorkflowDecl")
         assert wf["name"] == "BulkSend"
         assert wf["mixins"][0]["target"] == "Retry"
         assert wf["body"]["foreach"]["variable"] == "recipient"
@@ -458,7 +473,7 @@ class TestDefaultParameterValues:
         """String default value emitted correctly."""
         ast = parse('facet Greeting(message: String = "hello")')
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param == {
             "name": "message",
             "type": "String",
@@ -469,14 +484,14 @@ class TestDefaultParameterValues:
         """Integer default value emitted correctly."""
         ast = parse("facet Config(retries: Int = 3)")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param == {"name": "retries", "type": "Int", "default": {"type": "Int", "value": 3}}
 
     def test_boolean_default(self, emitter):
         """Boolean default value emitted correctly."""
         ast = parse("facet Config(verbose: Boolean = true)")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param == {
             "name": "verbose",
             "type": "Boolean",
@@ -487,21 +502,21 @@ class TestDefaultParameterValues:
         """Null default value emitted correctly."""
         ast = parse("facet Config(extra: Json = null)")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param == {"name": "extra", "type": "Json", "default": {"type": "Null"}}
 
     def test_no_default_omits_key(self, emitter):
         """Parameters without defaults omit the default key."""
         ast = parse("facet Data(value: String)")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert "default" not in param
 
     def test_mixed_defaults(self, emitter):
         """Mix of params with and without defaults."""
         ast = parse("facet Mixed(required: String, optional: Int = 42)")
         data = emitter.emit_dict(ast)
-        params = data["facets"][0]["params"]
+        params = _first_decl(data, "FacetDecl")["params"]
         assert "default" not in params[0]
         assert params[1]["default"] == {"type": "Int", "value": 42}
 
@@ -509,7 +524,7 @@ class TestDefaultParameterValues:
         """Workflow params and returns with defaults round-trip correctly."""
         ast = parse('workflow MyFlow(input: String = "hello") => (output: String = "world")')
         data = emitter.emit_dict(ast)
-        wf = data["workflows"][0]
+        wf = _first_decl(data, "WorkflowDecl")
         assert wf["params"][0]["default"] == {"type": "String", "value": "hello"}
         assert wf["returns"][0]["default"] == {"type": "String", "value": "world"}
 
@@ -518,7 +533,7 @@ class TestDefaultParameterValues:
         ast = parse("facet Config(retries: Int = 3)")
         json_str = emit_json(ast, include_locations=False)
         data = json.loads(json_str)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param["default"] == {"type": "Int", "value": 3}
 
 
@@ -564,10 +579,10 @@ class TestSchemaEmission:
         }
         """)
         data = emitter.emit_dict(ast)
-        ns = data["namespaces"][0]
-        assert "schemas" in ns
-        assert len(ns["schemas"]) == 1
-        schema = ns["schemas"][0]
+        ns = _first_decl(data, "Namespace")
+        schemas = _decls_by_type(ns, "SchemaDecl")
+        assert len(schemas) == 1
+        schema = schemas[0]
         assert schema["type"] == "SchemaDecl"
         assert schema["name"] == "UserRequest"
         assert len(schema["fields"]) == 2
@@ -584,7 +599,8 @@ class TestSchemaEmission:
         }
         """)
         data = emitter.emit_dict(ast)
-        field = data["namespaces"][0]["schemas"][0]["fields"][0]
+        ns = _first_decl(data, "Namespace")
+        field = _first_decl(ns, "SchemaDecl")["fields"][0]
         assert field["name"] == "tags"
         assert field["type"] == {"type": "ArrayType", "elementType": "String"}
 
@@ -592,7 +608,7 @@ class TestSchemaEmission:
         """Array types emit correctly in regular parameters."""
         ast = parse("facet Process(items: [String])")
         data = emitter.emit_dict(ast)
-        param = data["facets"][0]["params"][0]
+        param = _first_decl(data, "FacetDecl")["params"][0]
         assert param["name"] == "items"
         assert param["type"] == {"type": "ArrayType", "elementType": "String"}
 
@@ -606,7 +622,8 @@ class TestSchemaEmission:
         }
         """)
         data = emitter.emit_dict(ast)
-        field = data["namespaces"][0]["schemas"][0]["fields"][0]
+        ns = _first_decl(data, "Namespace")
+        field = _first_decl(ns, "SchemaDecl")["fields"][0]
         assert field["type"] == {
             "type": "ArrayType",
             "elementType": {"type": "ArrayType", "elementType": "Int"},
@@ -622,10 +639,10 @@ class TestSchemaEmission:
         }
         """)
         data = emitter.emit_dict(ast)
-        ns = data["namespaces"][0]
-        assert "schemas" in ns
-        assert len(ns["schemas"]) == 1
-        assert ns["schemas"][0]["name"] == "Config"
+        ns = _first_decl(data, "Namespace")
+        schemas = _decls_by_type(ns, "SchemaDecl")
+        assert len(schemas) == 1
+        assert schemas[0]["name"] == "Config"
 
     def test_schema_reference_as_field_type(self, emitter):
         """Schema name as field type emits as string."""
@@ -640,7 +657,9 @@ class TestSchemaEmission:
         }
         """)
         data = emitter.emit_dict(ast)
-        person_field = data["namespaces"][0]["schemas"][1]["fields"][0]
+        ns = _first_decl(data, "Namespace")
+        schemas = _decls_by_type(ns, "SchemaDecl")
+        person_field = schemas[1]["fields"][0]
         assert person_field == {"name": "home", "type": "Address"}
 
 
@@ -656,7 +675,7 @@ class TestUsesDecl:
         }
         """)
         data = emitter.emit_dict(ast)
-        ns = data["namespaces"][0]
+        ns = _first_decl(data, "Namespace")
         # Uses declarations are emitted as a list of strings in namespace
         assert "uses" in ns or "uses" not in ns  # uses are emitted as name strings
         # The namespace should contain the use reference
@@ -708,7 +727,7 @@ class TestProvenance:
             source_registry=registry,
         )
         data = emitter.emit_dict(ast)
-        loc = data["facets"][0]["location"]
+        loc = _first_decl(data, "FacetDecl")["location"]
         assert "provenance" in loc
         assert loc["provenance"]["type"] == "file"
 
@@ -794,7 +813,7 @@ class TestBinaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "BinaryExpr"
         assert arg_value["operator"] == "+"
@@ -812,7 +831,7 @@ class TestBinaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "BinaryExpr"
         assert arg_value["operator"] == "+"
@@ -831,7 +850,7 @@ class TestBinaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step2 = data["workflows"][0]["body"]["steps"][1]
+        step2 = _first_decl(data, "WorkflowDecl")["body"]["steps"][1]
         arg_value = step2["call"]["args"][0]["value"]
         assert arg_value["type"] == "BinaryExpr"
         assert arg_value["left"]["type"] == "StepRef"
@@ -856,7 +875,7 @@ class TestStepBodyEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         assert "body" in step
         assert step["body"]["type"] == "AndThenBlock"
         assert len(step["body"]["steps"]) == 1
@@ -872,7 +891,7 @@ class TestStepBodyEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         assert "body" not in step
 
 
@@ -893,7 +912,7 @@ class TestMultipleBlockEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        body = data["workflows"][0]["body"]
+        body = _first_decl(data, "WorkflowDecl")["body"]
         assert isinstance(body, list)
         assert len(body) == 2
         assert body[0]["type"] == "AndThenBlock"
@@ -910,7 +929,7 @@ class TestMultipleBlockEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        body = data["workflows"][0]["body"]
+        body = _first_decl(data, "WorkflowDecl")["body"]
         assert isinstance(body, dict)
         assert body["type"] == "AndThenBlock"
 
@@ -928,7 +947,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "ArrayLiteral"
         assert len(arg_value["elements"]) == 3
@@ -945,7 +964,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "ArrayLiteral"
         assert arg_value["elements"] == []
@@ -960,7 +979,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "MapLiteral"
         assert len(arg_value["entries"]) == 2
@@ -979,7 +998,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "MapLiteral"
         assert arg_value["entries"] == []
@@ -995,7 +1014,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][1]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][1]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "IndexExpr"
         assert arg_value["target"]["type"] == "StepRef"
@@ -1011,7 +1030,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "ArrayLiteral"
         assert len(arg_value["elements"]) == 2
@@ -1029,7 +1048,7 @@ class TestCollectionLiteralEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][1]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][1]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "ArrayLiteral"
         assert arg_value["elements"][0]["type"] == "InputRef"
@@ -1049,7 +1068,7 @@ class TestUnaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "UnaryExpr"
         assert arg_value["operator"] == "-"
@@ -1065,7 +1084,7 @@ class TestUnaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "UnaryExpr"
         assert arg_value["operator"] == "-"
@@ -1081,7 +1100,7 @@ class TestUnaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "UnaryExpr"
         assert arg_value["operator"] == "-"
@@ -1097,7 +1116,7 @@ class TestUnaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "UnaryExpr"
         assert arg_value["operand"]["type"] == "UnaryExpr"
@@ -1113,7 +1132,7 @@ class TestUnaryExprEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        step = data["workflows"][0]["body"]["steps"][0]
+        step = _first_decl(data, "WorkflowDecl")["body"]["steps"][0]
         arg_value = step["call"]["args"][0]["value"]
         assert arg_value["type"] == "BinaryExpr"
         assert arg_value["operator"] == "+"
@@ -1151,7 +1170,7 @@ class TestWorkflowInDeclarations:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        ns = data["namespaces"][0]
+        ns = _first_decl(data, "Namespace")
         decl_types = [d["type"] for d in ns.get("declarations", [])]
         assert "WorkflowDecl" in decl_types
 
@@ -1169,7 +1188,7 @@ class TestWorkflowInDeclarations:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        ns = data["namespaces"][0]
+        ns = _first_decl(data, "Namespace")
         decl_types = {d["type"] for d in ns.get("declarations", [])}
         assert "FacetDecl" in decl_types
         assert "EventFacetDecl" in decl_types
@@ -1189,7 +1208,7 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        assert data["namespaces"][0]["doc"] == {
+        assert _first_decl(data, "Namespace")["doc"] == {
             "description": "NS doc.",
             "params": [],
             "returns": [],
@@ -1205,7 +1224,8 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        facet = data["namespaces"][0]["facets"][0]
+        ns = _first_decl(data, "Namespace")
+        facet = _first_decl(ns, "FacetDecl")
         assert facet["doc"] == {
             "description": "Facet doc.",
             "params": [],
@@ -1226,7 +1246,8 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        decls = {d["name"]: d for d in data["namespaces"][0]["declarations"]}
+        ns = _first_decl(data, "Namespace")
+        decls = {d["name"]: d for d in ns["declarations"]}
         assert decls["EF"]["doc"]["description"] == "EF doc."
         assert decls["WF"]["doc"]["description"] == "WF doc."
 
@@ -1240,7 +1261,8 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        schema = data["namespaces"][0]["schemas"][0]
+        ns = _first_decl(data, "Namespace")
+        schema = _first_decl(ns, "SchemaDecl")
         assert schema["doc"] == {
             "description": "Schema doc.",
             "params": [],
@@ -1256,8 +1278,9 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        assert "doc" not in data["namespaces"][0]
-        assert "doc" not in data["namespaces"][0]["facets"][0]
+        ns = _first_decl(data, "Namespace")
+        assert "doc" not in ns
+        assert "doc" not in _first_decl(ns, "FacetDecl")
 
     def test_doc_with_tags_emits_structured(self):
         """Doc comment with @param/@return tags emits full structured output."""
@@ -1273,7 +1296,8 @@ class TestDocCommentEmission:
         """)
         emitter = JSONEmitter(include_locations=False)
         data = emitter.emit_dict(ast)
-        doc = data["namespaces"][0]["eventFacets"][0]["doc"]
+        ns = _first_decl(data, "Namespace")
+        doc = _first_decl(ns, "EventFacetDecl")["doc"]
         assert doc["description"] == "Adds one to the input."
         assert doc["params"] == [{"name": "value", "description": "The input value."}]
         assert doc["returns"] == [{"name": "result", "description": "The incremented value."}]
