@@ -1,5 +1,15 @@
 # Implementation Changelog
 
+## Completed (v0.12.46) - Refactor Scripts with Shared .env Configuration
+- Added `.env.example` template with all configurable settings (MongoDB, scaling, overlays, external data dirs)
+- Added `scripts/_env.sh` shared helper: loads `.env` without overriding already-set env vars, exports `_compute_compose_args()` for overlay-aware compose file/profile computation
+- Added `.env` and `.afl-active-config` to `.gitignore`
+- Refactored `scripts/setup`: defaults now read from env vars (`AFL_RUNNERS`, `AFL_AGENTS`, `AFL_OSM_AGENTS`, etc.); writes `.afl-active-config` after computing overlay state
+- Refactored `scripts/rebuild`: overlay-aware build and `--up` — reads `.afl-active-config` or `.env` so containers start with correct compose files (mirror, HDFS, PostGIS); fixes bug where `rebuild --up` started containers without overlay mounts
+- Refactored `scripts/teardown`: sources `_env.sh` to populate `AFL_GEOFABRIK_MIRROR` from `.env`
+- Refactored `scripts/easy.sh`: reads all config from `.env` instead of hardcoding `/Volumes/afl_data/osm`, `3 runners`, `4 osm-agents`
+- Added `source _env.sh` to `seed-examples`, `run-workflow`, `publish`, `db-stats`, `server`, `runner` for consistent MongoDB connection via `.env`
+
 ## Completed (v0.12.45) - Add Step Logging to AgentPoller and Example Handlers
 - Added `_emit_step_log()` method to AgentPoller (mirrors RegistryRunner pattern)
 - AgentPoller now emits framework-level step logs: task claimed, dispatching, handler completed, handler error
