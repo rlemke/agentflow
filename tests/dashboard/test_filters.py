@@ -41,7 +41,8 @@ class TestTimestampFmt:
 
     def test_custom_format(self):
         result = timestamp_fmt(1704067200000, fmt="%Y")
-        assert result == "2024"
+        assert "2024" in result
+        assert "data-ts=" in result
 
 
 class TestDurationFmt:

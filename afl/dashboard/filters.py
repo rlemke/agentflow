@@ -19,14 +19,25 @@ from __future__ import annotations
 import datetime
 
 from jinja2 import Environment
+from markupsafe import Markup
 
 
 def timestamp_fmt(value: int | float | None, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Format a millisecond-epoch timestamp as a human-readable string."""
+    """Format a millisecond-epoch timestamp as a <time> element.
+
+    Renders a ``<time>`` tag whose ``datetime`` attribute holds the ISO-8601
+    UTC value and whose ``data-ts`` attribute holds the epoch-millisecond
+    value.  A small script in ``base.html`` converts the visible text to the
+    viewer's local timezone on page load.
+    """
     if not value:
         return "—"
     dt = datetime.datetime.fromtimestamp(value / 1000, tz=datetime.UTC)
-    return dt.strftime(fmt)
+    iso = dt.isoformat()
+    utc_text = dt.strftime(fmt)
+    return Markup(
+        f'<time datetime="{iso}" data-ts="{int(value)}">{utc_text}</time>'
+    )
 
 
 def duration_fmt(ms: int | float | None) -> str:
