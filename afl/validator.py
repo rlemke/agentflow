@@ -36,6 +36,7 @@ from .ast import (
     EventFacetDecl,
     FacetDecl,
     FacetSig,
+    ImplicitDecl,
     IndexExpr,
     Literal,
     MapLiteral,
@@ -467,6 +468,8 @@ class AFLValidator:
             self._validate_event_facet_decl(event_facet)
         for workflow in program.workflows:
             self._validate_workflow_decl(workflow)
+        for implicit in program.implicits:
+            self._validate_implicit_decl(implicit)
 
     def _validate_top_level_uniqueness(self, program: Program) -> None:
         """Validate that top-level names are unique."""
@@ -520,6 +523,8 @@ class AFLValidator:
             self._validate_event_facet_decl(event_facet)
         for workflow in namespace.workflows:
             self._validate_workflow_decl(workflow)
+        for implicit in namespace.implicits:
+            self._validate_implicit_decl(implicit)
 
         self._current_namespace = ""
         self._current_imports = set()
@@ -997,6 +1002,29 @@ class AFLValidator:
             self._check_name_unique(f.name, f.location, field_names, "schema field")
             # Validate field type reference
             self._validate_type_ref(f.type, f.location)
+
+    def _validate_implicit_decl(self, implicit: ImplicitDecl) -> None:
+        """Validate an implicit declaration.
+
+        Checks that:
+        - The call target references a known facet
+        - The call args match the target facet's parameters
+        """
+        call = implicit.call
+        facet_info = self._resolve_facet_name(call.name, implicit.location)
+        if facet_info is None:
+            # _resolve_facet_name already reported an error if it was ambiguous;
+            # for unknown external facets it returns None silently — skip arg checks
+            return
+
+        # Validate that implicit args are valid params of the target facet
+        for arg in call.args:
+            if arg.name not in facet_info.params:
+                self._result.add_error(
+                    f"Implicit '{implicit.name}' passes unknown parameter "
+                    f"'{arg.name}' to facet '{call.name}'",
+                    implicit.location,
+                )
 
 
 def validate(program: Program) -> ValidationResult:

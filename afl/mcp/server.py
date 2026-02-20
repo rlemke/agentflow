@@ -348,10 +348,9 @@ def _tool_compile(arguments: dict[str, Any]) -> list[TextContent]:
     source = arguments.get("source", "")
     try:
         from afl import emit_dict, parse
-        from afl.ast_utils import normalize_program_ast
 
         ast = parse(source)
-        compiled = normalize_program_ast(emit_dict(ast))
+        compiled = emit_dict(ast)
         result = {"success": True, "json": compiled}
     except Exception as e:
         result = {"success": False, "errors": [str(e)]}
@@ -393,11 +392,10 @@ def _tool_execute_workflow(arguments: dict[str, Any]) -> list[TextContent]:
 
     try:
         from afl import emit_dict, parse
-        from afl.ast_utils import normalize_program_ast
         from afl.runtime import Evaluator, MemoryStore
 
         ast = parse(source)
-        compiled = normalize_program_ast(emit_dict(ast))
+        compiled = emit_dict(ast)
 
         # Find the workflow by name
         workflow_ast = _find_workflow(compiled, workflow_name)
@@ -474,11 +472,10 @@ def _tool_resume_workflow(
 
     try:
         from afl import emit_dict, parse
-        from afl.ast_utils import normalize_program_ast
         from afl.runtime import Evaluator
 
         ast = parse(source)
-        compiled = normalize_program_ast(emit_dict(ast))
+        compiled = emit_dict(ast)
         workflow_ast = _find_workflow(compiled, workflow_name)
         if workflow_ast is None:
             return [

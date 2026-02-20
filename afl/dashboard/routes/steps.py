@@ -110,9 +110,9 @@ def _resolve_statement_name(statement_id: str, runner, store) -> str | None:
     parser = AFLParser()
     ast = parser.parse(flow.compiled_sources[0].content)
     emitter = JSONEmitter(include_locations=False)
-    from afl.ast_utils import find_all_workflows, normalize_program_ast
+    from afl.ast_utils import find_all_workflows
 
-    program_dict = normalize_program_ast(json.loads(emitter.emit(ast)))
+    program_dict = json.loads(emitter.emit(ast))
 
     for wf in find_all_workflows(program_dict):
         body = wf.get("body")

@@ -79,6 +79,15 @@ class FacetInitializationBeginHandler(StateHandler):
             args = stmt_def.args
             evaluated = evaluate_args(args, ctx)
 
+            # Apply implicit defaults for any params not provided in the call
+            if self.step.facet_name:
+                implicit_args = self.context.get_implicit_args(self.step.facet_name)
+                if implicit_args:
+                    expr_eval = ExpressionEvaluator()
+                    for name, value_expr in implicit_args.items():
+                        if name not in evaluated:
+                            evaluated[name] = expr_eval.evaluate(value_expr, ctx)
+
             # Apply facet defaults for any params not provided in the call
             if self.step.facet_name:
                 facet_def = self.context.get_facet_definition(self.step.facet_name)

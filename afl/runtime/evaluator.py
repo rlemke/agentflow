@@ -479,6 +479,55 @@ class ExecutionContext:
                     return result
         return None
 
+    def get_implicit_args(self, facet_name: str) -> dict | None:
+        """Get implicit default args for a facet from program AST.
+
+        Searches all ImplicitDecl nodes whose call target matches facet_name.
+        Returns the first matching implicit's args as a dict, or None.
+
+        Args:
+            facet_name: The facet name to look up (qualified or short)
+
+        Returns:
+            Dict of {arg_name: value_expr} or None if no matching implicit
+        """
+        if not self.program_ast:
+            return None
+        return self._search_implicit_declarations(
+            self.program_ast.get("declarations", []), facet_name
+        )
+
+    def _search_implicit_declarations(
+        self, declarations: list, facet_name: str
+    ) -> dict | None:
+        """Search declarations for an ImplicitDecl targeting facet_name.
+
+        Args:
+            declarations: List of declaration dicts
+            facet_name: The facet name to match
+
+        Returns:
+            Dict of {arg_name: value_expr} or None
+        """
+        short_name = facet_name.split(".")[-1] if "." in facet_name else facet_name
+        for decl in declarations:
+            if decl.get("type") == "ImplicitDecl":
+                call = decl.get("call", {})
+                target = call.get("target", "")
+                target_short = target.split(".")[-1] if "." in target else target
+                if target == facet_name or target_short == short_name:
+                    return {
+                        arg["name"]: arg["value"]
+                        for arg in call.get("args", [])
+                    }
+            elif decl.get("type") == "Namespace":
+                result = self._search_implicit_declarations(
+                    decl.get("declarations", []), facet_name
+                )
+                if result:
+                    return result
+        return None
+
     def set_block_ast_cache(self, block_id: StepId, ast: dict) -> None:
         """Cache a block AST for direct lookup (e.g., foreach sub-blocks).
 

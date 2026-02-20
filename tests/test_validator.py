@@ -1668,3 +1668,41 @@ class TestWorkflowAsStep:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestImplicitValidation:
+    """Test validation of implicit declarations."""
+
+    def test_valid_implicit(self, validator):
+        """Valid implicit referencing a known facet with correct params."""
+        ast = parse("""
+        namespace ns {
+            facet Retry(maxAttempts: Int)
+            implicit retryDefaults = Retry(maxAttempts = 5)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_implicit_unknown_param(self, validator):
+        """Implicit passes an arg not in the target facet's params."""
+        ast = parse("""
+        namespace ns {
+            facet Retry(maxAttempts: Int)
+            implicit retryDefaults = Retry(unknownParam = 5)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("unknownParam" in str(e) for e in result.errors)
+
+    def test_implicit_valid_with_multiple_params(self, validator):
+        """Implicit providing multiple valid params."""
+        ast = parse("""
+        namespace ns {
+            facet Config(timeout: Int, retries: Int)
+            implicit defaults = Config(timeout = 30, retries = 3)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

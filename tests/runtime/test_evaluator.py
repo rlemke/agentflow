@@ -4366,3 +4366,289 @@ class TestWorkflowAsStep:
         )
         assert result.success is True
         assert result.outputs["result"] == 14
+
+
+class TestImplicitDefaults:
+    """Tests for implicit declaration default parameter resolution."""
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        telemetry = Telemetry(enabled=True)
+        return Evaluator(persistence=store, telemetry=telemetry)
+
+    def test_implicit_provides_default_when_no_explicit_arg(self, evaluator):
+        """Implicit provides a default value when the step has no explicit arg."""
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "FacetDecl",
+                            "name": "Retry",
+                            "params": [{"name": "maxAttempts", "type": "Int"}],
+                        },
+                        {
+                            "type": "ImplicitDecl",
+                            "name": "retryDefaults",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Retry",
+                                "args": [
+                                    {
+                                        "name": "maxAttempts",
+                                        "value": {"type": "Int", "value": 5},
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "type": "WorkflowDecl",
+                            "name": "TestWf",
+                            "params": [],
+                            "body": {
+                                "type": "AndThenBlock",
+                                "steps": [
+                                    {
+                                        "type": "StepStmt",
+                                        "id": "step-r",
+                                        "name": "r",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "Retry",
+                                            "args": [],
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        workflow_ast = program_ast["declarations"][0]["declarations"][2]
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+
+        assert result.success is True
+        assert result.status == ExecutionStatus.COMPLETED
+        steps = evaluator.persistence.get_steps_by_workflow(result.workflow_id)
+        retry_step = None
+        for s in steps:
+            if s.facet_name and "Retry" in s.facet_name:
+                retry_step = s
+                break
+        assert retry_step is not None
+        assert retry_step.get_attribute("maxAttempts") == 5
+
+    def test_explicit_arg_overrides_implicit(self, evaluator):
+        """Explicit call args take priority over implicit defaults."""
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "FacetDecl",
+                            "name": "Retry",
+                            "params": [{"name": "maxAttempts", "type": "Int"}],
+                        },
+                        {
+                            "type": "ImplicitDecl",
+                            "name": "retryDefaults",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Retry",
+                                "args": [
+                                    {
+                                        "name": "maxAttempts",
+                                        "value": {"type": "Int", "value": 5},
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "type": "WorkflowDecl",
+                            "name": "TestWf",
+                            "params": [],
+                            "body": {
+                                "type": "AndThenBlock",
+                                "steps": [
+                                    {
+                                        "type": "StepStmt",
+                                        "id": "step-r",
+                                        "name": "r",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "Retry",
+                                            "args": [
+                                                {
+                                                    "name": "maxAttempts",
+                                                    "value": {
+                                                        "type": "Int",
+                                                        "value": 2,
+                                                    },
+                                                }
+                                            ],
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        workflow_ast = program_ast["declarations"][0]["declarations"][2]
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+
+        assert result.success is True
+        steps = evaluator.persistence.get_steps_by_workflow(result.workflow_id)
+        retry_step = None
+        for s in steps:
+            if s.facet_name and "Retry" in s.facet_name:
+                retry_step = s
+                break
+        assert retry_step is not None
+        assert retry_step.get_attribute("maxAttempts") == 2
+
+    def test_implicit_overrides_facet_default(self, evaluator):
+        """Implicit defaults take priority over facet parameter defaults."""
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "FacetDecl",
+                            "name": "Retry",
+                            "params": [
+                                {
+                                    "name": "maxAttempts",
+                                    "type": "Int",
+                                    "default": {"type": "Int", "value": 3},
+                                }
+                            ],
+                        },
+                        {
+                            "type": "ImplicitDecl",
+                            "name": "retryDefaults",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Retry",
+                                "args": [
+                                    {
+                                        "name": "maxAttempts",
+                                        "value": {"type": "Int", "value": 5},
+                                    }
+                                ],
+                            },
+                        },
+                        {
+                            "type": "WorkflowDecl",
+                            "name": "TestWf",
+                            "params": [],
+                            "body": {
+                                "type": "AndThenBlock",
+                                "steps": [
+                                    {
+                                        "type": "StepStmt",
+                                        "id": "step-r",
+                                        "name": "r",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "Retry",
+                                            "args": [],
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        workflow_ast = program_ast["declarations"][0]["declarations"][2]
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+
+        assert result.success is True
+        steps = evaluator.persistence.get_steps_by_workflow(result.workflow_id)
+        retry_step = None
+        for s in steps:
+            if s.facet_name and "Retry" in s.facet_name:
+                retry_step = s
+                break
+        assert retry_step is not None
+        # Implicit (5) beats facet default (3)
+        assert retry_step.get_attribute("maxAttempts") == 5
+
+    def test_no_implicit_no_effect(self, evaluator):
+        """When no implicit matches, normal facet defaults apply."""
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "FacetDecl",
+                            "name": "Retry",
+                            "params": [
+                                {
+                                    "name": "maxAttempts",
+                                    "type": "Int",
+                                    "default": {"type": "Int", "value": 3},
+                                }
+                            ],
+                        },
+                        {
+                            "type": "WorkflowDecl",
+                            "name": "TestWf",
+                            "params": [],
+                            "body": {
+                                "type": "AndThenBlock",
+                                "steps": [
+                                    {
+                                        "type": "StepStmt",
+                                        "id": "step-r",
+                                        "name": "r",
+                                        "call": {
+                                            "type": "CallExpr",
+                                            "target": "Retry",
+                                            "args": [],
+                                        },
+                                    }
+                                ],
+                            },
+                        },
+                    ],
+                }
+            ],
+        }
+
+        workflow_ast = program_ast["declarations"][0]["declarations"][1]
+        result = evaluator.execute(workflow_ast, program_ast=program_ast)
+
+        assert result.success is True
+        steps = evaluator.persistence.get_steps_by_workflow(result.workflow_id)
+        retry_step = None
+        for s in steps:
+            if s.facet_name and "Retry" in s.facet_name:
+                retry_step = s
+                break
+        assert retry_step is not None
+        # Facet default (3) applies since no implicit exists
+        assert retry_step.get_attribute("maxAttempts") == 3

@@ -198,7 +198,7 @@ def flow_run_form(
 
     if flow.compiled_sources:
         try:
-            from afl.ast_utils import find_workflow, normalize_program_ast
+            from afl.ast_utils import find_workflow
             from afl.emitter import JSONEmitter
             from afl.parser import AFLParser
 
@@ -207,7 +207,7 @@ def flow_run_form(
             ast = parser.parse(source_text)
             emitter = JSONEmitter(include_locations=False)
             program_json = emitter.emit(ast)
-            program_dict = normalize_program_ast(json.loads(program_json))
+            program_dict = json.loads(program_json)
 
             wf_ast = find_workflow(program_dict, workflow_name)
             if wf_ast:
@@ -268,7 +268,7 @@ def flow_run_execute(
         TaskDefinition,
         TaskState,
     )
-    from afl.ast_utils import find_workflow, normalize_program_ast
+    from afl.ast_utils import find_workflow
     from afl.runtime.types import generate_id
 
     flow = store.get_flow(flow_id)
@@ -290,7 +290,7 @@ def flow_run_execute(
             ast = parser.parse(source_text)
             emitter = JSONEmitter(include_locations=False)
             program_json = emitter.emit(ast)
-            program_dict = normalize_program_ast(json.loads(program_json))
+            program_dict = json.loads(program_json)
 
             wf_ast = find_workflow(program_dict, workflow_def.name)
             if wf_ast:

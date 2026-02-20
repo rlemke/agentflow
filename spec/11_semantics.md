@@ -25,6 +25,8 @@ All AST nodes MUST have a unique UUID (v4) stored in the `node_id` field. This I
 |------|-------------|
 | `Program` | Root containing namespaces, facets, event_facets, workflows, implicits |
 
+> **Note**: The Python AST dataclass `Program` has separate fields (`namespaces`, `facets`, `event_facets`, `workflows`, `implicits`, `schemas`). The JSON serialization flattens these into a unified `declarations` list. Both representations carry the same information.
+
 ### Declaration Nodes
 | Node | Description |
 |------|-------------|

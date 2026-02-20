@@ -109,6 +109,8 @@ No other parsing, compiler, or DSL libraries are permitted in v1:
 - JSON output format is considered stable within MAJOR version
 - `type` field present on all nodes
 - Location fields optional (controlled by flag)
+- As of v0.12.52, the emitter produces **declarations-only** format (no categorized `namespaces`/`facets`/`eventFacets`/`workflows`/`implicits`/`schemas` keys)
+- `normalize_program_ast()` in `afl/ast_utils.py` handles backward compatibility for legacy JSON that uses categorized keys
 
 ---
 

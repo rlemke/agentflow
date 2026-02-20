@@ -124,6 +124,30 @@ When `include_provenance=True`, locations include `sourceId` and `provenance`:
 }
 ```
 
+### Declarations-Only Output Format
+
+As of v0.12.52, the emitter produces a **declarations-only** JSON format:
+
+- The `Program` node contains a single `declarations` list — there are no separate `namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, or `schemas` keys
+- `Namespace` nodes also use a `declarations` list internally
+- All declaration types (`FacetDecl`, `EventFacetDecl`, `WorkflowDecl`, `ImplicitDecl`, `SchemaDecl`, `Namespace`) appear in the unified `declarations` list
+
+For backward compatibility with legacy/external JSON that uses categorized keys, `normalize_program_ast()` in `afl/ast_utils.py` converts categorized-key JSON into declarations-only format.
+
+Example:
+```json
+{
+  "type": "Program",
+  "declarations": [
+    {"type": "Namespace", "name": "ns", "declarations": [
+      {"type": "FacetDecl", "name": "MyFacet", ...},
+      {"type": "ImplicitDecl", "name": "defaults", ...}
+    ]},
+    {"type": "WorkflowDecl", "name": "Main", ...}
+  ]
+}
+```
+
 ### Node Type Mapping
 | AST Node | JSON `type` field |
 |----------|-------------------|

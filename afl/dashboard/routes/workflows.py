@@ -121,9 +121,9 @@ def workflow_compile(request: Request, source: str = Form(...)):
         # Emit to JSON and extract workflows
         emitter = JSONEmitter(include_locations=False)
         program_json = emitter.emit(ast)
-        from afl.ast_utils import find_all_workflows, normalize_program_ast
+        from afl.ast_utils import find_all_workflows
 
-        program_dict = normalize_program_ast(json.loads(program_json))
+        program_dict = json.loads(program_json)
 
         for wf in find_all_workflows(program_dict):
             params_with_defaults = []
@@ -188,9 +188,9 @@ def workflow_run(
     ast = parser.parse(source)
     emitter = JSONEmitter(include_locations=False)
     program_json = emitter.emit(ast)
-    from afl.ast_utils import find_workflow, normalize_program_ast
+    from afl.ast_utils import find_workflow
 
-    program_dict = normalize_program_ast(json.loads(program_json))
+    program_dict = json.loads(program_json)
 
     # Extract input values: start with defaults from the compiled AST
 

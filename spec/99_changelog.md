@@ -1,5 +1,20 @@
 # Implementation Changelog
 
+## Completed (v0.12.53) - Remove normalize calls, wire implicit defaults, spec cleanup
+- **Removed 13 no-op `normalize_program_ast()` calls** from all AST entry points: `submit.py`, `service.py` (2 sites), `registry_runner.py`, `agent_poller.py`, `server.py` (3 sites), `steps.py`, `flows.py` (2 sites), `workflows.py` (2 sites). The function itself is preserved in `afl/ast_utils.py` and `afl/__init__.py` for external/legacy JSON consumers.
+- **Wired implicit declaration defaults into the runtime**:
+  - Added `get_implicit_args()` and `_search_implicit_declarations()` to `ExecutionContext` in `afl/runtime/evaluator.py` — scans program AST for `ImplicitDecl` nodes matching a facet name
+  - Added implicit default resolution in `FacetInitializationBeginHandler.process_state()` in `afl/runtime/handlers/initialization.py` — applies between explicit args and facet defaults (priority: explicit > implicit > facet default)
+  - Added 4 tests in `tests/runtime/test_evaluator.py::TestImplicitDefaults`: provides default, explicit overrides implicit, implicit overrides facet default, no-implicit-no-effect
+- **Added implicit validation** in `afl/validator.py`:
+  - `_validate_implicit_decl()` checks that the implicit's call target references a known facet and that call args match target facet parameters
+  - Called from both `_validate_program()` and `_validate_namespace()`
+  - Added 3 tests in `tests/test_validator.py::TestImplicitValidation`
+- **Updated spec files** for declarations-only format:
+  - `spec/20_compiler.md`: added "Declarations-Only Output Format" subsection under JSON Emitter
+  - `spec/11_semantics.md`: added note clarifying Python AST vs JSON serialization
+  - `spec/90_nonfunctional.md`: updated JSON Format Stability section
+
 ## Completed (v0.12.52) - Remove Categorized Keys from Emitter and Consumers
 - **Emitter no longer emits categorized keys**: removed `namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, `schemas` from `_program()` and `_namespace()` in `afl/emitter.py`; only the unified `declarations` list is emitted
 - **Implicits now included in declarations**: both `_program()` and `_namespace()` now add `ImplicitDecl` nodes to the `declarations` list (previously omitted from declarations but present in categorized `implicits` key)
