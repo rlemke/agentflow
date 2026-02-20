@@ -1,5 +1,20 @@
 # Implementation Changelog
 
+## Completed (v0.12.51) - Wire normalize_program_ast at All Entry Points
+- Wired `normalize_program_ast()` at all 13 AST ingestion points so downstream code always receives declarations-only dicts:
+  - `afl/runtime/submit.py` (after JSON parse)
+  - `afl/runtime/runner/service.py` (execute path + resume path — 2 sites)
+  - `afl/runtime/registry_runner.py` (AST load path)
+  - `afl/runtime/agent_poller.py` (AST load path)
+  - `afl/mcp/server.py` (`_tool_compile`, `_tool_execute_workflow`, `_tool_resume_workflow` — 3 sites)
+  - `afl/dashboard/routes/flows.py` (`flow_run_detail`, `flow_run_execute` — 2 sites)
+  - `afl/dashboard/routes/workflows.py` (`workflow_new`, `submit_workflow` — 2 sites)
+  - `afl/dashboard/routes/steps.py` (step name lookup)
+- Cleaned up evaluator dual-format workaround: removed `+ decl.get("eventFacets", [])` concatenation in `evaluator.py:427` — after normalization, `eventFacets` is always folded into `declarations`
+- Added 2 new tests in `tests/test_ast_utils.py::TestNormalizeNamespaceEventFacets`:
+  - `test_namespace_eventfacets_moved_to_declarations`: unit test confirming eventFacets are folded into declarations
+  - `test_compile_event_facet_normalize_roundtrip`: integration test compiling AFL with event facets, normalizing, verifying structure
+
 ## Completed (v0.12.50) - AST Format Normalization and Shared find_workflow
 - Added `afl/ast_utils.py` with three public functions:
   - `normalize_program_ast()`: strips categorized keys (`namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, `schemas`), keeps `declarations` as the single source of truth; builds `declarations` from categorized keys if missing; recursively normalizes namespace nodes; idempotent and non-mutating
