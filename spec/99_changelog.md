@@ -1,5 +1,11 @@
 # Implementation Changelog
 
+## Completed (v0.12.49) - Add AnalyzeRegion and AnalyzeAllStates Workflows
+- Added `osm_analyze_states.afl` with two workflows in namespace `osm.geo.UnitedStates.analysis`:
+  - `AnalyzeRegion(region)`: runs 10 composed workflows (VisualizeBicycleRoutes, AnalyzeParks, LargeCitiesMap, TransportOverview, NationalParksAnalysis, CityAnalysis, TransportMap, StateBoundariesWithStats, DiscoverCitiesAndTowns, RegionalAnalysis) for a single region
+  - `AnalyzeAllStates()`: calls AnalyzeRegion for all 50 US states plus DC (51 steps, each expanding to 10 sub-workflow calls)
+- Added `run_osm_analyze_states.sh` convenience script: sets up Docker stack, compiles with all OSM library files, and submits the workflow
+
 ## Completed (v0.12.48) - Rename osmstates30 to osm_cache_states with All 50 States
 - Renamed `osmstates30.afl` → `osm_cache_states.afl`; expanded from 30 states to all 50 US states plus DC
 - Renamed workflow `Download30States` → `DownloadAllStates` (namespace `osm.geo.UnitedStates.cache`)
