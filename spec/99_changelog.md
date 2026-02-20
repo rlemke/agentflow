@@ -1,5 +1,10 @@
 # Implementation Changelog
 
+## Completed (v0.12.55) - Document .env.example and _env.sh configuration workflow
+- **Added "Environment Configuration" section to `spec/90_nonfunctional.md`**: documents the `.env.example` → `.env` → `_env.sh` pipeline, how `scripts/easy.sh` translates env vars to CLI flags, precedence rules (CLI flags > env vars > `.env` > defaults), and a full variable reference table grouped by category (MongoDB, Scaling, Overlays, Data directories)
+- **Updated convenience scripts listing** in `spec/90_nonfunctional.md`: added `scripts/_env.sh` (shared env loader) and `scripts/easy.sh` (one-command pipeline)
+- **Added "Environment configuration" note to `CLAUDE.md`** after "Quick commands" so contributors can discover the `.env` workflow without reading the full spec
+
 ## Completed (v0.12.54) - Extract run_agent() helper to eliminate example agent.py duplication
 - **New module `afl/runtime/agent_runner.py`** with `AgentConfig` dataclass, `make_store()` public helper, and `run_agent()` bootstrap function that encapsulates store creation, evaluator setup, signal handling, and the RegistryRunner/AgentPoller branching logic
 - **Exported** `AgentConfig`, `make_store`, `run_agent` from `afl/runtime/__init__.py`
