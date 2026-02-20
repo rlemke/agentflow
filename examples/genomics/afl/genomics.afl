@@ -165,8 +165,8 @@ namespace genomics.pipeline {
 
     use genomics.types
 
-    /** Fans out QC, alignment, and variant calling across samples in parallel. */
     // Per-sample fan-out: QC -> Align -> Call Variants for each sample
+    /** Fans out QC, alignment, and variant calling across samples in parallel. */
     workflow SamplePipeline(
         samples: Json,
         reference_build: String = "GRCh38"
@@ -193,8 +193,8 @@ namespace genomics.pipeline {
         )
     }
 
-    /** Performs joint genotyping, annotation, and publishing for a complete cohort. */
     // Cohort fan-in: joint genotyping, annotation, and publishing
+    /** Performs joint genotyping, annotation, and publishing for a complete cohort. */
     workflow CohortAnalysis(
         dataset_id: String,
         reference_build: String = "GRCh38",
