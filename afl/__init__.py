@@ -14,6 +14,7 @@
 
 """AFL (Agent Flow Language) compiler package."""
 
+from .ast_utils import find_all_workflows, find_workflow, normalize_program_ast
 from .ast import (
     AndThenBlock,
     ArrayLiteral,
@@ -70,6 +71,10 @@ from .validator import AFLValidator, ValidationError, ValidationResult, validate
 __version__ = "0.1.0"
 
 __all__ = [
+    # AST utilities
+    "normalize_program_ast",
+    "find_workflow",
+    "find_all_workflows",
     # Parser
     "AFLParser",
     "ParseError",

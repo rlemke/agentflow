@@ -123,7 +123,9 @@ def workflow_compile(request: Request, source: str = Form(...)):
         program_json = emitter.emit(ast)
         program_dict = json.loads(program_json)
 
-        for wf in program_dict.get("workflows", []):
+        from afl.ast_utils import find_all_workflows
+
+        for wf in find_all_workflows(program_dict):
             params_with_defaults = []
             for p in wf.get("params", []):
                 default_val = p.get("default")
@@ -189,17 +191,18 @@ def workflow_run(
     program_dict = json.loads(program_json)
 
     # Extract input values: start with defaults from the compiled AST
+    from afl.ast_utils import find_workflow
+
     inputs: dict = {}
-    for wf in program_dict.get("workflows", []):
-        if wf.get("name") == workflow_name:
-            for param in wf.get("params", []):
-                default_val = param.get("default")
-                if default_val is not None:
-                    if isinstance(default_val, dict) and "value" in default_val:
-                        inputs[param["name"]] = default_val["value"]
-                    else:
-                        inputs[param["name"]] = default_val
-            break
+    wf_ast = find_workflow(program_dict, workflow_name)
+    if wf_ast:
+        for param in wf_ast.get("params", []):
+            default_val = param.get("default")
+            if default_val is not None:
+                if isinstance(default_val, dict) and "value" in default_val:
+                    inputs[param["name"]] = default_val["value"]
+                else:
+                    inputs[param["name"]] = default_val
 
     # Override with user-provided inputs from form
     try:

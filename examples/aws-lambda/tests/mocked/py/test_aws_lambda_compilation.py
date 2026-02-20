@@ -219,13 +219,6 @@ class TestAwsLambdaWorkflows:
     @staticmethod
     def _find_workflow(program: dict, name: str) -> dict | None:
         """Find a workflow by name in the emitted program."""
-        def _walk(node):
-            for wf in node.get("workflows", []):
-                if wf["name"] == name:
-                    return wf
-            for ns in node.get("namespaces", []):
-                found = _walk(ns)
-                if found:
-                    return found
-            return None
-        return _walk(program)
+        from afl.ast_utils import find_workflow
+
+        return find_workflow(program, name)

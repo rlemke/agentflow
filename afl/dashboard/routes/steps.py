@@ -113,7 +113,9 @@ def _resolve_statement_name(statement_id: str, runner, store) -> str | None:
     program_dict = json.loads(emitter.emit(ast))
 
     # Search all workflow bodies for a step matching the statement_id
-    for wf in program_dict.get("workflows", []):
+    from afl.ast_utils import find_all_workflows
+
+    for wf in find_all_workflows(program_dict):
         body = wf.get("body")
         if not body:
             continue

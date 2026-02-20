@@ -198,9 +198,9 @@ def flow_run_form(
 
     if flow.compiled_sources:
         try:
+            from afl.ast_utils import find_workflow
             from afl.emitter import JSONEmitter
             from afl.parser import AFLParser
-            from afl.runtime.submit import _find_workflow_in_program
 
             parser = AFLParser()
             source_text = flow.compiled_sources[0].content
@@ -209,7 +209,7 @@ def flow_run_form(
             program_json = emitter.emit(ast)
             program_dict = json.loads(program_json)
 
-            wf_ast = _find_workflow_in_program(program_dict, workflow_name)
+            wf_ast = find_workflow(program_dict, workflow_name)
             if wf_ast:
                 workflow_doc = wf_ast.get("doc")
 
@@ -268,7 +268,7 @@ def flow_run_execute(
         TaskDefinition,
         TaskState,
     )
-    from afl.runtime.submit import _find_workflow_in_program
+    from afl.ast_utils import find_workflow
     from afl.runtime.types import generate_id
 
     flow = store.get_flow(flow_id)
@@ -292,7 +292,7 @@ def flow_run_execute(
             program_json = emitter.emit(ast)
             program_dict = json.loads(program_json)
 
-            wf_ast = _find_workflow_in_program(program_dict, workflow_def.name)
+            wf_ast = find_workflow(program_dict, workflow_def.name)
             if wf_ast:
                 for param in wf_ast.get("params", []):
                     default_val = param.get("default")

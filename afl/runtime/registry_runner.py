@@ -399,29 +399,10 @@ class RegistryRunner:
 
     @staticmethod
     def _find_workflow_in_program(program_dict: dict, workflow_name: str) -> dict | None:
-        """Find a workflow in the program AST by name.
+        """Find a workflow in the program AST by name."""
+        from afl.ast_utils import find_workflow
 
-        Supports both simple names and qualified names (e.g. "ns.WorkflowName").
-        """
-        for w in program_dict.get("workflows", []):
-            if w.get("name") == workflow_name:
-                return w
-
-        if "." in workflow_name:
-            parts = workflow_name.split(".")
-            short_name = parts[-1]
-            ns_prefix = ".".join(parts[:-1])
-
-            for decl in program_dict.get("declarations", []):
-                if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
-                    for w in decl.get("workflows", []):
-                        if w.get("name") == short_name:
-                            return w
-                    for d in decl.get("declarations", []):
-                        if d.get("type") == "WorkflowDecl" and d.get("name") == short_name:
-                            return d
-
-        return None
+        return find_workflow(program_dict, workflow_name)
 
     # =========================================================================
     # Server Registration

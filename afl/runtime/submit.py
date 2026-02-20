@@ -107,75 +107,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _find_workflow_in_program(program_dict: dict, workflow_name: str) -> dict | None:
-    """Find a workflow in the compiled program AST by name.
+    """Find a workflow in the compiled program AST by name."""
+    from afl.ast_utils import find_workflow
 
-    Supports both simple names ("WorkflowName") and qualified names
-    ("namespace.sub.WorkflowName").
-
-    Handles two emitter formats:
-    - **Nested**: namespaces contain child namespaces (step-by-step navigation)
-    - **Flat**: namespaces have dotted names like "a.b.c" at the top level
-    """
-    if "." in workflow_name:
-        parts = workflow_name.split(".")
-        short_name = parts[-1]
-        ns_prefix = ".".join(parts[:-1])
-
-        # Strategy 1: flat namespace match (dotted name equals full prefix)
-        for ns in program_dict.get("namespaces", []):
-            if ns.get("name") == ns_prefix:
-                for w in ns.get("workflows", []):
-                    if w.get("name") == short_name:
-                        return w
-        for decl in program_dict.get("declarations", []):
-            if decl.get("type") == "Namespace" and decl.get("name") == ns_prefix:
-                for w in decl.get("workflows", []):
-                    if w.get("name") == short_name:
-                        return w
-                for d in decl.get("declarations", []):
-                    if d.get("type") == "WorkflowDecl" and d.get("name") == short_name:
-                        return d
-
-        # Strategy 2: nested namespace navigation (step by step)
-        ns_parts = parts[:-1]
-        current = program_dict
-        for ns_name in ns_parts:
-            found_ns = None
-            for ns in current.get("namespaces", []):
-                if ns.get("name") == ns_name:
-                    found_ns = ns
-                    break
-            if not found_ns:
-                for decl in current.get("declarations", []):
-                    if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
-                        found_ns = decl
-                        break
-            if not found_ns:
-                return None
-            current = found_ns
-
-        for w in current.get("workflows", []):
-            if w.get("name") == short_name:
-                return w
-        for decl in current.get("declarations", []):
-            if decl.get("type") == "WorkflowDecl" and decl.get("name") == short_name:
-                return decl
-    else:
-        for w in program_dict.get("workflows", []):
-            if w.get("name") == workflow_name:
-                return w
-
-        for ns in program_dict.get("namespaces", []):
-            result = _search_namespace_workflows(ns, workflow_name)
-            if result:
-                return result
-        for decl in program_dict.get("declarations", []):
-            if decl.get("type") == "Namespace":
-                result = _search_namespace_workflows(decl, workflow_name)
-                if result:
-                    return result
-
-    return None
+    return find_workflow(program_dict, workflow_name)
 
 
 def _connect_store(config):
@@ -183,25 +118,6 @@ def _connect_store(config):
     from .mongo_store import MongoStore
 
     return MongoStore.from_config(config.mongodb)
-
-
-def _search_namespace_workflows(namespace: dict, workflow_name: str) -> dict | None:
-    """Recursively search a namespace for a workflow by name."""
-    for w in namespace.get("workflows", []):
-        if w.get("name") == workflow_name:
-            return w
-    for decl in namespace.get("declarations", []):
-        if decl.get("type") == "WorkflowDecl" and decl.get("name") == workflow_name:
-            return decl
-        if decl.get("type") == "Namespace":
-            result = _search_namespace_workflows(decl, workflow_name)
-            if result:
-                return result
-    for ns in namespace.get("namespaces", []):
-        result = _search_namespace_workflows(ns, workflow_name)
-        if result:
-            return result
-    return None
 
 
 def main(args: list[str] | None = None) -> int:

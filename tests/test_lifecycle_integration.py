@@ -96,24 +96,9 @@ def _compile(source: str):
 
 def _find_workflow(compiled: dict, name: str):
     """Find a workflow declaration by name in compiled output."""
-    # Check top-level workflows list
-    for wf in compiled.get("workflows", []):
-        if wf.get("name") == name:
-            return wf
-    # Check namespaces
-    for ns in compiled.get("namespaces", []):
-        for wf in ns.get("workflows", []):
-            if wf.get("name") == name:
-                return wf
-    # Check declarations (may contain WorkflowDecl or namespaces)
-    for decl in compiled.get("declarations", []):
-        if decl.get("type") == "WorkflowDecl" and decl.get("name") == name:
-            return decl
-        if decl.get("type") == "Namespace":
-            for nested in decl.get("declarations", []):
-                if nested.get("type") == "WorkflowDecl" and nested.get("name") == name:
-                    return nested
-    return None
+    from afl.ast_utils import find_workflow
+
+    return find_workflow(compiled, name)
 
 
 def _register_handler(store, tmp_path, facet_name, code):

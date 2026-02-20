@@ -787,16 +787,6 @@ def _handle_resource(uri: str, get_store: Any) -> str:
 
 def _find_workflow(compiled: dict, workflow_name: str) -> dict | None:
     """Find a workflow declaration by name in compiled output."""
-    # Check top-level workflows list
-    for wf in compiled.get("workflows", []):
-        if wf.get("name") == workflow_name:
-            return wf
-    # Check declarations (may contain WorkflowDecl or namespaces)
-    for decl in compiled.get("declarations", []):
-        if decl.get("type") == "WorkflowDecl" and decl.get("name") == workflow_name:
-            return decl
-        if decl.get("type") == "Namespace":
-            for nested in decl.get("declarations", []):
-                if nested.get("type") == "WorkflowDecl" and nested.get("name") == workflow_name:
-                    return nested
-    return None
+    from afl.ast_utils import find_workflow
+
+    return find_workflow(compiled, workflow_name)
