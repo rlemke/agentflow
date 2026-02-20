@@ -66,7 +66,7 @@ class ToolDefinition:
 class ToolRegistry:
     """Registry of custom handlers for event facet types.
 
-    Mirrors the LocalEventHandler pattern but supports a default fallback handler.
+    Registry of handler functions keyed by facet name, with optional default fallback.
     """
 
     def __init__(self) -> None:

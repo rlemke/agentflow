@@ -1009,9 +1009,6 @@ class TestSpecExample4:
         blocked_step = blocked_steps[0]
         assert blocked_step.facet_name == "CountDocuments"
 
-        # Verify an event was created
-        assert store.event_count() == 1
-
         # Simulate external agent: continue the blocked step with a result
         evaluator.continue_step(blocked_step.id)
 
@@ -3382,9 +3379,6 @@ class TestIterationTraces:
         assert len(steps) == 8  # yields not yet created
         assert self._count_complete(steps) == 1  # s2
         assert self._count_at_state(steps, StepState.EVENT_TRANSMIT) == 1  # subStep1
-
-        # Verify the event was created
-        assert store.event_count() == 1
 
         # Find the blocked step
         blocked = [s for s in steps if s.state == StepState.EVENT_TRANSMIT]

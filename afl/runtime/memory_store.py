@@ -29,9 +29,9 @@ from .entities import (
     StepLogEntry,
     TaskDefinition,
 )
-from .persistence import EventDefinition, IterationChanges, PersistenceAPI
+from .persistence import IterationChanges, PersistenceAPI
 from .step import StepDefinition
-from .types import BlockId, EventId, StepId, WorkflowId
+from .types import BlockId, StepId, WorkflowId
 
 if TYPE_CHECKING:
     from .persistence import LockMetaData
@@ -52,7 +52,6 @@ class MemoryStore(PersistenceAPI):
     def __init__(self):
         """Initialize empty stores."""
         self._steps: dict[StepId, StepDefinition] = {}
-        self._events: dict[EventId, EventDefinition] = {}
 
         # Indexes for efficient queries
         self._steps_by_block: dict[BlockId, list[StepId]] = defaultdict(list)
@@ -162,18 +161,6 @@ class MemoryStore(PersistenceAPI):
         block_str = str(block_id) if block_id else "root"
         return f"{statement_id}:{block_str}"
 
-    def get_event(self, event_id: EventId) -> EventDefinition | None:
-        """Fetch an event by ID."""
-        return self._events.get(event_id)
-
-    def save_event(self, event: EventDefinition) -> None:
-        """Save an event to the store."""
-        self._events[event.id] = event
-
-    def get_all_events(self) -> list[EventDefinition]:
-        """Get all events."""
-        return list(self._events.values())
-
     def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
         """Fetch all block steps for a containing step."""
         block_ids = self._blocks_by_step.get(step_id, [])
@@ -192,14 +179,6 @@ class MemoryStore(PersistenceAPI):
         # Save updated steps
         for step in changes.updated_steps:
             self.save_step(step)
-
-        # Save created events
-        for event in changes.created_events:
-            self.save_event(event)
-
-        # Save updated events
-        for event in changes.updated_events:
-            self.save_event(event)
 
         # Save created tasks
         for task in changes.created_tasks:
@@ -224,7 +203,6 @@ class MemoryStore(PersistenceAPI):
     def clear(self) -> None:
         """Clear all stored data."""
         self._steps.clear()
-        self._events.clear()
         self._steps_by_block.clear()
         self._steps_by_workflow.clear()
         self._steps_by_container.clear()
@@ -241,10 +219,6 @@ class MemoryStore(PersistenceAPI):
     def step_count(self) -> int:
         """Get total number of steps."""
         return len(self._steps)
-
-    def event_count(self) -> int:
-        """Get total number of events."""
-        return len(self._events)
 
     def get_all_steps(self) -> list[StepDefinition]:
         """Get all steps (for testing)."""
@@ -285,9 +259,22 @@ class MemoryStore(PersistenceAPI):
             return None
         return max(matching, key=lambda t: t.created)
 
+    def get_task(self, task_id: str) -> Optional["TaskDefinition"]:
+        """Get a task by ID."""
+        return self._tasks.get(task_id)
+
     def save_task(self, task: "TaskDefinition") -> None:
         """Save a task."""
         self._tasks[task.uuid] = task
+
+    def get_all_tasks(self, limit: int = 100) -> list["TaskDefinition"]:
+        """Get all tasks, most recently created first."""
+        tasks = sorted(self._tasks.values(), key=lambda t: t.created, reverse=True)
+        return tasks[:limit]
+
+    def get_tasks_by_state(self, state: str) -> list["TaskDefinition"]:
+        """Get tasks by state."""
+        return [t for t in self._tasks.values() if t.state == state]
 
     def claim_task(
         self,

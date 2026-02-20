@@ -24,7 +24,6 @@ from .block import BlockAnalysis, StatementDefinition, StepAnalysis
 # DAO protocols
 from .dao import (
     DataServices,
-    EventDefinitionDAO,
     FlowDefinitionDAO,
     KeyLockDAO,
     LogDefinitionDAO,
@@ -96,7 +95,6 @@ from .errors import (
     ConcurrencyError,
     DependencyNotSatisfiedError,
     EvaluationError,
-    EventError,
     InvalidStepStateError,
     InvalidTransitionError,
     ReferenceError,
@@ -105,19 +103,16 @@ from .errors import (
     VersionMismatchError,
 )
 from .evaluator import Evaluator, ExecutionContext, ExecutionResult, ExecutionStatus
-from .events import EventDispatcher, EventManager, LocalEventHandler
 from .expression import EvaluationContext, ExpressionEvaluator, evaluate_args
 from .memory_store import MemoryStore
-from .persistence import EventDefinition, IterationChanges, PersistenceAPI
+from .persistence import IterationChanges, PersistenceAPI
 from .registry_runner import RegistryRunner, RegistryRunnerConfig
 from .runner import RunnerConfig, RunnerService
 from .states import (
     BLOCK_TRANSITIONS,
-    EVENT_TRANSITIONS,
     SCHEMA_TRANSITIONS,
     STEP_TRANSITIONS,
     YIELD_TRANSITIONS,
-    EventState,
     StepState,
     get_next_state,
     select_transitions,
@@ -127,7 +122,6 @@ from .telemetry import Telemetry, TelemetryEvent
 from .types import (
     AttributeValue,
     BlockId,
-    EventId,
     FacetAttributes,
     ObjectType,
     StatementId,
@@ -135,7 +129,6 @@ from .types import (
     VersionInfo,
     WorkflowId,
     block_id,
-    event_id,
     generate_id,
     step_id,
     workflow_id,
@@ -145,7 +138,6 @@ __all__ = [
     # Types
     "StepId",
     "BlockId",
-    "EventId",
     "WorkflowId",
     "StatementId",
     "ObjectType",
@@ -155,16 +147,13 @@ __all__ = [
     "generate_id",
     "step_id",
     "block_id",
-    "event_id",
     "workflow_id",
     # States
     "StepState",
-    "EventState",
     "STEP_TRANSITIONS",
     "BLOCK_TRANSITIONS",
     "YIELD_TRANSITIONS",
     "SCHEMA_TRANSITIONS",
-    "EVENT_TRANSITIONS",
     "get_next_state",
     "select_transitions",
     # Step
@@ -173,7 +162,6 @@ __all__ = [
     # Persistence
     "PersistenceAPI",
     "IterationChanges",
-    "EventDefinition",
     "MemoryStore",
     # Block
     "StatementDefinition",
@@ -194,9 +182,6 @@ __all__ = [
     "Telemetry",
     "TelemetryEvent",
     # Events
-    "EventManager",
-    "EventDispatcher",
-    "LocalEventHandler",
     # Agent
     "ClaudeAgentRunner",
     "ToolRegistry",
@@ -227,7 +212,6 @@ __all__ = [
     "ReferenceError",
     "InvalidTransitionError",
     "ConcurrencyError",
-    "EventError",
     "VersionMismatchError",
     # Entity types
     "Parameter",
@@ -273,7 +257,6 @@ __all__ = [
     "WorkflowDefinitionDAO",
     "RunnerDefinitionDAO",
     "StepDefinitionDAO",
-    "EventDefinitionDAO",
     "TaskDefinitionDAO",
     "LogDefinitionDAO",
     "ServerDefinitionDAO",

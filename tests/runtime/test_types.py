@@ -19,7 +19,6 @@ from afl.runtime import (
     FacetAttributes,
     ObjectType,
     block_id,
-    event_id,
     step_id,
     workflow_id,
 )
@@ -109,11 +108,9 @@ class TestIdGeneration:
         """Test ID type wrappers."""
         s_id = step_id()
         b_id = block_id()
-        e_id = event_id()
         w_id = workflow_id()
 
         # All should be strings
         assert isinstance(s_id, str)
         assert isinstance(b_id, str)
-        assert isinstance(e_id, str)
         assert isinstance(w_id, str)

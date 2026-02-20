@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 from .step import StepDefinition
-from .types import BlockId, EventId, StepId, WorkflowId
+from .types import BlockId, StepId, WorkflowId
 
 if TYPE_CHECKING:
     from .entities import (
@@ -48,8 +48,6 @@ class IterationChanges:
 
     created_steps: list[StepDefinition] = field(default_factory=list)
     updated_steps: list[StepDefinition] = field(default_factory=list)
-    created_events: list["EventDefinition"] = field(default_factory=list)
-    updated_events: list["EventDefinition"] = field(default_factory=list)
     created_tasks: list["TaskDefinition"] = field(default_factory=list)
 
     # Track step IDs to avoid duplicates
@@ -72,14 +70,6 @@ class IterationChanges:
             self._updated_ids[step.id] = len(self.updated_steps)
             self.updated_steps.append(step)
 
-    def add_created_event(self, event: "EventDefinition") -> None:
-        """Record a newly created event."""
-        self.created_events.append(event)
-
-    def add_updated_event(self, event: "EventDefinition") -> None:
-        """Record an updated event."""
-        self.updated_events.append(event)
-
     def add_created_task(self, task: "TaskDefinition") -> None:
         """Record a newly created task."""
         self.created_tasks.append(task)
@@ -90,8 +80,6 @@ class IterationChanges:
         return (
             len(self.created_steps) > 0
             or len(self.updated_steps) > 0
-            or len(self.created_events) > 0
-            or len(self.updated_events) > 0
             or len(self.created_tasks) > 0
         )
 
@@ -99,26 +87,9 @@ class IterationChanges:
         """Clear all accumulated changes."""
         self.created_steps.clear()
         self.updated_steps.clear()
-        self.created_events.clear()
-        self.updated_events.clear()
         self.created_tasks.clear()
         self._created_ids.clear()
         self._updated_ids.clear()
-
-
-@dataclass
-class EventDefinition:
-    """Event definition for external dispatch.
-
-    Events represent work to be dispatched to agents.
-    """
-
-    id: EventId
-    step_id: StepId
-    workflow_id: WorkflowId
-    state: str  # EventState constant
-    event_type: str
-    payload: dict = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -199,28 +170,6 @@ class PersistenceAPI(Protocol):
 
         Args:
             step: The step to save
-        """
-        ...
-
-    # Event operations
-    @abstractmethod
-    def get_event(self, event_id: EventId) -> EventDefinition | None:
-        """Fetch an event by its ID.
-
-        Args:
-            event_id: The event's unique identifier
-
-        Returns:
-            The event if found, None otherwise
-        """
-        ...
-
-    @abstractmethod
-    def save_event(self, event: EventDefinition) -> None:
-        """Persist a new or updated event.
-
-        Args:
-            event: The event to save
         """
         ...
 

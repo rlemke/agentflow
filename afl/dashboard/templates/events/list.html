@@ -5,11 +5,10 @@
 
 <nav>
     <a href="/events">All</a> |
-    <a href="/events?state=event.Created">Created</a> |
-    <a href="/events?state=event.Dispatched">Dispatched</a> |
-    <a href="/events?state=event.Processing">Processing</a> |
-    <a href="/events?state=event.Completed">Completed</a> |
-    <a href="/events?state=event.Error">Error</a>
+    <a href="/events?state=pending">Pending</a> |
+    <a href="/events?state=running">Running</a> |
+    <a href="/events?state=completed">Completed</a> |
+    <a href="/events?state=failed">Failed</a>
 </nav>
 
 {% if filter_state %}
@@ -31,12 +30,12 @@
     <tbody>
         {% for event in events %}
         <tr>
-            <td><a href="/events/{{ event.id }}">{{ event.id[:12] }}...</a></td>
+            <td><a href="/events/{{ event.uuid }}">{{ event.uuid[:12] }}...</a></td>
             <td class="mono">{{ event.step_id[:12] }}...</td>
             <td>{{ step_names.get(event.step_id, '') or '—' }}</td>
             <td class="mono">{{ event.workflow_id[:12] }}...</td>
             <td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td>
-            <td>{{ event.event_type }}</td>
+            <td>{{ event.name }}</td>
         </tr>
         {% endfor %}
     </tbody>

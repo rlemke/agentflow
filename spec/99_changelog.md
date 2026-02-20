@@ -1,5 +1,16 @@
 # Implementation Changelog
 
+## Completed (v0.12.44) - Merge EventDefinition into TaskDefinition
+- Removed EventDefinition dataclass, EventState, EVENT_TRANSITIONS, EventManager, EventDispatcher, LocalEventHandler
+- Removed EventError, EventId, event_id(), EventDefinitionDAO
+- Removed events MongoDB collection and all indexes
+- Removed events from IterationChanges (created_events, updated_events)
+- Removed get_event()/save_event() from PersistenceAPI
+- Consolidated dashboard /events page to query tasks instead of events
+- Removed event_count from dashboard home page
+- Updated API /api/events endpoint to return tasks with event-compatible field names
+- Tasks already contain all needed fields: name (event_type), data (payload), step_id, workflow_id
+
 ## Completed (v0.1.0) - Compiler
 - Lark LALR grammar for AFL syntax
 - AST dataclasses for all language constructs

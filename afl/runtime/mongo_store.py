@@ -69,9 +69,9 @@ from .entities import (
     TaskDefinition,
     WorkflowDefinition,
 )
-from .persistence import EventDefinition, IterationChanges, PersistenceAPI
+from .persistence import IterationChanges, PersistenceAPI
 from .step import StepDefinition
-from .types import BlockId, EventId, StepId, VersionInfo, WorkflowId
+from .types import BlockId, StepId, VersionInfo, WorkflowId
 
 T = TypeVar("T")
 
@@ -156,22 +156,6 @@ class MongoStore(PersistenceAPI):
         steps.create_index("block_id", name="step_block_id_index")
         steps.create_index("container_id", name="step_container_id_index")
         steps.create_index("state", name="step_state_index")
-
-        # Events collection
-        events = self._db.events
-        events.create_index("uuid", unique=True, name="event_uuid_index")
-        events.create_index("runner_id", name="event_runner_id_index")
-        events.create_index("step_id", name="event_step_id_index")
-        events.create_index("state", name="event_state_index")
-        events.create_index("topic", name="event_topic_index")
-        events.create_index("handler", name="event_handler_index")
-        # Partial unique index for running events
-        events.create_index(
-            "step_id",
-            unique=True,
-            partialFilterExpression={"state": "running"},
-            name="event_step_id_running_unique_index",
-        )
 
         # Flows collection
         flows = self._db.flows
@@ -313,35 +297,6 @@ class MongoStore(PersistenceAPI):
         return self._db.steps.count_documents(query, limit=1) > 0
 
     # =========================================================================
-    # Event Operations (PersistenceAPI)
-    # =========================================================================
-
-    def get_event(self, event_id: EventId) -> EventDefinition | None:
-        """Fetch an event by ID."""
-        doc = self._db.events.find_one({"uuid": event_id})
-        return self._doc_to_event(doc) if doc else None
-
-    def save_event(self, event: EventDefinition) -> None:
-        """Save an event to the store."""
-        doc = self._event_to_doc(event)
-        self._db.events.replace_one({"uuid": event.id}, doc, upsert=True)
-
-    def get_events_by_workflow(self, workflow_id: str) -> Sequence[EventDefinition]:
-        """Get all events for a workflow."""
-        docs = self._db.events.find({"workflow_id": workflow_id})
-        return [self._doc_to_event(doc) for doc in docs]
-
-    def get_all_events(self, limit: int = 500) -> list[EventDefinition]:
-        """Get all events, most recent first."""
-        docs = self._db.events.find().sort("_id", -1).limit(limit)
-        return [self._doc_to_event(doc) for doc in docs]
-
-    def get_events_by_state(self, state: str) -> Sequence[EventDefinition]:
-        """Get events by state."""
-        docs = self._db.events.find({"state": state})
-        return [self._doc_to_event(doc) for doc in docs]
-
-    # =========================================================================
     # Atomic Commit (PersistenceAPI)
     # =========================================================================
 
@@ -386,14 +341,6 @@ class MongoStore(PersistenceAPI):
         for step in changes.updated_steps:
             doc = self._step_to_doc(step)
             self._db.steps.replace_one({"uuid": step.id}, doc, **kwargs)
-
-        for event in changes.created_events:
-            doc = self._event_to_doc(event)
-            self._db.events.insert_one(doc, **kwargs)
-
-        for event in changes.updated_events:
-            doc = self._event_to_doc(event)
-            self._db.events.replace_one({"uuid": event.id}, doc, **kwargs)
 
         for task in changes.created_tasks:
             doc = self._task_to_doc(task)
@@ -926,28 +873,6 @@ class MongoStore(PersistenceAPI):
             step.transition.error = Exception(doc["error"])
 
         return step
-
-    def _event_to_doc(self, event: EventDefinition) -> dict:
-        """Convert EventDefinition to MongoDB document."""
-        return {
-            "uuid": event.id,
-            "step_id": event.step_id,
-            "workflow_id": event.workflow_id,
-            "state": event.state,
-            "event_type": event.event_type,
-            "payload": event.payload,
-        }
-
-    def _doc_to_event(self, doc: dict) -> EventDefinition:
-        """Convert MongoDB document to EventDefinition."""
-        return EventDefinition(
-            id=EventId(doc["uuid"]),
-            step_id=StepId(doc["step_id"]),
-            workflow_id=WorkflowId(doc["workflow_id"]),
-            state=doc["state"],
-            event_type=doc["event_type"],
-            payload=doc.get("payload", {}),
-        )
 
     def _runner_to_doc(self, runner: RunnerDefinition) -> dict:
         """Convert RunnerDefinition to MongoDB document."""

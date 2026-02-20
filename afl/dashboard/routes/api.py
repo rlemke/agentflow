@@ -347,31 +347,31 @@ def api_sources(q: str | None = None, store=Depends(get_store)):
 
 @router.get("/events")
 def api_events(state: str | None = None, store=Depends(get_store)):
-    """Return all events as JSON, optionally filtered by state."""
+    """Return all events (tasks) as JSON, optionally filtered by state."""
     if state:
-        events = store.get_events_by_state(state)
+        tasks = store.get_tasks_by_state(state)
     else:
-        events = store.get_all_events()
+        tasks = store.get_all_tasks()
 
     step_names: dict[str, str] = {}
-    for e in events:
-        if e.step_id and e.step_id not in step_names:
-            step = store.get_step(e.step_id)
+    for t in tasks:
+        if t.step_id and t.step_id not in step_names:
+            step = store.get_step(t.step_id)
             if step:
-                step_names[e.step_id] = step.statement_name or step.facet_name or ""
+                step_names[t.step_id] = step.statement_name or step.facet_name or ""
 
     return JSONResponse(
         [
             {
-                "id": e.id,
-                "step_id": e.step_id,
-                "step_name": step_names.get(e.step_id, ""),
-                "workflow_id": e.workflow_id,
-                "state": e.state,
-                "event_type": e.event_type,
-                "payload": e.payload,
+                "id": t.uuid,
+                "step_id": t.step_id,
+                "step_name": step_names.get(t.step_id, ""),
+                "workflow_id": t.workflow_id,
+                "state": t.state,
+                "event_type": t.name,
+                "payload": t.data,
             }
-            for e in events
+            for t in tasks
         ]
     )
 

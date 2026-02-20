@@ -31,7 +31,6 @@ from .entities import (
     TaskDefinition,
     WorkflowDefinition,
 )
-from .persistence import EventDefinition
 from .step import StepDefinition
 
 
@@ -128,35 +127,6 @@ class StepDefinitionDAO(Protocol):
 
     def save(self, step: StepDefinition) -> None:
         """Save or update a step."""
-        ...
-
-
-@runtime_checkable
-class EventDefinitionDAO(Protocol):
-    """Data access for events collection."""
-
-    def get_by_id(self, uuid: str) -> EventDefinition | None:
-        """Get event by UUID."""
-        ...
-
-    def get_by_runner(self, runner_id: str) -> Sequence[EventDefinition]:
-        """Get all events for a runner."""
-        ...
-
-    def get_by_step(self, step_id: str) -> Sequence[EventDefinition]:
-        """Get all events for a step."""
-        ...
-
-    def get_by_state(self, state: str) -> Sequence[EventDefinition]:
-        """Get events by state."""
-        ...
-
-    def get_running_for_step(self, step_id: str) -> EventDefinition | None:
-        """Get the running event for a step (if any)."""
-        ...
-
-    def save(self, event: EventDefinition) -> None:
-        """Save or update an event."""
         ...
 
 
@@ -313,11 +283,6 @@ class DataServices(Protocol):
     @property
     def task(self) -> TaskDefinitionDAO:
         """Task queue."""
-        ...
-
-    @property
-    def event(self) -> EventDefinitionDAO:
-        """Event sourcing."""
         ...
 
     @property

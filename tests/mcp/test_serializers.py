@@ -372,7 +372,6 @@ class TestSerializeEdgeCases:
             outputs={},
             iterations=2,
             status=ExecutionStatus.PAUSED,
-            pending_events=["step-1", "step-2"],
         )
         d = serialize_execution_result(er)
         assert d["success"] is True

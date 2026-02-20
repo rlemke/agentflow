@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass
 
-from .types import BlockId, EventId, StepId
+from .types import BlockId, StepId
 
 
 class RuntimeError(Exception):
@@ -122,17 +122,6 @@ class ConcurrencyError(RuntimeError):
 
     def __str__(self) -> str:
         return f"Concurrency error for step {self.step_id}: {self.message}"
-
-
-@dataclass
-class EventError(RuntimeError):
-    """Raised when an event operation fails."""
-
-    event_id: EventId
-    message: str
-
-    def __str__(self) -> str:
-        return f"Event error for {self.event_id}: {self.message}"
 
 
 @dataclass

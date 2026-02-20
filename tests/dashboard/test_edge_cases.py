@@ -100,16 +100,21 @@ def _make_task(uuid="task-1", name="SendEmail", state="pending", error=None, dat
     )
 
 
-def _make_event(event_id="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", event_type="afl:execute"):
-    from afl.runtime.persistence import EventDefinition
+def _make_event_task(uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"):
+    from afl.runtime.entities import TaskDefinition
 
-    return EventDefinition(
-        id=event_id,
-        step_id=step_id,
+    return TaskDefinition(
+        uuid=uuid,
+        name=name,
+        runner_id="",
         workflow_id=workflow_id,
+        flow_id="",
+        step_id=step_id,
         state=state,
-        event_type=event_type,
-        payload={"key": "value"},
+        created=0,
+        updated=0,
+        task_list_name="default",
+        data={"key": "value"},
     )
 
 
@@ -480,33 +485,38 @@ class TestServerEdgeCases:
 class TestEventEdgeCases:
     def test_event_execute_vs_resume_types(self, client):
         tc, store = client
-        store.save_event(_make_event("evt-1", event_type="afl:execute"))
-        store.save_event(_make_event("evt-2", step_id="step-2", event_type="afl:resume"))
+        store.save_task(_make_event_task("evt-1", name="afl:execute"))
+        store.save_task(_make_event_task("evt-2", step_id="step-2", name="afl:resume"))
         resp = tc.get("/events")
         assert resp.status_code == 200
         assert "evt-1" in resp.text
         assert "evt-2" in resp.text
 
-    def test_event_with_large_payload(self, client):
+    def test_event_with_large_data(self, client):
         tc, store = client
-        from afl.runtime.persistence import EventDefinition
+        from afl.runtime.entities import TaskDefinition
 
-        large_payload = {"data": "x" * 5000}
-        event = EventDefinition(
-            id="evt-big",
-            step_id="step-1",
+        large_data = {"data": "x" * 5000}
+        task = TaskDefinition(
+            uuid="evt-big",
+            name="afl:execute",
+            runner_id="",
             workflow_id="wf-1",
+            flow_id="",
+            step_id="step-1",
             state="pending",
-            event_type="afl:execute",
-            payload=large_payload,
+            created=0,
+            updated=0,
+            task_list_name="default",
+            data=large_data,
         )
-        store.save_event(event)
+        store.save_task(task)
         resp = tc.get("/events/evt-big")
         assert resp.status_code == 200
 
     def test_event_filter_nonexistent_state_returns_empty(self, client):
         tc, store = client
-        store.save_event(_make_event("evt-1"))
+        store.save_task(_make_event_task("evt-1"))
         resp = tc.get("/events?state=nonexistent_state")
         assert resp.status_code == 200
         # Should return a page but without the event that has a different state

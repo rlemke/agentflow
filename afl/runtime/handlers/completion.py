@@ -21,8 +21,7 @@ import time
 from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
-from ..states import EventState
-from ..types import event_id, generate_id
+from ..types import generate_id
 from .base import StateHandler
 
 if TYPE_CHECKING:
@@ -67,22 +66,7 @@ class EventTransmitHandler(StateHandler):
                 except Exception as e:
                     return self.error(e)
 
-            # Fallback: create event + task and block
-            from ..persistence import EventDefinition
-
-            event = EventDefinition(
-                id=event_id(),
-                step_id=self.step.id,
-                workflow_id=self.step.workflow_id,
-                state=EventState.CREATED,
-                event_type=self.step.facet_name,
-                payload=self._build_payload(),
-            )
-
-            # Add to pending events
-            self.context.changes.add_created_event(event)
-
-            # Create a task in the task queue for agents to claim
+            # Fallback: create task and block
             self._create_event_task()
 
             # BLOCK: stay at EventTransmit, do not re-queue

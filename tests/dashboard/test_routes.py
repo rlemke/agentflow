@@ -986,16 +986,21 @@ class TestHandlerRoutes:
         assert "Handlers" in resp.text
 
 
-def _make_event(event_id="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", event_type="afl:execute"):
-    from afl.runtime.persistence import EventDefinition
+def _make_event_task(uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"):
+    from afl.runtime.entities import TaskDefinition
 
-    return EventDefinition(
-        id=event_id,
-        step_id=step_id,
+    return TaskDefinition(
+        uuid=uuid,
+        name=name,
+        runner_id="",
         workflow_id=workflow_id,
+        flow_id="",
+        step_id=step_id,
         state=state,
-        event_type=event_type,
-        payload={"key": "value"},
+        created=0,
+        updated=0,
+        task_list_name="default",
+        data={"key": "value"},
     )
 
 
@@ -1008,14 +1013,14 @@ class TestEventRoutes:
 
     def test_event_list_with_data(self, client):
         tc, store = client
-        store.save_event(_make_event())
+        store.save_task(_make_event_task())
         resp = tc.get("/events")
         assert resp.status_code == 200
         assert "evt-1" in resp.text
 
     def test_event_detail(self, client):
         tc, store = client
-        store.save_event(_make_event())
+        store.save_task(_make_event_task())
         resp = tc.get("/events/evt-1")
         assert resp.status_code == 200
         assert "evt-1" in resp.text
@@ -1027,9 +1032,9 @@ class TestEventRoutes:
         assert resp.status_code == 200
         assert "not found" in resp.text.lower()
 
-    def test_event_detail_shows_payload(self, client):
+    def test_event_detail_shows_data(self, client):
         tc, store = client
-        store.save_event(_make_event())
+        store.save_task(_make_event_task())
         resp = tc.get("/events/evt-1")
         assert resp.status_code == 200
         assert "key" in resp.text
@@ -1042,7 +1047,7 @@ class TestEventRoutes:
 
     def test_api_events_with_data(self, client):
         tc, store = client
-        store.save_event(_make_event())
+        store.save_task(_make_event_task())
         resp = tc.get("/api/events")
         assert resp.status_code == 200
         data = resp.json()
@@ -1461,10 +1466,10 @@ class TestFlowDetailImprovements:
 class TestListFiltering:
     def test_event_list_filter_by_state(self, client):
         tc, store = client
-        store.save_event(_make_event("evt-1", state="event.Created"))
-        store.save_event(_make_event("evt-2", step_id="step-2", state="event.Completed"))
+        store.save_task(_make_event_task("evt-1", state="pending"))
+        store.save_task(_make_event_task("evt-2", step_id="step-2", state="completed"))
 
-        resp = tc.get("/events?state=event.Created")
+        resp = tc.get("/events?state=pending")
         assert resp.status_code == 200
         assert "evt-1" in resp.text
 
@@ -1595,10 +1600,10 @@ class TestApiExpansion:
 
     def test_api_events_filter(self, client):
         tc, store = client
-        store.save_event(_make_event("evt-1", state="event.Created"))
-        store.save_event(_make_event("evt-2", step_id="step-2", state="event.Completed"))
+        store.save_task(_make_event_task("evt-1", state="pending"))
+        store.save_task(_make_event_task("evt-2", step_id="step-2", state="completed"))
 
-        resp = tc.get("/api/events?state=event.Created")
+        resp = tc.get("/api/events?state=pending")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1

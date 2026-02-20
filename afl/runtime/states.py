@@ -175,24 +175,3 @@ def select_transitions(object_type: str) -> dict[str, str]:
         return STEP_TRANSITIONS
 
 
-class EventState:
-    """Event state constants for event lifecycle."""
-
-    CREATED = "event.Created"
-    DISPATCHED = "event.Dispatched"
-    PROCESSING = "event.Processing"
-    COMPLETED = "event.Completed"
-    ERROR = "event.Error"
-
-    @classmethod
-    def is_terminal(cls, state: str) -> bool:
-        """Check if event state is terminal."""
-        return state in (cls.COMPLETED, cls.ERROR)
-
-
-# Event state transitions
-EVENT_TRANSITIONS: dict[str, str] = {
-    EventState.CREATED: EventState.DISPATCHED,
-    EventState.DISPATCHED: EventState.PROCESSING,
-    EventState.PROCESSING: EventState.COMPLETED,
-}

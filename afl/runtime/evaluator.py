@@ -58,7 +58,6 @@ class ExecutionResult:
     error: Exception | None = None
     iterations: int = 0
     status: str = ExecutionStatus.COMPLETED
-    pending_events: list = field(default_factory=list)
 
 
 @dataclass
@@ -603,9 +602,6 @@ class Evaluator:
                             workflow_id=wf_id,
                             iterations=iteration,
                             status=ExecutionStatus.PAUSED,
-                            pending_events=list(self.persistence._events.values())
-                            if hasattr(self.persistence, "_events")
-                            else [],
                         )
                     # Fixed point reached
                     break
@@ -1056,11 +1052,10 @@ class Evaluator:
         """
         if context.changes.has_changes:
             logger.info(
-                "Iteration commit: workflow_id=%s created_steps=%d updated_steps=%d created_events=%d created_tasks=%d",
+                "Iteration commit: workflow_id=%s created_steps=%d updated_steps=%d created_tasks=%d",
                 context.workflow_id,
                 len(context.changes.created_steps),
                 len(context.changes.updated_steps),
-                len(context.changes.created_events),
                 len(context.changes.created_tasks),
             )
             self.persistence.commit(context.changes)

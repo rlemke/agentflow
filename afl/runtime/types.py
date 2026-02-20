@@ -21,7 +21,6 @@ from typing import NewType
 # Type aliases for IDs
 StepId = NewType("StepId", str)
 BlockId = NewType("BlockId", str)
-EventId = NewType("EventId", str)
 WorkflowId = NewType("WorkflowId", str)
 StatementId = NewType("StatementId", str)
 
@@ -39,11 +38,6 @@ def step_id() -> StepId:
 def block_id() -> BlockId:
     """Generate a new BlockId."""
     return BlockId(generate_id())
-
-
-def event_id() -> EventId:
-    """Generate a new EventId."""
-    return EventId(generate_id())
 
 
 def workflow_id() -> WorkflowId:

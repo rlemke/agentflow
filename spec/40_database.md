@@ -4,7 +4,7 @@ This document describes the MongoDB collections used by the AFL event-driven wor
 
 ## Database: `afl`
 
-The system uses 9 MongoDB collections to persist workflow definitions, execution state, events, and operational data.
+The system uses 8 MongoDB collections to persist workflow definitions, execution state, tasks, and operational data.
 
 ---
 
@@ -16,8 +16,7 @@ The system uses 9 MongoDB collections to persist workflow definitions, execution
 | `workflows` | Named workflow entry points | `WorkflowDefinition` |
 | `runners` | Workflow execution instances | `RunnerDefinition` |
 | `steps` | Step execution records | `StepDefinition` |
-| `events` | Event sourcing / state transitions | `EventDefinition` |
-| `tasks` | Task queue for async operations | `TaskDefinition` |
+| `tasks` | Task queue for event dispatch and async operations | `TaskDefinition` |
 | `logs` | Audit and execution logs | `LogDefinition` |
 | `servers` | Agent/server registration | `ServerDefinition` |
 | `locks` | Distributed locking | `LockDefinition` |
@@ -290,88 +289,6 @@ class StepDefinition:
 | `step_workflow_id_index` | `workflow_id` | |
 | `step_flow_id_index` | `flow_id` | |
 | `step_state_index` | `state` | |
-
----
-
-## Collection: `events`
-
-Event sourcing collection that drives workflow state transitions.
-
-**DAO:** `EventDefinitionDAO`
-**Entity:** `EventDefinition`
-
-### Entity Definition
-
-```python
-@dataclass
-class EventDefinition:
-    """Event for workflow state transitions."""
-    uuid: str
-    partition_key: str
-    correlation_id: str
-    purpose: str
-    runner_id: str
-    topic: str
-    handler: str
-    state: str
-    step_id: Optional[str] = None
-    created: int = 0   # Creation timestamp (ms)
-    updated: int = 0   # Last updated timestamp (ms)
-    event_data: Optional[EventData] = None
-    error: Optional[ErrorPersistence] = None
-    cursor: Optional[ASTCursor] = None
-```
-
-### Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `uuid` | str | Unique identifier (primary key) |
-| `partition_key` | str | Partition identifier |
-| `correlation_id` | str | Correlation ID for tracking |
-| `purpose` | str | Event purpose |
-| `runner_id` | str | Reference to runner |
-| `topic` | str | Kafka topic name |
-| `handler` | str | Event handler name |
-| `state` | str | Event state |
-| `step_id` | Optional[str] | Reference to step |
-| `created` | int | Creation timestamp (ms) |
-| `updated` | int | Last updated timestamp (ms) |
-| `event_data` | Optional[EventData] | Event payload |
-| `error` | Optional[ErrorPersistence] | Error details |
-| `cursor` | Optional[ASTCursor] | AST cursor info |
-
-### Event Purposes
-
-- `workflow` - Workflow state event
-- `command` - Command event
-
-### Event States
-
-- `pending` - Awaiting processing
-- `running` - Currently processing
-- `completed` - Successfully processed
-- `ignored` - Skipped
-- `error` - Failed with error
-
-### Indexes
-
-| Index Name | Fields | Properties |
-|------------|--------|------------|
-| `event_uuid_index` | `uuid` | UNIQUE |
-| `event_runner_id_index` | `runner_id` | |
-| `event_workflow_id_index` | `workflow_id` | |
-| `event_step_id_index` | `step_id` | |
-| `event_state_index` | `state` | |
-| `event_partition_index` | `partition_key` | |
-| `event_handler_index` | `handler` | |
-| `event_topic_index` | `topic` | |
-| `event_purpose_index` | `purpose` | |
-| `event_updated_index` | `updated` | |
-| `event_created_index` | `created` | |
-| `event_step_id_running_unique_index` | `step_id` | UNIQUE, PARTIAL (state="running") |
-
-The partial unique index ensures only one event per step can be in "running" state.
 
 ---
 
@@ -655,11 +572,11 @@ class LockDefinition:
 +-----------------------------+------------------------------------+
                               | 1:N
           +-------------------+-------------------+-----------------+
-          v                   v                   v                 v
-+-----------------+   +-----------+     +-----------+     +---------+
-|  StepDefinition |   |   Event   |     |   Task    |     |   Log   |
-|  (Step record)  |   | Definition|     | Definition|     |Definition|
-+-----------------+   +-----------+     +-----------+     +---------+
+          v                                       v                 v
++-----------------+                      +-----------+     +---------+
+|  StepDefinition |                      |   Task    |     |   Log   |
+|  (Step record)  |                      | Definition|     |Definition|
++-----------------+                      +-----------+     +---------+
 ```
 
 ## Query Patterns
@@ -710,11 +627,6 @@ class DataServices(Protocol):
     @property
     def task(self) -> TaskDefinitionDAO:
         """Task queue."""
-        ...
-
-    @property
-    def event(self) -> EventDefinitionDAO:
-        """Event sourcing."""
         ...
 
     @property

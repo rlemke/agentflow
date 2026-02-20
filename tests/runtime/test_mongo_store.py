@@ -47,7 +47,7 @@ from afl.runtime.entities import (
     TaskState,
     WorkflowDefinition,
 )
-from afl.runtime.persistence import EventDefinition, IterationChanges
+from afl.runtime.persistence import IterationChanges
 from afl.runtime.step import StepDefinition
 from afl.runtime.types import StepId, WorkflowId, block_id, step_id, workflow_id
 
@@ -542,31 +542,6 @@ class TestNewQueryMethods:
         tasks = mongo_store.get_tasks_by_runner("r-1")
         assert len(tasks) == 1
         assert tasks[0].uuid == "task-1"
-
-    def test_get_events_by_workflow(self, mongo_store):
-        """Test getting events by workflow."""
-        from afl.runtime.types import EventId, StepId
-
-        e1 = EventDefinition(
-            id=EventId("e-1"),
-            step_id=StepId("s-1"),
-            workflow_id=WorkflowId("wf-1"),
-            state="running",
-            event_type="step.start",
-        )
-        e2 = EventDefinition(
-            id=EventId("e-2"),
-            step_id=StepId("s-2"),
-            workflow_id=WorkflowId("wf-2"),
-            state="running",
-            event_type="step.start",
-        )
-        mongo_store.save_event(e1)
-        mongo_store.save_event(e2)
-
-        events = mongo_store.get_events_by_workflow("wf-1")
-        assert len(events) == 1
-        assert events[0].id == "e-1"
 
 
 class TestFlowOperations:

@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Event dashboard routes."""
+"""Event dashboard routes.
+
+Events are now backed by the tasks collection. The /events UI shows
+tasks (which represent event facet work dispatched to agents).
+"""
 
 from __future__ import annotations
 
@@ -25,37 +29,37 @@ router = APIRouter(prefix="/events")
 
 @router.get("")
 def event_list(request: Request, state: str | None = None, store=Depends(get_store)):
-    """List all events, optionally filtered by state."""
+    """List all events (tasks), optionally filtered by state."""
     if state:
-        events = store.get_events_by_state(state)
+        tasks = store.get_tasks_by_state(state)
     else:
-        events = store.get_all_events()
+        tasks = store.get_all_tasks()
 
     step_names: dict[str, str] = {}
-    for event in events:
-        if event.step_id and event.step_id not in step_names:
-            step = store.get_step(event.step_id)
+    for task in tasks:
+        if task.step_id and task.step_id not in step_names:
+            step = store.get_step(task.step_id)
             if step:
-                step_names[event.step_id] = step.statement_name or step.facet_name or ""
+                step_names[task.step_id] = step.statement_name or step.facet_name or ""
 
     return request.app.state.templates.TemplateResponse(
         request,
         "events/list.html",
-        {"events": events, "filter_state": state, "step_names": step_names},
+        {"events": tasks, "filter_state": state, "step_names": step_names},
     )
 
 
-@router.get("/{event_id}")
-def event_detail(event_id: str, request: Request, store=Depends(get_store)):
-    """Show event detail."""
-    event = store.get_event(event_id)
+@router.get("/{task_id}")
+def event_detail(task_id: str, request: Request, store=Depends(get_store)):
+    """Show event (task) detail."""
+    task = store.get_task(task_id)
     step_name = ""
-    if event and event.step_id:
-        step = store.get_step(event.step_id)
+    if task and task.step_id:
+        step = store.get_step(task.step_id)
         if step:
             step_name = step.statement_name or step.facet_name or ""
     return request.app.state.templates.TemplateResponse(
         request,
         "events/detail.html",
-        {"event": event, "step_name": step_name},
+        {"event": task, "step_name": step_name},
     )
