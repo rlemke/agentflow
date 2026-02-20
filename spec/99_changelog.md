@@ -1,5 +1,17 @@
 # Implementation Changelog
 
+## Completed (v0.12.48) - Rename osmstates30 to osm_cache_states with All 50 States
+- Renamed `osmstates30.afl` → `osm_cache_states.afl`; expanded from 30 states to all 50 US states plus DC
+- Renamed workflow `Download30States` → `DownloadAllStates` (namespace `osm.geo.UnitedStates.cache`)
+- Renamed `run_30states.sh` → `run_osm_cache_states.sh` with updated AFL path, output path, and workflow name
+- Removed tracked `osmstates30.json` compiled artifact; updated `.gitignore` for new output filename
+
+## Completed (v0.12.47) - Replace Region-Specific Workflows with Generic CityAnalysis
+- Removed `GermanyCityAnalysis` and `FranceCityAnalysis` (hardcoded regions, no parameters)
+- Added `CityAnalysis(region: String, min_population: Long)` — generic replacement using `Operations.Cache`
+- Fixed `NationalParksAnalysis` — added missing `region: String = "Liechtenstein"` parameter
+- Updated mocked and real integration tests; updated `COMPOSED_WORKFLOWS.md` Pattern 6
+
 ## Completed (v0.12.46) - Refactor Scripts with Shared .env Configuration
 - Added `.env.example` template with all configurable settings (MongoDB, scaling, overlays, external data dirs)
 - Added `scripts/_env.sh` shared helper: loads `.env` without overriding already-set env vars, exports `_compute_compose_args()` for overlay-aware compose file/profile computation
