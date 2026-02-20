@@ -424,7 +424,7 @@ class ExecutionContext:
             ns_name = ".".join(parts[:i])
             for decl in declarations:
                 if decl.get("type") == "Namespace" and decl.get("name") == ns_name:
-                    inner = decl.get("declarations", []) + decl.get("eventFacets", [])
+                    inner = decl.get("declarations", [])
                     target = parts[i]
                     for inner_decl in inner:
                         if inner_decl.get("type") in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):

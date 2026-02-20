@@ -221,6 +221,10 @@ def main(args: list[str] | None = None) -> int:
     program_json = emitter.emit(ast)
     program_dict = json.loads(program_json)
 
+    from afl.ast_utils import normalize_program_ast
+
+    program_dict = normalize_program_ast(program_dict)
+
     # -------------------------------------------------------------------------
     # 4. Find workflow and extract default inputs
     # -------------------------------------------------------------------------

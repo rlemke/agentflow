@@ -799,6 +799,10 @@ class RunnerService:
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
 
+            from ...ast_utils import normalize_program_ast
+
+            program_dict = normalize_program_ast(program_dict)
+
             # Find workflow AST by name (supports qualified names like "ns.WorkflowName")
             workflow_ast = self._find_workflow_in_program(program_dict, workflow_name)
 
@@ -913,6 +917,10 @@ class RunnerService:
             ast = parser.parse(flow.compiled_sources[0].content)
             emitter = JSONEmitter(include_locations=False)
             program_dict = json.loads(emitter.emit(ast))
+
+            from ...ast_utils import normalize_program_ast
+
+            program_dict = normalize_program_ast(program_dict)
 
             # Cache program AST for facet definition lookups during resume
             self._program_ast_cache[workflow_id] = program_dict

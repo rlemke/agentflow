@@ -364,3 +364,81 @@ namespace ns {
         all_wfs = find_all_workflows(compiled)
         names = {w["name"] for w in all_wfs}
         assert names == {"A", "B"}
+
+
+# ---------------------------------------------------------------------------
+# Normalization of namespace eventFacets
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeNamespaceEventFacets:
+    """Verify that normalize_program_ast moves eventFacets into declarations."""
+
+    def test_namespace_eventfacets_moved_to_declarations(self):
+        """eventFacets inside a namespace are folded into declarations."""
+        ns_node = {
+            "type": "Namespace",
+            "name": "myns",
+            "eventFacets": [_EVENT_B],
+            "facets": [_FACET_A],
+        }
+        prog = {
+            "type": "Program",
+            "declarations": [ns_node],
+        }
+        result = normalize_program_ast(prog)
+
+        ns_out = result["declarations"][0]
+        assert "eventFacets" not in ns_out
+        assert "facets" not in ns_out
+        types = [d["type"] for d in ns_out["declarations"]]
+        assert "EventFacetDecl" in types
+        assert "FacetDecl" in types
+
+    def test_compile_event_facet_normalize_roundtrip(self):
+        """Compile AFL with event facets, normalize, confirm eventFacets absent."""
+        from afl import emit_dict, parse
+
+        source = """
+namespace myns {
+    event facet DoWork(input: String) => (result: String)
+    workflow Main() => (out: String) andThen {
+        s = myns.DoWork(input = "hello")
+        yield Main(out = s.result)
+    }
+}
+"""
+        ast = parse(source)
+        compiled = emit_dict(ast)
+
+        # Before normalization: namespace may have eventFacets key
+        ns_before = None
+        for d in compiled.get("declarations", []):
+            if d.get("type") == "Namespace":
+                ns_before = d
+                break
+        assert ns_before is not None
+
+        normalized = normalize_program_ast(compiled)
+
+        # After normalization: eventFacets key must be absent
+        ns_after = None
+        for d in normalized["declarations"]:
+            if d.get("type") == "Namespace":
+                ns_after = d
+                break
+        assert ns_after is not None
+        assert "eventFacets" not in ns_after
+
+        # Event facet should still be findable in declarations
+        event_facets = [
+            d for d in ns_after["declarations"]
+            if d.get("type") == "EventFacetDecl"
+        ]
+        assert len(event_facets) == 1
+        assert event_facets[0]["name"] == "DoWork"
+
+        # Workflow should still be findable
+        wf = find_workflow(normalized, "myns.Main")
+        assert wf is not None
+        assert wf["name"] == "Main"
