@@ -28,6 +28,7 @@ afl-test.log
 
 # Compiled AFL output
 examples/osm-geocoder/tests/real/osm_cache_states.json
+examples/osm-geocoder/tests/real/osm_analyze_states.json
 
 # AgentFlow runtime config
 .env
