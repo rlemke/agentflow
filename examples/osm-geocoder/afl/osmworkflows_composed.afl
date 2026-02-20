@@ -158,60 +158,32 @@ namespace examples.composed {
     }
 
     // ==========================================================================
-    // PATTERN 6: Workflow Composition with Different Regions
-    // Demonstrating parameterized workflows
+    // PATTERN 6: Parameterized City Analysis
+    // Region and population threshold as parameters
     // ==========================================================================
 
-    /** Extracts German cities with population over 100k, computes statistics, and renders a map. */
-    workflow GermanyCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
-        // Use Germany cache
-        cache = osm.geo.cache.Europe.Germany()
+    /** Extracts cities above a population threshold, computes statistics, and renders a map. */
+    workflow CityAnalysis(region: String = "Liechtenstein", min_population: Long = 100000) => (map_path: String, large_cities: Long, total_pop: Long) andThen {
+        // Stage 1: Get cached region data
+        cache = osm.geo.Operations.Cache(region = $.region)
 
-        // Extract cities with population
-        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
+        // Stage 2: Extract cities with population
+        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = $.min_population)
 
-        // Get statistics
+        // Stage 3: Get statistics
         stats = osm.geo.Population.PopulationStatistics(
             input_path = cities.result.output_path,
             place_type = "city"
         )
 
-        // Visualize
+        // Stage 4: Visualize
         map = osm.geo.Visualization.RenderMap(
             geojson_path = cities.result.output_path,
-            title = "German Cities > 100k",
+            title = "Cities",
             color = "#3498db"
         )
 
-        yield GermanyCityAnalysis(
-            map_path = map.result.output_path,
-            large_cities = stats.stats.total_places,
-            total_pop = stats.stats.total_population
-        )
-    }
-
-    /** Extracts French cities with population over 100k, computes statistics, and renders a map. */
-    workflow FranceCityAnalysis() => (map_path: String, large_cities: Long, total_pop: Long) andThen {
-        // Use France cache
-        cache = osm.geo.cache.Europe.France()
-
-        // Extract cities with population
-        cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
-
-        // Get statistics
-        stats = osm.geo.Population.PopulationStatistics(
-            input_path = cities.result.output_path,
-            place_type = "city"
-        )
-
-        // Visualize
-        map = osm.geo.Visualization.RenderMap(
-            geojson_path = cities.result.output_path,
-            title = "French Cities > 100k",
-            color = "#e74c3c"
-        )
-
-        yield FranceCityAnalysis(
+        yield CityAnalysis(
             map_path = map.result.output_path,
             large_cities = stats.stats.total_places,
             total_pop = stats.stats.total_population

@@ -1,4 +1,4 @@
-"""Integration tests for all 16 composed workflows in osmworkflows_composed.afl.
+"""Integration tests for all 15 composed workflows in osmworkflows_composed.afl.
 
 Verifies that every workflow compiles correctly and has the expected params,
 returns, steps, and cache call targets.  Pure compile-time tests — no MongoDB
@@ -111,8 +111,7 @@ ALL_WORKFLOW_NAMES = [
     "LargeCitiesMap",
     "TransportOverview",
     "NationalParksAnalysis",
-    "GermanyCityAnalysis",
-    "FranceCityAnalysis",
+    "CityAnalysis",
     "TransportMap",
     "StateBoundariesWithStats",
     "DiscoverCitiesAndTowns",
@@ -131,6 +130,7 @@ _OPERATIONS_CACHE_WORKFLOWS = [
     "LargeCitiesMap",
     "TransportOverview",
     "NationalParksAnalysis",
+    "CityAnalysis",
     "TransportMap",
     "StateBoundariesWithStats",
     "DiscoverCitiesAndTowns",
@@ -143,7 +143,7 @@ _OPERATIONS_CACHE_WORKFLOWS = [
 
 
 class TestComposedWorkflows:
-    """Integration tests for all 16 composed workflows."""
+    """Integration tests for all 15 composed workflows."""
 
     # ------------------------------------------------------------------
     # Smoke / completeness
@@ -153,8 +153,8 @@ class TestComposedWorkflows:
         """All 43 AFL files compile together without errors."""
         assert program["type"] == "Program"
 
-    def test_all_16_workflows_present(self, program):
-        """Every one of the 16 composed workflows exists in the compiled output."""
+    def test_all_15_workflows_present(self, program):
+        """Every one of the 15 composed workflows exists in the compiled output."""
         for name in ALL_WORKFLOW_NAMES:
             wf = _find_wf(program, name)
             assert wf is not None, f"Workflow {name!r} not found in compiled program"
@@ -241,7 +241,8 @@ class TestComposedWorkflows:
         wf = _find_wf(program, "NationalParksAnalysis")
         assert wf is not None
 
-        assert _param_dict(wf) == {"region": "String"}
+        params = _param_dict(wf)
+        assert params == {"region": "String"}
         assert _return_dict(wf) == {
             "map_path": "String",
             "park_count": "Long",
@@ -254,23 +255,14 @@ class TestComposedWorkflows:
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
 
     # ------------------------------------------------------------------
-    # Pattern 6: Workflow Composition with Different Regions
+    # Pattern 6: Parameterized City Analysis
     # ------------------------------------------------------------------
 
-    @pytest.mark.parametrize(
-        "wf_name, cache_target",
-        [
-            ("GermanyCityAnalysis", "osm.geo.cache.Europe.Germany"),
-            ("FranceCityAnalysis", "osm.geo.cache.Europe.France"),
-        ],
-        ids=["Germany", "France"],
-    )
-    def test_hardcoded_city_analysis(self, program, wf_name, cache_target):
-        wf = _find_wf(program, wf_name)
+    def test_city_analysis(self, program):
+        wf = _find_wf(program, "CityAnalysis")
         assert wf is not None
 
-        # No params (region is hardcoded)
-        assert _param_dict(wf) == {}
+        assert _param_dict(wf) == {"region": "String", "min_population": "Long"}
         assert _return_dict(wf) == {
             "map_path": "String",
             "large_cities": "Long",
@@ -279,7 +271,7 @@ class TestComposedWorkflows:
 
         assert len(_steps(wf)) == 4
         assert _step_names(wf) == ["cache", "cities", "stats", "map"]
-        assert _step_call_target(_steps(wf)[0]) == cache_target
+        assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
 
     # ------------------------------------------------------------------
     # Pattern 7: Multi-Layer Visualization
@@ -475,7 +467,7 @@ class TestComposedWorkflows:
     # ------------------------------------------------------------------
 
     def test_generic_cache_workflows_use_operations_cache(self, program):
-        """Regression guard: 13 workflows must use osm.geo.Operations.Cache."""
+        """Regression guard: 14 workflows must use osm.geo.Operations.Cache."""
         for name in _OPERATIONS_CACHE_WORKFLOWS:
             wf = _find_wf(program, name)
             assert wf is not None, f"{name} not found"

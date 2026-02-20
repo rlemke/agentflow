@@ -154,49 +154,27 @@ workflow NationalParksAnalysis(region: String = "Liechtenstein")
 }
 ```
 
-### Pattern 6: Parameterized Regional Workflows
+### Pattern 6: Parameterized City Analysis
 
-Same analysis pattern applied to different regions.
+City extraction and statistics with configurable region and population threshold.
 
 ```afl
-workflow GermanyCityAnalysis()
+workflow CityAnalysis(region: String = "Liechtenstein", min_population: Long = 100000)
     => (map_path: String, large_cities: Long, total_pop: Long) andThen {
 
-    cache = osm.geo.cache.Europe.Germany()
-    cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
+    cache = osm.geo.Operations.Cache(region = $.region)
+    cities = osm.geo.Population.Cities(cache = cache.cache, min_population = $.min_population)
     stats = osm.geo.Population.PopulationStatistics(
         input_path = cities.result.output_path,
         place_type = "city"
     )
     map = osm.geo.Visualization.RenderMap(
         geojson_path = cities.result.output_path,
-        title = "German Cities > 100k",
+        title = "Cities",
         color = "#3498db"
     )
 
-    yield GermanyCityAnalysis(
-        map_path = map.result.output_path,
-        large_cities = stats.stats.total_places,
-        total_pop = stats.stats.total_population
-    )
-}
-
-workflow FranceCityAnalysis()
-    => (map_path: String, large_cities: Long, total_pop: Long) andThen {
-
-    cache = osm.geo.cache.Europe.France()
-    cities = osm.geo.Population.Cities(cache = cache.cache, min_population = 100000)
-    stats = osm.geo.Population.PopulationStatistics(
-        input_path = cities.result.output_path,
-        place_type = "city"
-    )
-    map = osm.geo.Visualization.RenderMap(
-        geojson_path = cities.result.output_path,
-        title = "French Cities > 100k",
-        color = "#e74c3c"
-    )
-
-    yield FranceCityAnalysis(
+    yield CityAnalysis(
         map_path = map.result.output_path,
         large_cities = stats.stats.total_places,
         total_pop = stats.stats.total_population

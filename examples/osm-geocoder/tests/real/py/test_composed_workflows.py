@@ -1,4 +1,4 @@
-"""Runtime integration tests for all 16 composed workflows in osmworkflows_composed.afl.
+"""Runtime integration tests for all 15 composed workflows in osmworkflows_composed.afl.
 
 Compiles all 43 AFL files, then executes each workflow end-to-end through:
   AFL source → compile → MongoStore → Evaluator → AgentPoller → real handlers → completion
@@ -6,7 +6,6 @@ Compiles all 43 AFL files, then executes each workflow end-to-end through:
 Uses Liechtenstein as the default region (tiny ~2MB download, fast processing).
 
 Special cases:
-  - GermanyCityAnalysis / FranceCityAnalysis: compile-only (hardcoded 4GB+ countries)
   - TransitAnalysis / TransitAccessibility: compile-only (require external GTFS feed)
   - RoadZoomBuilder: compile-only (requires GraphHopper JAR)
 
@@ -66,8 +65,7 @@ ALL_WORKFLOW_NAMES = [
     "LargeCitiesMap",
     "TransportOverview",
     "NationalParksAnalysis",
-    "GermanyCityAnalysis",
-    "FranceCityAnalysis",
+    "CityAnalysis",
     "TransportMap",
     "StateBoundariesWithStats",
     "DiscoverCitiesAndTowns",
@@ -106,10 +104,10 @@ def _register_handlers(poller):
 
 
 class TestComposedWorkflowsCompilation:
-    """Verify all 16 composed workflows compile from AFL source."""
+    """Verify all 15 composed workflows compile from AFL source."""
 
     def test_compile_all_composed_workflows(self):
-        """All 43 AFL files compile together and all 16 workflows are present."""
+        """All 43 AFL files compile together and all 15 workflows are present."""
         program = _compile_composed()
         assert program["type"] == "Program"
 
@@ -250,24 +248,26 @@ class TestComposedWorkflowsIntegration:
         assert isinstance(result.outputs["avg_area"], (int, float))
 
     # ------------------------------------------------------------------
-    # Pattern 6: Hardcoded country workflows (compile-only)
-    # GermanyCityAnalysis and FranceCityAnalysis use hardcoded cache facets
-    # that would download 4GB+ PBF files. Verified at compile time only.
+    # Pattern 6: Parameterized City Analysis (4 steps)
     # ------------------------------------------------------------------
 
-    def test_germany_city_analysis_compiles(self):
-        """GermanyCityAnalysis compiles (runtime skipped: 4GB+ Germany download)."""
+    def test_city_analysis(self, mongo_store, evaluator, poller):
+        """CityAnalysis: cache -> cities -> population stats -> render map."""
         program = _compile_composed()
-        workflow = extract_workflow(program, "GermanyCityAnalysis")
-        assert workflow["name"] == "GermanyCityAnalysis"
-        assert len(workflow["body"]["steps"]) == 4
+        workflow = extract_workflow(program, "CityAnalysis")
+        _register_handlers(poller)
 
-    def test_france_city_analysis_compiles(self):
-        """FranceCityAnalysis compiles (runtime skipped: 4GB+ France download)."""
-        program = _compile_composed()
-        workflow = extract_workflow(program, "FranceCityAnalysis")
-        assert workflow["name"] == "FranceCityAnalysis"
-        assert len(workflow["body"]["steps"]) == 4
+        result = run_to_completion(
+            evaluator, poller, workflow, program,
+            inputs={"region": "Liechtenstein", "min_population": 0},
+            max_rounds=50,
+        )
+
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+        assert isinstance(result.outputs["map_path"], str)
+        assert isinstance(result.outputs["large_cities"], int)
+        assert isinstance(result.outputs["total_pop"], int)
 
     # ------------------------------------------------------------------
     # Pattern 7: Multi-Layer Visualization (4 steps)
