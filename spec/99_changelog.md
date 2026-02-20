@@ -1,5 +1,8 @@
 # Implementation Changelog
 
+## Completed (v0.12.57) - Fix genomics.afl parse error
+- **Reordered comments in `examples/genomics/afl/genomics.afl`**: moved `//` line comments before `/** */` doc comments on both `SamplePipeline` and `CohortAnalysis` workflows — doc comments must be immediately followed by a declaration keyword, not separated by other comments
+
 ## Completed (v0.12.56) - Fix easy.sh --clean flag causing setup to exit early
 - **Removed `--clean` from `SETUP_ARGS`** in `scripts/easy.sh`: `scripts/setup --clean` exits after cleaning without starting containers, so `--clean --build` together skipped the build and start phases entirely
 - Since `easy.sh` already runs `scripts/teardown --all` first, the `--clean` flag was redundant
