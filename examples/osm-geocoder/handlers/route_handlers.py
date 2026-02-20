@@ -31,7 +31,10 @@ def _make_extract_routes_handler(facet_name: str):
         route_type = payload.get("route_type", "bicycle")
         network = payload.get("network", "*")
         include_infrastructure = payload.get("include_infrastructure", True)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
         log.info(
             "%s extracting %s routes from %s (network=%s, infra=%s)",
             facet_name, route_type, pbf_path, network, include_infrastructure
@@ -62,7 +65,10 @@ def _make_filter_routes_handler(facet_name: str):
         input_path = payload.get("input_path", "")
         route_type = payload.get("route_type", "bicycle")
         network = payload.get("network", "*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {route_type} routes")
         log.info(
             "%s filtering %s for %s routes (network=%s)",
             facet_name, input_path, route_type, network
@@ -90,7 +96,10 @@ def _make_route_stats_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path}")
         log.info("%s calculating stats for %s", facet_name, input_path)
 
         if not input_path:
@@ -114,7 +123,10 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
         pbf_path = cache.get("path", "")
         network = payload.get("network", "*")
         include_infrastructure = payload.get("include_infrastructure", True)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
         log.info(
             "%s extracting from %s (network=%s, infra=%s)",
             facet_name, pbf_path, network, include_infrastructure
@@ -144,7 +156,10 @@ def _make_public_transport_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting public transport from {pbf_path}")
         log.info("%s extracting public transport from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:

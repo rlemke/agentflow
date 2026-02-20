@@ -49,6 +49,9 @@ def _make_index_handler(aligner: str, reference: str) -> Callable:
     multiplier = ALIGNER_SIZE_MULTIPLIERS.get(aligner, 1.0)
 
     def handler(payload: dict) -> dict[str, Any]:
+        step_log = payload.get("_step_log")
+        if step_log:
+            step_log(f"Index: {aligner}/{reference}")
         source_path = ""
         if isinstance(payload.get("cache"), dict):
             source_path = payload["cache"].get("path", "")

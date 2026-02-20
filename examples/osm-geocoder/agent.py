@@ -47,6 +47,7 @@ def geocode_handler(payload: dict) -> dict:
         ValueError: If the address cannot be resolved
     """
     address = payload.get("address", "")
+    step_log = payload.get("_step_log")
     if not address:
         raise ValueError("No address provided")
 
@@ -63,6 +64,8 @@ def geocode_handler(payload: dict) -> dict:
         raise ValueError(f"No results found for address: {address}")
 
     result = results[0]
+    if step_log:
+        step_log(f"Geocode: '{address}' -> ({result['lat']}, {result['lon']})")
     return {
         "result": {
             "lat": result["lat"],

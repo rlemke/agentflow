@@ -36,7 +36,10 @@ def _make_admin_handler(facet_name: str, admin_levels: list[int]):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting admin levels {admin_levels} from {pbf_path}")
         log.info(
             "%s extracting admin levels %s from: %s",
             facet_name,
@@ -86,7 +89,10 @@ def _make_natural_handler(facet_name: str, natural_types: list[str]):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting natural types {natural_types} from {pbf_path}")
         log.info(
             "%s extracting natural types %s from: %s",
             facet_name,
@@ -132,7 +138,10 @@ def _make_configurable_admin_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         admin_level = payload.get("admin_level", 2)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting admin level {admin_level} from {pbf_path}")
         log.info(
             "%s extracting admin level %d from: %s",
             facet_name,
@@ -177,7 +186,10 @@ def _make_configurable_natural_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         natural_type = payload.get("natural_type", "water")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting natural type {natural_type} from {pbf_path}")
         log.info(
             "%s extracting natural type %s from: %s",
             facet_name,

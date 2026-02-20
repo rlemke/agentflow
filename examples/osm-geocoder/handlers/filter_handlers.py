@@ -49,7 +49,10 @@ def _make_radius_filter_handler(facet_name: str):
         radius = payload.get("radius", 0.0)
         unit = payload.get("unit", "kilometers")
         operator = payload.get("operator", "gte")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} with radius {operator} {radius} {unit}")
         log.info(
             "%s filtering %s with radius %s %s %s",
             facet_name,
@@ -91,7 +94,10 @@ def _make_radius_range_handler(facet_name: str):
         min_radius = payload.get("min_radius", 0.0)
         max_radius = payload.get("max_radius", 0.0)
         unit = payload.get("unit", "kilometers")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} with radius {min_radius}-{max_radius} {unit}")
         log.info(
             "%s filtering %s with radius %s-%s %s",
             facet_name,
@@ -139,7 +145,10 @@ def _make_type_and_radius_handler(facet_name: str):
         radius = payload.get("radius", 0.0)
         unit = payload.get("unit", "kilometers")
         operator = payload.get("operator", "gte")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} type={boundary_type} radius {operator} {radius} {unit}")
         log.info(
             "%s filtering %s type=%s with radius %s %s %s",
             facet_name,
@@ -185,6 +194,10 @@ def _make_extract_and_filter_handler(facet_name: str):
         radius = payload.get("radius", 0.0)
         unit = payload.get("unit", "kilometers")
         operator = payload.get("operator", "gte")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: extracting from {pbf_path} then filtering radius {operator} {radius} {unit}")
 
         # Normalize admin_levels to list of ints
         if isinstance(admin_levels, str):
@@ -299,7 +312,10 @@ def _make_osm_type_filter_handler(facet_name: str):
         input_path = payload.get("input_path", "")
         osm_type = payload.get("osm_type", "*")
         include_dependencies = payload.get("include_dependencies", False)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} by OSM type={osm_type}")
         log.info(
             "%s filtering %s by OSM type=%s (deps=%s)",
             facet_name,
@@ -346,7 +362,10 @@ def _make_osm_tag_filter_handler(facet_name: str):
         tag_value = payload.get("tag_value", "*")
         osm_type = payload.get("osm_type", "*")
         include_dependencies = payload.get("include_dependencies", False)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} by tag {tag_key}={tag_value}")
         log.info(
             "%s filtering %s by tag %s=%s, type=%s (deps=%s)",
             facet_name,
@@ -396,7 +415,10 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
         osm_type = payload.get("osm_type", "*")
         tag_key = payload.get("tag_key", "") or None
         tag_value = payload.get("tag_value", "*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering GeoJSON {input_path} by OSM type={osm_type}")
         log.info(
             "%s filtering GeoJSON %s by OSM type=%s, tag=%s=%s",
             facet_name,

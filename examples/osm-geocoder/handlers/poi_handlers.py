@@ -29,6 +29,10 @@ def _make_poi_handler(facet_name: str, return_param: str):
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: extracting from {cache.get('url', 'unknown')}")
         log.info("%s extracting from: %s", facet_name, cache.get("url", "unknown"))
 
         return {

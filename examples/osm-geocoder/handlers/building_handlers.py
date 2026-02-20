@@ -28,7 +28,10 @@ def _make_extract_buildings_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         building_type = payload.get("building_type", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {building_type} buildings from {pbf_path}")
         log.info("%s extracting %s buildings from %s", facet_name, building_type, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -50,7 +53,10 @@ def _make_typed_building_handler(facet_name: str, building_type: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {building_type} buildings from {pbf_path}")
         log.info("%s extracting from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -72,7 +78,10 @@ def _make_buildings_3d_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting 3D buildings from {pbf_path}")
         log.info("%s extracting 3D buildings from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -95,7 +104,10 @@ def _make_large_buildings_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         min_area_m2 = payload.get("min_area_m2", 1000.0)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting buildings >= {min_area_m2:.0f} m2 from {pbf_path}")
         log.info("%s extracting buildings >= %.0f m² from %s", facet_name, min_area_m2, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -116,7 +128,10 @@ def _make_building_stats_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path}")
         log.info("%s calculating stats for %s", facet_name, input_path)
 
         if not input_path:
@@ -138,7 +153,10 @@ def _make_filter_buildings_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         building_type = payload.get("building_type", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {building_type} buildings")
         log.info("%s filtering %s for %s buildings", facet_name, input_path, building_type)
 
         if not input_path:

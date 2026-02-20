@@ -34,7 +34,10 @@ def _make_extract_amenities_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         category = payload.get("category", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {category} amenities from {pbf_path}")
         log.info("%s extracting %s amenities from %s", facet_name, category, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -56,7 +59,10 @@ def _make_typed_amenity_handler(facet_name: str, amenity_types: set[str], catego
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {category} amenities from {pbf_path}")
         log.info("%s extracting from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -78,7 +84,10 @@ def _make_single_amenity_handler(facet_name: str, amenity_type: str, category: s
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {amenity_type} from {pbf_path}")
         log.info("%s extracting from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -99,7 +108,10 @@ def _make_amenity_stats_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path}")
         log.info("%s calculating stats for %s", facet_name, input_path)
 
         if not input_path:
@@ -121,7 +133,10 @@ def _make_search_amenities_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         name_pattern = payload.get("name_pattern", ".*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: searching {input_path} for pattern '{name_pattern}'")
         log.info("%s searching %s for pattern '%s'", facet_name, input_path, name_pattern)
 
         if not input_path:
@@ -143,7 +158,10 @@ def _make_filter_by_category_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         category = payload.get("category", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for category {category}")
         log.info("%s filtering %s for category %s", facet_name, input_path, category)
 
         if not input_path:

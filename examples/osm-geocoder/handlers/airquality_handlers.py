@@ -69,6 +69,10 @@ def handle_fetch_air_quality(payload: dict) -> dict:
     bbox = payload.get("bbox", "")
     parameter = payload.get("parameter", "pm25")
     radius_m = payload.get("radius_m", 25000)
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"FetchAirQuality: fetching {parameter} data for bbox {bbox}")
 
     if not HAS_REQUESTS or not OPENAQ_API_KEY:
         log.warning("OpenAQ API key not set or requests not available; returning empty result")
@@ -174,6 +178,10 @@ def handle_correlate(payload: dict) -> dict:
     schools_path = payload.get("schools_path", "")
     air_quality_path = payload.get("air_quality_path", "")
     max_distance_km = payload.get("max_distance_km", 10.0)
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"CorrelateSchoolAirQuality: correlating schools with air quality (max {max_distance_km} km)")
 
     if not schools_path or not air_quality_path:
         return {"result": _empty_correlation_result()}
@@ -273,6 +281,10 @@ def handle_exposure_stats(payload: dict) -> dict:
         stats: ExposureStats dict
     """
     input_path = payload.get("input_path", "")
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ExposureStatistics: computing exposure stats from {input_path}")
 
     if not input_path:
         return {"stats": _empty_stats()}

@@ -31,7 +31,10 @@ def _make_extract_roads_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         road_class = payload.get("road_class", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {road_class} roads from {pbf_path}")
         log.info("%s extracting %s roads from %s", facet_name, road_class, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -53,7 +56,10 @@ def _make_typed_road_handler(facet_name: str, road_class: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {road_class} roads from {pbf_path}")
         log.info("%s extracting from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -75,7 +81,10 @@ def _make_major_roads_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting major roads from {pbf_path}")
         log.info("%s extracting major roads from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -130,7 +139,10 @@ def _make_special_road_handler(facet_name: str, attribute: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {attribute} from {pbf_path}")
         log.info("%s extracting %s from %s", facet_name, attribute, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -184,7 +196,10 @@ def _make_surface_handler(facet_name: str, surface_type: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {surface_type} roads from {pbf_path}")
         log.info("%s extracting %s roads from %s", facet_name, surface_type, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -206,7 +221,10 @@ def _make_speed_limit_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting roads with speed limits from {pbf_path}")
         log.info("%s extracting roads with speed limits from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -227,7 +245,10 @@ def _make_road_stats_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path}")
         log.info("%s calculating stats for %s", facet_name, input_path)
 
         if not input_path:
@@ -249,7 +270,10 @@ def _make_filter_by_class_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         road_class = payload.get("road_class", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {road_class} roads")
         log.info("%s filtering %s for %s roads", facet_name, input_path, road_class)
 
         if not input_path:
@@ -272,7 +296,10 @@ def _make_filter_by_speed_handler(facet_name: str):
         input_path = payload.get("input_path", "")
         min_speed = payload.get("min_speed", 0)
         max_speed = payload.get("max_speed", 999)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for speed {min_speed}-{max_speed}")
         log.info("%s filtering %s for speed %d-%d", facet_name, input_path, min_speed, max_speed)
 
         if not input_path:

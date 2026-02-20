@@ -1,5 +1,19 @@
 # Implementation Changelog
 
+## Completed (v0.12.45) - Add Step Logging to AgentPoller and Example Handlers
+- Added `_emit_step_log()` method to AgentPoller (mirrors RegistryRunner pattern)
+- AgentPoller now emits framework-level step logs: task claimed, dispatching, handler completed, handler error
+- AgentPoller injects `_step_log` callback into handler payloads for handler-level logging
+- Updated all example handler files to use `_step_log` for operational messages visible in the dashboard:
+  - `docker/agents/addone_agent.py`: AddOne, Multiply, Greet handlers
+  - `examples/osm-geocoder/agent.py`: geocode_handler
+  - `examples/osm-geocoder/handlers/`: region, operations, cache, park, building, road, poi, amenity, boundary, elevation, filter, graphhopper, gtfs, osmose, population, route, tiger, validation, visualization, zoom, airquality, postgis handlers
+  - `examples/genomics/handlers/`: cache, genomics, index, operations, resolve handlers
+  - `examples/jenkins/handlers/`: build, artifact, deploy, notify, scm, test handlers
+  - `examples/aws-lambda/handlers/`: lambda, stepfunctions handlers
+  - `examples/maven/handlers/`: runner handlers
+- Added 3 new AgentPoller step log tests: test_step_logs_on_success, test_step_logs_on_failure, test_step_log_callback_injection
+
 ## Completed (v0.12.44) - Merge EventDefinition into TaskDefinition
 - Removed EventDefinition dataclass, EventState, EVENT_TRANSITIONS, EventManager, EventDispatcher, LocalEventHandler
 - Removed EventError, EventId, event_id(), EventDefinitionDAO

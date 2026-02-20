@@ -16,7 +16,10 @@ NAMESPACE = "jenkins.artifact"
 
 def _archive_artifacts_handler(payload: dict) -> dict[str, Any]:
     """Archive build artifacts."""
+    step_log = payload.get("_step_log")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
+    if step_log:
+        step_log(f"ArchiveArtifacts: {workspace}")
     includes = payload.get("includes", "**/*.jar")
     return {
         "artifact": {
@@ -32,8 +35,11 @@ def _archive_artifacts_handler(payload: dict) -> dict[str, Any]:
 
 def _publish_to_registry_handler(payload: dict) -> dict[str, Any]:
     """Publish an artifact to a registry (Maven, npm, etc.)."""
+    step_log = payload.get("_step_log")
     registry_url = payload.get("registry_url", "https://registry.example.com")
     version = payload.get("version", "1.0.0")
+    if step_log:
+        step_log(f"PublishToRegistry: v{version} -> {registry_url}")
     group_id = payload.get("group_id", "com.example")
     return {
         "artifact": {
@@ -49,7 +55,10 @@ def _publish_to_registry_handler(payload: dict) -> dict[str, Any]:
 
 def _docker_push_handler(payload: dict) -> dict[str, Any]:
     """Push a Docker image to a container registry."""
+    step_log = payload.get("_step_log")
     image_tag = payload.get("image_tag", "app:latest")
+    if step_log:
+        step_log(f"DockerPush: {image_tag}")
     registry_url = payload.get("registry_url", "registry.example.com")
     tag = image_tag.split(":")[-1] if ":" in image_tag else "latest"
     image_name = image_tag.split(":")[0]

@@ -77,11 +77,14 @@ def resolve_reference(payload: dict) -> dict[str, Any]:
     """Resolve a reference genome name to its cache entry."""
     name = payload.get("name", "").lower().strip()
     prefer_source = payload.get("prefer_source", "")
+    step_log = payload.get("_step_log")
 
     entry = REFERENCE_ALIASES.get(name)
     if entry:
         ns, facet = entry
         cache = _resolve_to_cache(ns, facet)
+        if step_log:
+            step_log(f"ResolveReference: '{name}' -> {facet}")
         return {
             "cache": cache,
             "resolution": {
@@ -131,11 +134,14 @@ def resolve_reference(payload: dict) -> dict[str, Any]:
 def resolve_annotation(payload: dict) -> dict[str, Any]:
     """Resolve an annotation database name to its cache entry."""
     name = payload.get("name", "").lower().strip()
+    step_log = payload.get("_step_log")
 
     entry = ANNOTATION_ALIASES.get(name)
     if entry:
         ns, facet = entry
         cache = _resolve_to_cache(ns, facet)
+        if step_log:
+            step_log(f"ResolveAnnotation: '{name}' -> {facet}")
         return {
             "cache": cache,
             "resolution": {
@@ -167,11 +173,14 @@ def resolve_annotation(payload: dict) -> dict[str, Any]:
 def resolve_sample(payload: dict) -> dict[str, Any]:
     """Resolve an SRA accession to its cache entry."""
     accession = payload.get("accession", "").strip()
+    step_log = payload.get("_step_log")
     sra_ns = "genomics.cache.sra"
 
     facets = RESOURCE_REGISTRY.get(sra_ns, {})
     if accession in facets:
         cache = _resolve_to_cache(sra_ns, accession)
+        if step_log:
+            step_log(f"ResolveSample: '{accession}' found")
         return {
             "cache": cache,
             "resolution": {
@@ -203,6 +212,9 @@ def resolve_sample(payload: dict) -> dict[str, Any]:
 def list_resources(payload: dict) -> dict[str, Any]:
     """List all available cached resources, optionally filtered by category."""
     category = payload.get("category", "").lower().strip()
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"ListResources: category={category or 'all'}")
 
     resources = []
     categories: dict[str, int] = {}

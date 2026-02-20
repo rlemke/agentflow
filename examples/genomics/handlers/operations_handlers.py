@@ -15,14 +15,20 @@ NAMESPACE = "genomics.cache.Operations"
 
 def download(payload: dict) -> dict[str, Any]:
     """Simulate downloading a cached resource (pass-through)."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"Download: {payload.get('cache', {}).get('path', '')}")
     cache = payload.get("cache", {})
     return {"cache": cache}
 
 
 def index(payload: dict) -> dict[str, Any]:
     """Simulate building an aligner index from a cached reference."""
+    step_log = payload.get("_step_log")
     cache = payload.get("cache", {})
     aligner = payload.get("aligner", "bwa")
+    if step_log:
+        step_log(f"Index: {aligner} from {cache.get('path', '')}")
     source_path = cache.get("path", "")
     return {
         "cache": {
@@ -41,11 +47,17 @@ def index(payload: dict) -> dict[str, Any]:
 
 def validate(payload: dict) -> dict[str, Any]:
     """Simulate validating a cached resource."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log("Validate: verifying checksum")
     return {"valid": True, "message": "Checksum verified"}
 
 
 def status(payload: dict) -> dict[str, Any]:
     """Return status information for a cached resource."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log("Status: checking cache")
     cache = payload.get("cache", {})
     return {
         "status": "cached",
@@ -56,6 +68,9 @@ def status(payload: dict) -> dict[str, Any]:
 
 def checksum(payload: dict) -> dict[str, Any]:
     """Compute or verify the checksum of a cached resource."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log("Checksum: computing hash")
     cache = payload.get("cache", {})
     return {
         "checksum": cache.get("checksum", "sha256:00000000"),

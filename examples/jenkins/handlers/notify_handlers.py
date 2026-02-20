@@ -16,8 +16,11 @@ NAMESPACE = "jenkins.notify"
 
 def _slack_notify_handler(payload: dict) -> dict[str, Any]:
     """Send a Slack notification."""
+    step_log = payload.get("_step_log")
     channel = payload.get("channel", "#general")
     message = payload.get("message", "")
+    if step_log:
+        step_log(f"SlackNotify: {channel}")
     return {
         "sent": True,
         "timestamp": "1708100000.000100",
@@ -26,8 +29,11 @@ def _slack_notify_handler(payload: dict) -> dict[str, Any]:
 
 def _email_notify_handler(payload: dict) -> dict[str, Any]:
     """Send an email notification."""
+    step_log = payload.get("_step_log")
     recipients = payload.get("recipients", "")
     subject = payload.get("subject", "")
+    if step_log:
+        step_log(f"EmailNotify: {subject}")
     return {
         "sent": True,
         "message_id": "<20240216120000.ABC123@jenkins.example.com>",

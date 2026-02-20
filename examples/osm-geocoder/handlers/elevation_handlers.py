@@ -194,6 +194,10 @@ def handle_enrich_with_elevation(params: dict[str, Any]) -> dict[str, Any]:
     """
     input_path = params["input_path"]
     dem_source = params.get("dem_source", "srtm")
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"EnrichWithElevation: enriching {input_path} with {dem_source} elevation data")
 
     # Read input GeoJSON
     with open(input_path) as f:
@@ -257,6 +261,10 @@ def handle_filter_by_max_elevation(params: dict[str, Any]) -> dict[str, Any]:
     """
     input_path = params["input_path"]
     threshold_ft = params["min_max_elevation_ft"]
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"FilterByMaxElevation: filtering {input_path} above {threshold_ft} ft")
 
     with open(input_path) as f:
         geojson = json.load(f)
@@ -307,6 +315,10 @@ def handle_filter_by_min_elevation(params: dict[str, Any]) -> dict[str, Any]:
     """
     input_path = params["input_path"]
     threshold_ft = params["max_min_elevation_ft"]
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"FilterByMinElevation: filtering {input_path} below {threshold_ft} ft")
 
     with open(input_path) as f:
         geojson = json.load(f)
@@ -356,6 +368,10 @@ def handle_filter_by_elevation_gain(params: dict[str, Any]) -> dict[str, Any]:
     """
     input_path = params["input_path"]
     min_gain_ft = params["min_gain_ft"]
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"FilterByElevationGain: filtering {input_path} for gain >= {min_gain_ft} ft")
 
     with open(input_path) as f:
         geojson = json.load(f)
@@ -407,6 +423,10 @@ def handle_filter_by_elevation_range(params: dict[str, Any]) -> dict[str, Any]:
     input_path = params["input_path"]
     min_elev = params["min_elevation_ft"]
     max_elev = params["max_elevation_ft"]
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"FilterByElevationRange: filtering {input_path} for range {min_elev}-{max_elev} ft")
 
     with open(input_path) as f:
         geojson = json.load(f)
@@ -467,6 +487,10 @@ def handle_high_elevation_hiking_trails(params: dict[str, Any]) -> dict[str, Any
     min_elevation_ft = params.get("min_elevation_ft", 2000.0)
     network = params.get("network", "*")
     dem_source = params.get("dem_source", "srtm")
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"HighElevationHikingTrails: filtering hiking trails above {min_elevation_ft} ft")
 
     # For now, we expect the cache to have a path to extracted data
     # In a full implementation, this would trigger the route extraction first
@@ -492,6 +516,10 @@ def handle_high_elevation_cycling_routes(params: dict[str, Any]) -> dict[str, An
     """Combined: Extract cycling routes with elevation above threshold."""
     min_elevation_ft = params.get("min_elevation_ft", 2000.0)
     dem_source = params.get("dem_source", "srtm")
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"HighElevationCyclingRoutes: filtering cycling routes above {min_elevation_ft} ft")
 
     return {
         "result": {
@@ -512,6 +540,10 @@ def handle_high_elevation_routes(params: dict[str, Any]) -> dict[str, Any]:
     route_type = params["route_type"]
     min_elevation_ft = params.get("min_elevation_ft", 2000.0)
     dem_source = params.get("dem_source", "srtm")
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"HighElevationRoutes: filtering {route_type} routes above {min_elevation_ft} ft")
 
     return {
         "result": {
@@ -532,6 +564,10 @@ def handle_climbing_routes(params: dict[str, Any]) -> dict[str, Any]:
     route_type = params["route_type"]
     min_gain_ft = params.get("min_gain_ft", 1000.0)
     dem_source = params.get("dem_source", "srtm")
+    step_log = params.get("_step_log")
+
+    if step_log:
+        step_log(f"ClimbingRoutes: filtering {route_type} routes with gain >= {min_gain_ft} ft")
 
     return {
         "result": {

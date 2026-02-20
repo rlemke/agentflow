@@ -69,11 +69,14 @@ def handle_validate_cache(payload: dict) -> dict:
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
     output_dir = payload.get("output_dir", "/tmp")
+    step_log = payload.get("_step_log")
 
     if not pbf_path:
         log.warning("No PBF path in cache; returning empty validation")
         return {"stats": _empty_stats(), "result": _empty_result()}
 
+    if step_log:
+        step_log(f"ValidateCache: validating {pbf_path}")
     log.info("ValidateCache: validating %s", pbf_path)
     result, summary = verify_pbf(pbf_path, output_dir)
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
@@ -83,6 +86,10 @@ def handle_validate_geometry(payload: dict) -> dict:
     """Geometry-only validation."""
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ValidateGeometry: validating geometry of {pbf_path}")
 
     if not pbf_path:
         return {"stats": _empty_stats(), "result": _empty_result()}
@@ -98,6 +105,10 @@ def handle_validate_tags(payload: dict) -> dict:
     """Tag-only validation."""
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ValidateTags: validating tags of {pbf_path}")
 
     if not pbf_path:
         return {"stats": _empty_stats(), "result": _empty_result()}
@@ -113,6 +124,10 @@ def handle_validate_bounds(payload: dict) -> dict:
     """Coordinate bounds validation."""
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ValidateBounds: validating coordinate bounds of {pbf_path}")
 
     if not pbf_path:
         return {"stats": _empty_stats(), "result": _empty_result()}
@@ -127,6 +142,10 @@ def handle_validate_bounds(payload: dict) -> dict:
 def handle_validation_summary(payload: dict) -> dict:
     """Compute summary from a validation result file."""
     input_path = payload.get("input_path", "")
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ValidationSummary: computing summary for {input_path}")
 
     if not input_path:
         return {"stats": _empty_stats()}

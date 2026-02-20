@@ -31,9 +31,12 @@ def _default_phase(goal: str) -> str:
 
 def _run_maven_artifact_handler(payload: dict) -> dict[str, Any]:
     """Simulate running a Maven artifact as a JVM subprocess."""
+    step_log = payload.get("_step_log")
     step_id = payload.get("step_id", "unknown")
     group_id = payload.get("group_id", "com.example")
     artifact_id = payload.get("artifact_id", "app")
+    if step_log:
+        step_log(f"RunMavenArtifact: {group_id}:{artifact_id}")
     version = payload.get("version", "1.0.0")
     classifier = payload.get("classifier", "")
     entrypoint = payload.get("entrypoint", "")
@@ -68,8 +71,11 @@ def _run_maven_artifact_handler(payload: dict) -> dict[str, Any]:
 
 def _run_maven_plugin_handler(payload: dict) -> dict[str, Any]:
     """Simulate running a Maven plugin goal within a workspace."""
+    step_log = payload.get("_step_log")
     workspace_path = payload.get("workspace_path", "/tmp/workspace")
     plugin_group_id = payload.get("plugin_group_id", "org.apache.maven.plugins")
+    if step_log:
+        step_log(f"RunMavenPlugin: {payload.get('goal', 'compile')}")
     plugin_artifact_id = payload.get("plugin_artifact_id", "maven-compiler-plugin")
     plugin_version = payload.get("plugin_version", "3.11.0")
     goal = payload.get("goal", "compile")

@@ -54,7 +54,10 @@ def _make_build_logical_graph_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: building logical graph from {pbf_path}")
         log.info("%s building logical graph from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -85,7 +88,10 @@ def _make_build_anchors_handler(facet_name: str):
         graph_path = payload.get("graph_path", "")
         cities_path = payload.get("cities_path", "")
         zoom_level = payload.get("zoom_level", 4)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: building anchors for zoom {zoom_level}")
         log.info("%s building anchors for zoom %d", facet_name, zoom_level)
 
         if not graph_path:
@@ -119,7 +125,10 @@ def _make_compute_sbs_handler(facet_name: str):
 
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: computing SBS for zoom {zoom_level}")
         log.info("%s computing SBS for zoom %d", facet_name, zoom_level)
 
         if not graph_path:
@@ -152,7 +161,10 @@ def _make_compute_scores_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
         sbs_paths_str = payload.get("sbs_paths", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: computing scores")
         log.info("%s computing scores", facet_name)
 
         if not graph_path:
@@ -203,7 +215,10 @@ def _make_detect_bypasses_handler(facet_name: str):
 
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: detecting bypasses")
         log.info("%s detecting bypasses", facet_name)
 
         if not graph_path:
@@ -236,7 +251,10 @@ def _make_detect_rings_handler(facet_name: str):
 
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: detecting rings")
         log.info("%s detecting rings", facet_name)
 
         if not graph_path:
@@ -267,7 +285,10 @@ def _make_select_edges_handler(facet_name: str):
         cities_path = payload.get("cities_path", "")
         bypasses_path = payload.get("bypasses_path", "")
         rings_path = payload.get("rings_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: selecting edges")
         log.info("%s selecting edges", facet_name)
 
         if not graph_path or not scores_path:
@@ -321,7 +342,10 @@ def _make_export_zoom_layers_handler(facet_name: str):
         assignments_path = payload.get("assignments_path", "")
         graph_path = payload.get("graph_path", "")
         output_dir = payload.get("output_dir", "/tmp/zoom-export")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: exporting zoom layers to {output_dir}")
         log.info("%s exporting zoom layers to %s", facet_name, output_dir)
 
         if not assignments_path or not graph_path:
@@ -371,7 +395,10 @@ def _make_build_zoom_layers_handler(facet_name: str):
         min_population = payload.get("min_population", 50000)
         output_dir = payload.get("output_dir", "/tmp/zoom-builder")
         max_concurrent = payload.get("max_concurrent", 16)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: running full pipeline to {output_dir}")
         log.info("%s running full pipeline to %s", facet_name, output_dir)
 
         try:

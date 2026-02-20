@@ -54,9 +54,13 @@ def handle_verify_all(payload: dict) -> dict:
     """
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
     if not pbf_path:
         log.warning("No PBF path in cache; returning empty result")
         return {"result": _result_dict(VerifyResult("", 0, 0, 0, 0)), "summary": _summary_dict(VerifySummaryData())}
+
+    if step_log:
+        step_log(f"VerifyAll: running full verification on {pbf_path}")
 
     output_dir = payload.get("output_dir", "/tmp")
 
@@ -85,9 +89,13 @@ def handle_verify_geometry(payload: dict) -> dict:
     """
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
     if not pbf_path:
         log.warning("No PBF path in cache; returning empty result")
         return {"result": _result_dict(VerifyResult("", 0, 0, 0, 0)), "summary": _summary_dict(VerifySummaryData())}
+
+    if step_log:
+        step_log(f"VerifyGeometry: verifying geometry of {pbf_path}")
 
     result, summary = verify_pbf(
         pbf_path,
@@ -114,9 +122,13 @@ def handle_verify_tags(payload: dict) -> dict:
     """
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
+    step_log = payload.get("_step_log")
     if not pbf_path:
         log.warning("No PBF path in cache; returning empty result")
         return {"result": _result_dict(VerifyResult("", 0, 0, 0, 0)), "summary": _summary_dict(VerifySummaryData())}
+
+    if step_log:
+        step_log(f"VerifyTags: verifying tags of {pbf_path}")
 
     required_tags_str = payload.get("required_tags", "name")
     required_tags = [t.strip() for t in required_tags_str.split(",") if t.strip()]
@@ -145,9 +157,13 @@ def handle_verify_geojson(payload: dict) -> dict:
         summary: VerifySummary dict
     """
     input_path = payload.get("input_path", "")
+    step_log = payload.get("_step_log")
     if not input_path:
         log.warning("No input_path provided; returning empty result")
         return {"result": _result_dict(VerifyResult("", 0, 0, 0, 0)), "summary": _summary_dict(VerifySummaryData())}
+
+    if step_log:
+        step_log(f"VerifyGeoJSON: verifying {input_path}")
 
     result, summary = verify_geojson(input_path)
 
@@ -164,9 +180,13 @@ def handle_verify_summary(payload: dict) -> dict:
         summary: VerifySummary dict
     """
     input_path = payload.get("input_path", "")
+    step_log = payload.get("_step_log")
     if not input_path:
         log.warning("No input_path provided; returning empty summary")
         return {"summary": _summary_dict(VerifySummaryData())}
+
+    if step_log:
+        step_log(f"ComputeVerifySummary: computing summary for {input_path}")
 
     summary = compute_verify_summary(input_path)
 

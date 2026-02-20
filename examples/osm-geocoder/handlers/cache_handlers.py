@@ -16,6 +16,9 @@ def _make_handler(region_path: str):
     """Create a handler function that downloads and caches a region."""
 
     def handler(payload: dict) -> dict:
+        step_log = payload.get("_step_log")
+        if step_log:
+            step_log(f"Cache: downloading {region_path}")
         return {"cache": download(region_path)}
 
     return handler

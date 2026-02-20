@@ -17,6 +17,9 @@ NAMESPACE = "genomics.Facets"
 def ingest_reference(payload: dict) -> dict[str, Any]:
     """Download and index a reference genome build."""
     build = payload.get("reference_build", "GRCh38")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"IngestReference: {build}")
     return {
         "result": {
             "fasta_path": f"/ref/{build}/{build}.fa",
@@ -30,6 +33,9 @@ def ingest_reference(payload: dict) -> dict[str, Any]:
 def qc_reads(payload: dict) -> dict[str, Any]:
     """Run quality control on paired-end FASTQ reads."""
     sample_id = payload.get("sample_id", "unknown")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"QcReads: sample {sample_id}")
     return {
         "result": {
             "sample_id": sample_id,
@@ -46,6 +52,9 @@ def qc_reads(payload: dict) -> dict[str, Any]:
 def align_reads(payload: dict) -> dict[str, Any]:
     """Align cleaned reads to the reference genome."""
     sample_id = payload.get("sample_id", "unknown")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"AlignReads: sample {sample_id}")
     return {
         "result": {
             "sample_id": sample_id,
@@ -62,6 +71,9 @@ def align_reads(payload: dict) -> dict[str, Any]:
 def call_variants(payload: dict) -> dict[str, Any]:
     """Call genomic variants from an aligned BAM file."""
     sample_id = payload.get("sample_id", "unknown")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"CallVariants: sample {sample_id}")
     return {
         "result": {
             "sample_id": sample_id,
@@ -76,6 +88,9 @@ def call_variants(payload: dict) -> dict[str, Any]:
 def joint_genotype(payload: dict) -> dict[str, Any]:
     """Perform joint genotyping across all samples in the cohort."""
     sample_count = payload.get("sample_count", 1)
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"JointGenotype: {sample_count} samples")
     return {
         "result": {
             "cohort_vcf_path": "/vcf/cohort/joint_genotyped.vcf.gz",
@@ -89,6 +104,9 @@ def joint_genotype(payload: dict) -> dict[str, Any]:
 
 def normalize_filter(payload: dict) -> dict[str, Any]:
     """Normalize and filter a multi-sample VCF."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"NormalizeFilter: {payload.get('vcf_path', '')}")
     return {
         "result": {
             "cohort_vcf_path": payload.get("vcf_path", ""),
@@ -102,6 +120,9 @@ def normalize_filter(payload: dict) -> dict[str, Any]:
 
 def annotate(payload: dict) -> dict[str, Any]:
     """Annotate variants with gene and functional information."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log("Annotate: annotating variants")
     return {
         "result": {
             "variant_table_path": "/annotation/cohort/variant_table.tsv",
@@ -115,6 +136,9 @@ def annotate(payload: dict) -> dict[str, Any]:
 def cohort_analytics(payload: dict) -> dict[str, Any]:
     """Compute aggregate QC and statistics across the cohort."""
     dataset_id = payload.get("dataset_id", "unknown")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"CohortAnalytics: dataset {dataset_id}")
     return {
         "result": {
             "qc_report_path": f"/reports/{dataset_id}/qc_report.html",
@@ -129,6 +153,9 @@ def cohort_analytics(payload: dict) -> dict[str, Any]:
 def publish(payload: dict) -> dict[str, Any]:
     """Package and publish the final analysis results."""
     dataset_id = payload.get("dataset_id", "unknown")
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"Publish: dataset {dataset_id}")
     return {
         "result": {
             "package_path": f"/publish/{dataset_id}/package.tar.gz",

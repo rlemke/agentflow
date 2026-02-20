@@ -16,8 +16,11 @@ NAMESPACE = "jenkins.build"
 
 def _maven_build_handler(payload: dict) -> dict[str, Any]:
     """Run a Maven build."""
+    step_log = payload.get("_step_log")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     goals = payload.get("goals", "clean package")
+    if step_log:
+        step_log(f"MavenBuild: {goals} in {workspace}")
     jdk = payload.get("jdk_version", "17")
     return {
         "result": {
@@ -34,8 +37,11 @@ def _maven_build_handler(payload: dict) -> dict[str, Any]:
 
 def _gradle_build_handler(payload: dict) -> dict[str, Any]:
     """Run a Gradle build."""
+    step_log = payload.get("_step_log")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     tasks = payload.get("tasks", "build")
+    if step_log:
+        step_log(f"GradleBuild: {tasks} in {workspace}")
     jdk = payload.get("jdk_version", "17")
     return {
         "result": {
@@ -52,8 +58,11 @@ def _gradle_build_handler(payload: dict) -> dict[str, Any]:
 
 def _npm_build_handler(payload: dict) -> dict[str, Any]:
     """Run an npm build."""
+    step_log = payload.get("_step_log")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     script = payload.get("build_script", "build")
+    if step_log:
+        step_log(f"NpmBuild: {script} in {workspace}")
     node_version = payload.get("node_version", "20")
     return {
         "result": {
@@ -70,8 +79,11 @@ def _npm_build_handler(payload: dict) -> dict[str, Any]:
 
 def _docker_build_handler(payload: dict) -> dict[str, Any]:
     """Build a Docker image."""
+    step_log = payload.get("_step_log")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     image_tag = payload.get("image_tag", "app:latest")
+    if step_log:
+        step_log(f"DockerBuild: {image_tag}")
     dockerfile = payload.get("dockerfile", "Dockerfile")
     return {
         "result": {

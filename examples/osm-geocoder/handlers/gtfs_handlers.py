@@ -285,6 +285,10 @@ def _make_download_feed_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         url = payload.get("url", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: downloading GTFS feed from {url}")
         log.info("%s downloading GTFS feed from %s", facet_name, url)
 
         if not url:
@@ -306,6 +310,10 @@ def _make_extract_stops_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         feed = payload.get("feed", {})
         feed_path = feed.get("path", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: extracting stops from {feed_path}")
         log.info("%s extracting stops from %s", facet_name, feed_path)
 
         if not feed_path:
@@ -327,6 +335,10 @@ def _make_extract_routes_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         feed = payload.get("feed", {})
         feed_path = feed.get("path", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: extracting routes from {feed_path}")
         log.info("%s extracting routes from %s", facet_name, feed_path)
 
         if not feed_path:
@@ -348,6 +360,10 @@ def _make_service_frequency_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         feed = payload.get("feed", {})
         feed_path = feed.get("path", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: computing service frequency from {feed_path}")
         log.info("%s computing service frequency from %s", facet_name, feed_path)
 
         if not feed_path:
@@ -369,6 +385,10 @@ def _make_transit_statistics_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         feed = payload.get("feed", {})
         feed_path = feed.get("path", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: computing transit statistics from {feed_path}")
         log.info("%s computing transit statistics from %s", facet_name, feed_path)
 
         if not feed_path:
@@ -391,6 +411,10 @@ def _make_nearest_stops_handler(facet_name: str):
         osm_path = payload.get("osm_geojson_path", "")
         stops_path = payload.get("stops_geojson_path", "")
         max_dist = payload.get("max_distance_m", 2000)
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: finding nearest stops (max {max_dist}m)")
         log.info("%s finding nearest stops (max %dm)", facet_name, max_dist)
 
         if not osm_path or not stops_path:
@@ -413,6 +437,10 @@ def _make_stop_accessibility_handler(facet_name: str):
         osm_path = payload.get("osm_geojson_path", "")
         stops_path = payload.get("stops_geojson_path", "")
         threshold = payload.get("walk_threshold_m", 400)
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: computing stop accessibility (threshold {threshold}m)")
         log.info("%s computing stop accessibility (threshold %dm)", facet_name, threshold)
 
         if not osm_path or not stops_path:
@@ -437,6 +465,10 @@ def _make_coverage_gaps_handler(facet_name: str):
         stops_path = payload.get("stops_geojson_path", "")
         osm_path = payload.get("osm_geojson_path", "")
         cell_size = payload.get("cell_size_m", 500)
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: computing coverage gaps (cell {cell_size}m)")
         log.info("%s computing coverage gaps (cell %dm)", facet_name, cell_size)
 
         if not stops_path or not osm_path:
@@ -458,6 +490,10 @@ def _make_route_density_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         routes_path = payload.get("routes_geojson_path", "")
         cell_size = payload.get("cell_size_m", 500)
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: computing route density (cell {cell_size}m)")
         log.info("%s computing route density (cell %dm)", facet_name, cell_size)
 
         if not routes_path:
@@ -480,6 +516,10 @@ def _make_generate_report_handler(facet_name: str):
         feed = payload.get("feed", {})
         feed_path = feed.get("path", "")
         osm_path = payload.get("osm_geojson_path", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: generating transit report from {feed_path}")
         log.info("%s generating transit report from %s", facet_name, feed_path)
 
         if not feed_path:

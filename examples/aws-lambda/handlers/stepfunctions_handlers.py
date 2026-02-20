@@ -84,10 +84,13 @@ def _default_definition() -> str:
 
 def _create_state_machine_handler(payload: dict) -> dict[str, Any]:
     """Create a Step Functions state machine."""
+    step_log = payload.get("_step_log")
     client = _sfn_client()
     role_arn = _ensure_sfn_role()
 
     sm_name = payload.get("state_machine_name", "afl-state-machine")
+    if step_log:
+        step_log(f"CreateStateMachine: {sm_name}")
     definition = payload.get("definition", "") or _default_definition()
     custom_role = payload.get("role_arn", "")
 
@@ -113,8 +116,11 @@ def _create_state_machine_handler(payload: dict) -> dict[str, Any]:
 
 def _start_execution_handler(payload: dict) -> dict[str, Any]:
     """Start execution of a state machine."""
+    step_log = payload.get("_step_log")
     client = _sfn_client()
     sm_arn = payload.get("state_machine_arn", "")
+    if step_log:
+        step_log(f"StartExecution: {sm_arn}")
     input_payload = payload.get("input_payload", "{}")
     exec_name = payload.get("execution_name", "") or f"afl-exec-{uuid.uuid4().hex[:8]}"
 
@@ -142,8 +148,11 @@ def _start_execution_handler(payload: dict) -> dict[str, Any]:
 
 def _describe_execution_handler(payload: dict) -> dict[str, Any]:
     """Describe a state machine execution."""
+    step_log = payload.get("_step_log")
     client = _sfn_client()
     exec_arn = payload.get("execution_arn", "")
+    if step_log:
+        step_log(f"DescribeExecution: {exec_arn}")
 
     resp = client.describe_execution(executionArn=exec_arn)
 
@@ -167,8 +176,11 @@ def _describe_execution_handler(payload: dict) -> dict[str, Any]:
 
 def _delete_state_machine_handler(payload: dict) -> dict[str, Any]:
     """Delete a state machine."""
+    step_log = payload.get("_step_log")
     client = _sfn_client()
     sm_arn = payload.get("state_machine_arn", "")
+    if step_log:
+        step_log(f"DeleteStateMachine: {sm_arn}")
 
     client.delete_state_machine(stateMachineArn=sm_arn)
 
@@ -186,8 +198,11 @@ def _delete_state_machine_handler(payload: dict) -> dict[str, Any]:
 
 def _list_executions_handler(payload: dict) -> dict[str, Any]:
     """List executions of a state machine."""
+    step_log = payload.get("_step_log")
     client = _sfn_client()
     sm_arn = payload.get("state_machine_arn", "")
+    if step_log:
+        step_log(f"ListExecutions: {sm_arn}")
     status_filter = payload.get("status_filter", "")
     max_results = payload.get("max_results", 100)
 

@@ -16,8 +16,11 @@ NAMESPACE = "jenkins.test"
 
 def _run_tests_handler(payload: dict) -> dict[str, Any]:
     """Run a test suite."""
+    step_log = payload.get("_step_log")
     framework = payload.get("framework", "junit")
     suite = payload.get("suite", "unit")
+    if step_log:
+        step_log(f"RunTests: {framework}/{suite}")
     return {
         "report": {
             "total": 342,
@@ -33,7 +36,10 @@ def _run_tests_handler(payload: dict) -> dict[str, Any]:
 
 def _code_quality_handler(payload: dict) -> dict[str, Any]:
     """Run a code quality analysis."""
+    step_log = payload.get("_step_log")
     tool = payload.get("tool", "sonarqube")
+    if step_log:
+        step_log(f"CodeQuality: {tool}")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     return {
         "report": {
@@ -50,7 +56,10 @@ def _code_quality_handler(payload: dict) -> dict[str, Any]:
 
 def _security_scan_handler(payload: dict) -> dict[str, Any]:
     """Run a security vulnerability scan."""
+    step_log = payload.get("_step_log")
     scanner = payload.get("scanner", "trivy")
+    if step_log:
+        step_log(f"SecurityScan: {scanner}")
     threshold = payload.get("severity_threshold", "HIGH")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     return {

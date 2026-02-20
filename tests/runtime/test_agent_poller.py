@@ -597,3 +597,108 @@ class TestAgentPollerRunnerState:
             assert len(blocked) >= 1  # still paused
         finally:
             lock.release()
+
+
+# =========================================================================
+# TestAgentPollerStepLogs
+# =========================================================================
+
+
+class TestAgentPollerStepLogs:
+    """Tests that AgentPoller emits step logs during event processing."""
+
+    def test_step_logs_on_success(self, store, evaluator, workflow_ast, program_ast):
+        """Successful dispatch emits claimed, dispatching, and completed logs."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        assert len(blocked) >= 1
+        step = blocked[0]
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", lambda p: {"output": 42})
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        poller.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        messages = [entry.message for entry in logs]
+
+        # Should have at least: claimed, dispatching, completed
+        assert any("Task claimed" in m for m in messages)
+        assert any("Dispatching handler" in m for m in messages)
+        assert any("Handler completed" in m for m in messages)
+
+        # Check levels
+        levels = {entry.message: entry.level for entry in logs}
+        completed_key = [k for k in levels if "Handler completed" in k][0]
+        assert levels[completed_key] == "success"
+
+    def test_step_logs_on_failure(self, store, evaluator, workflow_ast, program_ast):
+        """Handler exception emits an error step log."""
+        _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        def failing_handler(payload):
+            raise ValueError("boom")
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", failing_handler)
+        poller.cache_workflow_ast(
+            store.get_steps_by_state(StepState.EVENT_TRANSMIT)[0].workflow_id
+            if store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            else step.workflow_id,
+            workflow_ast,
+        )
+
+        poller.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        error_logs = [entry for entry in logs if entry.level == "error"]
+        assert len(error_logs) >= 1
+        assert any("Handler error" in entry.message for entry in error_logs)
+
+    def test_step_log_callback_injection(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Handler receives _step_log callback and can emit handler-level logs."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        step = blocked[0]
+
+        def logging_handler(payload):
+            log = payload.get("_step_log")
+            if log:
+                log("Fetching data from API")
+                log("Download complete", level="success")
+            return {"output": 42}
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", logging_handler)
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        poller.poll_once()
+
+        logs = store.get_step_logs_by_step(step.id)
+        handler_logs = [entry for entry in logs if entry.source == "handler"]
+        assert len(handler_logs) == 2
+        assert handler_logs[0].message == "Fetching data from API"
+        assert handler_logs[0].level == "info"
+        assert handler_logs[1].message == "Download complete"
+        assert handler_logs[1].level == "success"

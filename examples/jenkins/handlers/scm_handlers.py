@@ -15,8 +15,11 @@ NAMESPACE = "jenkins.scm"
 
 def _git_checkout_handler(payload: dict) -> dict[str, Any]:
     """Clone/checkout a git repository."""
+    step_log = payload.get("_step_log")
     repo = payload.get("repo", "unknown")
     branch = payload.get("branch", "main")
+    if step_log:
+        step_log(f"GitCheckout: {repo}@{branch}")
     return {
         "info": {
             "repo": repo,
@@ -32,8 +35,11 @@ def _git_checkout_handler(payload: dict) -> dict[str, Any]:
 
 def _git_merge_handler(payload: dict) -> dict[str, Any]:
     """Merge a source branch into a target branch."""
+    step_log = payload.get("_step_log")
     source = payload.get("source_branch", "feature")
     target = payload.get("target_branch", "main")
+    if step_log:
+        step_log(f"GitMerge: {source} -> {target}")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/repo")
     return {
         "info": {

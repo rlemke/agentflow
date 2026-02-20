@@ -58,6 +58,9 @@ def _make_operation_handler(facet_name: str, return_param: str | None):
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
+        step_log = payload.get("_step_log")
+        if step_log:
+            step_log(f"{facet_name}: processing {cache.get('url', 'unknown')}")
         log.info("%s processing cache: %s", facet_name, cache.get("url", "unknown"))
 
         if return_param is None:
@@ -83,6 +86,9 @@ def _make_shapefile_handler(facet_name: str):
         cache = payload.get("cache", {})
         url = cache.get("url", "")
         region_path = _extract_region_path(url)
+        step_log = payload.get("_step_log")
+        if step_log:
+            step_log(f"{facet_name}: downloading shapefile for {region_path}")
         log.info("%s downloading shapefile for: %s", facet_name, region_path)
         from .downloader import download
 
@@ -103,6 +109,9 @@ def _download_handler(payload: dict) -> dict:
     url = payload.get("url", "")
     path = payload.get("path", "")
     force = payload.get("force", False)
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log(f"Download: {url} -> {path}")
 
     log.info("Download: %s -> %s (force=%s)", url, path, force)
     return {"downloadCache": download_url(url, path, force=force)}
@@ -117,6 +126,7 @@ def _cache_handler(payload: dict) -> dict:
     from .downloader import download
 
     region = payload.get("region", "")
+    step_log = payload.get("_step_log")
 
     # Try exact match first
     region_path = _REGION_LOOKUP.get(region)
@@ -133,6 +143,8 @@ def _cache_handler(payload: dict) -> dict:
         log.warning("Cache: unknown region '%s', using as raw path", region)
         region_path = region.lower()
 
+    if step_log:
+        step_log(f"Cache: resolving region '{region}' -> '{region_path}'")
     log.info("Cache: resolving region '%s' -> '%s'", region, region_path)
     return {"cache": download(region_path)}
 

@@ -32,7 +32,10 @@ def _make_filter_by_population_handler(facet_name: str):
         min_population = payload.get("min_population", 0)
         place_type = payload.get("place_type", "all")
         operator = payload.get("operator", "gte")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {place_type} with population {operator} {min_population}")
         log.info(
             "%s filtering %s for %s with population %s %d",
             facet_name, input_path, place_type, operator, min_population
@@ -64,7 +67,10 @@ def _make_filter_by_population_range_handler(facet_name: str):
         min_population = payload.get("min_population", 0)
         max_population = payload.get("max_population", 0)
         place_type = payload.get("place_type", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {place_type} with population {min_population}-{max_population}")
         log.info(
             "%s filtering %s for %s with population %d-%d",
             facet_name, input_path, place_type, min_population, max_population
@@ -97,7 +103,10 @@ def _make_extract_places_handler(facet_name: str):
         pbf_path = cache.get("path", "")
         place_type = payload.get("place_type", "all")
         min_population = payload.get("min_population", 0)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})")
         log.info(
             "%s extracting %s from %s (min_pop=%d)",
             facet_name, place_type, pbf_path, min_population
@@ -127,7 +136,10 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         min_population = payload.get("min_population", 0)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})")
         log.info(
             "%s extracting from %s (min_pop=%d)",
             facet_name, pbf_path, min_population
@@ -156,7 +168,10 @@ def _make_admin_handler(facet_name: str, place_type: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {place_type} from {pbf_path}")
         log.info("%s extracting from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -182,7 +197,10 @@ def _make_population_stats_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         place_type = payload.get("place_type", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path} ({place_type})")
         log.info("%s calculating stats for %s (%s)", facet_name, input_path, place_type)
 
         if not input_path:

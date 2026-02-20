@@ -41,6 +41,9 @@ def handle_addone(params: dict) -> dict:
     """
     value = params.get("value", 0)
     result = value + 1
+    step_log = params.get("_step_log")
+    if step_log:
+        step_log(f"AddOne: {value} + 1 = {result}")
     logger.info(f"AddOne: {value} + 1 = {result}")
     return {"result": result}
 
@@ -59,6 +62,9 @@ def handle_multiply(params: dict) -> dict:
     a = params.get("a", 0)
     b = params.get("b", 0)
     result = a * b
+    step_log = params.get("_step_log")
+    if step_log:
+        step_log(f"Multiply: {a} * {b} = {result}")
     logger.info(f"Multiply: {a} * {b} = {result}")
     return {"result": result}
 
@@ -75,6 +81,9 @@ def handle_greet(params: dict) -> dict:
     """
     name = params.get("name", "World")
     message = f"Hello, {name}!"
+    step_log = params.get("_step_log")
+    if step_log:
+        step_log(f"Greet: {message}")
     logger.info(f"Greet: {message}")
     return {"message": message}
 

@@ -69,7 +69,10 @@ def _make_congressional_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         year = payload.get("year", 2023)
         congress_number = payload.get("congress_number", 118)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: downloading CD for {congress_number}th Congress (year {year})")
         log.info("%s downloading CD for %dth Congress (year %d)",
                  facet_name, congress_number, year)
 
@@ -100,7 +103,10 @@ def _make_state_senate_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         state_fips = payload.get("state_fips", "")
         year = payload.get("year", 2023)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: downloading SLDU for state {state_fips} (year {year})")
         log.info("%s downloading SLDU for state %s (year %d)",
                  facet_name, state_fips, year)
 
@@ -131,7 +137,10 @@ def _make_state_house_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         state_fips = payload.get("state_fips", "")
         year = payload.get("year", 2023)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: downloading SLDL for state {state_fips} (year {year})")
         log.info("%s downloading SLDL for state %s (year %d)",
                  facet_name, state_fips, year)
 
@@ -162,7 +171,10 @@ def _make_voting_precincts_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         state_fips = payload.get("state_fips", "")
         year = payload.get("year", 2020)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: downloading VTD for state {state_fips} (year {year})")
         log.info("%s downloading VTD for state %s (year %d)",
                  facet_name, state_fips, year)
 
@@ -196,7 +208,10 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
         district_type = cache.get("district_type", "")
         state_fips = cache.get("state_fips", "US")
         year = cache.get("year", 0)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: converting {zip_path} to GeoJSON")
         log.info("%s converting %s to GeoJSON", facet_name, zip_path)
 
         if not zip_path or not os.path.exists(zip_path):
@@ -304,6 +319,10 @@ def _make_state_fips_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         state = payload.get("state", "")
+        step_log = payload.get("_step_log")
+
+        if step_log:
+            step_log(f"{facet_name}: resolving FIPS for state {state}")
 
         try:
             fips = resolve_state_fips(state)
@@ -322,7 +341,10 @@ def _make_filter_districts_handler(facet_name: str):
         input_path = payload.get("input_path", "")
         attribute = payload.get("attribute", "")
         value = payload.get("value", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} where {attribute}={value}")
         log.info("%s filtering %s where %s=%s",
                  facet_name, input_path, attribute, value)
 

@@ -246,7 +246,8 @@ class TestAsyncInvocation:
 
         # Verify async handler was invoked
         assert invoked["count"] == 1
-        assert invoked["payload"] == {"input": "test_input"}
+        assert invoked["payload"]["input"] == "test_input"
+        assert "_step_log" in invoked["payload"]
 
         # Task should be completed
         updated_task = store._tasks[task.uuid]

@@ -218,8 +218,11 @@ def build_graph_handler(payload: dict) -> dict:
     cache = payload.get("cache", {})
     profile = payload.get("profile", "car")
     recreate = payload.get("recreate", False)
+    step_log = payload.get("_step_log")
 
     osm_path = cache.get("path", "")
+    if step_log:
+        step_log(f"BuildGraph: building {profile} routing graph from {osm_path}")
     if not osm_path:
         raise ValueError("No OSM path provided in cache")
 
@@ -246,6 +249,10 @@ def build_multi_profile_handler(payload: dict) -> dict:
     cache = payload.get("cache", {})
     profiles = payload.get("profiles", ["car"])
     recreate = payload.get("recreate", False)
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"BuildMultiProfile: building graphs for profiles {profiles}")
 
     graphs = []
     for profile in profiles:
@@ -269,6 +276,10 @@ def validate_graph_handler(payload: dict) -> dict:
     """Validate a GraphHopper routing graph and return statistics."""
     graph = payload.get("graph", {})
     graph_dir = graph.get("graphDir", "")
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"ValidateGraph: validating graph at {graph_dir}")
 
     if not graph_dir:
         return {"valid": False, "nodeCount": 0, "edgeCount": 0}
@@ -285,6 +296,10 @@ def clean_graph_handler(payload: dict) -> dict:
     """Clean up a routing graph directory."""
     graph = payload.get("graph", {})
     graph_dir = graph.get("graphDir", "")
+    step_log = payload.get("_step_log")
+
+    if step_log:
+        step_log(f"CleanGraph: cleaning graph at {graph_dir}")
 
     if graph_dir and _storage.exists(graph_dir):
         _storage.rmtree(graph_dir)

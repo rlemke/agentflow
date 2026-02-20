@@ -83,9 +83,12 @@ def _create_zip_package(handler_code: str = "") -> bytes:
 
 def _create_function_handler(payload: dict) -> dict[str, Any]:
     """Create a Lambda function."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     role_arn = _ensure_role()
     function_name = payload.get("function_name", "afl-function")
+    if step_log:
+        step_log(f"CreateFunction: {function_name}")
     runtime = payload.get("runtime", "python3.12")
     handler = payload.get("handler", "lambda_function.lambda_handler")
     memory_mb = payload.get("memory_mb", 128)
@@ -127,8 +130,11 @@ def _create_function_handler(payload: dict) -> dict[str, Any]:
 
 def _invoke_function_handler(payload: dict) -> dict[str, Any]:
     """Invoke a Lambda function."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     function_name = payload.get("function_name", "afl-function")
+    if step_log:
+        step_log(f"InvokeFunction: {function_name}")
     input_payload = payload.get("input_payload", "{}")
     invocation_type = payload.get("invocation_type", "RequestResponse")
 
@@ -158,8 +164,11 @@ def _invoke_function_handler(payload: dict) -> dict[str, Any]:
 
 def _update_function_code_handler(payload: dict) -> dict[str, Any]:
     """Update a Lambda function's code."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     function_name = payload.get("function_name", "afl-function")
+    if step_log:
+        step_log(f"UpdateFunctionCode: {function_name}")
     s3_bucket = payload.get("s3_bucket", "")
     s3_key = payload.get("s3_key", "")
 
@@ -192,8 +201,11 @@ def _update_function_code_handler(payload: dict) -> dict[str, Any]:
 
 def _delete_function_handler(payload: dict) -> dict[str, Any]:
     """Delete a Lambda function."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     function_name = payload.get("function_name", "afl-function")
+    if step_log:
+        step_log(f"DeleteFunction: {function_name}")
 
     client.delete_function(FunctionName=function_name)
 
@@ -214,6 +226,9 @@ def _delete_function_handler(payload: dict) -> dict[str, Any]:
 
 def _list_functions_handler(payload: dict) -> dict[str, Any]:
     """List Lambda functions."""
+    step_log = payload.get("_step_log")
+    if step_log:
+        step_log("ListFunctions")
     client = _lambda_client()
     max_items = payload.get("max_items", 50)
     marker = payload.get("marker", "")
@@ -258,8 +273,11 @@ def _list_functions_handler(payload: dict) -> dict[str, Any]:
 
 def _get_function_info_handler(payload: dict) -> dict[str, Any]:
     """Get detailed function information."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     function_name = payload.get("function_name", "afl-function")
+    if step_log:
+        step_log(f"GetFunctionInfo: {function_name}")
 
     resp = client.get_function(FunctionName=function_name)
     config = resp.get("Configuration", {})
@@ -279,8 +297,11 @@ def _get_function_info_handler(payload: dict) -> dict[str, Any]:
 
 def _publish_layer_handler(payload: dict) -> dict[str, Any]:
     """Publish a Lambda layer version."""
+    step_log = payload.get("_step_log")
     client = _lambda_client()
     layer_name = payload.get("layer_name", "afl-layer")
+    if step_log:
+        step_log(f"PublishLayer: {layer_name}")
     compatible_runtimes = payload.get("compatible_runtimes", "python3.12")
     description = payload.get("description", "")
 

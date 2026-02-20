@@ -23,7 +23,10 @@ def _postgis_import_handler(payload: dict) -> dict:
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "")
     source_url = cache.get("url", "")
+    step_log = payload.get("_step_log")
 
+    if step_log:
+        step_log(f"PostGisImport: processing cache {source_url or pbf_path}")
     log.info("PostGisImport processing cache: %s", source_url or pbf_path)
 
     if not HAS_OSMIUM or not HAS_PSYCOPG2 or not pbf_path:

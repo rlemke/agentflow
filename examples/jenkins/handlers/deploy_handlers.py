@@ -16,7 +16,10 @@ NAMESPACE = "jenkins.deploy"
 
 def _deploy_to_environment_handler(payload: dict) -> dict[str, Any]:
     """Deploy an artifact to a target environment."""
+    step_log = payload.get("_step_log")
     environment = payload.get("environment", "staging")
+    if step_log:
+        step_log(f"Deploy: {payload.get('version', '1.0.0')} -> {environment}")
     strategy = payload.get("strategy", "rolling")
     version = payload.get("version", "1.0.0")
     return {
@@ -34,8 +37,11 @@ def _deploy_to_environment_handler(payload: dict) -> dict[str, Any]:
 
 def _deploy_to_k8s_handler(payload: dict) -> dict[str, Any]:
     """Deploy to a Kubernetes cluster."""
+    step_log = payload.get("_step_log")
     namespace = payload.get("k8s_namespace", "default")
     cluster = payload.get("cluster", "default")
+    if step_log:
+        step_log(f"DeployToK8s: {cluster}/{namespace}")
     replicas = payload.get("replicas", 2)
     image_tag = payload.get("image_tag", "app:latest")
     return {
@@ -53,7 +59,10 @@ def _deploy_to_k8s_handler(payload: dict) -> dict[str, Any]:
 
 def _rollback_deploy_handler(payload: dict) -> dict[str, Any]:
     """Roll back a deployment."""
+    step_log = payload.get("_step_log")
     deploy_id = payload.get("deploy_id", "deploy-unknown-001")
+    if step_log:
+        step_log(f"RollbackDeploy: {deploy_id}")
     environment = payload.get("environment", "staging")
     return {
         "result": {

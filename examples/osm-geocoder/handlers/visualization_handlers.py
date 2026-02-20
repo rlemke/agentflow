@@ -33,7 +33,10 @@ def _make_render_map_handler(facet_name: str):
         height = payload.get("height", 600)
         color = payload.get("color", "#3388ff")
         fill_opacity = payload.get("fill_opacity", 0.4)
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: rendering {geojson_path} as {format}")
         log.info("%s rendering %s as %s", facet_name, geojson_path, format)
 
         if not geojson_path:
@@ -74,7 +77,10 @@ def _make_render_map_at_handler(facet_name: str):
         lon = payload.get("lon", 0.0)
         zoom = payload.get("zoom", 10)
         title = payload.get("title", "Map")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: rendering {geojson_path} at ({lat:.4f}, {lon:.4f}) zoom {zoom}")
         log.info("%s rendering %s at (%.4f, %.4f) zoom %d",
                  facet_name, geojson_path, lat, lon, zoom)
 
@@ -109,6 +115,7 @@ def _make_render_layers_handler(facet_name: str):
         colors = payload.get("colors", [])
         title = payload.get("title", "Map")
         format = payload.get("format", "html")
+        step_log = payload.get("_step_log")
 
         # Normalize layers to list
         if isinstance(layers, str):
@@ -116,6 +123,8 @@ def _make_render_layers_handler(facet_name: str):
         if isinstance(colors, str):
             colors = [c.strip() for c in colors.split(",") if c.strip()]
 
+        if step_log:
+            step_log(f"{facet_name}: rendering {len(layers)} layers")
         log.info("%s rendering %d layers", facet_name, len(layers))
 
         if not layers:
@@ -147,7 +156,10 @@ def _make_render_styled_map_handler(facet_name: str):
         geojson_path = payload.get("geojson_path", "")
         style_dict = payload.get("style", {})
         title = payload.get("title", "Map")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: rendering {geojson_path} with custom style")
         log.info("%s rendering %s with custom style", facet_name, geojson_path)
 
         if not geojson_path:
@@ -184,7 +196,10 @@ def _make_preview_map_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         geojson_path = payload.get("geojson_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: previewing {geojson_path}")
         log.info("%s previewing %s", facet_name, geojson_path)
 
         if not geojson_path:

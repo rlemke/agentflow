@@ -28,7 +28,10 @@ def _make_national_parks_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting national parks from {pbf_path}")
         log.info("%s extracting national parks from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -53,7 +56,10 @@ def _make_state_parks_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting state parks from {pbf_path}")
         log.info("%s extracting state parks from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -78,7 +84,10 @@ def _make_nature_reserves_handler(facet_name: str):
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting nature reserves from {pbf_path}")
         log.info("%s extracting nature reserves from %s", facet_name, pbf_path)
 
         if not HAS_OSMIUM or not pbf_path:
@@ -104,7 +113,10 @@ def _make_protected_areas_handler(facet_name: str):
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         protect_classes = payload.get("protect_classes", "*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting protected areas from {pbf_path}")
         log.info(
             "%s extracting protected areas from %s (classes=%s)",
             facet_name, pbf_path, protect_classes
@@ -135,7 +147,10 @@ def _make_extract_parks_handler(facet_name: str):
         pbf_path = cache.get("path", "")
         park_type = payload.get("park_type", "all")
         protect_classes = payload.get("protect_classes", "*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {park_type} parks from {pbf_path}")
         log.info(
             "%s extracting %s parks from %s (classes=%s)",
             facet_name, park_type, pbf_path, protect_classes
@@ -165,7 +180,10 @@ def _make_filter_parks_handler(facet_name: str):
         input_path = payload.get("input_path", "")
         park_type = payload.get("park_type", "all")
         protect_classes = payload.get("protect_classes", "*")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: filtering {input_path} for {park_type} parks")
         log.info(
             "%s filtering %s for %s parks (classes=%s)",
             facet_name, input_path, park_type, protect_classes
@@ -193,7 +211,10 @@ def _make_park_stats_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: calculating stats for {input_path}")
         log.info("%s calculating stats for %s", facet_name, input_path)
 
         if not input_path:
@@ -217,7 +238,10 @@ def _make_large_parks_handler(facet_name: str):
         pbf_path = cache.get("path", "")
         min_area_km2 = payload.get("min_area_km2", 100.0)
         park_type = payload.get("park_type", "all")
+        step_log = payload.get("_step_log")
 
+        if step_log:
+            step_log(f"{facet_name}: extracting {park_type} parks >= {min_area_km2:.1f} km2 from {pbf_path}")
         log.info(
             "%s extracting %s parks >= %.1f km² from %s",
             facet_name, park_type, min_area_km2, pbf_path

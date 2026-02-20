@@ -24,10 +24,14 @@ def handle_resolve_region(params: dict[str, Any]) -> dict[str, Any]:
     """
     name = params["name"]
     prefer_continent = params.get("prefer_continent", "") or None
+    step_log = params.get("_step_log")
 
     result = resolve(name, prefer_continent=prefer_continent)
 
     if not result.matches:
+        if step_log:
+            step_log(f"ResolveRegion: no match for '{name}'")
+
         return {
             "cache": {
                 "url": "",
@@ -48,6 +52,8 @@ def handle_resolve_region(params: dict[str, Any]) -> dict[str, Any]:
         }
 
     best = result.matches[0]
+    if step_log:
+        step_log(f"ResolveRegion: '{name}' -> {best.facet_name} ({best.geofabrik_path})")
     cache = download(best.geofabrik_path)
 
     return {
@@ -73,8 +79,11 @@ def handle_resolve_regions(params: dict[str, Any]) -> dict[str, Any]:
     """
     name = params["name"]
     prefer_continent = params.get("prefer_continent", "") or None
+    step_log = params.get("_step_log")
 
     result = resolve(name, prefer_continent=prefer_continent)
+    if step_log:
+        step_log(f"ResolveRegions: '{name}' -> {len(result.matches)} matches")
 
     caches = []
     regions = []

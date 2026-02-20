@@ -131,6 +131,9 @@ RESOURCE_REGISTRY: dict[str, dict[str, tuple[str, str, int, str]]] = {
 def _make_handler(url: str, path: str, size: int, resource_type: str) -> Callable:
     """Factory: create a cache handler returning a GenomicsCache dict."""
     def handler(payload: dict) -> dict[str, Any]:
+        step_log = payload.get("_step_log")
+        if step_log:
+            step_log(f"Cache: {resource_type} {path}")
         return {
             "cache": {
                 "url": url,
