@@ -2,7 +2,7 @@
 
 ## Purpose
 This repository contains the **AgentFlow** platform:
-- **AFL compiler**: parses AFL source (Lark LALR) and emits JSON workflow definitions
+- **AFL compiler**: parses AFL source (Lark LALR) and emits JSON workflow definitions (declarations-only format)
 - **AFL runtime**: executes compiled workflows with iterative evaluation and dependency-driven step creation
 - **Agent libraries**: Python, Scala, Go, TypeScript, Java
 - **Dashboard, Runner, MCP server**: operational infrastructure
@@ -93,6 +93,7 @@ python -m afl.mcp                   # MCP server (stdio)
 - Grammar must be LALR-compatible (no conflicts)
 - AST nodes must use dataclasses
 - JSON output must be stable and consistent
+- **Emitter output uses `declarations` only** — the emitter does not produce categorized keys (`namespaces`, `facets`, `eventFacets`, `workflows`, `implicits`, `schemas`). All declaration nodes appear in a single `declarations` list. `normalize_program_ast()` in `afl/ast_utils.py` still handles old/external JSON that uses categorized keys.
 
 ### Testing requirements
 - All grammar constructs must have parser tests
@@ -120,4 +121,4 @@ python -m afl.mcp                   # MCP server (stdio)
 - `spec/70_examples.md` — iteration traces for Examples 2, 3, 4
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.44)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.52)
