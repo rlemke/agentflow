@@ -16,6 +16,8 @@ from pathlib import Path
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
@@ -332,9 +334,11 @@ def extract_roads(
         road_class = RoadClass.from_string(road_class)
 
     if output_path is None:
-        suffix = f"_{road_class.value}_roads"
-        output_path = pbf_path.with_suffix(f"{suffix}.geojson")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-roads")
+        output_path_str = f"{out_dir}/{pbf_path.stem}_{road_class.value}_roads.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     handler = RoadHandler(
         road_class=road_class,
@@ -352,11 +356,11 @@ def extract_roads(
 
     geojson = {"type": "FeatureCollection", "features": handler.features}
 
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(geojson, f, indent=2)
 
     return RoadResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(handler.features),
         road_class=road_class.value,
         total_length_km=round(total_length, 2),

@@ -14,6 +14,8 @@ from pathlib import Path
 
 from afl.runtime.storage import localize
 
+from ._output import ensure_dir, open_output
+
 log = logging.getLogger(__name__)
 
 try:
@@ -206,7 +208,8 @@ class RoadGraph:
 
     def save(self, path: str) -> None:
         """Save graph to JSON file."""
-        with open(path, "w", encoding="utf-8") as f:
+        ensure_dir(path)
+        with open_output(path) as f:
             json.dump(self.to_dict(), f)
         log.info("Saved road graph: %d edges, %d nodes → %s",
                  len(self.edges), len(self.node_coords), path)

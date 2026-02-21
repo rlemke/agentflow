@@ -21,6 +21,8 @@ from typing import Any
 
 from afl.runtime.storage import localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 log = logging.getLogger(__name__)
 
 try:
@@ -430,12 +432,12 @@ def verify_pbf(
     handler.apply_file(localize(str(pbf_path)), locations=True)
 
     # Write issues GeoJSON
-    out_subdir = os.path.join(output_dir, "osm-osmose")
-    os.makedirs(out_subdir, exist_ok=True)
-    output_path = os.path.join(out_subdir, "verify-issues.geojson")
+    out_subdir = resolve_output_dir("osm-osmose", default_local=output_dir)
+    output_path = f"{out_subdir}/verify-issues.geojson"
+    ensure_dir(output_path)
 
     geojson = {"type": "FeatureCollection", "features": handler.issues}
-    with open(output_path, "w") as f:
+    with open_output(output_path) as f:
         json.dump(geojson, f)
 
     verify_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -545,12 +547,12 @@ def verify_geojson(
                 lv3 += 1
 
     # Write issues GeoJSON
-    out_subdir = os.path.join(output_dir, "osm-osmose")
-    os.makedirs(out_subdir, exist_ok=True)
-    output_path = os.path.join(out_subdir, "verify-issues.geojson")
+    out_subdir = resolve_output_dir("osm-osmose", default_local=output_dir)
+    output_path = f"{out_subdir}/verify-issues.geojson"
+    ensure_dir(output_path)
 
     geojson_out = {"type": "FeatureCollection", "features": issues}
-    with open(output_path, "w") as f:
+    with open_output(output_path) as f:
         json.dump(geojson_out, f)
 
     verify_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

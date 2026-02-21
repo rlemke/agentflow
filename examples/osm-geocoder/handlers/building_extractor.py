@@ -16,6 +16,8 @@ from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
@@ -309,9 +311,11 @@ def extract_buildings(
         building_type = BuildingType.from_string(building_type)
 
     if output_path is None:
-        suffix = f"_{building_type.value}_buildings"
-        output_path = pbf_path.with_suffix(f"{suffix}.geojson")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-buildings")
+        output_path_str = f"{out_dir}/{pbf_path.stem}_{building_type.value}_buildings.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     handler = BuildingHandler(
         building_type=building_type,
@@ -330,11 +334,11 @@ def extract_buildings(
         "features": handler.features,
     }
 
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(geojson, f, indent=2)
 
     return BuildingResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(handler.features),
         building_type=building_type.value,
         total_area_km2=round(total_area / 1_000_000, 4),

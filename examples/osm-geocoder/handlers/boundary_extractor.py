@@ -15,6 +15,8 @@ from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 try:
@@ -205,8 +207,10 @@ def extract_boundaries(
     local_pbf = localize(pbf_str)
     pbf_path = Path(local_pbf)
 
-    output_dir = output_dir or DEFAULT_OUTPUT_DIR
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir is None:
+        out_base = resolve_output_dir("osm-boundaries")
+    else:
+        out_base = str(output_dir)
 
     # Build descriptive filename
     parts = [pbf_path.stem]
@@ -215,7 +219,8 @@ def extract_boundaries(
     if natural_types:
         parts.append("-".join(natural_types))
     output_name = "_".join(parts) + ".geojson"
-    output_path = output_dir / output_name
+    output_path = f"{out_base}/{output_name}"
+    ensure_dir(output_path)
 
     # Extract boundaries
     handler = BoundaryHandler(admin_levels=admin_levels, natural_types=natural_types)
@@ -225,7 +230,7 @@ def extract_boundaries(
     geojson = _features_to_geojson(handler.features)
 
     # Write output
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path) as f:
         json.dump(geojson, f, ensure_ascii=False, indent=2)
 
     log.info(
@@ -235,7 +240,7 @@ def extract_boundaries(
     )
 
     return ExtractionResult(
-        output_path=str(output_path),
+        output_path=output_path,
         feature_count=len(handler.features),
         boundary_type=_describe_boundary_type(admin_levels, natural_types),
         admin_levels=",".join(str(l) for l in (admin_levels or [])),

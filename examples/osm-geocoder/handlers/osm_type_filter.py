@@ -16,6 +16,8 @@ from typing import Any
 
 from afl.runtime.storage import localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 log = logging.getLogger(__name__)
 
 # Check for pyosmium availability
@@ -291,8 +293,11 @@ def filter_pbf_by_type(
 
     input_path = Path(localize(str(input_path)))
     if output_path is None:
-        output_path = input_path.with_suffix(".filtered.geojson")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-filtered")
+        output_path_str = f"{out_dir}/{input_path.stem}.filtered.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     # Parse OSM type
     if isinstance(osm_type, str):
@@ -341,14 +346,14 @@ def filter_pbf_by_type(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open_output(output_path_str) as f:
         json.dump(output_geojson, f, indent=2)
 
     # Build filter description
     filter_desc = _describe_osm_filter(osm_type, tag_key, tag_value, include_dependencies)
 
     return OSMFilterResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(features),
         original_count=handler.total_count,
         osm_type=osm_type.value,
@@ -382,8 +387,11 @@ def filter_geojson_by_osm_type(
     """
     input_path = Path(input_path)
     if output_path is None:
-        output_path = input_path.with_stem(f"{input_path.stem}_filtered")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-filtered")
+        output_path_str = f"{out_dir}/{input_path.stem}_filtered.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     # Parse OSM type
     if isinstance(osm_type, str):
@@ -423,13 +431,13 @@ def filter_geojson_by_osm_type(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open_output(output_path_str) as f:
         json.dump(output_geojson, f, indent=2)
 
     filter_desc = _describe_osm_filter(osm_type, tag_key, tag_value, False)
 
     return OSMFilterResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(filtered_features),
         original_count=original_count,
         osm_type=osm_type.value,

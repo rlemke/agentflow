@@ -18,6 +18,8 @@ from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
@@ -385,9 +387,11 @@ def extract_parks(
 
     # Generate output path if not provided
     if output_path is None:
-        suffix = f"_{park_type.value}_parks"
-        output_path = pbf_path.with_suffix(f"{suffix}.geojson")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-parks")
+        output_path_str = f"{out_dir}/{pbf_path.stem}_{park_type.value}_parks.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     # Extract parks
     handler = ParkHandler(
@@ -410,11 +414,11 @@ def extract_parks(
     }
 
     # Write output
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(geojson, f, indent=2)
 
     return ParkResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(handler.features),
         park_type=park_type.value,
         protect_classes=protect_classes,

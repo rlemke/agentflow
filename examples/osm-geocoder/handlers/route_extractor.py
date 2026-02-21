@@ -17,6 +17,8 @@ from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
@@ -335,9 +337,12 @@ def extract_routes(
 
     pbf_path = Path(localize(str(pbf_path)))
     if output_path is None:
+        out_dir = resolve_output_dir("osm-routes")
         suffix = f"_{route_type}" if isinstance(route_type, str) else f"_{route_type.value}"
-        output_path = pbf_path.with_suffix(f"{suffix}_routes.geojson")
-    output_path = Path(output_path)
+        output_path_str = f"{out_dir}/{pbf_path.stem}{suffix}_routes.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     # Parse route type
     if isinstance(route_type, str):
@@ -383,11 +388,11 @@ def extract_routes(
     }
 
     # Write output
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(geojson, f, indent=2)
 
     return RouteResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(features),
         route_type=route_type.value,
         network_level=network,

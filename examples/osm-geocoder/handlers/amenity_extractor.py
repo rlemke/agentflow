@@ -13,6 +13,8 @@ from pathlib import Path
 
 from afl.runtime.storage import get_storage_backend, localize
 
+from ._output import ensure_dir, open_output, resolve_output_dir
+
 _storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
@@ -239,22 +241,24 @@ def extract_amenities(
         category = AmenityCategory.from_string(category)
 
     if output_path is None:
-        suffix = f"_{category.value}_amenities"
-        output_path = pbf_path.with_suffix(f"{suffix}.geojson")
-    output_path = Path(output_path)
+        out_dir = resolve_output_dir("osm-amenities")
+        output_path_str = f"{out_dir}/{pbf_path.stem}_{category.value}_amenities.geojson"
+    else:
+        output_path_str = str(output_path)
+    ensure_dir(output_path_str)
 
     handler = AmenityHandler(category=category, amenity_types=amenity_types)
     handler.apply_file(str(pbf_path), locations=True)
 
     geojson = {"type": "FeatureCollection", "features": handler.features}
 
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(geojson, f, indent=2)
 
     types_str = ",".join(sorted(amenity_types)) if amenity_types else category.value
 
     return AmenityResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(handler.features),
         amenity_category=category.value,
         amenity_types=types_str,
