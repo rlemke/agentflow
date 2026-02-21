@@ -1,5 +1,21 @@
 # Implementation Changelog
 
+## Completed (v0.12.63) - Write OSM extractor output to HDFS via AFL_OSM_OUTPUT_BASE
+- **New helper module `examples/osm-geocoder/handlers/_output.py`** with `resolve_output_dir(category)`, `open_output(path)`, and `ensure_dir(path)` — routes extractor output to HDFS when `AFL_OSM_OUTPUT_BASE` is set (e.g. `hdfs://namenode:8020/osm-output`), unchanged local `/tmp/` behavior when unset
+- **Updated 10 extractor handlers** to use the shared output helpers instead of hardcoded local paths and direct `open()` / `_storage.open()` calls:
+  - `boundary_extractor.py` → `osm-boundaries/` category
+  - `park_extractor.py` → `osm-parks/` category
+  - `route_extractor.py` → `osm-routes/` category
+  - `building_extractor.py` → `osm-buildings/` category
+  - `amenity_extractor.py` → `osm-amenities/` category
+  - `road_extractor.py` → `osm-roads/` category
+  - `osm_type_filter.py` → `osm-filtered/` category
+  - `population_filter.py` → `osm-population/` category
+  - `osmose_verifier.py` → `osm-osmose/` category
+  - `zoom_graph.py` — `RoadGraph.save()` uses `open_output()` + `ensure_dir()`
+- **Added `AFL_OSM_OUTPUT_BASE`** to `.env.example` (commented) and `.env` (active, `hdfs://namenode:8020/osm-output`)
+- HDFS directory creation handled automatically via `ensure_dir()` calling `backend.makedirs()`; local paths use `Path.mkdir(parents=True)`
+
 ## Completed (v0.12.62) - Use .env data dirs in run_osm scripts
 - **Fixed `run_osm_cache_states.sh` and `run_osm_analyze_states.sh`** to use `HDFS_NAMENODE_DIR`, `HDFS_DATANODE_DIR`, and `MONGODB_DATA_DIR` from `.env` (via `_env.sh`) instead of hardcoding `~/data/hdfs/*` and `~/data/mongodb`
 - **MongoDB data dir is now optional**: when `MONGODB_DATA_DIR` is unset/empty, the scripts skip `--mongodb-data-dir` and MongoDB uses a Docker volume — avoids WiredTiger "Operation not permitted" crashes from bind-mounted directories
