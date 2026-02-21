@@ -1,5 +1,11 @@
 # Implementation Changelog
 
+## Completed (v0.12.59) - Fix HDFS PBF file access for pyosmium extractors
+- **Added `localize()` function to `afl/runtime/storage.py`**: streams HDFS files to a local cache directory (`/tmp/osm-local/`) via WebHDFS OPEN with 64 KB chunked streaming; skips re-download when a local copy with matching byte-size already exists; returns local paths unchanged
+- **Fixed all 11 OSM extractors** to use `localize()` before calling pyosmium `apply_file()`: `boundary_extractor.py`, `park_extractor.py`, `route_extractor.py`, `building_extractor.py`, `amenity_extractor.py`, `road_extractor.py`, `osm_type_filter.py`, `population_filter.py`, `osmose_verifier.py`, `zoom_graph.py`, `postgis_importer.py`
+- **Fixed `boundary_extractor.py` existence check**: replaced `Path(pbf_path).exists()` (local filesystem only) with `get_storage_backend(path).exists(path)` (works with both local and HDFS paths)
+- **Root cause**: Cache steps return HDFS URIs (`hdfs://namenode:8020/osm-cache/...`), but all extractors converted these to `Path` objects — `Path.exists()` always returned `False` for HDFS URIs, and pyosmium cannot read HDFS URIs directly
+
 ## Completed (v0.12.58) - Fix route visualization workflows to use Cache(region) parameter
 - **Replaced 8 hardcoded `osm.geo.cache.Europe.Liechtenstein()` calls** with `Cache(region = $.region_name)` in `examples/osm-geocoder/afl/example_routes_visualization.afl` — all 8 workflows (`BicycleRoutesMap`, `HikingTrailsMap`, `TrainRoutesMap`, `BusRoutesMap`, `PublicTransportMap`, `BicycleRoutesWithStats`, `HikingTrailsWithStats`, `NationalCycleNetwork`) now use their `region_name` parameter instead of ignoring it
 
