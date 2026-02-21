@@ -205,7 +205,7 @@ class TestMavenRunnerConfig:
         assert cfg.service_name == "afl-maven-runner"
         assert cfg.server_group == "default"
         assert cfg.task_list == "default"
-        assert cfg.poll_interval_ms == 2000
+        assert cfg.poll_interval_ms == 1000
         assert cfg.max_concurrent == 2
         assert cfg.repository_url == "https://repo1.maven.org/maven2"
         assert cfg.java_command == "java"

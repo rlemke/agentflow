@@ -67,7 +67,7 @@ class RunnerConfig:
     server_name: str = ""
     topics: list[str] = field(default_factory=list)
     task_list: str = "default"
-    poll_interval_ms: int = 2000
+    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
     heartbeat_interval_ms: int = 10000
     lock_duration_ms: int = 60000
     lock_extend_interval_ms: int = 20000

@@ -94,7 +94,7 @@ class AgentPollerConfig:
     server_group: str = "default"
     server_name: str = ""
     task_list: str = "default"
-    poll_interval_ms: int = 2000
+    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
     max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
     heartbeat_interval_ms: int = 10000
 

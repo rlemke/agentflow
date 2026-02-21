@@ -85,7 +85,7 @@ class TestAgentConfig:
         cfg = AgentConfig(service_name="test-agent", server_group="test")
         assert cfg.service_name == "test-agent"
         assert cfg.server_group == "test"
-        assert cfg.poll_interval_ms == 2000
+        assert cfg.poll_interval_ms == 1000
         assert cfg.max_concurrent == 2
         assert cfg.mongodb_database == ""
 

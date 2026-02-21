@@ -215,7 +215,7 @@ class TestRunnerConfig:
         assert config.server_name == socket.gethostname()
         assert config.topics == []
         assert config.task_list == "default"
-        assert config.poll_interval_ms == 2000
+        assert config.poll_interval_ms == 1000
         assert config.heartbeat_interval_ms == 10000
         assert config.lock_duration_ms == 60000
         assert config.lock_extend_interval_ms == 20000

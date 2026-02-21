@@ -66,8 +66,8 @@ def main() -> None:
     parser.add_argument(
         "--poll-interval",
         type=int,
-        default=2000,
-        help="Poll interval in ms (default: 2000)",
+        default=int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000")),
+        help="Poll interval in ms (default: AFL_POLL_INTERVAL_MS or 1000)",
     )
     parser.add_argument(
         "--heartbeat-interval",
