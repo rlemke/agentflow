@@ -16,6 +16,7 @@
 - **Added `AFL_OSM_OUTPUT_BASE`** to `.env.example` and `.env` (active, `hdfs://namenode:8020/osm-output`)
 - **Passed `AFL_OSM_OUTPUT_BASE` to Docker containers** in `docker-compose.yml`: added to `runner`, `agent-osm-geocoder`, and `agent-osm-geocoder-lite` services via `${AFL_OSM_OUTPUT_BASE:-}` interpolation — without this, the env var was only on the host and extractors kept writing to local `/tmp/`
 - HDFS directory creation handled automatically via `ensure_dir()` calling `backend.makedirs()`; local paths use `Path.mkdir(parents=True)`
+- **End-to-end verified**: submitted `StateBoundariesWithStats(region="Delaware")` workflow — Cache found PBF in HDFS, boundary extractor wrote 86 KB GeoJSON to `hdfs://namenode:8020/osm-output/osm-boundaries/delaware-latest.osm_admin4.geojson`, confirmed valid FeatureCollection with Delaware state boundary (admin_level 4)
 
 ## Completed (v0.12.62) - Use .env data dirs in run_osm scripts
 - **Fixed `run_osm_cache_states.sh` and `run_osm_analyze_states.sh`** to use `HDFS_NAMENODE_DIR`, `HDFS_DATANODE_DIR`, and `MONGODB_DATA_DIR` from `.env` (via `_env.sh`) instead of hardcoding `~/data/hdfs/*` and `~/data/mongodb`
