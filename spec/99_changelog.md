@@ -1,5 +1,14 @@
 # Implementation Changelog
 
+## Completed (v0.12.61) - Make poll_interval_ms configurable via AFL_POLL_INTERVAL_MS
+- **All runner configs** (`AgentPollerConfig`, `RegistryRunnerConfig`, `RunnerConfig`, `AgentConfig`) now read `AFL_POLL_INTERVAL_MS` env var with a default of **1000 ms** (was hardcoded 2000 ms)
+- **Runner CLI** `--poll-interval` flag respects the env var as its default
+
+## Completed (v0.12.60) - Make max_concurrent configurable and add progress logging
+- **`AFL_MAX_CONCURRENT` env var**: all runner configs (`AgentPollerConfig`, `RegistryRunnerConfig`, `RunnerConfig`, `AgentConfig`) now read this env var with a default of **2** (was hardcoded 5); runner CLI `--max-concurrent` flag also respects the env var
+- **Progress logging in `downloader.py`**: cache-hit/miss/seed events with human-readable sizes; progress every 100 MB during mirror-to-HDFS copies and HTTP downloads
+- **HDFS upload logging in `storage.py`**: `_WebHDFSWriteStream` logs upload start/complete with size in MB
+
 ## Completed (v0.12.59) - Fix HDFS PBF file access for pyosmium extractors
 - **Added `localize()` function to `afl/runtime/storage.py`**: streams HDFS files to a local cache directory (`/tmp/osm-local/`) via WebHDFS OPEN with 64 KB chunked streaming; skips re-download when a local copy with matching byte-size already exists; returns local paths unchanged
 - **Fixed all 11 OSM extractors** to use `localize()` before calling pyosmium `apply_file()`: `boundary_extractor.py`, `park_extractor.py`, `route_extractor.py`, `building_extractor.py`, `amenity_extractor.py`, `road_extractor.py`, `osm_type_filter.py`, `population_filter.py`, `osmose_verifier.py`, `zoom_graph.py`, `postgis_importer.py`
