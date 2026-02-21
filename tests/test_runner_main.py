@@ -44,7 +44,7 @@ class TestRunnerMain:
         assert config.service_name == "afl-runner"
         assert config.task_list == "default"
         assert config.poll_interval_ms == 2000
-        assert config.max_concurrent == 5
+        assert config.max_concurrent == 2
         assert config.http_port == 8080
         mock_svc.return_value.start.assert_called_once()
 

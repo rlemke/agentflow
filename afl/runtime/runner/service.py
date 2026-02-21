@@ -24,6 +24,7 @@ through MongoDB locks and server registration.
 
 import json as _json
 import logging
+import os
 import socket
 import threading
 import time
@@ -70,7 +71,7 @@ class RunnerConfig:
     heartbeat_interval_ms: int = 10000
     lock_duration_ms: int = 60000
     lock_extend_interval_ms: int = 20000
-    max_concurrent: int = 5
+    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
     shutdown_timeout_ms: int = 30000
     http_port: int = 8080
     http_max_port_attempts: int = 20

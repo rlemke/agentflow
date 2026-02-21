@@ -20,6 +20,7 @@ Usage:
 
 import argparse
 import logging
+import os
 import signal
 
 from .service import RunnerConfig, RunnerService
@@ -77,8 +78,8 @@ def main() -> None:
     parser.add_argument(
         "--max-concurrent",
         type=int,
-        default=5,
-        help="Max concurrent work items (default: 5)",
+        default=int(os.environ.get("AFL_MAX_CONCURRENT", "2")),
+        help="Max concurrent work items (default: AFL_MAX_CONCURRENT or 2)",
     )
     parser.add_argument(
         "--lock-duration",

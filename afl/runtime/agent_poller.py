@@ -51,6 +51,7 @@ For async handlers (e.g., LLM-based handlers)::
 import asyncio
 import inspect
 import logging
+import os
 import socket
 import threading
 import time
@@ -94,7 +95,7 @@ class AgentPollerConfig:
     server_name: str = ""
     task_list: str = "default"
     poll_interval_ms: int = 2000
-    max_concurrent: int = 5
+    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
     heartbeat_interval_ms: int = 10000
 
     def __post_init__(self) -> None:

@@ -206,7 +206,7 @@ class TestMavenRunnerConfig:
         assert cfg.server_group == "default"
         assert cfg.task_list == "default"
         assert cfg.poll_interval_ms == 2000
-        assert cfg.max_concurrent == 5
+        assert cfg.max_concurrent == 2
         assert cfg.repository_url == "https://repo1.maven.org/maven2"
         assert cfg.java_command == "java"
         assert cfg.default_timeout_ms == 300000

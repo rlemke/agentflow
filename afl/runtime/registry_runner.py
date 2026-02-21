@@ -46,6 +46,7 @@ Example usage::
 
 import fnmatch
 import logging
+import os
 import socket
 import threading
 import time
@@ -86,7 +87,7 @@ class RegistryRunnerConfig:
     server_name: str = ""
     task_list: str = "default"
     poll_interval_ms: int = 2000
-    max_concurrent: int = 5
+    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
     heartbeat_interval_ms: int = 10000
     registry_refresh_interval_ms: int = 30000
     topics: list[str] = field(default_factory=list)

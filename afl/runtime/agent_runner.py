@@ -69,7 +69,7 @@ class AgentConfig:
     service_name: str
     server_group: str
     poll_interval_ms: int = 2000
-    max_concurrent: int = 5
+    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
     mongodb_database: str = ""
 
 
