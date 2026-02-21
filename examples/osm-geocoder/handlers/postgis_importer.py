@@ -11,6 +11,8 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from afl.runtime.storage import localize
+
 log = logging.getLogger(__name__)
 
 try:
@@ -278,6 +280,7 @@ def import_to_postgis(
     if not HAS_PSYCOPG2:
         raise ImportError("psycopg2 is required for PostGIS import")
 
+    pbf_path = localize(pbf_path)
     postgis_url = postgis_url or get_postgis_url()
     conn = psycopg2.connect(postgis_url)
 

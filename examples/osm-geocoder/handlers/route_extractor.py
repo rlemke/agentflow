@@ -15,7 +15,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import get_storage_backend
+from afl.runtime.storage import get_storage_backend, localize
 
 _storage = get_storage_backend()
 
@@ -333,7 +333,7 @@ def extract_routes(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for route extraction")
 
-    pbf_path = Path(pbf_path)
+    pbf_path = Path(localize(str(pbf_path)))
     if output_path is None:
         suffix = f"_{route_type}" if isinstance(route_type, str) else f"_{route_type.value}"
         output_path = pbf_path.with_suffix(f"{suffix}_routes.geojson")

@@ -12,6 +12,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import localize
+
 log = logging.getLogger(__name__)
 
 # Check for pyosmium availability
@@ -463,7 +465,7 @@ def extract_places_with_population(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for PBF extraction")
 
-    pbf_path = Path(pbf_path)
+    pbf_path = Path(localize(str(pbf_path)))
 
     # Parse place type
     if isinstance(place_type, str):

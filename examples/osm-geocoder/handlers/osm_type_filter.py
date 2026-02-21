@@ -14,6 +14,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import localize
+
 log = logging.getLogger(__name__)
 
 # Check for pyosmium availability
@@ -287,7 +289,7 @@ def filter_pbf_by_type(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for PBF filtering")
 
-    input_path = Path(input_path)
+    input_path = Path(localize(str(input_path)))
     if output_path is None:
         output_path = input_path.with_suffix(".filtered.geojson")
     output_path = Path(output_path)

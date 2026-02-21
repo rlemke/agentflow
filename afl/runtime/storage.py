@@ -354,6 +354,68 @@ class _WebHDFSWriteStream:
 _local_backend: LocalStorageBackend | None = None
 _hdfs_backends: dict[str, HDFSStorageBackend] = {}
 
+_DEFAULT_LOCAL_CACHE = "/tmp/osm-local"
+
+
+def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
+    """Ensure a file is available on the local filesystem.
+
+    For local paths, returns *path* unchanged.  For ``hdfs://`` URIs,
+    downloads the file to *target_dir* (preserving the HDFS directory
+    structure) and returns the local path.  Skips download when a local
+    copy with the same byte-size already exists.
+
+    Args:
+        path: Local path or ``hdfs://`` URI.
+        target_dir: Root directory for cached downloads.
+
+    Returns:
+        A local filesystem path suitable for tools that require local files
+        (e.g. pyosmium ``apply_file``).
+    """
+    if not path.startswith("hdfs://"):
+        return path
+
+    parsed = urlparse(path)
+    hdfs_subpath = parsed.path.lstrip("/")
+    local_path = os.path.join(target_dir, hdfs_subpath)
+
+    backend = get_storage_backend(path)
+
+    # Check if already cached locally with matching size
+    if os.path.isfile(local_path):
+        try:
+            local_size = os.path.getsize(local_path)
+            hdfs_size = backend.getsize(path)
+            if local_size == hdfs_size:
+                logger.debug("localize: cache hit %s -> %s", path, local_path)
+                return local_path
+        except Exception:
+            pass  # re-download on any error
+
+    # Stream download from HDFS via WebHDFS OPEN
+    logger.info("localize: downloading %s -> %s", path, local_path)
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+
+    hdfs_path = parsed.path
+
+    def _do_download() -> None:
+        r = _requests.get(
+            backend._url(hdfs_path),
+            params=backend._params(op="OPEN"),
+            allow_redirects=True,
+            stream=True,
+        )
+        r.raise_for_status()
+        with builtins.open(local_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=65536):
+                f.write(chunk)
+
+    _hdfs_retry(_do_download)
+    dl_size = os.path.getsize(local_path)
+    logger.info("localize: downloaded %s (%d bytes)", local_path, dl_size)
+    return local_path
+
 
 def get_storage_backend(path: str | None = None) -> StorageBackend:
     """Return the appropriate storage backend for the given path.

@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from afl.runtime.storage import localize
+
 log = logging.getLogger(__name__)
 
 try:
@@ -425,7 +427,7 @@ def verify_pbf(
         required_tags=required_tags,
     )
 
-    handler.apply_file(str(pbf_path), locations=True)
+    handler.apply_file(localize(str(pbf_path)), locations=True)
 
     # Write issues GeoJSON
     out_subdir = os.path.join(output_dir, "osm-osmose")

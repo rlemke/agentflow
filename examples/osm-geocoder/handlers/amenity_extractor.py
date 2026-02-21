@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
-from afl.runtime.storage import get_storage_backend
+from afl.runtime.storage import get_storage_backend, localize
 
 _storage = get_storage_backend()
 
@@ -233,7 +233,7 @@ def extract_amenities(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for amenity extraction")
 
-    pbf_path = Path(pbf_path)
+    pbf_path = Path(localize(str(pbf_path)))
 
     if isinstance(category, str):
         category = AmenityCategory.from_string(category)

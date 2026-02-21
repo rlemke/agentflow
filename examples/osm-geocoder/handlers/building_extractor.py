@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import get_storage_backend
+from afl.runtime.storage import get_storage_backend, localize
 
 _storage = get_storage_backend()
 
@@ -303,7 +303,7 @@ def extract_buildings(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for building extraction")
 
-    pbf_path = Path(pbf_path)
+    pbf_path = Path(localize(str(pbf_path)))
 
     if isinstance(building_type, str):
         building_type = BuildingType.from_string(building_type)

@@ -12,6 +12,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from afl.runtime.storage import localize
+
 log = logging.getLogger(__name__)
 
 try:
@@ -552,7 +554,7 @@ def build_logical_graph(pbf_path: str, output_path: str | None = None) -> RoadGr
         raise RuntimeError("pyosmium is required for graph construction")
 
     handler = TopologyHandler()
-    handler.apply_file(pbf_path, locations=False)
+    handler.apply_file(localize(pbf_path), locations=False)
     graph = handler.finalize()
 
     if output_path:

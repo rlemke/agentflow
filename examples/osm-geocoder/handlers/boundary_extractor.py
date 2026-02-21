@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import get_storage_backend
+from afl.runtime.storage import get_storage_backend, localize
 
 _storage = get_storage_backend()
 
@@ -198,9 +198,12 @@ def extract_boundaries(
     if not HAS_OSMIUM:
         raise ImportError("pyosmium is required for boundary extraction")
 
-    pbf_path = Path(pbf_path)
-    if not pbf_path.exists():
+    pbf_str = str(pbf_path)
+    backend = get_storage_backend(pbf_str)
+    if not backend.exists(pbf_str):
         raise FileNotFoundError(f"PBF file not found: {pbf_path}")
+    local_pbf = localize(pbf_str)
+    pbf_path = Path(local_pbf)
 
     output_dir = output_dir or DEFAULT_OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)

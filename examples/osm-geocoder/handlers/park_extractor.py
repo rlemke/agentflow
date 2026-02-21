@@ -16,7 +16,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import get_storage_backend
+from afl.runtime.storage import get_storage_backend, localize
 
 _storage = get_storage_backend()
 
@@ -374,7 +374,7 @@ def extract_parks(
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for park extraction")
 
-    pbf_path = Path(pbf_path)
+    pbf_path = Path(localize(str(pbf_path)))
 
     # Parse park type
     if isinstance(park_type, str):
