@@ -51,6 +51,7 @@ services:
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
+      - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -94,6 +95,7 @@ services:
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
+      - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
     volumes:
       - ${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper
     depends_on:
@@ -109,6 +111,7 @@ services:
     environment:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
+      - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
     depends_on:
       mongodb:
         condition: service_healthy
