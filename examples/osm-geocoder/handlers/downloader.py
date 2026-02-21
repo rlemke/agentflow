@@ -9,6 +9,7 @@ multiple threads request the same file, and atomic temp-file renames ensure
 the cache file is always either absent or complete (never partial).
 """
 
+import logging
 import os
 import shutil
 import tempfile
@@ -18,6 +19,8 @@ from datetime import UTC, datetime
 import requests
 
 from afl.runtime.storage import get_storage_backend
+
+log = logging.getLogger(__name__)
 
 CACHE_DIR = os.environ.get("AFL_CACHE_DIR", os.path.join(tempfile.gettempdir(), "osm-cache"))
 _storage = get_storage_backend(CACHE_DIR)
@@ -32,6 +35,19 @@ FORMAT_EXTENSIONS = {
 
 _path_locks: dict[str, threading.Lock] = {}
 _path_locks_guard = threading.Lock()
+
+_LOG_INTERVAL = 100 * 1024 * 1024  # log every 100 MB
+
+
+def _fmt_bytes(n: int) -> str:
+    """Format byte count as human-readable string."""
+    if n >= 1_073_741_824:
+        return f"{n / 1_073_741_824:.1f} GB"
+    if n >= 1_048_576:
+        return f"{n / 1_048_576:.1f} MB"
+    if n >= 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n} B"
 
 
 def _get_path_lock(path: str) -> threading.Lock:
@@ -71,15 +87,32 @@ def _cache_miss(url: str, path: str, storage=None) -> dict:
 
 def _stream_to_file(url: str, path: str, storage) -> None:
     """Download URL content and stream it to path via storage backend."""
+    log.info("download: starting %s -> %s", url, path)
     response = requests.get(url, stream=True, headers={"User-Agent": USER_AGENT}, timeout=300)
     response.raise_for_status()
+    try:
+        total = int(response.headers.get("Content-Length", 0))
+    except (TypeError, ValueError):
+        total = 0
+    written = 0
+    next_log = _LOG_INTERVAL
     with storage.open(path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
+        for chunk in response.iter_content(chunk_size=65536):
             f.write(chunk)
+            written += len(chunk)
+            if written >= next_log:
+                log.info("download: %s — %s / %s",
+                         os.path.basename(path), _fmt_bytes(written),
+                         _fmt_bytes(total) if total else "?")
+                next_log += _LOG_INTERVAL
+    log.info("download: finished %s (%s)", os.path.basename(path), _fmt_bytes(written))
 
 
 def _copy_to_cache(src_path: str, dst_path: str) -> None:
     """Copy a local file to the configured cache location (local or HDFS)."""
+    src_size = os.path.getsize(src_path)
+    fname = os.path.basename(src_path)
+    log.info("cache-copy: start %s (%s) -> %s", fname, _fmt_bytes(src_size), dst_path)
     _storage.makedirs(_storage.dirname(dst_path), exist_ok=True)
     is_local = not CACHE_DIR.startswith("hdfs://")
     if is_local:
@@ -94,10 +127,26 @@ def _copy_to_cache(src_path: str, dst_path: str) -> None:
                 pass
             raise
     else:
-        # HDFS: stream from local mirror file to HDFS
+        # HDFS: read from mirror in chunks, buffer in write stream, then upload
+        copied = 0
+        next_log = _LOG_INTERVAL
         with open(src_path, "rb") as src:
             with _storage.open(dst_path, "wb") as dst:
-                shutil.copyfileobj(src, dst)
+                while True:
+                    chunk = src.read(65536)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+                    copied += len(chunk)
+                    if copied >= next_log:
+                        log.info("cache-copy: %s — %s / %s buffered",
+                                 fname, _fmt_bytes(copied), _fmt_bytes(src_size))
+                        next_log += _LOG_INTERVAL
+                log.info("cache-copy: %s — uploading %s to HDFS...",
+                         fname, _fmt_bytes(copied))
+            # dst.close() happens here — the actual HDFS upload
+        log.info("cache-copy: %s — upload complete", fname)
+    log.info("cache-copy: finished %s (%s)", fname, _fmt_bytes(src_size))
 
 
 def geofabrik_url(region_path: str, fmt: str = "pbf") -> str:
@@ -136,6 +185,7 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
     if _storage.exists(local_path):
         result = _cache_hit(url, local_path)
         result["source"] = "cache"
+        log.info("cache-hit: %s (%s)", region_path, _fmt_bytes(result["size"]))
         return result
 
     # Check local mirror — seed source, not the cache itself
@@ -147,10 +197,12 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
                 if _storage.exists(local_path):
                     result = _cache_hit(url, local_path)
                     result["source"] = "cache"
+                    log.info("cache-hit: %s (after lock, %s)", region_path, _fmt_bytes(result["size"]))
                     return result
                 _copy_to_cache(mirror_path, local_path)
             result = _cache_miss(url, local_path)
             result["source"] = "mirror"
+            log.info("cache-seeded: %s from mirror (%s)", region_path, _fmt_bytes(result["size"]))
             return result
 
     with _get_path_lock(local_path):
@@ -158,9 +210,11 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
         if _storage.exists(local_path):
             result = _cache_hit(url, local_path)
             result["source"] = "cache"
+            log.info("cache-hit: %s (after lock, %s)", region_path, _fmt_bytes(result["size"]))
             return result
 
         # Download to temp file, then atomic rename
+        log.info("cache-miss: %s — downloading from %s", region_path, url)
         _storage.makedirs(_storage.dirname(local_path), exist_ok=True)
         tmp_path = local_path + f".tmp.{os.getpid()}.{threading.get_ident()}"
         try:
@@ -175,6 +229,7 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
 
     result = _cache_miss(url, local_path)
     result["source"] = "download"
+    log.info("cache-downloaded: %s (%s)", region_path, _fmt_bytes(result["size"]))
     return result
 
 

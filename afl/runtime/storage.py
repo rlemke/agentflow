@@ -328,6 +328,8 @@ class _WebHDFSWriteStream:
 
     def close(self):
         data = self._buffer.getvalue()
+        size_mb = len(data) / 1_048_576
+        logger.info("HDFS upload: %s (%.1f MB) — starting", self._hdfs_path, size_mb)
 
         def _do_create():
             r = _requests.put(
@@ -342,6 +344,7 @@ class _WebHDFSWriteStream:
                 r2.raise_for_status()
 
         _hdfs_retry(_do_create)
+        logger.info("HDFS upload: %s (%.1f MB) — complete", self._hdfs_path, size_mb)
 
     def __enter__(self):
         return self
