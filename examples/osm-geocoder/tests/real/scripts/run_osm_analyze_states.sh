@@ -22,18 +22,24 @@ if [ -f "$PROJECT_DIR/scripts/_env.sh" ]; then
     source "$PROJECT_DIR/scripts/_env.sh"
 fi
 
-HDFS_BASE="$HOME/data/hdfs"
-MONGODB_DATA="$HOME/data/mongodb"
+HDFS_NAMENODE_DIR="${HDFS_NAMENODE_DIR:-$HOME/data/hdfs/namenode}"
+HDFS_DATANODE_DIR="${HDFS_DATANODE_DIR:-$HOME/data/hdfs/datanode}"
+MONGODB_DATA_DIR="${MONGODB_DATA_DIR:-}"
 GEOFABRIK_MIRROR="${AFL_GEOFABRIK_MIRROR:-}"
 
 # ---------------------------------------------------------------------------
 # 1. Create data directories
 # ---------------------------------------------------------------------------
 echo "=== Creating data directories ==="
-mkdir -p "$HDFS_BASE/namenode" "$HDFS_BASE/datanode" "$MONGODB_DATA"
-echo "  HDFS NameNode: $HDFS_BASE/namenode"
-echo "  HDFS DataNode: $HDFS_BASE/datanode"
-echo "  MongoDB:       $MONGODB_DATA"
+mkdir -p "$HDFS_NAMENODE_DIR" "$HDFS_DATANODE_DIR"
+echo "  HDFS NameNode: $HDFS_NAMENODE_DIR"
+echo "  HDFS DataNode: $HDFS_DATANODE_DIR"
+if [ -n "$MONGODB_DATA_DIR" ]; then
+    mkdir -p "$MONGODB_DATA_DIR"
+    echo "  MongoDB:       $MONGODB_DATA_DIR"
+else
+    echo "  MongoDB:       (Docker volume)"
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -42,11 +48,13 @@ echo ""
 echo "=== Starting AgentFlow stack ==="
 SETUP_ARGS=(
     --hdfs
-    --hdfs-namenode-dir "$HDFS_BASE/namenode"
-    --hdfs-datanode-dir "$HDFS_BASE/datanode"
-    --mongodb-data-dir "$MONGODB_DATA"
+    --hdfs-namenode-dir "$HDFS_NAMENODE_DIR"
+    --hdfs-datanode-dir "$HDFS_DATANODE_DIR"
     --osm-agents 3
 )
+if [ -n "$MONGODB_DATA_DIR" ]; then
+    SETUP_ARGS+=(--mongodb-data-dir "$MONGODB_DATA_DIR")
+fi
 if [ -n "$GEOFABRIK_MIRROR" ]; then
     SETUP_ARGS+=(--mirror "$GEOFABRIK_MIRROR")
 fi
