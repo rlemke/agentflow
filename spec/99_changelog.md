@@ -1,5 +1,9 @@
 # Implementation Changelog
 
+## Completed (v0.12.62) - Use .env data dirs in run_osm scripts
+- **Fixed `run_osm_cache_states.sh` and `run_osm_analyze_states.sh`** to use `HDFS_NAMENODE_DIR`, `HDFS_DATANODE_DIR`, and `MONGODB_DATA_DIR` from `.env` (via `_env.sh`) instead of hardcoding `~/data/hdfs/*` and `~/data/mongodb`
+- **MongoDB data dir is now optional**: when `MONGODB_DATA_DIR` is unset/empty, the scripts skip `--mongodb-data-dir` and MongoDB uses a Docker volume — avoids WiredTiger "Operation not permitted" crashes from bind-mounted directories
+
 ## Completed (v0.12.61) - Make poll_interval_ms configurable via AFL_POLL_INTERVAL_MS
 - **All runner configs** (`AgentPollerConfig`, `RegistryRunnerConfig`, `RunnerConfig`, `AgentConfig`) now read `AFL_POLL_INTERVAL_MS` env var with a default of **1000 ms** (was hardcoded 2000 ms)
 - **Runner CLI** `--poll-interval` flag respects the env var as its default
