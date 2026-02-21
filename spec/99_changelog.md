@@ -13,7 +13,8 @@
   - `population_filter.py` → `osm-population/` category
   - `osmose_verifier.py` → `osm-osmose/` category
   - `zoom_graph.py` — `RoadGraph.save()` uses `open_output()` + `ensure_dir()`
-- **Added `AFL_OSM_OUTPUT_BASE`** to `.env.example` (commented) and `.env` (active, `hdfs://namenode:8020/osm-output`)
+- **Added `AFL_OSM_OUTPUT_BASE`** to `.env.example` and `.env` (active, `hdfs://namenode:8020/osm-output`)
+- **Passed `AFL_OSM_OUTPUT_BASE` to Docker containers** in `docker-compose.yml`: added to `runner`, `agent-osm-geocoder`, and `agent-osm-geocoder-lite` services via `${AFL_OSM_OUTPUT_BASE:-}` interpolation — without this, the env var was only on the host and extractors kept writing to local `/tmp/`
 - HDFS directory creation handled automatically via `ensure_dir()` calling `backend.makedirs()`; local paths use `Path.mkdir(parents=True)`
 
 ## Completed (v0.12.62) - Use .env data dirs in run_osm scripts
