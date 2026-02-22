@@ -1,5 +1,14 @@
 # Implementation Changelog
 
+## Completed (v0.12.64) - Add resume_step() for O(depth) step resumption, fix concurrent resume loss
+- **Three performance/correctness fixes** for large-scale workflow execution (500K+ steps):
+  1. **AgentPoller concurrent resume fix**: `_resume_workflow()` non-blocking lock was silently dropping resumes when contended — added `_resume_pending` set so the lock holder re-runs after its iteration completes, ensuring no step transitions are lost
+  2. **`get_actionable_steps_by_workflow()`**: new method on `PersistenceAPI`, `MemoryStore`, and `MongoStore` that filters out terminal (`Complete`/`Error`) and non-transitioning `EventTransmit` steps at the DB level — `MongoStore` uses a `$nor` query; reduces evaluator iteration scope from all steps to only actionable ones
+  3. **`Evaluator.resume_step()`**: focused single-step resume that walks the continued step's container+block chain with iterative commit until fixed point — O(depth) instead of O(total_steps); `AgentPoller._do_resume()` now calls `resume_step()` when a `step_id` is available, falls back to full `resume()` for pending re-runs
+- **Docker env var passthrough**: added `AFL_CACHE_DIR` and `AFL_GEOFABRIK_MIRROR` to `docker-compose.yml` for `runner`, `agent-osm-geocoder`, and `agent-osm-geocoder-lite` services — without these, agents couldn't locate PBF files in HDFS and fell back to failed Geofabrik downloads
+- **Added `AFL_CACHE_DIR`** to `.env.example` (commented) and `.env`
+- Files changed: `afl/runtime/evaluator.py`, `afl/runtime/agent_poller.py`, `afl/runtime/persistence.py`, `afl/runtime/mongo_store.py`, `afl/runtime/memory_store.py`, `docker-compose.yml`, `.env.example`
+
 ## Completed (v0.12.63) - Write OSM extractor output to HDFS via AFL_OSM_OUTPUT_BASE
 - **New helper module `examples/osm-geocoder/handlers/_output.py`** with `resolve_output_dir(category)`, `open_output(path)`, and `ensure_dir(path)` — routes extractor output to HDFS when `AFL_OSM_OUTPUT_BASE` is set (e.g. `hdfs://namenode:8020/osm-output`), unchanged local `/tmp/` behavior when unset
 - **Updated 10 extractor handlers** to use the shared output helpers instead of hardcoded local paths and direct `open()` / `_storage.open()` calls:
