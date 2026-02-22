@@ -1,5 +1,15 @@
 # Implementation Changelog
 
+## Completed (v0.12.69) - Extract cache-dependent logic into FromCache facets
+- **22 FromCache composition facets** added across two AFL files: `example_routes_visualization.afl` (8 facets) and `osmworkflows_composed.afl` (14 facets, excluding `TransitAnalysis` which has no Cache dependency)
+- **Transformation pattern**: each workflow that previously created a Cache and then ran multi-step logic now delegates to a `facet XFromCache(cache: OSMCache)` that accepts the cache directly — the workflow becomes a thin wrapper (`cache = Cache(region = $.region)`, `f = XFromCache(cache = cache.cache)`, `yield`)
+- **Extra parameters preserved**: workflows with additional params beyond `region` (e.g. `min_pop`, `output_dir`, `max_concurrent`, `gtfs_url`) pass them through to the FromCache facet, which preserves their defaults
+- **`use osm.types` added** to both `examples.routes` and `examples.composed` namespace blocks to resolve the `OSMCache` schema type in FromCache parameter signatures
+- **`AnalyzeRegion` workflow updated** (`osm_analyze_states.afl`): now creates a single shared cache and passes it to all 10 `FromCache` facets instead of each sub-workflow creating its own cache independently
+- **16 new tests** in `test_osm_composed_workflows.py`: `test_all_from_cache_facets_present`, 14 individual `test_*_from_cache` tests verifying params/steps/returns, and `test_cache_workflows_delegate_to_from_cache` cross-cutting assertion
+- **4 test files updated** to match new 2-step workflow structure: `test_osm_composed_workflows.py`, `test_osm_validation.py`, `test_osm_zoom_validation.py`, `test_composed_workflows.py`
+- 7 files changed, 477 insertions, 237 deletions; test suite: 2406 passed, 79 skipped; total collected 2485
+
 ## Completed (v0.12.68) - Add v2 handlers page with namespace-tabbed list and inline detail
 - **5 new handler endpoints** in `routes/dashboard_v2.py` under `/v2` prefix: handler list with namespace-prefix tabs (`GET /v2/handlers`), HTMX partial for 5s auto-refresh (`GET /v2/handlers/partial`), handler detail (`GET /v2/handlers/{facet_name:path}`), detail partial for live refresh (`GET /v2/handlers/{facet_name:path}/partial`), and delete (`POST /v2/handlers/{facet_name:path}/delete`)
 - **Namespace-prefix sub-tabs**: dynamically discovered prefixes (first dotted segment of `facet_name`, e.g. `osm` from `osm.geo.Cache`) with per-tab counts — "All" tab shows everything; tab filtering via `_filter_handlers_by_prefix()` and `_count_handlers_by_prefix()` helpers
