@@ -1,5 +1,16 @@
 # Implementation Changelog
 
+## Completed (v0.12.68) - Add v2 handlers page with namespace-tabbed list and inline detail
+- **5 new handler endpoints** in `routes/dashboard_v2.py` under `/v2` prefix: handler list with namespace-prefix tabs (`GET /v2/handlers`), HTMX partial for 5s auto-refresh (`GET /v2/handlers/partial`), handler detail (`GET /v2/handlers/{facet_name:path}`), detail partial for live refresh (`GET /v2/handlers/{facet_name:path}/partial`), and delete (`POST /v2/handlers/{facet_name:path}/delete`)
+- **Namespace-prefix sub-tabs**: dynamically discovered prefixes (first dotted segment of `facet_name`, e.g. `osm` from `osm.geo.Cache`) with per-tab counts — "All" tab shows everything; tab filtering via `_filter_handlers_by_prefix()` and `_count_handlers_by_prefix()` helpers
+- **Namespace-group accordion**: handlers grouped by full namespace (all segments except last) using `<details class="ns-group">` — each group shows a table with short facet name, module URI, entrypoint, version, timeout, and registered timestamp
+- **Handler detail page**: summary cards (module URI, entrypoint, timeout), two-column layout (details table + actions/requirements/metadata), delete button with HTMX confirm — all with HTMX 5s polling for live updates
+- **New helpers** in `helpers.py`: `extract_handler_prefix()` (first dotted segment or `(top-level)`) and `group_handlers_by_namespace()` (groups by full namespace, returns sorted `{"namespace", "handlers", "total"}` dicts) — reuses existing `extract_namespace()` for grouping
+- **Nav link updated**: Handlers link in `base.html` More dropdown changed from `/handlers` to `/v2/handlers` with `active_tab` highlighting; old `/handlers` route continues working unchanged
+- **4 new templates**: `v2/handlers/list.html`, `v2/handlers/_handler_groups.html`, `v2/handlers/detail.html`, `v2/handlers/_detail_content.html` — reuses existing `.subnav`, `.ns-group`, `.summary-grid`, `.badge` CSS classes
+- **28 new tests** in `tests/dashboard/test_handlers_v2.py`: 4 `extract_handler_prefix` tests + 6 `group_handlers_by_namespace` tests + 7 list route tests (empty, tabs, filtering, partial, counts) + 8 detail route tests (found, not found, partial, version, delete, requirements, metadata) + 3 nav tests (v2 link, highlighting, old route)
+- 9 files changed, 635 insertions, 5 deletions; test suite: 2390 passed, 79 skipped; total collected 2469
+
 ## Completed (v0.12.67) - Add v2 servers page with state-grouped list and inline detail
 - **4 new server endpoints** in `routes/dashboard_v2.py` under `/v2` prefix: server list with state tabs (`GET /v2/servers`), HTMX partial for 5s auto-refresh (`GET /v2/servers/partial`), server detail (`GET /v2/servers/{id}`), and detail partial for live ping/state refresh (`GET /v2/servers/{id}/partial`)
 - **State sub-tabs**: Running / Startup / Error / Shutdown with per-tab counts — mirrors the workflow page pattern with `_filter_servers()` and `_count_servers_by_tab()` helpers
