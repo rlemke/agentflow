@@ -8,43 +8,65 @@ The implementation includes pytest tests that verify parser, emitter, validator,
 
 | Category | Test File | Tests | Coverage |
 |----------|-----------|-------|----------|
-| Compiler | `tests/test_parser.py` | 96 | Parser functionality |
-| Compiler | `tests/test_emitter.py` | 69 | JSON emission |
-| Compiler | `tests/test_validator.py` | 103 | Semantic validation |
+| Compiler | `tests/test_parser.py` | 123 | Parser functionality |
+| Compiler | `tests/test_emitter.py` | 85 | JSON emission |
+| Compiler | `tests/test_validator.py` | 120 | Semantic validation |
 | Compiler | `tests/test_source.py` | 33 | Source input and provenance |
 | Compiler | `tests/test_config.py` | 16 | Configuration loading |
 | Compiler | `tests/test_cli.py` | 25 | CLI argument parsing and error handling |
 | Compiler | `tests/test_loader.py` | 13 | MongoDB and Maven source loaders |
 | Compiler | `tests/test_runner_main.py` | 5 | Runner CLI entry point |
+| Compiler | `tests/test_ast_utils.py` | 24 | AST normalization utilities |
+| Compiler | `tests/test_resolver.py` | 24 | Cross-file type resolution |
+| Compiler | `tests/test_publisher.py` | 14 | Namespace publishing |
+| Compiler | `tests/test_entry_points.py` | 9 | Package entry points |
+| Compiler | `tests/test_lifecycle_integration.py` | 24 | End-to-end lifecycle tests |
 | Runtime | `tests/runtime/test_types.py` | 8 | StepId, BlockId, ObjectType, FacetAttributes |
 | Runtime | `tests/runtime/test_states.py` | 15 | State constants and transitions |
 | Runtime | `tests/runtime/test_step.py` | 13 | StepDefinition and StepTransition |
 | Runtime | `tests/runtime/test_entities.py` | 29 | Runtime entity types |
-| Runtime | `tests/runtime/test_memory_store.py` | 9 | In-memory persistence |
-| Runtime | `tests/runtime/test_mongo_store.py` | 32 | MongoDB persistence (mongomock) |
+| Runtime | `tests/runtime/test_memory_store.py` | 14 | In-memory persistence |
+| Runtime | `tests/runtime/test_mongo_store.py` | 31 | MongoDB persistence (mongomock) |
 | Runtime | `tests/runtime/test_dependency.py` | 10 | DependencyGraph from AST |
-| Runtime | `tests/runtime/test_expression.py` | 51 | Expression evaluation (InputRef, StepRef, BinaryExpr, ConcatExpr) |
-| Runtime | `tests/runtime/test_events.py` | 15 | Event lifecycle |
-| Runtime | `tests/runtime/test_evaluator.py` | 68 | Spec examples, iteration traces, acceptance tests |
-| Runtime | `tests/runtime/test_script_executor.py` | 25 | Sandboxed script execution |
-| Runtime | `tests/runtime/test_runner_service.py` | 105 | Distributed runner service |
-| Runtime | `tests/runtime/test_agent_poller.py` | 14 | AgentPoller core |
+| Runtime | `tests/runtime/test_expression.py` | 60 | Expression evaluation (InputRef, StepRef, BinaryExpr, ConcatExpr) |
+| Runtime | `tests/runtime/test_evaluator.py` | 77 | Spec examples, iteration traces, acceptance tests |
+| Runtime | `tests/runtime/test_script_executor.py` | 32 | Sandboxed script execution |
+| Runtime | `tests/runtime/test_runner_service.py` | 106 | Distributed runner service |
+| Runtime | `tests/runtime/test_agent_poller.py` | 20 | AgentPoller core |
 | Runtime | `tests/runtime/test_agent_poller_async.py` | 10 | Async handler tests |
-| Runtime | `tests/runtime/test_agent_poller_extended.py` | 19 | AgentPoller edge cases |
-| Runtime | `tests/runtime/test_agent.py` | 19 | Agent integration |
+| Runtime | `tests/runtime/test_agent_poller_extended.py` | 20 | AgentPoller edge cases |
+| Runtime | `tests/runtime/test_agent.py` | 39 | Agent integration |
 | Runtime | `tests/runtime/test_addone_agent.py` | 7 | AddOne agent end-to-end |
 | Runtime | `tests/runtime/test_resume_task.py` | 7 | Resume task protocol |
+| Runtime | `tests/runtime/test_storage.py` | 46 | Storage backends (local, HDFS) |
+| Runtime | `tests/runtime/test_hdfs_storage.py` | 19 | HDFS storage operations |
+| Runtime | `tests/runtime/test_dispatcher.py` | 23 | Event dispatcher |
+| Runtime | `tests/runtime/test_submit.py` | 24 | Workflow submission |
+| Runtime | `tests/runtime/test_registry_runner.py` | 37 | RegistryRunner unit tests |
+| Runtime | `tests/runtime/test_registry_runner_integration.py` | 30 | RegistryRunner integration |
+| Runtime | `tests/runtime/test_agent_runner.py` | 11 | AgentRunner make_store/config/run_agent |
+| Runtime | `tests/runtime/test_inline_dispatch.py` | 14 | Inline handler dispatch |
+| Runtime | `tests/runtime/test_script_handlers.py` | 8 | Script handler tests |
 | Dashboard | `tests/dashboard/test_app.py` | 3 | App creation and route registration |
-| Dashboard | `tests/dashboard/test_filters.py` | 22 | Jinja2 filter unit tests |
-| Dashboard | `tests/dashboard/test_routes.py` | 44 | Route integration tests |
+| Dashboard | `tests/dashboard/test_filters.py` | 42 | Jinja2 filter unit tests |
+| Dashboard | `tests/dashboard/test_routes.py` | 131 | Route integration tests |
 | Dashboard | `tests/dashboard/test_step_routes.py` | 14 | Step detail and name resolution |
 | Dashboard | `tests/dashboard/test_workflows.py` | 13 | Workflow routes |
 | Dashboard | `tests/dashboard/test_dependencies.py` | 5 | Dependency injection |
-| MCP | `tests/mcp/test_server.py` | 32 | Tool + resource integration |
-| MCP | `tests/mcp/test_server_extended.py` | 16 | Continue/resume/resource edge cases |
-| MCP | `tests/mcp/test_serializers.py` | 12 | Serializer unit tests |
+| Dashboard | `tests/dashboard/test_dashboard_v2.py` | 33 | V2 workflow helpers and routes |
+| Dashboard | `tests/dashboard/test_servers_v2.py` | 21 | V2 server helpers and routes |
+| Dashboard | `tests/dashboard/test_template_rendering.py` | 14 | Navigation and template rendering |
+| Dashboard | `tests/dashboard/test_edge_cases.py` | 39 | Dashboard edge cases |
+| Dashboard | `tests/dashboard/test_flow_namespaces.py` | 17 | Flow namespace views |
+| Dashboard | `tests/dashboard/test_flow_run.py` | 14 | Flow run execution |
+| Dashboard | `tests/dashboard/test_step_tree.py` | 11 | Step tree view |
+| MCP | `tests/mcp/test_server.py` | 49 | Tool + resource integration |
+| MCP | `tests/mcp/test_server_extended.py` | 18 | Continue/resume/resource edge cases |
+| MCP | `tests/mcp/test_serializers.py` | 23 | Serializer unit tests |
 | MCP | `tests/mcp/test_store.py` | 3 | MongoStore singleton factory |
-| **Total** | | **980** | |
+| MCP | `tests/mcp/test_error_handling.py` | 29 | Error handling edge cases |
+| MCP | `tests/mcp/test_tool_workflows.py` | 14 | Workflow tool tests |
+| **Total** | | **1718** | |
 
 ---
 

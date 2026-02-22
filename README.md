@@ -451,11 +451,13 @@ python -m afl.dashboard --reload
 
 ### Features
 
-- **Home dashboard** — summary cards with runner, server, and task counts
-- **Runners** — list (filterable by state), detail with steps/logs/parameters
+The dashboard uses a 2-tab navigation (**Workflows** / **Servers**) with a **More** dropdown for secondary pages. `GET /` redirects to `/v2/workflows`.
+
+- **Workflows (v2)** — namespace-grouped runner list with Running/Completed/Failed sub-tabs, inline step expansion, HTMX 5s auto-refresh
+- **Servers (v2)** — server-group accordion with Running/Startup/Error/Shutdown sub-tabs, detail page with handlers/stats, HTMX 5s auto-refresh
+- **Runners** — list (filterable by state), detail with steps/logs/parameters (legacy)
 - **Steps** — detail view with attributes (params and returns tables)
 - **Flows** — list, detail, AFL source with syntax highlighting, compiled JSON view
-- **Servers** — server status table with state, IPs, handlers, last ping
 - **Logs** — log entries per runner ordered by time
 - **Tasks** — task queue with state and metadata
 - **Actions** — cancel/pause/resume runners, retry failed steps (via htmx POST with confirmation)
@@ -1285,8 +1287,9 @@ agentflow/
 │       ├── __main__.py      # python -m afl.dashboard entry point
 │       ├── dependencies.py  # MongoStore dependency injection
 │       ├── filters.py       # Jinja2 template filters
-│       ├── routes/          # Route modules (home, runners, steps, flows, etc.)
-│       ├── templates/       # Jinja2 templates
+│       ├── helpers.py       # Shared utilities (grouping, categorization)
+│       ├── routes/          # Route modules (dashboard_v2, home, runners, flows, etc.)
+│       ├── templates/       # Jinja2 templates (v2/workflows/, v2/servers/, legacy)
 │       └── static/          # CSS
 ├── tests/
 │   ├── test_parser.py       # Parser tests
@@ -1311,7 +1314,15 @@ agentflow/
 │       ├── test_filters.py  # Filter unit tests
 │       ├── test_routes.py   # Route integration tests
 │       ├── test_step_routes.py # Step detail tests
-│       └── test_dependencies.py # Dependency injection tests
+│       ├── test_dependencies.py # Dependency injection tests
+│       ├── test_dashboard_v2.py # V2 workflow helpers and routes
+│       ├── test_servers_v2.py # V2 server helpers and routes
+│       ├── test_template_rendering.py # Navigation and template tests
+│       ├── test_workflows.py # Workflow routes
+│       ├── test_flow_namespaces.py # Flow namespace tests
+│       ├── test_flow_run.py # Flow run tests
+│       ├── test_edge_cases.py # Edge case tests
+│       └── test_step_tree.py # Step tree view tests
 ├── agents/                  # Multi-language agent integration libraries
 │   ├── protocol/            # Cross-language protocol constants
 │   │   ├── constants.json   # Collection names, states, document schemas

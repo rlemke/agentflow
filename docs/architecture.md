@@ -143,8 +143,9 @@ The Model Context Protocol server exposes AgentFlow to LLM agents. It provides:
 `afl/dashboard/`
 
 A FastAPI web application providing monitoring and management:
+- **V2 views** with 2-tab navigation (Workflows / Servers) and namespace/group accordion grouping
 - Runner, flow, task, server, event, handler, source, lock, and namespace views
-- Real-time status with auto-refresh
+- Real-time status with HTMX 5s auto-refresh on v2 pages
 - Workflow compilation and validation
 - API endpoints (`/api/*`) for programmatic access
 
@@ -223,10 +224,12 @@ afl/
     __main__.py          # CLI entry point
   dashboard/
     app.py               # FastAPI application factory
-    routes/              # Route handlers
-    templates/           # Jinja2 templates
-    static/              # CSS/JS assets
+    dependencies.py      # MongoStore dependency injection
+    helpers.py           # Shared utilities (grouping, categorization)
     filters.py           # Template filters
+    routes/              # Route handlers (dashboard_v2, home, runners, flows, etc.)
+    templates/           # Jinja2 templates (v2/workflows/, v2/servers/, legacy)
+    static/              # CSS/JS assets
     __main__.py          # CLI entry point
 agents/
   python/               # Python agent library

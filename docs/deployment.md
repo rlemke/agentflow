@@ -170,13 +170,18 @@ python -m afl.mcp
 
 ### Dashboard Pages
 
+The main navigation uses a 2-tab layout (**Workflows** / **Servers**) with a **More** dropdown for secondary pages. `GET /` redirects to `/v2/workflows`.
+
 | Page | URL | Content |
 |------|-----|---------|
-| Home | `/` | Counts for runners, tasks, servers, flows, handlers, sources |
-| Runners | `/runners` | Active/completed/failed workflow executions |
+| Workflows (v2) | `/v2/workflows` | Namespace-grouped runners with Running/Completed/Failed sub-tabs, HTMX 5s auto-refresh |
+| Workflow Detail (v2) | `/v2/workflows/{id}` | Step sub-tabs (Running/Error/Complete), inline step expansion, pause/cancel/resume actions |
+| Servers (v2) | `/v2/servers` | Server-group accordion with Running/Startup/Error/Shutdown sub-tabs, HTMX 5s auto-refresh |
+| Server Detail (v2) | `/v2/servers/{id}` | Details, topics, handlers, handled stats, error display with live polling |
+| Runners | `/runners` | Active/completed/failed workflow executions (legacy) |
 | Flows | `/flows` | Compiled workflow definitions and sources |
 | Tasks | `/tasks` | Event task queue (pending, running, completed, failed) |
-| Servers | `/servers` | Registered agent servers with heartbeat status |
+| Servers | `/servers` | Registered agent servers with heartbeat status (legacy) |
 | Events | `/events` | Event lifecycle tracking |
 | Handlers | `/handlers` | Registered handler modules |
 | Sources | `/sources` | Published AFL source namespaces |
