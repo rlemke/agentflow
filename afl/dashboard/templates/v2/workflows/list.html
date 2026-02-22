@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Workflows — AgentFlow Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="container">
+    <div class="subnav">
+        <a href="/v2/workflows?tab=running"
+           class="subnav-pill{% if tab == 'running' %} active{% endif %}">
+            Running <span class="subnav-count">{{ tab_counts.running }}</span>
+        </a>
+        <a href="/v2/workflows?tab=completed"
+           class="subnav-pill{% if tab == 'completed' %} active{% endif %}">
+            Completed <span class="subnav-count">{{ tab_counts.completed }}</span>
+        </a>
+        <a href="/v2/workflows?tab=failed"
+           class="subnav-pill{% if tab == 'failed' %} active{% endif %}">
+            Failed <span class="subnav-count">{{ tab_counts.failed }}</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Workflows</h1>
+
+<div id="runner-groups"
+     hx-get="/v2/workflows/partial?tab={{ tab }}"
+     hx-trigger="every 5s"
+     hx-swap="innerHTML">
+    {% include "v2/workflows/_runner_groups.html" %}
+</div>
+{% endblock %}

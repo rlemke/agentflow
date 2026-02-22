@@ -151,6 +151,27 @@ def step_log_color(level: str | None) -> str:
     return _STEP_LOG_COLORS.get(level.lower(), "secondary")
 
 
+def short_workflow_name_filter(name: str) -> str:
+    """Extract the short name from a qualified workflow name."""
+    from .helpers import short_workflow_name
+
+    return short_workflow_name(name)
+
+
+def step_category_filter(state: str) -> str:
+    """Categorize a step state as running/complete/error."""
+    from .helpers import categorize_step_state
+
+    return categorize_step_state(state)
+
+
+def namespace_of_filter(name: str) -> str:
+    """Extract the namespace from a qualified workflow name."""
+    from .helpers import extract_namespace
+
+    return extract_namespace(name)
+
+
 def register_filters(env: Environment) -> None:
     """Register all custom filters on a Jinja2 environment."""
     env.filters["timestamp"] = timestamp_fmt
@@ -162,3 +183,6 @@ def register_filters(env: Environment) -> None:
     env.filters["doc_params"] = doc_params
     env.filters["doc_returns"] = doc_returns
     env.filters["step_log_color"] = step_log_color
+    env.filters["short_workflow_name"] = short_workflow_name_filter
+    env.filters["step_category"] = step_category_filter
+    env.filters["namespace_of"] = namespace_of_filter

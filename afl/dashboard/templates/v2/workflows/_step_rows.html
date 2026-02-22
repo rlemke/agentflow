@@ -1,0 +1,44 @@
+{% if steps %}
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Statement</th>
+            <th>Facet</th>
+            <th>State</th>
+            <th>Duration</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for step in steps %}
+        <tr>
+            <td>{{ step.statement_name or '—' }}</td>
+            <td>{{ step.facet_name or '—' }}</td>
+            <td>
+                <span class="badge badge-{{ step.state|state_color }}">
+                    {{ step.state|state_label }}
+                </span>
+            </td>
+            <td>
+                {% if step.last_modified and step.start_time %}
+                    {{ (step.last_modified - step.start_time)|duration }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn-retry-inline outline secondary"
+                        hx-get="/v2/workflows/{{ runner.uuid }}/steps/{{ step.id }}/expand"
+                        hx-target="#expand-{{ step.id|replace('.', '-') }}"
+                        hx-swap="innerHTML">
+                    Details
+                </button>
+            </td>
+        </tr>
+        <tr id="expand-{{ step.id|replace('.', '-') }}" class="wf-expand"></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No steps in this category.</p>
+{% endif %}

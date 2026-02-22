@@ -1,0 +1,46 @@
+{% if groups %}
+{% for group in groups %}
+<details class="ns-group" open>
+    <summary>
+        <strong>{{ group.namespace }}</strong>
+        <span class="badge badge-secondary">{{ group.total }}</span>
+    </summary>
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Workflow</th>
+                <th>ID</th>
+                <th>State</th>
+                <th>Started</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for runner in group.runners %}
+            <tr>
+                <td>
+                    <a href="/v2/workflows/{{ runner.uuid }}">
+                        {{ runner.workflow.name|short_workflow_name }}
+                    </a>
+                </td>
+                <td class="mono">
+                    <a href="/v2/workflows/{{ runner.uuid }}">
+                        {{ runner.uuid|truncate_uuid }}
+                    </a>
+                </td>
+                <td>
+                    <span class="badge badge-{{ runner.state|state_color }}">
+                        {{ runner.state }}
+                    </span>
+                </td>
+                <td>{{ runner.start_time|timestamp }}</td>
+                <td>{{ runner.duration|duration }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</details>
+{% endfor %}
+{% else %}
+<p>No workflows in this category.</p>
+{% endif %}

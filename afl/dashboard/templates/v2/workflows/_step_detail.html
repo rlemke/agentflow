@@ -1,0 +1,61 @@
+{% if step %}
+<td colspan="5" style="background: var(--card-background-color, #f8f9fa); padding: 1rem;">
+    <h4 style="margin-top:0;">
+        {{ step.statement_name or step.facet_name }}
+        <span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span>
+    </h4>
+
+    {% if step.attributes and step.attributes.params %}
+    <h5>Parameters</h5>
+    <table style="font-size: 0.85em;">
+        <thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead>
+        <tbody>
+        {% for name, param in step.attributes.params.items() %}
+        <tr>
+            <td><code>{{ name }}</code></td>
+            <td class="mono">{{ param.type_hint or '—' }}</td>
+            <td><code>{{ param.value }}</code></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if step.attributes and step.attributes.returns %}
+    <h5>Returns</h5>
+    <table style="font-size: 0.85em;">
+        <thead><tr><th>Name</th><th>Type</th><th>Value</th></tr></thead>
+        <tbody>
+        {% for name, ret in step.attributes.returns.items() %}
+        <tr>
+            <td><code>{{ name }}</code></td>
+            <td class="mono">{{ ret.type_hint or '—' }}</td>
+            <td><code>{{ ret.value }}</code></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if task %}
+    <h5>Task</h5>
+    <table style="font-size: 0.85em;">
+        <tbody>
+        <tr><td>Name</td><td>{{ task.name }}</td></tr>
+        <tr><td>State</td><td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td></tr>
+        <tr><td>Created</td><td>{{ task.created|timestamp }}</td></tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if step.state == 'state.statement.Error' and runner %}
+    <form method="post" action="/runners/{{ runner.uuid }}/resume" style="margin-top:0.5rem;">
+        <button type="submit" class="outline">Retry</button>
+    </form>
+    {% endif %}
+
+    <a href="/steps/{{ step.id }}" style="font-size: 0.85em;">Full step detail</a>
+</td>
+{% else %}
+<td colspan="5"><em>Step not found.</em></td>
+{% endif %}

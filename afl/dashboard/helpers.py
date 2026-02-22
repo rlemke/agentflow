@@ -1,0 +1,99 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Shared helper utilities for the dashboard."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from afl.runtime.entities import RunnerDefinition
+
+
+def extract_namespace(workflow_name: str) -> str:
+    """Extract the namespace prefix from a qualified workflow name.
+
+    >>> extract_namespace("osm.geo.Routes.BicycleRoutes")
+    'osm.geo.Routes'
+    >>> extract_namespace("SimpleWorkflow")
+    '(top-level)'
+    """
+    if "." in workflow_name:
+        ns, _ = workflow_name.rsplit(".", 1)
+        return ns
+    return "(top-level)"
+
+
+def short_workflow_name(workflow_name: str) -> str:
+    """Extract the short name from a qualified workflow name.
+
+    >>> short_workflow_name("osm.geo.Routes.BicycleRoutes")
+    'BicycleRoutes'
+    >>> short_workflow_name("SimpleWorkflow")
+    'SimpleWorkflow'
+    """
+    if "." in workflow_name:
+        _, short = workflow_name.rsplit(".", 1)
+        return short
+    return workflow_name
+
+
+def categorize_step_state(state: str) -> str:
+    """Categorize a step state into running/complete/error.
+
+    >>> categorize_step_state("state.statement.Complete")
+    'complete'
+    >>> categorize_step_state("state.statement.Error")
+    'error'
+    >>> categorize_step_state("state.statement.Created")
+    'running'
+    """
+    from afl.runtime.states import StepState
+
+    if state == StepState.STATEMENT_COMPLETE:
+        return "complete"
+    if state == StepState.STATEMENT_ERROR:
+        return "error"
+    return "running"
+
+
+def group_runners_by_namespace(
+    runners: list[RunnerDefinition],
+) -> list[dict]:
+    """Group runners by their workflow namespace.
+
+    Returns a sorted list of dicts:
+        [{"namespace": "osm.geo", "runners": [...], "counts": {...}, "total": N}]
+    """
+    ns_map: dict[str, list[RunnerDefinition]] = {}
+    for r in runners:
+        ns = extract_namespace(r.workflow.name)
+        ns_map.setdefault(ns, []).append(r)
+
+    groups = []
+    for ns in sorted(ns_map):
+        ns_runners = ns_map[ns]
+        counts: dict[str, int] = {}
+        for r in ns_runners:
+            counts[r.state] = counts.get(r.state, 0) + 1
+        groups.append(
+            {
+                "namespace": ns,
+                "runners": ns_runners,
+                "counts": counts,
+                "total": len(ns_runners),
+            }
+        )
+    return groups

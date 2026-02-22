@@ -239,4 +239,4 @@ class TestNavLink:
         resp = tc.get("/")
         assert resp.status_code == 200
         assert "/workflows/new" in resp.text
-        assert ">New<" in resp.text
+        assert ">New Workflow<" in resp.text

@@ -16,50 +16,13 @@
 
 from __future__ import annotations
 
-import time
-
-from fastapi import APIRouter, Depends, Request
-
-from ..dependencies import get_store
+from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
 
 router = APIRouter()
 
 
 @router.get("/")
-def home(request: Request, store=Depends(get_store)):
-    """Render the summary dashboard."""
-    runners = store.get_all_runners(limit=500)
-    servers = store.get_all_servers()
-    tasks = store.get_all_tasks(limit=500)
-    handlers = store.list_handler_registrations()
-    sources = store.list_published_sources()
-    locks = store.get_all_locks()
-
-    # Count runners by state
-    runner_counts: dict[str, int] = {}
-    for r in runners:
-        runner_counts[r.state] = runner_counts.get(r.state, 0) + 1
-
-    # Count tasks by state
-    task_counts: dict[str, int] = {}
-    for t in tasks:
-        task_counts[t.state] = task_counts.get(t.state, 0) + 1
-
-    # Count active (non-expired) locks
-    now_ms = int(time.time() * 1000)
-    active_lock_count = sum(1 for l in locks if l.expires_at > now_ms)
-
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "index.html",
-        {
-            "runner_counts": runner_counts,
-            "total_runners": len(runners),
-            "server_count": len(servers),
-            "task_counts": task_counts,
-            "total_tasks": len(tasks),
-            "handler_count": len(handlers),
-            "source_count": len(sources),
-            "active_lock_count": active_lock_count,
-        },
-    )
+def home():
+    """Redirect to the v2 workflow list."""
+    return RedirectResponse(url="/v2/workflows", status_code=302)

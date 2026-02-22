@@ -147,6 +147,100 @@ pre code {
     cursor: pointer;
 }
 
+/* Sub-navigation tab bar */
+.subnav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+}
+.subnav-pill {
+    display: inline-block;
+    padding: 0.3em 1em;
+    border-radius: 20px;
+    font-size: 0.9em;
+    text-decoration: none;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    background: transparent;
+}
+.subnav-pill.active {
+    background: var(--primary);
+    color: #fff;
+}
+.subnav-pill:hover:not(.active) {
+    background: var(--primary-focus, rgba(16, 149, 193, 0.1));
+}
+.subnav-count {
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+/* Namespace group accordion */
+.ns-group {
+    margin-bottom: 1rem;
+    border: 1px solid var(--muted-border-color, #ddd);
+    border-radius: 4px;
+}
+.ns-group summary {
+    cursor: pointer;
+    padding: 0.75rem 1rem;
+    background: var(--card-background-color, #f8f9fa);
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.ns-group > table {
+    margin: 0;
+}
+
+/* Inline step expansion */
+.wf-expand:empty {
+    display: none;
+}
+.wf-expand td {
+    border-top: none;
+}
+
+/* Nav dropdown for More menu */
+.nav-dropdown-container {
+    position: relative;
+}
+.nav-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--background-color, #fff);
+    border: 1px solid var(--muted-border-color, #ddd);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 0;
+    min-width: 160px;
+    z-index: 100;
+    list-style: none;
+    margin: 0;
+}
+.nav-dropdown li {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.nav-dropdown li a {
+    display: block;
+    padding: 0.4rem 1rem;
+    white-space: nowrap;
+}
+.nav-dropdown-container:hover .nav-dropdown {
+    display: block;
+}
+
+/* Active nav link */
+.nav-active {
+    font-weight: 700;
+}
+
 /* Doc comment rendering */
 .doc-comment { margin-top: 0.5rem; font-size: 0.9em; color: var(--muted-color); }
 .doc-description p { margin: 0.25rem 0; }
