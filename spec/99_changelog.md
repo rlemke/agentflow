@@ -1,5 +1,16 @@
 # Implementation Changelog
 
+## Completed (v0.12.67) - Add v2 servers page with state-grouped list and inline detail
+- **4 new server endpoints** in `routes/dashboard_v2.py` under `/v2` prefix: server list with state tabs (`GET /v2/servers`), HTMX partial for 5s auto-refresh (`GET /v2/servers/partial`), server detail (`GET /v2/servers/{id}`), and detail partial for live ping/state refresh (`GET /v2/servers/{id}/partial`)
+- **State sub-tabs**: Running / Startup / Error / Shutdown with per-tab counts — mirrors the workflow page pattern with `_filter_servers()` and `_count_servers_by_tab()` helpers
+- **Server group accordion**: servers grouped by `server_group` field using `<details class="ns-group">` — each group shows a table with name, service, state badge, IPs, last ping, and handler count
+- **Server detail page**: summary cards (UUID, start time, last ping), two-column layout (details table + topics/handlers lists), handled statistics table, error display — all with HTMX 5s polling for live updates
+- **New `group_servers_by_group()` helper** in `helpers.py`: groups servers by `server_group`, returns sorted list of `{"group", "servers", "total"}` dicts — follows same pattern as `group_runners_by_namespace()`
+- **Nav link updated**: Servers link in `base.html` changed from `/servers` to `/v2/servers`; old `/servers` route continues working unchanged
+- **4 new templates**: `v2/servers/list.html`, `v2/servers/_server_groups.html`, `v2/servers/detail.html`, `v2/servers/_detail_content.html` — reuses existing `.subnav`, `.ns-group`, `.summary-grid`, `.badge` CSS classes
+- **21 new tests** in `tests/dashboard/test_servers_v2.py`: 5 helper unit tests (grouping, sorting, empty, single group) + 8 list route tests (empty, tabs, filtering, partial, counts) + 5 detail route tests (found, not found, partial, handlers) + 3 nav tests (v2 link, highlighting, old route)
+- 10 files changed, 599 insertions, 6 deletions; test suite: 2362 passed, 79 skipped
+
 ## Completed (v0.12.66) - Redesign dashboard UI with 2-tab nav and namespace-grouped workflows
 - **New `/v2/workflows` routes** with 5 endpoints: workflow list with Running/Completed/Failed sub-tabs, HTMX partial for 5s auto-refresh, workflow detail with step sub-tabs (Running/Error/Complete), step table partial, and inline step expansion partial
 - **Namespace-grouped runner display**: runners grouped by workflow namespace prefix using `<details>` accordion — each group shows a table with short workflow name, truncated ID, state badge, start time, and duration
