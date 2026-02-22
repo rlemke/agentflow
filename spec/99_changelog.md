@@ -1,5 +1,10 @@
 # Implementation Changelog
 
+## Completed (v0.12.73) - Verify concurrent step dedup with 3 evaluators
+- **Integration verification**: ran 3 concurrent `Evaluator.execute()` instances against the same `AnalyzeAllStates` workflow (50 US states, ~3300 steps) — all three competed to create the same steps simultaneously
+- **Result**: 3321 total steps (3 root steps × 1 per evaluator + 3318 unique statement steps), **0 duplicate `(statement_id, block_id, container_id)` triples** — all three layers (application checks, unique index, DuplicateKeyError catch) working correctly
+- No code changes; test suite unchanged: 2430 passed, 79 skipped; total collected 2509
+
 ## Completed (v0.12.72) - Fix concurrent step duplication race condition
 - **Three-layer defense** against duplicate step creation when multiple runners call `evaluator.resume()` concurrently:
   1. **Application-level idempotency**: `_create_block_steps()` in `blocks.py` now checks `block_step_exists()` and pending creates before creating block steps; `_process_foreach()` in `block_execution.py` now checks `step_exists()` and pending creates before creating foreach sub-blocks
