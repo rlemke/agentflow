@@ -97,16 +97,21 @@ def flow_json(flow_id: str, request: Request, store=Depends(get_store)):
     json_output = None
     parse_error = None
 
-    if flow and flow.compiled_sources:
+    if flow:
         try:
-            from afl.emitter import JSONEmitter
-            from afl.parser import AFLParser
+            if flow.compiled_ast:
+                import json
 
-            parser = AFLParser()
-            source_text = flow.compiled_sources[0].content
-            ast = parser.parse(source_text)
-            emitter = JSONEmitter(indent=2)
-            json_output = emitter.emit(ast)
+                json_output = json.dumps(flow.compiled_ast, indent=2)
+            elif flow.compiled_sources:
+                from afl.emitter import JSONEmitter
+                from afl.parser import AFLParser
+
+                parser = AFLParser()
+                source_text = flow.compiled_sources[0].content
+                ast = parser.parse(source_text)
+                emitter = JSONEmitter(indent=2)
+                json_output = emitter.emit(ast)
         except Exception as exc:
             parse_error = str(exc)
 
@@ -196,18 +201,22 @@ def flow_run_form(
     parse_error = None
     workflow_doc = None
 
-    if flow.compiled_sources:
+    if flow.compiled_ast or flow.compiled_sources:
         try:
             from afl.ast_utils import find_workflow
-            from afl.emitter import JSONEmitter
-            from afl.parser import AFLParser
 
-            parser = AFLParser()
-            source_text = flow.compiled_sources[0].content
-            ast = parser.parse(source_text)
-            emitter = JSONEmitter(include_locations=False)
-            program_json = emitter.emit(ast)
-            program_dict = json.loads(program_json)
+            if flow.compiled_ast:
+                program_dict = flow.compiled_ast
+            else:
+                from afl.emitter import JSONEmitter
+                from afl.parser import AFLParser
+
+                parser = AFLParser()
+                source_text = flow.compiled_sources[0].content
+                ast = parser.parse(source_text)
+                emitter = JSONEmitter(include_locations=False)
+                program_json = emitter.emit(ast)
+                program_dict = json.loads(program_json)
 
             wf_ast = find_workflow(program_dict, workflow_name)
             if wf_ast:
@@ -283,14 +292,17 @@ def flow_run_execute(
 
     # Extract defaults from compiled AST
     inputs: dict = {}
-    if flow.compiled_sources:
+    if flow.compiled_ast or flow.compiled_sources:
         try:
-            parser = AFLParser()
-            source_text = flow.compiled_sources[0].content
-            ast = parser.parse(source_text)
-            emitter = JSONEmitter(include_locations=False)
-            program_json = emitter.emit(ast)
-            program_dict = json.loads(program_json)
+            if flow.compiled_ast:
+                program_dict = flow.compiled_ast
+            else:
+                parser = AFLParser()
+                source_text = flow.compiled_sources[0].content
+                ast = parser.parse(source_text)
+                emitter = JSONEmitter(include_locations=False)
+                program_json = emitter.emit(ast)
+                program_dict = json.loads(program_json)
 
             wf_ast = find_workflow(program_dict, workflow_def.name)
             if wf_ast:

@@ -101,18 +101,23 @@ def _resolve_statement_name(statement_id: str, runner, store) -> str | None:
     import json
 
     flow = store.get_flow(runner.workflow.flow_id)
-    if not flow or not flow.compiled_sources:
+    if not flow:
         return None
 
-    from afl.emitter import JSONEmitter
-    from afl.parser import AFLParser
-
-    parser = AFLParser()
-    ast = parser.parse(flow.compiled_sources[0].content)
-    emitter = JSONEmitter(include_locations=False)
     from afl.ast_utils import find_all_workflows
 
-    program_dict = json.loads(emitter.emit(ast))
+    if flow.compiled_ast:
+        program_dict = flow.compiled_ast
+    elif flow.compiled_sources:
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
+        parser = AFLParser()
+        ast = parser.parse(flow.compiled_sources[0].content)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter.emit(ast))
+    else:
+        return None
 
     for wf in find_all_workflows(program_dict):
         body = wf.get("body")

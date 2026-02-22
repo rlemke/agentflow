@@ -1156,6 +1156,7 @@ class MongoStore(PersistenceAPI):
             "publisher": asdict(flow.publisher) if flow.publisher else None,
             "ownership": asdict(flow.ownership) if flow.ownership else None,
             "compiled_sources": [asdict(s) for s in flow.compiled_sources],
+            "compiled_ast": flow.compiled_ast,
         }
 
     def _doc_to_flow(self, doc: dict) -> FlowDefinition:
@@ -1219,6 +1220,7 @@ class MongoStore(PersistenceAPI):
             publisher=publisher,
             ownership=ownership,
             compiled_sources=[SourceText(**s) for s in doc.get("compiled_sources", [])],
+            compiled_ast=doc.get("compiled_ast"),
         )
 
     # =========================================================================

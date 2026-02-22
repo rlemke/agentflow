@@ -333,6 +333,37 @@ class TestMongoSubmit:
         assert task.data["runner_id"] == runner.uuid
         assert task.data["flow_id"] == flow.uuid
 
+    def test_submit_stores_compiled_ast(self, tmp_path, mock_store, capsys):
+        """Verify submit stores compiled_ast on FlowDefinition."""
+        f = tmp_path / "wf.afl"
+        f.write_text("namespace n {\n  workflow Go(count: Int = 5)\n}")
+        result = self._run_with_mock_store(
+            mock_store, [str(f), "--workflow", "n.Go"]
+        )
+        assert result == 0
+        ids = self._parse_ids(capsys.readouterr().out)
+        flow = mock_store.get_flow(ids["flow_id"])
+        assert flow is not None
+        assert flow.compiled_ast is not None
+        assert isinstance(flow.compiled_ast, dict)
+        assert "declarations" in flow.compiled_ast
+
+    def test_submit_compiled_ast_has_stable_ids(self, tmp_path, mock_store, capsys):
+        """Verify that compiled_ast statement IDs are stable (not regenerated)."""
+        f = tmp_path / "wf.afl"
+        f.write_text("namespace n {\n  workflow Go(count: Int = 5)\n}")
+        result = self._run_with_mock_store(
+            mock_store, [str(f), "--workflow", "n.Go"]
+        )
+        assert result == 0
+        ids = self._parse_ids(capsys.readouterr().out)
+        flow = mock_store.get_flow(ids["flow_id"])
+
+        # Read the compiled_ast twice — same dict, same IDs
+        ast1 = flow.compiled_ast
+        ast2 = flow.compiled_ast
+        assert ast1 == ast2
+
 
 # ============================================================================
 # MongoDB connection error

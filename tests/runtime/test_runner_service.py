@@ -1280,13 +1280,14 @@ class TestResumeWorkflowEdgeCases:
         assert result is None
 
     def test_load_workflow_ast_flow_no_sources(self, evaluator, registry):
-        """_load_workflow_ast returns None when flow has no compiled_sources."""
+        """_load_workflow_ast returns None when flow has no compiled_ast or sources."""
         mock_store = MagicMock()
         mock_wf = MagicMock()
         mock_wf.flow_id = "f1"
         mock_store.get_workflow.return_value = mock_wf
 
         mock_flow = MagicMock()
+        mock_flow.compiled_ast = None
         mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
 
@@ -1311,7 +1312,7 @@ class TestResumeWorkflowEdgeCases:
         assert result is None
 
     def test_load_workflow_ast_parse_exception(self, evaluator, registry):
-        """_load_workflow_ast returns None on parse error."""
+        """_load_workflow_ast returns None on parse error (legacy fallback)."""
         mock_store = MagicMock()
         mock_wf = MagicMock()
         mock_wf.flow_id = "f1"
@@ -1321,6 +1322,7 @@ class TestResumeWorkflowEdgeCases:
         mock_source = MagicMock()
         mock_source.content = "this is not valid AFL %%% syntax"
         mock_flow = MagicMock()
+        mock_flow.compiled_ast = None
         mock_flow.compiled_sources = [mock_source]
         mock_store.get_flow.return_value = mock_flow
 
@@ -1331,7 +1333,44 @@ class TestResumeWorkflowEdgeCases:
         assert result is None
 
     def test_load_workflow_ast_success(self, evaluator, registry):
-        """_load_workflow_ast succeeds with valid AFL source."""
+        """_load_workflow_ast succeeds with compiled_ast on flow."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
+        # Build a real compiled AST
+        source = """
+workflow TestLoad(x: Long) => (result: Long) andThen {
+    step1 = Compute(input = $.x)
+    yield TestLoad(result = step1.input)
+}
+"""
+        parser = AFLParser()
+        ast = parser.parse(source)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter.emit(ast))
+
+        mock_store = MagicMock()
+        mock_wf = MagicMock()
+        mock_wf.flow_id = "f1"
+        mock_wf.name = "TestLoad"
+        mock_store.get_workflow.return_value = mock_wf
+
+        mock_flow = MagicMock()
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
+        mock_store.get_flow.return_value = mock_flow
+
+        config = RunnerConfig()
+        svc = RunnerService(mock_store, evaluator, config, registry)
+
+        result = svc._load_workflow_ast("wf-1")
+        assert result is not None
+        assert result["name"] == "TestLoad"
+
+    def test_load_workflow_ast_legacy_fallback(self, evaluator, registry):
+        """_load_workflow_ast falls back to recompilation when compiled_ast is None."""
         mock_store = MagicMock()
         mock_wf = MagicMock()
         mock_wf.flow_id = "f1"
@@ -1346,6 +1385,7 @@ workflow TestLoad(x: Long) => (result: Long) andThen {
 }
 """
         mock_flow = MagicMock()
+        mock_flow.compiled_ast = None
         mock_flow.compiled_sources = [mock_source]
         mock_store.get_flow.return_value = mock_flow
 
@@ -1358,21 +1398,31 @@ workflow TestLoad(x: Long) => (result: Long) andThen {
 
     def test_load_workflow_ast_no_matching_workflow(self, evaluator, registry):
         """_load_workflow_ast returns None when no workflow matches name."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
+        source = """
+workflow OtherName(x: Long) => (result: Long) andThen {
+    step1 = Compute(input = $.x)
+    yield OtherName(result = step1.input)
+}
+"""
+        parser = AFLParser()
+        ast = parser.parse(source)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter.emit(ast))
+
         mock_store = MagicMock()
         mock_wf = MagicMock()
         mock_wf.flow_id = "f1"
         mock_wf.name = "NonExistent"
         mock_store.get_workflow.return_value = mock_wf
 
-        mock_source = MagicMock()
-        mock_source.content = """
-workflow OtherName(x: Long) => (result: Long) andThen {
-    step1 = Compute(input = $.x)
-    yield OtherName(result = step1.input)
-}
-"""
         mock_flow = MagicMock()
-        mock_flow.compiled_sources = [mock_source]
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
 
         config = RunnerConfig()
@@ -1383,21 +1433,31 @@ workflow OtherName(x: Long) => (result: Long) andThen {
 
     def test_resume_caches_loaded_ast(self, evaluator, registry):
         """_resume_workflow caches AST loaded from persistence."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
+        source = """
+workflow CacheTest(x: Long) => (result: Long) andThen {
+    step1 = Compute(input = $.x)
+    yield CacheTest(result = step1.input)
+}
+"""
+        parser = AFLParser()
+        ast = parser.parse(source)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter.emit(ast))
+
         mock_store = MagicMock()
         mock_wf = MagicMock()
         mock_wf.flow_id = "f1"
         mock_wf.name = "CacheTest"
         mock_store.get_workflow.return_value = mock_wf
 
-        mock_source = MagicMock()
-        mock_source.content = """
-workflow CacheTest(x: Long) => (result: Long) andThen {
-    step1 = Compute(input = $.x)
-    yield CacheTest(result = step1.input)
-}
-"""
         mock_flow = MagicMock()
-        mock_flow.compiled_sources = [mock_source]
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
 
         # get_steps_by_workflow returns empty for resume
@@ -1671,13 +1731,17 @@ class TestExecuteWorkflowHandler:
 
     def test_execute_workflow_success(self, evaluator, config):
         """afl:execute handler executes a workflow and updates runner state."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
         from afl.runtime.entities import (
             RunnerState,
         )
 
         mock_store = MagicMock()
 
-        # Create flow with AFL source
+        # Create flow with compiled AST
         afl_source = """
 facet Compute(input: Long)
 
@@ -1686,11 +1750,14 @@ workflow SimpleWF(x: Long) => (result: Long) andThen {
     yield SimpleWF(result = s1.input)
 }
 """
-        mock_source = MagicMock()
-        mock_source.content = afl_source
+        parser = AFLParser()
+        ast = parser.parse(afl_source)
+        emitter_obj = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter_obj.emit(ast))
 
         mock_flow = MagicMock()
-        mock_flow.compiled_sources = [mock_source]
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
 
         # Create runner
@@ -1746,9 +1813,10 @@ workflow SimpleWF(x: Long) => (result: Long) andThen {
             )
 
     def test_execute_workflow_no_sources(self, evaluator, config):
-        """afl:execute handler raises when flow has no compiled sources."""
+        """afl:execute handler raises when flow has no compiled AST or sources."""
         mock_store = MagicMock()
         mock_flow = MagicMock()
+        mock_flow.compiled_ast = None
         mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
         mock_store.get_runner.return_value = None
@@ -1756,7 +1824,7 @@ workflow SimpleWF(x: Long) => (result: Long) andThen {
         registry = ToolRegistry()
         svc = RunnerService(mock_store, evaluator, config, registry)
 
-        with pytest.raises(RuntimeError, match="no compiled sources"):
+        with pytest.raises(RuntimeError, match="no compiled AST or sources"):
             svc._handle_execute_workflow(
                 {
                     "flow_id": "f-1",
@@ -1767,9 +1835,13 @@ workflow SimpleWF(x: Long) => (result: Long) andThen {
 
     def test_execute_workflow_name_not_found(self, evaluator, config):
         """afl:execute handler raises when workflow name not in flow."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
         mock_store = MagicMock()
-        mock_source = MagicMock()
-        mock_source.content = """
+        afl_source = """
 facet Compute(input: Long)
 
 workflow OtherWF(x: Long) => (result: Long) andThen {
@@ -1777,8 +1849,14 @@ workflow OtherWF(x: Long) => (result: Long) andThen {
     yield OtherWF(result = s1.input)
 }
 """
+        parser = AFLParser()
+        ast = parser.parse(afl_source)
+        emitter_obj = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter_obj.emit(ast))
+
         mock_flow = MagicMock()
-        mock_flow.compiled_sources = [mock_source]
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
         mock_store.get_runner.return_value = None
 
@@ -1838,6 +1916,10 @@ workflow OtherWF(x: Long) => (result: Long) andThen {
 
     def test_execute_workflow_as_task(self, evaluator, config):
         """afl:execute task is processed end-to-end via run_once."""
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
         from afl.runtime.entities import RunnerState
 
         mock_store = MagicMock()
@@ -1850,10 +1932,14 @@ workflow TaskWF(x: Long) => (result: Long) andThen {
     yield TaskWF(result = s1.input)
 }
 """
-        mock_source = MagicMock()
-        mock_source.content = afl_source
+        parser = AFLParser()
+        ast = parser.parse(afl_source)
+        emitter_obj = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter_obj.emit(ast))
+
         mock_flow = MagicMock()
-        mock_flow.compiled_sources = [mock_source]
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
         mock_store.get_flow.return_value = mock_flow
 
         mock_runner = MagicMock()

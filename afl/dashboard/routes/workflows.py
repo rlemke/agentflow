@@ -223,6 +223,7 @@ def workflow_run(
         uuid=flow_id,
         name=FlowIdentity(name=workflow_name, path="dashboard", uuid=flow_id),
         compiled_sources=[SourceText(name="source.afl", content=source)],
+        compiled_ast=program_dict,
     )
     store.save_flow(flow)
 

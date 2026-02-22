@@ -286,6 +286,7 @@ def main(args: list[str] | None = None) -> int:
         uuid=flow_id,
         name=FlowIdentity(name=parsed.workflow, path="cli:submit", uuid=flow_id),
         compiled_sources=[SourceText(name="source.afl", content=combined_source)],
+        compiled_ast=program_dict,
     )
     store.save_flow(flow)
 

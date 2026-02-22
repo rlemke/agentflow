@@ -243,6 +243,7 @@ class FlowDefinition:
     publisher: UserDefinition | None = None
     ownership: Ownership | None = None
     compiled_sources: list[SourceText] = field(default_factory=list)
+    compiled_ast: dict | None = None  # Immutable compiled JSON (program_ast)
 
 
 # =============================================================================

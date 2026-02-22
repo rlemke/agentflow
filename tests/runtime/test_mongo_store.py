@@ -585,6 +585,53 @@ class TestFlowOperations:
         retrieved = mongo_store.get_flow("flow-123")
         assert retrieved is None
 
+    def test_flow_compiled_ast_round_trip(self, mongo_store):
+        """Test that compiled_ast is persisted and retrieved correctly."""
+        program_dict = {
+            "declarations": [
+                {
+                    "type": "namespace",
+                    "name": "test",
+                    "body": [
+                        {
+                            "type": "workflow",
+                            "name": "TestWorkflow",
+                            "id": "stmt-abc-123",
+                            "params": [{"name": "x", "type": "String"}],
+                            "body": {"type": "block", "statements": []},
+                        }
+                    ],
+                }
+            ]
+        }
+        flow = FlowDefinition(
+            uuid="flow-ast-1",
+            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-ast-1"),
+            compiled_ast=program_dict,
+        )
+        mongo_store.save_flow(flow)
+        retrieved = mongo_store.get_flow("flow-ast-1")
+
+        assert retrieved is not None
+        assert retrieved.compiled_ast is not None
+        assert retrieved.compiled_ast == program_dict
+        # Verify nested structure survives round-trip
+        decls = retrieved.compiled_ast["declarations"]
+        assert len(decls) == 1
+        assert decls[0]["body"][0]["id"] == "stmt-abc-123"
+
+    def test_flow_compiled_ast_none_for_legacy(self, mongo_store):
+        """Test that flows without compiled_ast get None (backward compat)."""
+        flow = FlowDefinition(
+            uuid="flow-legacy",
+            name=FlowIdentity(name="LegacyFlow", path="/test", uuid="flow-legacy"),
+        )
+        mongo_store.save_flow(flow)
+        retrieved = mongo_store.get_flow("flow-legacy")
+
+        assert retrieved is not None
+        assert retrieved.compiled_ast is None
+
 
 class TestWorkflowOperations:
     """Tests for workflow persistence operations."""

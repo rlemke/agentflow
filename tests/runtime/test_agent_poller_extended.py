@@ -85,6 +85,7 @@ class TestLoadWorkflowAST:
         wf.flow_id = "f-1"
         poller._persistence.get_workflow.return_value = wf
         flow = MagicMock()
+        flow.compiled_ast = None
         flow.compiled_sources = []
         poller._persistence.get_flow.return_value = flow
         result = poller._load_workflow_ast("wf-1")
@@ -96,15 +97,26 @@ class TestLoadWorkflowAST:
         assert result is None
 
     def test_success_returns_workflow_ast(self, poller):
+        import json
+
+        from afl.emitter import JSONEmitter
+        from afl.parser import AFLParser
+
         wf = MagicMock()
         wf.flow_id = "f-1"
         wf.name = "TestWF"
         poller._persistence.get_workflow.return_value = wf
 
+        # Build a real compiled AST
+        source = "workflow TestWF(x: String) => (output: String)"
+        parser = AFLParser()
+        ast = parser.parse(source)
+        emitter = JSONEmitter(include_locations=False)
+        program_dict = json.loads(emitter.emit(ast))
+
         flow = MagicMock()
-        source = MagicMock()
-        source.content = "workflow TestWF(x: String) => (output: String)"
-        flow.compiled_sources = [source]
+        flow.compiled_ast = program_dict
+        flow.compiled_sources = []
         poller._persistence.get_flow.return_value = flow
 
         result = poller._load_workflow_ast("wf-1")

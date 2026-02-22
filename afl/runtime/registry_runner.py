@@ -377,18 +377,24 @@ class RegistryRunner:
                 return None
 
             flow = self._persistence.get_flow(wf.flow_id)
-            if not flow or not flow.compiled_sources:
+            if not flow:
                 return None
 
-            import json
+            # Use stored compiled AST; fall back to recompilation for legacy flows
+            program_dict = flow.compiled_ast
+            if not program_dict:
+                if not flow.compiled_sources:
+                    return None
+                import json
 
-            from ..emitter import JSONEmitter
-            from ..parser import AFLParser
+                from ..emitter import JSONEmitter
+                from ..parser import AFLParser
 
-            parser = AFLParser()
-            ast = parser.parse(flow.compiled_sources[0].content)
-            emitter = JSONEmitter(include_locations=False)
-            program_dict = json.loads(emitter.emit(ast))
+                parser = AFLParser()
+                ast = parser.parse(flow.compiled_sources[0].content)
+                emitter = JSONEmitter(include_locations=False)
+                program_dict = json.loads(emitter.emit(ast))
+                logger.warning("Flow '%s' has no compiled_ast, fell back to recompilation", wf.flow_id)
 
             # Cache program AST for facet definition lookups during resume
             self._program_ast_cache[workflow_id] = program_dict
