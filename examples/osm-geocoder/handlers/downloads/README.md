@@ -89,7 +89,7 @@ Facets with `=> ()` (no return) use `return_param=None` and return an empty dict
 
 ### Shapefile handler
 
-`DownloadShapefile` and `DownloadShapefileAll` use a specialized handler that extracts the region path from the cache URL and downloads in shapefile format. See [SHAPEFILES.md](SHAPEFILES.md) for details.
+`DownloadShapefile` and `DownloadShapefileAll` use a specialized handler that extracts the region path from the cache URL and downloads in shapefile format. See [shapefiles README](../shapefiles/README.md) for details.
 
 ### Handler dispatch
 

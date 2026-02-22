@@ -129,7 +129,7 @@ Downloaded files are stored under the system temp directory:
 
 The cache is keyed by region path and format. A file is considered cached if it exists on disk — there is no TTL or expiration. To force a re-download, delete the local file.
 
-Concurrent downloads of the same file are safe — the downloader uses per-path locks and atomic temp-file writes so the cache file is always either absent or complete. See [DOWNLOADS.md](DOWNLOADS.md#concurrency-control) for full details on the mirror and concurrency mechanisms.
+Concurrent downloads of the same file are safe — the downloader uses per-path locks and atomic temp-file writes so the cache file is always either absent or complete. See [downloads README](../downloads/README.md) for full details on the mirror and concurrency mechanisms.
 
 ## Geofabrik URL mapping
 

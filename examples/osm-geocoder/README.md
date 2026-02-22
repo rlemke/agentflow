@@ -10,7 +10,7 @@ This example demonstrates:
 - **AgentPoller** for building a standalone agent service
 - **Foreach iteration** for batch geocoding (`GeocodeAll`)
 - **Namespace-qualified handlers** registered programmatically from region registries
-- **Multi-format downloads** — PBF (default) and Geofabrik free shapefiles (`.shp.zip`) — see [SHAPEFILES.md](SHAPEFILES.md)
+- **Multi-format downloads** — PBF (default) and Geofabrik free shapefiles (`.shp.zip`) — see [shapefiles README](handlers/shapefiles/README.md)
 
 ### AFL Workflow
 
@@ -79,101 +79,75 @@ This starts a long-running agent that polls for `osm.geo.Geocode` tasks and ~330
 ### Compile check
 
 ```bash
-# Check all AFL sources
-for f in examples/osm-geocoder/afl/*.afl; do scripts/compile "$f" --check; done
+# Check all AFL sources (recursively discovers files in handler subdirectories)
+find examples/osm-geocoder -name '*.afl' -not -path '*/tests/*' -exec scripts/compile {} --check \;
 ```
 
-## Handler modules
+## Project structure
 
-The `handlers/` package organizes event facet handlers by category:
+The `handlers/` package is organized into 16 functional category subpackages, each containing its own handler modules, AFL source files, tests, and README:
 
-| Module | Event facets | Description |
-|--------|-------------|-------------|
-| `cache_handlers.py` | ~250 | Geographic region cache lookups across 11 namespaces — see [CACHE.md](CACHE.md) |
-| `operations_handlers.py` | 13 | Downloads and data processing operations — see [DOWNLOADS.md](DOWNLOADS.md) |
-| `poi_handlers.py` | 8 | Point-of-interest extraction — see [POI.md](POI.md) |
-| `boundary_handlers.py` | 7 | Administrative and natural boundary extraction — see [BOUNDARIES.md](BOUNDARIES.md) |
-| `filter_handlers.py` | 7 | Radius-based and OSM type filtering — see [FILTERS.md](FILTERS.md) |
-| `tiger_handlers.py` | 9 | US Census TIGER voting district data — see [VOTING.md](VOTING.md) |
-| `visualization_handlers.py` | 5 | GeoJSON map rendering with Leaflet — see [VISUALIZATION.md](VISUALIZATION.md) |
-| `route_handlers.py` | 8 | Bicycle, hiking, train, bus route extraction — see [ROUTES.md](ROUTES.md) |
-| `population_handlers.py` | 11 | Population-based filtering for cities, states, etc. — see [POPULATION.md](POPULATION.md) |
-| `park_handlers.py` | 8 | National parks, state parks, protected areas — see [PARKS.md](PARKS.md) |
-| `building_handlers.py` | 9 | Building footprint extraction with classification — see [BUILDINGS.md](BUILDINGS.md) |
-| `amenity_handlers.py` | 29 | Amenity extraction (food, shopping, healthcare, etc.) — see [AMENITIES.md](AMENITIES.md) |
-| `road_handlers.py` | 15 | Road network extraction by classification — see [ROADS.md](ROADS.md) |
-| `graphhopper_handlers.py` | ~200 | GraphHopper routing graph operations — see [GRAPHHOPPER.md](GRAPHHOPPER.md) |
-| `__init__.py` | — | `register_all_handlers(poller)` convenience function |
+```
+handlers/
+├── __init__.py              # backward-compatible facade + register_all_handlers()
+├── shared/                  # shared utilities (_output.py, downloader.py, region_resolver.py)
+├── amenities/               # amenity extraction (restaurants, shops, healthcare)
+├── boundaries/              # administrative and natural boundaries
+├── buildings/               # building footprint extraction
+├── cache/                   # geographic region cache (~250 facets, 11 namespaces)
+├── composed_workflows/      # example composed workflows
+├── downloads/               # download and data processing operations
+├── filters/                 # radius, OSM type, and validation filtering
+├── graphhopper/             # GraphHopper routing graphs (~200 facets)
+├── parks/                   # national parks, protected areas
+├── poi/                     # points of interest
+├── population/              # population-based filtering
+├── roads/                   # road network extraction + zoom builder
+├── routes/                  # bicycle, hiking, train, bus, city routing, GTFS, elevation
+├── shapefiles/              # shapefile downloads
+├── visualization/           # GeoJSON map rendering with Leaflet
+└── voting/                  # US Census TIGER voting districts
+```
 
-## AFL source files
+Each category directory follows the same layout:
 
-| File | Description |
-|------|-------------|
-| `afl/geocoder.afl` | Schema, event facet, and workflows for address geocoding |
-| `afl/osmtypes.afl` | `OSMCache` schema used by all OSM facets |
-| `afl/osmcache.afl` | ~250 cache event facets across 11 geographic namespaces |
-| `afl/osmoperations.afl` | Data processing operations (download, tile, routing, shapefile download) |
-| `afl/osmpoi.afl` | Point-of-interest extraction facets |
-| `afl/osmboundaries.afl` | Administrative and natural boundary extraction facets |
-| `afl/osmfilters.afl` | Radius-based and OSM type filtering facets |
-| `afl/osmfilters_population.afl` | Population-based filtering facets |
-| `afl/osmvoting.afl` | US Census TIGER voting district facets |
-| `afl/osmvisualization.afl` | GeoJSON visualization and map rendering facets |
-| `afl/osmroutes.afl` | Bicycle, hiking, train, bus route extraction facets |
-| `afl/osmparks.afl` | National parks, state parks, protected areas facets |
-| `afl/osmbuildings.afl` | Building footprint extraction facets |
-| `afl/osmamenities.afl` | Amenity extraction facets (food, shopping, healthcare, etc.) |
-| `afl/osmroads.afl` | Road network extraction facets |
-| `afl/osmgraphhopper.afl` | GraphHopper routing graph operation facets |
-| `afl/osmgraphhoppercache.afl` | Per-region GraphHopper cache facets (~200 facets) |
-| `afl/osmgraphhopper_workflows.afl` | Regional routing graph workflow compositions |
-| `afl/osmworkflows_composed.afl` | Example composed workflows demonstrating facet composition |
-| `afl/osmafrica.afl` | Africa workflow composing cache + download steps |
-| `afl/osmasia.afl` | Asia workflow |
-| `afl/osmaustralia.afl` | Australia/Oceania workflow |
-| `afl/osmcanada.afl` | Canada provinces workflow |
-| `afl/osmcentralamerica.afl` | Central America workflow |
-| `afl/osmeurope.afl` | Europe workflow |
-| `afl/osmnorthamerica.afl` | North America workflow |
-| `afl/osmsouthamerica.afl` | South America workflow |
-| `afl/osmunitedstates.afl` | US states workflow |
-| `afl/osmcontinents.afl` | Continents workflow |
-| `afl/osmworld.afl` | World workflow composing all regional workflows |
-| `afl/osmshapefiles.afl` | Europe shapefile download workflow (reuses cache facets with `DownloadShapefile`) |
-| `afl/example_routes_visualization.afl` | Example workflows combining routes and visualization |
+```
+handlers/{category}/
+├── __init__.py              # package marker
+├── *_handlers.py            # handler modules
+├── *_extractor.py           # extractors (where applicable)
+├── afl/*.afl                # AFL source files for this category
+├── tests/test_*.py          # category-specific tests
+└── README.md                # documentation (moved from root-level .md files)
+```
+
+The core geocoding AFL file remains at `afl/geocoder.afl`.
+
+## Handler categories
+
+| Category | Event facets | Handler modules | Description |
+|----------|-------------|-----------------|-------------|
+| [cache](handlers/cache/) | ~250 | cache_handlers, region_handlers | Geographic region caching across 11 namespaces |
+| [graphhopper](handlers/graphhopper/) | ~200 | graphhopper_handlers | Routing graph operations |
+| [amenities](handlers/amenities/) | 29 | amenity_handlers, amenity_extractor, airquality_handlers | Restaurants, shops, healthcare, air quality |
+| [roads](handlers/roads/) | 15 | road_handlers, road_extractor, zoom_* (6 modules) | Road networks + zoom builder |
+| [downloads](handlers/downloads/) | 13 | operations_handlers, postgis_handlers, postgis_importer | Download, tile, routing, PostGIS import |
+| [population](handlers/population/) | 11 | population_handlers, population_filter | Population-based filtering |
+| [buildings](handlers/buildings/) | 9 | building_handlers, building_extractor | Building footprint extraction |
+| [voting](handlers/voting/) | 9 | tiger_handlers, tiger_downloader | US Census TIGER data |
+| [routes](handlers/routes/) | 8 | route_handlers, route_extractor, elevation_handlers, routing_handlers, gtfs_* | Bicycle, hiking, train, bus, city routing, GTFS |
+| [poi](handlers/poi/) | 8 | poi_handlers | Points of interest |
+| [parks](handlers/parks/) | 8 | park_handlers, park_extractor | National parks, protected areas |
+| [boundaries](handlers/boundaries/) | 7 | boundary_handlers, boundary_extractor | Administrative and natural boundaries |
+| [filters](handlers/filters/) | 7 | filter_handlers, radius_filter, osm_type_filter, validation_handlers, osmose_* | Radius, type, validation, OSMOSE |
+| [visualization](handlers/visualization/) | 5 | visualization_handlers, map_renderer | GeoJSON rendering with Leaflet/Folium |
+| [shapefiles](handlers/shapefiles/) | — | *(reuses downloads)* | Shapefile download workflows |
+| [composed_workflows](handlers/composed_workflows/) | — | *(none)* | Workflow composition examples |
 
 ## Other files
 
 | File | Description |
 |------|-------------|
 | `agent.py` | Live agent using AgentPoller + Nominatim API + all OSM handlers |
-| `test_geocoder.py` | Offline end-to-end test with mock handler |
-| `test_downloader.py` | Downloader unit tests (PBF and shapefile formats) |
-| `test_filters.py` | Radius and OSM type filter tests |
-| `test_tiger.py` | Census TIGER voting district tests |
-| `test_visualization.py` | Map visualization tests |
-| `test_routes.py` | Route extraction tests |
-| `test_population.py` | Population filter tests |
-| `test_parks.py` | Park extraction tests |
 | `requirements.txt` | Python dependencies (`requests`, `pyosmium`, `shapely`, `pyproj`, `folium`) |
-
-## Documentation
-
-| File | Description |
-|------|-------------|
-| `CACHE.md` | Cache system documentation (OSMCache schema, namespaces, region registry) |
-| `DOWNLOADS.md` | Downloads and operations documentation (downloader API, operation facets, formats) |
-| `POI.md` | POI extraction documentation (event facets, handler dispatch, return grouping) |
-| `SHAPEFILES.md` | Shapefile download documentation (format details, handler flow, availability notes) |
-| `BOUNDARIES.md` | Administrative and natural boundary extraction |
-| `FILTERS.md` | Radius-based filtering and OSM type filtering |
-| `VOTING.md` | US Census TIGER voting district data |
-| `VISUALIZATION.md` | GeoJSON map rendering with Leaflet/Folium |
-| `ROUTES.md` | Bicycle, hiking, train, bus route extraction |
-| `POPULATION.md` | Population-based filtering for places |
-| `PARKS.md` | National parks, state parks, protected areas |
-| `BUILDINGS.md` | Building footprint extraction with classification |
-| `AMENITIES.md` | Amenity extraction (restaurants, shops, healthcare, etc.) |
-| `ROADS.md` | Road network extraction by classification |
-| `GRAPHHOPPER.md` | GraphHopper routing graph building and caching |
-| `COMPOSED_WORKFLOWS.md` | Examples demonstrating facet-based workflow composition |
+| `conftest.py` | pytest isolation for cross-example test collection |
