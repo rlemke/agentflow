@@ -1,5 +1,16 @@
 # Implementation Changelog
 
+## Completed (v0.12.65) - Reorganize osm-geocoder into functional subdirectories
+- **Restructured `examples/osm-geocoder/handlers/`** from a flat directory (~46 modules) into 16 category subpackages plus a `shared/` package: `amenities`, `boundaries`, `buildings`, `cache`, `composed_workflows`, `downloads`, `filters`, `graphhopper`, `parks`, `poi`, `population`, `roads`, `routes`, `shapefiles`, `visualization`, `voting`
+- Each category contains its own handler `.py` files, `afl/` subdirectory (42 AFL files total), `tests/` subdirectory (36 test files), and `README.md` (renamed from root-level `.md` docs)
+- **Backward-compatible `_AliasImporter` facade** in `handlers/__init__.py`: 41-entry `_MODULE_MAP` with a custom `importlib.abc.MetaPathFinder` that lazily redirects old flat imports (e.g. `from handlers.cache_handlers import REGION_REGISTRY`) to new subpackage paths (`handlers.cache.cache_handlers`) — only activates when the active `handlers` package is from osm-geocoder
+- **Shared utilities** moved to `handlers/shared/`: `_output.py`, `downloader.py`, `region_resolver.py`
+- **Cross-category imports** updated: `operations_handlers.py` → `from ..cache.cache_handlers import REGION_REGISTRY`; `region_resolver.py` → same pattern
+- **pytest cross-example isolation**: root `conftest.py` patches `_pytest.python.importtestmodule` to purge stale `handlers.*` modules immediately before each osm-geocoder module import — fixes collection conflicts where genomics/jenkins handlers would shadow osm-geocoder handlers
+- **Updated `scripts/seed-examples`** `discover_examples()`: recursive AFL glob now deduplicates by `os.path.realpath()` and excludes files resolving outside the example root (symlinks) and files inside `tests/` directories (test fixtures)
+- **continental-lz symlink** preserved: `collect_ignore_glob` in `examples/continental-lz/conftest.py` prevents test collection from symlinked handler tests
+- 181 files changed, 930 insertions, 156 deletions; test suite unchanged: 2308 passed, 79 skipped
+
 ## Completed (v0.12.64) - Add resume_step() for O(depth) step resumption, fix concurrent resume loss
 - **Three performance/correctness fixes** for large-scale workflow execution (500K+ steps):
   1. **AgentPoller concurrent resume fix**: `_resume_workflow()` non-blocking lock was silently dropping resumes when contended — added `_resume_pending` set so the lock holder re-runs after its iteration completes, ensuring no step transitions are lost

@@ -82,7 +82,7 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 | `afl/dashboard/` | FastAPI web monitoring dashboard |
 | `tests/` | Core tests (compiler, runtime, dashboard, MCP) |
 | `agents/` | Multi-language agent libraries (Python, Scala, Go, TypeScript, Java) |
-| `examples/osm-geocoder/` | OSM geocoding example (22 AFL files, ~480+ handlers) |
+| `examples/osm-geocoder/` | OSM geocoding example (42 AFL files, 16 handler categories, ~80 handler modules) |
 | `spec/` | Language and runtime specifications |
 | `docker/` | Dockerfiles for all services |
 | `scripts/` | Convenience scripts (setup, compile, runner, dashboard, etc.) |
@@ -124,4 +124,4 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 - `spec/70_examples.md` — iteration traces for Examples 2, 3, 4
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.63)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.12.65)
