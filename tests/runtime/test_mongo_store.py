@@ -190,6 +190,103 @@ class TestStepOperations:
         assert mongo_store.step_exists("stmt-456", blk_id) is False
         assert mongo_store.step_exists("stmt-123", None) is False
 
+    def test_block_step_exists(self, mongo_store):
+        """Test checking if a block step exists by statement_id and container_id."""
+        wf_id = workflow_id()
+        container = step_id()
+
+        step = StepDefinition(
+            id=step_id(),
+            workflow_id=wf_id,
+            object_type="AndThen",
+            state="state.block.execution.Begin",
+        )
+        step.statement_id = "block-0"
+        step.container_id = container
+
+        mongo_store.save_step(step)
+
+        assert mongo_store.block_step_exists("block-0", container) is True
+        assert mongo_store.block_step_exists("block-1", container) is False
+        assert mongo_store.block_step_exists("block-0", step_id()) is False
+
+
+class TestStepDedupIndex:
+    """Tests for the step deduplication unique index."""
+
+    def test_duplicate_step_insert_skipped_on_commit(self, mongo_store):
+        """DuplicateKeyError on commit is silently skipped."""
+        wf_id = workflow_id()
+        blk = step_id()
+        ctr = step_id()
+
+        # Insert a step directly
+        step1 = StepDefinition(
+            id=step_id(),
+            workflow_id=wf_id,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+        )
+        step1.statement_id = "s1"
+        step1.block_id = blk
+        step1.container_id = ctr
+        mongo_store.save_step(step1)
+
+        # Attempt to commit a second step with the same (statement_id, block_id, container_id)
+        step2 = StepDefinition(
+            id=step_id(),  # different uuid
+            workflow_id=wf_id,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+        )
+        step2.statement_id = "s1"
+        step2.block_id = blk
+        step2.container_id = ctr
+
+        changes = IterationChanges()
+        changes.add_created_step(step2)
+
+        # Should NOT raise — DuplicateKeyError is caught
+        mongo_store.commit(changes)
+
+        # Only the first step should exist
+        assert mongo_store.get_step(step1.id) is not None
+        assert mongo_store.get_step(step2.id) is None
+
+    def test_different_statement_ids_allowed(self, mongo_store):
+        """Steps with different statement_ids in the same block are allowed."""
+        wf_id = workflow_id()
+        blk = step_id()
+        ctr = step_id()
+
+        step1 = StepDefinition(
+            id=step_id(),
+            workflow_id=wf_id,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+        )
+        step1.statement_id = "s1"
+        step1.block_id = blk
+        step1.container_id = ctr
+        mongo_store.save_step(step1)
+
+        step2 = StepDefinition(
+            id=step_id(),
+            workflow_id=wf_id,
+            object_type="VariableAssignment",
+            state="state.facet.initialization.Begin",
+        )
+        step2.statement_id = "s2"
+        step2.block_id = blk
+        step2.container_id = ctr
+
+        changes = IterationChanges()
+        changes.add_created_step(step2)
+        mongo_store.commit(changes)
+
+        assert mongo_store.get_step(step1.id) is not None
+        assert mongo_store.get_step(step2.id) is not None
+
 
 class TestCommitOperations:
     """Tests for atomic commit operations."""

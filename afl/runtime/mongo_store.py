@@ -18,6 +18,7 @@ This module provides a MongoDB-backed persistence layer for the AFL runtime.
 It requires the pymongo package to be installed.
 """
 
+import logging
 import time
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -74,6 +75,7 @@ from .step import StepDefinition
 from .types import BlockId, StepId, VersionInfo, WorkflowId
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 def _current_time_ms() -> int:
@@ -156,6 +158,12 @@ class MongoStore(PersistenceAPI):
         steps.create_index("block_id", name="step_block_id_index")
         steps.create_index("container_id", name="step_container_id_index")
         steps.create_index("state", name="step_state_index")
+        steps.create_index(
+            [("statement_id", 1), ("block_id", 1), ("container_id", 1)],
+            unique=True,
+            partialFilterExpression={"statement_id": {"$type": "string"}},
+            name="step_dedup_index",
+        )
 
         # Flows collection
         flows = self._db.flows
@@ -316,6 +324,12 @@ class MongoStore(PersistenceAPI):
             query["block_id"] = None
         return self._db.steps.count_documents(query, limit=1) > 0
 
+    def block_step_exists(self, statement_id: str, container_id: StepId) -> bool:
+        """Check if a block step already exists for a statement in a container."""
+        return self._db.steps.count_documents(
+            {"statement_id": statement_id, "container_id": container_id}, limit=1
+        ) > 0
+
     # =========================================================================
     # Atomic Commit (PersistenceAPI)
     # =========================================================================
@@ -356,7 +370,15 @@ class MongoStore(PersistenceAPI):
 
         for step in changes.created_steps:
             doc = self._step_to_doc(step)
-            self._db.steps.insert_one(doc, **kwargs)
+            try:
+                self._db.steps.insert_one(doc, **kwargs)
+            except DuplicateKeyError:
+                logger.debug(
+                    "Skipping duplicate step: statement_id=%s block_id=%s container_id=%s",
+                    doc.get("statement_id"),
+                    doc.get("block_id"),
+                    doc.get("container_id"),
+                )
 
         for step in changes.updated_steps:
             doc = self._step_to_doc(step)

@@ -139,8 +139,20 @@ class StatementBlocksBeginHandler(StateHandler):
         # The body could be a single andThen block or a list of blocks
         bodies = body if isinstance(body, list) else [body]
         for i, _block_body in enumerate(bodies):
-            # Use "block-N" as statement_id to track which body this block corresponds to
-            statement_id = f"block-{i}" if len(bodies) > 1 else None
+            statement_id = f"block-{i}"
+
+            # Idempotency: skip if block step already exists in DB
+            if self.context.persistence.block_step_exists(statement_id, self.step.id):
+                continue
+
+            # Also check pending creates in current iteration
+            already_pending = any(
+                str(p.statement_id) == statement_id and p.container_id == self.step.id
+                for p in self.context.changes.created_steps
+            )
+            if already_pending:
+                continue
+
             block_step = StepDefinition.create(
                 workflow_id=self.step.workflow_id,
                 object_type=ObjectType.AND_THEN,

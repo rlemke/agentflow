@@ -2622,6 +2622,271 @@ class TestForeachExecution:
 
 
 # =========================================================================
+# Step Deduplication Tests
+# =========================================================================
+
+
+class TestStepDeduplication:
+    """Tests for step deduplication (block statement_id normalization).
+
+    Verifies that block steps always get a statement_id (never None)
+    and that foreach sub-blocks get a statement_id of "foreach-{i}".
+    """
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    def test_single_body_block_gets_statement_id(self, store, evaluator):
+        """Single-body andThen blocks produce statement_id='block-0' (not None)."""
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestSingleBlock",
+            "params": [{"name": "input", "type": "Long"}],
+            "returns": [{"name": "output", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-s1",
+                        "name": "s1",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["input"]},
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestSingleBlock",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["s1", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "declarations": [
+                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                workflow_ast,
+            ]
+        }
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast, inputs={"input": 1})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        block_steps = [s for s in all_steps if s.object_type == ObjectType.AND_THEN]
+        assert len(block_steps) == 1
+        assert block_steps[0].statement_id == "block-0"
+
+    def test_multi_body_blocks_get_indexed_statement_ids(self, store, evaluator):
+        """Multiple andThen bodies produce statement_id='block-0', 'block-1', etc."""
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestMultiBlock",
+            "params": [{"name": "input", "type": "Long"}],
+            "body": [
+                {
+                    "type": "AndThenBlock",
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-a",
+                            "name": "a",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Value",
+                                "args": [
+                                    {
+                                        "name": "input",
+                                        "value": {"type": "InputRef", "path": ["input"]},
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+                {
+                    "type": "AndThenBlock",
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-b",
+                            "name": "b",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Value",
+                                "args": [
+                                    {
+                                        "name": "input",
+                                        "value": {"type": "InputRef", "path": ["input"]},
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+
+        program_ast = {
+            "declarations": [
+                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                workflow_ast,
+            ]
+        }
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast, inputs={"input": 1})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        block_steps = sorted(
+            [s for s in all_steps if s.object_type == ObjectType.AND_THEN],
+            key=lambda s: s.statement_id or "",
+        )
+        assert len(block_steps) == 2
+        assert block_steps[0].statement_id == "block-0"
+        assert block_steps[1].statement_id == "block-1"
+
+    def test_foreach_sub_blocks_get_indexed_statement_ids(self, store, evaluator):
+        """Foreach sub-blocks produce statement_id='foreach-0', 'foreach-1', etc."""
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "ProcessAll",
+            "params": [{"name": "items", "type": "Json"}],
+            "body": {
+                "type": "AndThenBlock",
+                "foreach": {
+                    "variable": "r",
+                    "iterable": {"type": "InputRef", "path": ["items"]},
+                },
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-v",
+                        "name": "v",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["r"]},
+                                }
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "ProcessAll",
+                        "args": [
+                            {
+                                "name": "count",
+                                "value": {"type": "StepRef", "path": ["v", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        result = evaluator.execute(workflow_ast, inputs={"items": [10, 20, 30]})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        # Find the foreach sub-blocks (they have foreach_var set)
+        sub_blocks = sorted(
+            [s for s in all_steps if s.object_type == ObjectType.AND_THEN and s.foreach_var == "r"],
+            key=lambda s: s.statement_id or "",
+        )
+        assert len(sub_blocks) == 3
+        assert sub_blocks[0].statement_id == "foreach-0"
+        assert sub_blocks[1].statement_id == "foreach-1"
+        assert sub_blocks[2].statement_id == "foreach-2"
+
+    def test_block_step_idempotency(self, store, evaluator):
+        """Block step creation is idempotent — re-executing doesn't duplicate."""
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "TestIdemp",
+            "params": [{"name": "input", "type": "Long"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-s1",
+                        "name": "s1",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Value",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["input"]},
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-1",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "TestIdemp",
+                        "args": [
+                            {
+                                "name": "output",
+                                "value": {"type": "StepRef", "path": ["s1", "input"]},
+                            }
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "declarations": [
+                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                workflow_ast,
+            ]
+        }
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast, inputs={"input": 1})
+        assert result.success is True
+
+        all_steps = list(store.get_all_steps())
+        block_steps = [s for s in all_steps if s.object_type == ObjectType.AND_THEN]
+        # Exactly one block step, not duplicated
+        assert len(block_steps) == 1
+
+
+# =========================================================================
 # Iteration-Level Trace Tests (Features 12-14)
 # =========================================================================
 

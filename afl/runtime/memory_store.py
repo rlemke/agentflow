@@ -220,6 +220,13 @@ class MemoryStore(PersistenceAPI):
         key = self._statement_key(statement_id, block_id)
         return key in self._steps_by_statement
 
+    def block_step_exists(self, statement_id: str, container_id: StepId) -> bool:
+        """Check if a block step already exists for a statement in a container."""
+        for step in self._steps.values():
+            if str(step.statement_id) == statement_id and step.container_id == container_id:
+                return True
+        return False
+
     # Utility methods for testing
 
     def clear(self) -> None:

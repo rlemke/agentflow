@@ -255,6 +255,22 @@ class PersistenceAPI(Protocol):
         """
         ...
 
+    @abstractmethod
+    def block_step_exists(self, statement_id: str, container_id: StepId) -> bool:
+        """Check if a block step already exists for a statement in a container.
+
+        Block steps use container_id (not block_id) for hierarchy,
+        so they need a dedicated check separate from step_exists().
+
+        Args:
+            statement_id: The block statement ID (e.g. "block-0")
+            container_id: The containing step's ID
+
+        Returns:
+            True if block step already exists
+        """
+        ...
+
     # Runner operations
 
     @abstractmethod

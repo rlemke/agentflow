@@ -114,10 +114,25 @@ class BlockExecutionBeginHandler(StateHandler):
 
         # Create a sub-block for each element
         for i, element in enumerate(iterable):
+            foreach_stmt_id = f"foreach-{i}"
+
+            # Idempotency: skip if sub-block already exists in DB
+            if self.context.persistence.step_exists(foreach_stmt_id, self.step.id):
+                continue
+
+            # Also check pending creates in current iteration
+            already_pending = any(
+                str(p.statement_id) == foreach_stmt_id and p.block_id == self.step.id
+                for p in self.context.changes.created_steps
+            )
+            if already_pending:
+                continue
+
             sub_block = StepDefinition.create(
                 workflow_id=self.step.workflow_id,
                 object_type=ObjectType.AND_THEN,
                 facet_name="",
+                statement_id=foreach_stmt_id,
                 container_id=self.step.container_id,
                 block_id=self.step.id,
                 root_id=self.step.root_id or self.step.container_id,
