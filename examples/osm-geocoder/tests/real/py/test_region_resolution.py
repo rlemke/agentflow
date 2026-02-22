@@ -16,7 +16,7 @@ from pathlib import Path
 from afl.runtime import ExecutionStatus
 
 from helpers import (
-    EXAMPLE_AFL_DIR,
+    EXAMPLE_AFL_FILES,
     INTEGRATION_AFL_DIR,
     compile_afl_files,
     extract_workflow,
@@ -28,7 +28,7 @@ _EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
 if str(_EXAMPLE_ROOT) not in sys.path:
     sys.path.insert(0, str(_EXAMPLE_ROOT))
 
-from handlers.region_resolver import resolve  # noqa: E402
+from handlers.shared.region_resolver import resolve  # noqa: E402
 
 
 def _resolve_region_handler(params: dict) -> dict:
@@ -87,8 +87,8 @@ def _compile_region_test():
     """Compile the region test workflow with its dependencies."""
     return compile_afl_files(
         INTEGRATION_AFL_DIR / "resolve_region_test.afl",
-        EXAMPLE_AFL_DIR / "osmtypes.afl",
-        EXAMPLE_AFL_DIR / "osmregion.afl",
+        EXAMPLE_AFL_FILES["osmtypes.afl"],
+        EXAMPLE_AFL_FILES["osmregion.afl"],
     )
 
 

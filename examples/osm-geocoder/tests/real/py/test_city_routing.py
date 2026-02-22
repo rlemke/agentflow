@@ -32,7 +32,7 @@ import pytest
 from afl.runtime import ExecutionStatus
 
 from helpers import (
-    EXAMPLE_AFL_DIR,
+    EXAMPLE_AFL_FILES,
     INTEGRATION_AFL_DIR,
     compile_afl_files,
     extract_workflow,
@@ -72,21 +72,21 @@ _LIBRARY_FILES = [
 
 def _compile_city_routing():
     """Compile the CityRouteMap workflow with all dependencies."""
-    libs = [EXAMPLE_AFL_DIR / f for f in _LIBRARY_FILES]
+    libs = [EXAMPLE_AFL_FILES[f] for f in _LIBRARY_FILES]
     return compile_afl_files(
-        EXAMPLE_AFL_DIR / "osmcityrouting.afl",
+        EXAMPLE_AFL_FILES["osmcityrouting.afl"],
         *libs,
     )
 
 
 def _register_all_handlers(poller):
     """Register all handlers needed for the 9-step pipeline."""
-    from handlers.graphhopper_handlers import register_graphhopper_handlers
-    from handlers.operations_handlers import register_operations_handlers
-    from handlers.population_handlers import register_population_handlers
-    from handlers.region_handlers import register_region_handlers
-    from handlers.routing_handlers import register_routing_handlers
-    from handlers.visualization_handlers import register_visualization_handlers
+    from handlers.graphhopper.graphhopper_handlers import register_graphhopper_handlers
+    from handlers.downloads.operations_handlers import register_operations_handlers
+    from handlers.population.population_handlers import register_population_handlers
+    from handlers.cache.region_handlers import register_region_handlers
+    from handlers.routes.routing_handlers import register_routing_handlers
+    from handlers.visualization.visualization_handlers import register_visualization_handlers
 
     register_region_handlers(poller)
     register_operations_handlers(poller)

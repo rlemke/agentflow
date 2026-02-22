@@ -1,31 +1,149 @@
 """OSM Geocoder event handlers.
 
 Registers handlers for all OSM, Census TIGER, GraphHopper, elevation, and visualization event facets.
+
+Handler modules are organized into functional subdirectories (amenities/, boundaries/, etc.).
+For backward compatibility, ``sys.modules`` aliases map the old flat import paths
+(e.g. ``handlers.cache_handlers``) to the new subpackage paths
+(e.g. ``handlers.cache.cache_handlers``).
 """
 
-from .airquality_handlers import register_airquality_handlers
-from .amenity_handlers import register_amenity_handlers
-from .boundary_handlers import register_boundary_handlers
-from .building_handlers import register_building_handlers
-from .downloader import download as download_region  # noqa: F401
-from .elevation_handlers import register_elevation_handlers
-from .filter_handlers import register_filter_handlers
-from .graphhopper_handlers import register_graphhopper_handlers
-from .gtfs_handlers import register_gtfs_handlers
-from .operations_handlers import register_operations_handlers
-from .osmose_handlers import register_osmose_handlers
-from .park_handlers import register_park_handlers
-from .postgis_handlers import register_postgis_handlers
-from .poi_handlers import register_poi_handlers
-from .population_handlers import register_population_handlers
-from .region_handlers import register_region_handlers
-from .road_handlers import register_road_handlers
-from .route_handlers import register_route_handlers
-from .routing_handlers import register_routing_handlers
-from .tiger_handlers import register_tiger_handlers
-from .validation_handlers import register_validation_handlers
-from .visualization_handlers import register_visualization_handlers
-from .zoom_handlers import register_zoom_handlers
+import importlib
+import importlib.util
+import os
+import sys
+
+# ---------------------------------------------------------------------------
+# sys.modules aliasing: map old flat paths -> new subpackage paths
+# ---------------------------------------------------------------------------
+
+_MODULE_MAP = {
+    # shared utilities
+    "handlers._output": "handlers.shared._output",
+    "handlers.downloader": "handlers.shared.downloader",
+    "handlers.region_resolver": "handlers.shared.region_resolver",
+    # amenities
+    "handlers.amenity_extractor": "handlers.amenities.amenity_extractor",
+    "handlers.amenity_handlers": "handlers.amenities.amenity_handlers",
+    "handlers.airquality_handlers": "handlers.amenities.airquality_handlers",
+    # boundaries
+    "handlers.boundary_extractor": "handlers.boundaries.boundary_extractor",
+    "handlers.boundary_handlers": "handlers.boundaries.boundary_handlers",
+    # buildings
+    "handlers.building_extractor": "handlers.buildings.building_extractor",
+    "handlers.building_handlers": "handlers.buildings.building_handlers",
+    # cache
+    "handlers.cache_handlers": "handlers.cache.cache_handlers",
+    "handlers.region_handlers": "handlers.cache.region_handlers",
+    # downloads
+    "handlers.operations_handlers": "handlers.downloads.operations_handlers",
+    "handlers.postgis_importer": "handlers.downloads.postgis_importer",
+    "handlers.postgis_handlers": "handlers.downloads.postgis_handlers",
+    # filters
+    "handlers.filter_handlers": "handlers.filters.filter_handlers",
+    "handlers.radius_filter": "handlers.filters.radius_filter",
+    "handlers.osm_type_filter": "handlers.filters.osm_type_filter",
+    "handlers.validation_handlers": "handlers.filters.validation_handlers",
+    "handlers.osmose_verifier": "handlers.filters.osmose_verifier",
+    "handlers.osmose_handlers": "handlers.filters.osmose_handlers",
+    # graphhopper
+    "handlers.graphhopper_handlers": "handlers.graphhopper.graphhopper_handlers",
+    # parks
+    "handlers.park_extractor": "handlers.parks.park_extractor",
+    "handlers.park_handlers": "handlers.parks.park_handlers",
+    # poi
+    "handlers.poi_handlers": "handlers.poi.poi_handlers",
+    # population
+    "handlers.population_filter": "handlers.population.population_filter",
+    "handlers.population_handlers": "handlers.population.population_handlers",
+    # roads
+    "handlers.road_extractor": "handlers.roads.road_extractor",
+    "handlers.road_handlers": "handlers.roads.road_handlers",
+    "handlers.zoom_graph": "handlers.roads.zoom_graph",
+    "handlers.zoom_sbs": "handlers.roads.zoom_sbs",
+    "handlers.zoom_detection": "handlers.roads.zoom_detection",
+    "handlers.zoom_selection": "handlers.roads.zoom_selection",
+    "handlers.zoom_builder": "handlers.roads.zoom_builder",
+    "handlers.zoom_handlers": "handlers.roads.zoom_handlers",
+    # routes
+    "handlers.route_extractor": "handlers.routes.route_extractor",
+    "handlers.route_handlers": "handlers.routes.route_handlers",
+    "handlers.elevation_handlers": "handlers.routes.elevation_handlers",
+    "handlers.routing_handlers": "handlers.routes.routing_handlers",
+    "handlers.gtfs_extractor": "handlers.routes.gtfs_extractor",
+    "handlers.gtfs_handlers": "handlers.routes.gtfs_handlers",
+    # visualization
+    "handlers.visualization_handlers": "handlers.visualization.visualization_handlers",
+    "handlers.map_renderer": "handlers.visualization.map_renderer",
+    # voting
+    "handlers.tiger_downloader": "handlers.voting.tiger_downloader",
+    "handlers.tiger_handlers": "handlers.voting.tiger_handlers",
+}
+
+class _AliasImporter:
+    """Lazy sys.modules aliasing — imports on first access only.
+
+    Uses the modern importlib.abc.MetaPathFinder protocol (find_spec)
+    for compatibility with Python 3.12+.
+    """
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname not in _MODULE_MAP:
+            return None
+        # Only redirect when the active 'handlers' package is from osm-geocoder
+        # (avoids intercepting genomics, jenkins, etc. handler imports).
+        handlers_mod = sys.modules.get("handlers")
+        if handlers_mod is None:
+            return None
+        handlers_file = os.path.realpath(getattr(handlers_mod, "__file__", "") or "")
+        if "osm-geocoder" not in handlers_file:
+            return None
+        return importlib.util.spec_from_loader(fullname, loader=self)
+
+    def create_module(self, spec):
+        return None  # use default module creation
+
+    def exec_module(self, module):
+        real_name = _MODULE_MAP[module.__name__]
+        real_mod = importlib.import_module(real_name)
+        # Replace the module in sys.modules with the real one
+        sys.modules[module.__name__] = real_mod
+        # Copy attributes so the module object behaves like the real one
+        module.__dict__.update(real_mod.__dict__)
+        module.__file__ = getattr(real_mod, "__file__", None)
+        module.__path__ = getattr(real_mod, "__path__", [])
+        module.__loader__ = getattr(real_mod, "__loader__", None)
+
+
+sys.meta_path.insert(0, _AliasImporter())
+
+# ---------------------------------------------------------------------------
+# Public imports (using new paths)
+# ---------------------------------------------------------------------------
+
+from .amenities.airquality_handlers import register_airquality_handlers
+from .amenities.amenity_handlers import register_amenity_handlers
+from .boundaries.boundary_handlers import register_boundary_handlers
+from .buildings.building_handlers import register_building_handlers
+from .cache.region_handlers import register_region_handlers
+from .downloads.operations_handlers import register_operations_handlers
+from .downloads.postgis_handlers import register_postgis_handlers
+from .filters.filter_handlers import register_filter_handlers
+from .filters.osmose_handlers import register_osmose_handlers
+from .filters.validation_handlers import register_validation_handlers
+from .graphhopper.graphhopper_handlers import register_graphhopper_handlers
+from .parks.park_handlers import register_park_handlers
+from .poi.poi_handlers import register_poi_handlers
+from .population.population_handlers import register_population_handlers
+from .roads.road_handlers import register_road_handlers
+from .roads.zoom_handlers import register_zoom_handlers
+from .routes.elevation_handlers import register_elevation_handlers
+from .routes.gtfs_handlers import register_gtfs_handlers
+from .routes.route_handlers import register_route_handlers
+from .routes.routing_handlers import register_routing_handlers
+from .shared.downloader import download as download_region  # noqa: F401
+from .visualization.visualization_handlers import register_visualization_handlers
+from .voting.tiger_handlers import register_tiger_handlers
 
 __all__ = [
     "register_all_handlers",
@@ -84,28 +202,28 @@ def register_all_handlers(poller) -> None:
 
 def register_all_registry_handlers(runner) -> None:
     """Register all event facet handlers with a RegistryRunner."""
-    from .airquality_handlers import register_handlers as reg_airquality
-    from .amenity_handlers import register_handlers as reg_amenity
-    from .boundary_handlers import register_handlers as reg_boundary
-    from .building_handlers import register_handlers as reg_building
-    from .elevation_handlers import register_handlers as reg_elevation
-    from .filter_handlers import register_handlers as reg_filter
-    from .graphhopper_handlers import register_handlers as reg_graphhopper
-    from .gtfs_handlers import register_handlers as reg_gtfs
-    from .operations_handlers import register_handlers as reg_operations
-    from .osmose_handlers import register_handlers as reg_osmose
-    from .park_handlers import register_handlers as reg_park
-    from .postgis_handlers import register_handlers as reg_postgis
-    from .poi_handlers import register_handlers as reg_poi
-    from .population_handlers import register_handlers as reg_population
-    from .region_handlers import register_handlers as reg_region
-    from .road_handlers import register_handlers as reg_road
-    from .route_handlers import register_handlers as reg_route
-    from .routing_handlers import register_handlers as reg_routing
-    from .tiger_handlers import register_handlers as reg_tiger
-    from .validation_handlers import register_handlers as reg_validation
-    from .visualization_handlers import register_handlers as reg_visualization
-    from .zoom_handlers import register_handlers as reg_zoom
+    from .amenities.airquality_handlers import register_handlers as reg_airquality
+    from .amenities.amenity_handlers import register_handlers as reg_amenity
+    from .boundaries.boundary_handlers import register_handlers as reg_boundary
+    from .buildings.building_handlers import register_handlers as reg_building
+    from .cache.region_handlers import register_handlers as reg_region
+    from .downloads.operations_handlers import register_handlers as reg_operations
+    from .downloads.postgis_handlers import register_handlers as reg_postgis
+    from .filters.filter_handlers import register_handlers as reg_filter
+    from .filters.osmose_handlers import register_handlers as reg_osmose
+    from .filters.validation_handlers import register_handlers as reg_validation
+    from .graphhopper.graphhopper_handlers import register_handlers as reg_graphhopper
+    from .parks.park_handlers import register_handlers as reg_park
+    from .poi.poi_handlers import register_handlers as reg_poi
+    from .population.population_handlers import register_handlers as reg_population
+    from .roads.road_handlers import register_handlers as reg_road
+    from .roads.zoom_handlers import register_handlers as reg_zoom
+    from .routes.elevation_handlers import register_handlers as reg_elevation
+    from .routes.gtfs_handlers import register_handlers as reg_gtfs
+    from .routes.route_handlers import register_handlers as reg_route
+    from .routes.routing_handlers import register_handlers as reg_routing
+    from .visualization.visualization_handlers import register_handlers as reg_visualization
+    from .voting.tiger_handlers import register_handlers as reg_tiger
 
     reg_airquality(runner)
     reg_amenity(runner)

@@ -27,7 +27,7 @@ import pytest
 from afl.runtime import ExecutionStatus
 
 from helpers import (
-    EXAMPLE_AFL_DIR,
+    EXAMPLE_AFL_FILES,
     compile_afl_files,
     extract_workflow,
     run_to_completion,
@@ -84,10 +84,9 @@ ALL_WORKFLOW_NAMES = [
 
 
 def _compile_composed():
-    """Compile all 43 AFL files with osmworkflows_composed.afl as primary."""
-    all_afl = sorted(EXAMPLE_AFL_DIR.glob("*.afl"))
-    primary = EXAMPLE_AFL_DIR / "osmworkflows_composed.afl"
-    libs = [f for f in all_afl if f.name != "osmworkflows_composed.afl"]
+    """Compile all AFL files with osmworkflows_composed.afl as primary."""
+    primary = EXAMPLE_AFL_FILES["osmworkflows_composed.afl"]
+    libs = [p for n, p in sorted(EXAMPLE_AFL_FILES.items()) if n != "osmworkflows_composed.afl"]
     return compile_afl_files(primary, *libs)
 
 

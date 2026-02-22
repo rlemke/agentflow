@@ -86,7 +86,24 @@ def discover_examples(
         if not os.path.isdir(afl_dir):
             continue
 
+        # Collect AFL files from root afl/ and any subdirectory afl/ folders
+        # (e.g. handlers/amenities/afl/, handlers/cache/afl/).
         files = sorted(glob.glob(os.path.join(afl_dir, "*.afl")))
+        example_root = os.path.join(EXAMPLES_DIR, entry)
+        real_example_root = os.path.realpath(example_root)
+        files += sorted(glob.glob(os.path.join(example_root, "**", "afl", "*.afl"), recursive=True))
+        # Deduplicate by real path and exclude:
+        # - files that resolve outside this example (e.g. via symlinks)
+        # - files inside tests/ directories (test fixtures, not production AFL)
+        seen: set[str] = set()
+        unique: list[str] = []
+        for f in files:
+            real_f = os.path.realpath(f)
+            if real_f not in seen and real_f.startswith(real_example_root) and "/tests/" not in real_f:
+                seen.add(real_f)
+                unique.append(f)
+        files = unique
+
         if not files:
             continue
 

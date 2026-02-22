@@ -15,8 +15,15 @@ from afl.source import CompilerInput, FileOrigin, SourceEntry
 from afl.validator import validate
 
 # Paths
-EXAMPLE_AFL_DIR = Path(__file__).parent.parent.parent.parent / "afl"
+_EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
+EXAMPLE_AFL_DIR = _EXAMPLE_ROOT / "afl"  # root afl/ (geocoder.afl)
 INTEGRATION_AFL_DIR = Path(__file__).parent.parent / "afl"
+
+# All AFL files indexed by filename (root afl/ + handlers/*/afl/)
+EXAMPLE_AFL_FILES: dict[str, Path] = {}
+for _p in sorted(_EXAMPLE_ROOT.rglob("*.afl")):
+    if "/tests/" not in str(_p):
+        EXAMPLE_AFL_FILES[_p.name] = _p
 
 
 def compile_afl_files(

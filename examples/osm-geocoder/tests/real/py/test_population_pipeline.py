@@ -20,7 +20,7 @@ import pytest
 from afl.runtime import ExecutionStatus
 
 from helpers import (
-    EXAMPLE_AFL_DIR,
+    EXAMPLE_AFL_FILES,
     INTEGRATION_AFL_DIR,
     compile_afl_files,
     extract_workflow,
@@ -52,16 +52,16 @@ def _compile_population_pipeline():
     """Compile the population pipeline workflow with dependencies."""
     return compile_afl_files(
         INTEGRATION_AFL_DIR / "population_pipeline.afl",
-        EXAMPLE_AFL_DIR / "osmtypes.afl",
-        EXAMPLE_AFL_DIR / "osmregion.afl",
-        EXAMPLE_AFL_DIR / "osmfilters_population.afl",
+        EXAMPLE_AFL_FILES["osmtypes.afl"],
+        EXAMPLE_AFL_FILES["osmregion.afl"],
+        EXAMPLE_AFL_FILES["osmfilters_population.afl"],
     )
 
 
 def _register_handlers(poller):
     """Register real handlers for the population pipeline."""
-    from handlers.population_handlers import register_population_handlers
-    from handlers.region_handlers import register_region_handlers
+    from handlers.population.population_handlers import register_population_handlers
+    from handlers.cache.region_handlers import register_region_handlers
 
     register_region_handlers(poller)
     register_population_handlers(poller)
