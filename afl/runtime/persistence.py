@@ -140,6 +140,34 @@ class PersistenceAPI(Protocol):
         """
         ...
 
+    def get_actionable_steps_by_workflow(
+        self, workflow_id: WorkflowId
+    ) -> Sequence[StepDefinition]:
+        """Fetch steps that need processing in an evaluator iteration.
+
+        Returns steps that are NOT terminal (Complete/Error) and NOT
+        parked at EventTransmit without a pending transition.  Subclasses
+        may override to push the filtering into the database query.
+
+        Args:
+            workflow_id: The workflow's unique identifier
+
+        Returns:
+            Steps eligible for evaluator processing
+        """
+        from .states import StepState
+
+        steps = self.get_steps_by_workflow(workflow_id)
+        return [
+            s
+            for s in steps
+            if not StepState.is_terminal(s.state)
+            and not (
+                s.state == StepState.EVENT_TRANSMIT
+                and not s.transition.is_requesting_state_change
+            )
+        ]
+
     @abstractmethod
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a given state.

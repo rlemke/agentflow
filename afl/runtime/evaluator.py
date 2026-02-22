@@ -756,10 +756,13 @@ class Evaluator:
         progress = False
         processed_ids: set[StepId] = set()
 
-        # Get all steps for this workflow
-        steps = list(self.persistence.get_steps_by_workflow(context.workflow_id))
+        # Get actionable steps for this workflow (excludes terminal and
+        # EventTransmit steps without pending transitions).
+        steps = list(
+            self.persistence.get_actionable_steps_by_workflow(context.workflow_id)
+        )
         logger.debug(
-            "Iteration start: workflow_id=%s step_count=%d",
+            "Iteration start: workflow_id=%s actionable_step_count=%d",
             context.workflow_id,
             len(steps),
         )
@@ -899,6 +902,9 @@ class Evaluator:
         Returns:
             True if any steps are at EVENT_TRANSMIT state
         """
+        # Use actionable query to avoid loading terminal steps; any
+        # EventTransmit step (without request_transition) that still
+        # exists indicates event-blocked work.
         steps = self.persistence.get_steps_by_workflow(context.workflow_id)
         for step in steps:
             if step.state == StepState.EVENT_TRANSMIT and not step.is_terminal:
@@ -1084,6 +1090,168 @@ class Evaluator:
             logger.error(
                 "Workflow resume failed: workflow_id=%s error=%s",
                 workflow_id_val,
+                e,
+            )
+            return ExecutionResult(
+                success=False,
+                workflow_id=workflow_id_val,
+                error=e,
+                status=ExecutionStatus.ERROR,
+            )
+
+    def resume_step(
+        self,
+        workflow_id_val: WorkflowId,
+        step_id: StepId,
+        workflow_ast: dict,
+        program_ast: dict | None = None,
+        runner_id: str = "",
+    ) -> ExecutionResult:
+        """Resume execution scoped to a single continued step.
+
+        Instead of iterating every actionable step in the workflow,
+        this fetches only the continued step and walks up its container
+        chain, processing each ancestor.  This is O(depth) rather than
+        O(total_steps) and is the preferred resume path after
+        ``continue_step()``.
+
+        Args:
+            workflow_id_val: The workflow ID
+            step_id: The step that was continued via ``continue_step()``
+            workflow_ast: The workflow AST
+            program_ast: Optional full program AST
+            runner_id: Optional runner ID
+
+        Returns:
+            ExecutionResult
+        """
+        logger.info(
+            "Workflow resume_step: workflow_id=%s step_id=%s",
+            workflow_id_val,
+            step_id,
+        )
+
+        defaults = self._extract_defaults(workflow_ast, {})
+
+        context = ExecutionContext(
+            persistence=self.persistence,
+            telemetry=self.telemetry,
+            changes=IterationChanges(),
+            workflow_id=workflow_id_val,
+            workflow_ast=workflow_ast,
+            workflow_defaults=defaults,
+            program_ast=program_ast,
+            runner_id=runner_id,
+        )
+
+        try:
+            max_iterations = 50
+            total_iterations = 0
+
+            for iteration in range(1, max_iterations + 1):
+                # Re-read the chain from persistence each iteration so
+                # parent steps see committed child changes.
+                # Walk: step → block → block.container → ancestor block → ...
+                target_steps: list[StepDefinition] = []
+                seen_ids: set[StepId] = set()
+                current_id: str | None = step_id
+
+                while current_id and current_id not in seen_ids:
+                    step = self.persistence.get_step(current_id)
+                    if step is None:
+                        break
+                    seen_ids.add(current_id)
+                    target_steps.append(step)
+
+                    # Include the block step (which tracks child progress)
+                    if step.block_id and step.block_id not in seen_ids:
+                        block_step = self.persistence.get_step(step.block_id)
+                        if block_step:
+                            seen_ids.add(step.block_id)
+                            target_steps.append(block_step)
+
+                    current_id = step.container_id if step.container_id else None
+
+                if not target_steps:
+                    if iteration == 1:
+                        logger.warning("resume_step: step %s not found", step_id)
+                    break
+
+                context.changes = IterationChanges()
+
+                # Process the chain (leaf first, then ancestors)
+                processed_ids: set[StepId] = set()
+                for step in target_steps:
+                    if step.id in processed_ids:
+                        continue
+                    processed_ids.add(step.id)
+                    self._process_step(step, context)
+
+                # Process any newly created steps from the chain.
+                # _process_step may add more to created_steps, so loop
+                # until no unprocessed created steps remain.
+                while True:
+                    unprocessed = [
+                        s
+                        for s in context.changes.created_steps
+                        if s.id not in processed_ids
+                    ]
+                    if not unprocessed:
+                        break
+                    for ns in unprocessed:
+                        processed_ids.add(ns.id)
+                        self._process_step(ns, context)
+
+                if not context.changes.has_changes:
+                    break
+
+                self._commit_iteration(context)
+                total_iterations += 1
+
+            logger.info(
+                "resume_step done: workflow_id=%s iterations=%d",
+                workflow_id_val,
+                total_iterations,
+            )
+
+            # Check if the workflow root reached a terminal state
+            root = self.persistence.get_workflow_root(workflow_id_val)
+            if root and root.is_complete:
+                outputs = {
+                    name: attr.value
+                    for name, attr in root.attributes.returns.items()
+                }
+                self.telemetry.log_workflow_complete(workflow_id_val, outputs)
+                return ExecutionResult(
+                    success=True,
+                    workflow_id=workflow_id_val,
+                    outputs=outputs,
+                    iterations=total_iterations,
+                    status=ExecutionStatus.COMPLETED,
+                )
+            elif root and root.is_error:
+                error = root.transition.error or Exception("Workflow error")
+                self.telemetry.log_workflow_error(workflow_id_val, error)
+                return ExecutionResult(
+                    success=False,
+                    workflow_id=workflow_id_val,
+                    error=error,
+                    iterations=total_iterations,
+                    status=ExecutionStatus.ERROR,
+                )
+
+            return ExecutionResult(
+                success=True,
+                workflow_id=workflow_id_val,
+                iterations=total_iterations,
+                status=ExecutionStatus.PAUSED,
+            )
+
+        except Exception as e:
+            logger.error(
+                "resume_step failed: workflow_id=%s step_id=%s error=%s",
+                workflow_id_val,
+                step_id,
                 e,
             )
             return ExecutionResult(

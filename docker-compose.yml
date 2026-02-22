@@ -52,6 +52,8 @@ services:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
+      - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
+      - AFL_GEOFABRIK_MIRROR=${AFL_GEOFABRIK_MIRROR:-}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -96,6 +98,8 @@ services:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
+      - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
+      - AFL_GEOFABRIK_MIRROR=${AFL_GEOFABRIK_MIRROR:-}
     volumes:
       - ${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper
     depends_on:
@@ -112,6 +116,8 @@ services:
       - AFL_MONGODB_URL=mongodb://mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
+      - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
+      - AFL_GEOFABRIK_MIRROR=${AFL_GEOFABRIK_MIRROR:-}
     depends_on:
       mongodb:
         condition: service_healthy

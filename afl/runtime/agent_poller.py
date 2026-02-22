@@ -133,6 +133,8 @@ class AgentPoller:
         self._program_ast_cache: dict[str, dict] = {}
         self._resume_locks: dict[str, threading.Lock] = {}
         self._resume_locks_lock = threading.Lock()
+        self._resume_pending: set[str] = set()
+        self._resume_pending_lock = threading.Lock()
 
     @property
     def server_id(self) -> str:
@@ -603,8 +605,8 @@ class AgentPoller:
             # Continue the step with the result
             self._evaluator.continue_step(task.step_id, result)
 
-            # Resume the workflow
-            self._resume_workflow(task.workflow_id, task.runner_id)
+            # Resume the workflow (scoped to the completed step)
+            self._resume_workflow(task.workflow_id, task.runner_id, step_id=task.step_id)
 
             # Mark task completed
             task.state = TaskState.COMPLETED
@@ -649,8 +651,20 @@ class AgentPoller:
     # Workflow Resume
     # =========================================================================
 
-    def _resume_workflow(self, workflow_id: str, runner_id: str = "") -> None:
-        """Resume a paused workflow after step completion."""
+    def _resume_workflow(
+        self, workflow_id: str, runner_id: str = "", step_id: str = ""
+    ) -> None:
+        """Resume a paused workflow after step completion.
+
+        Uses a per-workflow lock to prevent concurrent evaluator resumes.
+        When a thread cannot acquire the lock, it marks the workflow as
+        pending so the lock holder re-runs the resume after its current
+        iteration completes.  This ensures no step transitions are lost
+        when multiple tasks for the same workflow complete concurrently.
+
+        When *step_id* is provided, uses ``evaluator.resume_step()`` for
+        O(depth) processing instead of iterating all actionable steps.
+        """
         # Acquire per-workflow lock to prevent concurrent resumes
         with self._resume_locks_lock:
             if workflow_id not in self._resume_locks:
@@ -658,35 +672,67 @@ class AgentPoller:
             lock = self._resume_locks[workflow_id]
 
         if not lock.acquire(blocking=False):
-            logger.debug("Resume already in progress for workflow %s, skipping", workflow_id)
+            # Another thread is already resuming — mark pending so
+            # the holder re-runs after its current iteration.
+            with self._resume_pending_lock:
+                self._resume_pending.add(workflow_id)
+            logger.debug("Resume already in progress for workflow %s, marked pending", workflow_id)
             return
 
         try:
-            workflow_ast = self._ast_cache.get(workflow_id)
-            if workflow_ast is None:
-                workflow_ast = self._load_workflow_ast(workflow_id)
-                if workflow_ast:
-                    self._ast_cache[workflow_id] = workflow_ast
+            self._do_resume(workflow_id, runner_id, step_id=step_id)
 
-            if workflow_ast is None:
-                logger.warning(
-                    "No AST available for workflow %s, skipping resume",
-                    workflow_id,
-                )
-                return
+            # Re-run if other threads flagged a pending resume while
+            # we held the lock.  Pending resumes use full resume()
+            # since we don't know which specific step triggered them.
+            while True:
+                with self._resume_pending_lock:
+                    if workflow_id not in self._resume_pending:
+                        break
+                    self._resume_pending.discard(workflow_id)
+                self._do_resume(workflow_id, runner_id)
+        finally:
+            lock.release()
 
-            program_ast = self._program_ast_cache.get(workflow_id)
+    def _do_resume(self, workflow_id: str, runner_id: str, step_id: str = "") -> None:
+        """Execute a single evaluator resume for *workflow_id*.
+
+        When *step_id* is provided, uses the focused ``resume_step()``
+        path (O(depth)).  Otherwise falls back to full ``resume()``.
+        """
+        workflow_ast = self._ast_cache.get(workflow_id)
+        if workflow_ast is None:
+            workflow_ast = self._load_workflow_ast(workflow_id)
+            if workflow_ast:
+                self._ast_cache[workflow_id] = workflow_ast
+
+        if workflow_ast is None:
+            logger.warning(
+                "No AST available for workflow %s, skipping resume",
+                workflow_id,
+            )
+            return
+
+        program_ast = self._program_ast_cache.get(workflow_id)
+
+        if step_id:
+            result = self._evaluator.resume_step(
+                workflow_id,
+                step_id,
+                workflow_ast,
+                program_ast=program_ast,
+                runner_id=runner_id,
+            )
+        else:
             result = self._evaluator.resume(
                 workflow_id, workflow_ast, program_ast=program_ast, runner_id=runner_id
             )
 
-            if runner_id and result.status in (
-                ExecutionStatus.COMPLETED,
-                ExecutionStatus.ERROR,
-            ):
-                self._update_runner_state(runner_id, result)
-        finally:
-            lock.release()
+        if runner_id and result.status in (
+            ExecutionStatus.COMPLETED,
+            ExecutionStatus.ERROR,
+        ):
+            self._update_runner_state(runner_id, result)
 
     def _update_runner_state(self, runner_id: str, result: "ExecutionResult") -> None:
         """Update runner state based on execution result."""

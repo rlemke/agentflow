@@ -251,6 +251,26 @@ class MongoStore(PersistenceAPI):
         docs = self._db.steps.find({"workflow_id": workflow_id})
         return [self._doc_to_step(doc) for doc in docs]
 
+    def get_actionable_steps_by_workflow(
+        self, workflow_id: WorkflowId
+    ) -> Sequence[StepDefinition]:
+        """Fetch steps that need processing — DB-level filtering.
+
+        Excludes terminal steps (Complete/Error) and EventTransmit steps
+        that do not have ``request_transition`` set.
+        """
+        from .states import StepState
+
+        docs = self._db.steps.find({
+            "workflow_id": workflow_id,
+            "$nor": [
+                {"state": StepState.STATEMENT_COMPLETE},
+                {"state": StepState.STATEMENT_ERROR},
+                {"state": StepState.EVENT_TRANSMIT, "request_transition": {"$ne": True}},
+            ],
+        })
+        return [self._doc_to_step(doc) for doc in docs]
+
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a given state."""
         docs = self._db.steps.find({"state": state})

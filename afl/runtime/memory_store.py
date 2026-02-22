@@ -89,6 +89,28 @@ class MemoryStore(PersistenceAPI):
         step_ids = self._steps_by_workflow.get(workflow_id, [])
         return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
 
+    def get_actionable_steps_by_workflow(
+        self, workflow_id: WorkflowId
+    ) -> Sequence[StepDefinition]:
+        """Fetch steps that need processing in an evaluator iteration."""
+        from .states import StepState
+
+        step_ids = self._steps_by_workflow.get(workflow_id, [])
+        result = []
+        for sid in step_ids:
+            s = self._steps.get(sid)
+            if s is None:
+                continue
+            if StepState.is_terminal(s.state):
+                continue
+            if (
+                s.state == StepState.EVENT_TRANSMIT
+                and not s.transition.is_requesting_state_change
+            ):
+                continue
+            result.append(s.clone())
+        return result
+
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a given state."""
         return [s.clone() for s in self._steps.values() if s.state == state]
