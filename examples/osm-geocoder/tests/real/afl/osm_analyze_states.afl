@@ -2,18 +2,19 @@
 namespace osm.geo.UnitedStates.analysis {
   use osm.types
 
-  /** Runs 10 composed analysis workflows for a single region. */
+  /** Runs 10 composed analysis workflows for a single region using a shared cache. */
   workflow AnalyzeRegion(region: String = "Liechtenstein") => (completed_region: String) andThen {
-    bicycleRoutes = examples.composed.VisualizeBicycleRoutes(region = $.region)
-    parks = examples.composed.AnalyzeParks(region = $.region)
-    largeCities = examples.composed.LargeCitiesMap(region = $.region, min_pop = 10000)
-    transport = examples.composed.TransportOverview(region = $.region)
-    nationalParks = examples.composed.NationalParksAnalysis(region = $.region)
-    cityAnalysis = examples.composed.CityAnalysis(region = $.region, min_population = 100000)
-    transportMap = examples.composed.TransportMap(region = $.region)
-    boundaries = examples.composed.StateBoundariesWithStats(region = $.region)
-    cities = examples.composed.DiscoverCitiesAndTowns(region = $.region)
-    regional = examples.composed.RegionalAnalysis(region = $.region)
+    cache = osm.geo.Operations.Cache(region = $.region)
+    bicycleRoutes = examples.composed.VisualizeBicycleRoutesFromCache(cache = cache.cache)
+    parks = examples.composed.AnalyzeParksFromCache(cache = cache.cache)
+    largeCities = examples.composed.LargeCitiesMapFromCache(cache = cache.cache, min_pop = 10000)
+    transport = examples.composed.TransportOverviewFromCache(cache = cache.cache)
+    nationalParks = examples.composed.NationalParksAnalysisFromCache(cache = cache.cache)
+    cityAnalysis = examples.composed.CityAnalysisFromCache(cache = cache.cache, min_population = 100000)
+    transportMap = examples.composed.TransportMapFromCache(cache = cache.cache)
+    boundaries = examples.composed.StateBoundariesWithStatsFromCache(cache = cache.cache)
+    cities = examples.composed.DiscoverCitiesAndTownsFromCache(cache = cache.cache)
+    regional = examples.composed.RegionalAnalysisFromCache(cache = cache.cache)
 
     yield AnalyzeRegion(completed_region = $.region)
   }
