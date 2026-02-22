@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Handlers — AgentFlow Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="container">
+    <div class="subnav">
+        <a href="/v2/handlers?tab=all"
+           class="subnav-pill{% if tab == 'all' %} active{% endif %}">
+            All <span class="subnav-count">{{ tab_counts.all }}</span>
+        </a>
+        {% for prefix in prefixes %}
+        <a href="/v2/handlers?tab={{ prefix }}"
+           class="subnav-pill{% if tab == prefix %} active{% endif %}">
+            {{ prefix }} <span class="subnav-count">{{ tab_counts[prefix] }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Handlers</h1>
+
+<div id="handler-groups"
+     hx-get="/v2/handlers/partial?tab={{ tab }}"
+     hx-trigger="every 5s"
+     hx-swap="innerHTML">
+    {% include "v2/handlers/_handler_groups.html" %}
+</div>
+{% endblock %}

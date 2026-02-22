@@ -1,0 +1,40 @@
+{% if groups %}
+{% for group in groups %}
+<details class="ns-group" open>
+    <summary>
+        <strong>{{ group.namespace }}</strong>
+        <span class="badge badge-secondary">{{ group.total }}</span>
+    </summary>
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Facet Name</th>
+                <th>Module URI</th>
+                <th>Entrypoint</th>
+                <th>Version</th>
+                <th>Timeout</th>
+                <th>Registered</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for handler in group.handlers %}
+            <tr>
+                <td>
+                    <a href="/v2/handlers/{{ handler.facet_name }}">
+                        {{ handler.facet_name|short_workflow_name }}
+                    </a>
+                </td>
+                <td class="mono">{{ handler.module_uri }}</td>
+                <td class="mono">{{ handler.entrypoint }}</td>
+                <td>{{ handler.version }}</td>
+                <td>{{ handler.timeout_ms }}ms</td>
+                <td>{{ handler.created|timestamp }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</details>
+{% endfor %}
+{% else %}
+<p>No handlers in this category.</p>
+{% endif %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if handler %}{{ handler.facet_name }} — AgentFlow{% else %}Handler Not Found{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if handler %}
+<hgroup>
+    <h1>{{ handler.facet_name|short_workflow_name }}</h1>
+    <p>
+        <span class="mono">{{ handler.facet_name }}</span>
+        &mdash; v{{ handler.version }}
+    </p>
+</hgroup>
+
+<div class="summary-grid">
+    <article class="summary-card">
+        <h2 class="mono">{{ handler.module_uri }}</h2>
+        <p>Module URI</p>
+    </article>
+    <article class="summary-card">
+        <h2 class="mono">{{ handler.entrypoint }}</h2>
+        <p>Entrypoint</p>
+    </article>
+    <article class="summary-card">
+        <h2>{{ handler.timeout_ms }}ms</h2>
+        <p>Timeout</p>
+    </article>
+</div>
+
+<div id="handler-detail-content"
+     hx-get="/v2/handlers/{{ handler.facet_name }}/partial"
+     hx-trigger="every 5s"
+     hx-swap="innerHTML">
+    {% include "v2/handlers/_detail_content.html" %}
+</div>
+
+{% else %}
+<h1>Handler Not Found</h1>
+<p>The requested handler could not be found.</p>
+<a href="/v2/handlers">Back to Handlers</a>
+{% endif %}
+{% endblock %}

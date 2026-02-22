@@ -12,14 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dashboard v2 routes — namespace-grouped workflow and server views."""
+"""Dashboard v2 routes — namespace-grouped workflow, server, and handler views."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import RedirectResponse
 
 from ..dependencies import get_store
-from ..helpers import categorize_step_state, group_runners_by_namespace, group_servers_by_group
+from ..helpers import (
+    categorize_step_state,
+    extract_handler_prefix,
+    group_handlers_by_namespace,
+    group_runners_by_namespace,
+    group_servers_by_group,
+    short_workflow_name,
+)
 
 router = APIRouter(prefix="/v2")
 
@@ -316,5 +324,118 @@ def server_detail_partial(
         "v2/servers/_detail_content.html",
         {
             "server": server,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Handler views
+# ---------------------------------------------------------------------------
+
+
+def _count_handlers_by_prefix(handlers: list) -> dict[str, int]:
+    """Count handlers per namespace prefix tab, including 'all'."""
+    counts: dict[str, int] = {"all": len(handlers)}
+    for h in handlers:
+        prefix = extract_handler_prefix(h.facet_name)
+        counts[prefix] = counts.get(prefix, 0) + 1
+    return counts
+
+
+def _filter_handlers_by_prefix(handlers: list, tab: str) -> list:
+    """Filter handlers by namespace prefix tab."""
+    if tab == "all":
+        return handlers
+    return [h for h in handlers if extract_handler_prefix(h.facet_name) == tab]
+
+
+@router.get("/handlers")
+def handler_list(
+    request: Request,
+    tab: str = "all",
+    store=Depends(get_store),
+):
+    """Handler list with namespace-prefix tabs and namespace-group accordion."""
+    all_handlers = store.list_handler_registrations()
+    tab_counts = _count_handlers_by_prefix(all_handlers)
+    # Build sorted list of unique prefixes (excluding 'all')
+    prefixes = sorted({extract_handler_prefix(h.facet_name) for h in all_handlers})
+    filtered = _filter_handlers_by_prefix(all_handlers, tab)
+    groups = group_handlers_by_namespace(filtered)
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/list.html",
+        {
+            "groups": groups,
+            "tab": tab,
+            "tab_counts": tab_counts,
+            "prefixes": prefixes,
+            "active_tab": "handlers",
+        },
+    )
+
+
+@router.get("/handlers/partial")
+def handler_list_partial(
+    request: Request,
+    tab: str = "all",
+    store=Depends(get_store),
+):
+    """HTMX partial for auto-refresh of handler groups."""
+    all_handlers = store.list_handler_registrations()
+    filtered = _filter_handlers_by_prefix(all_handlers, tab)
+    groups = group_handlers_by_namespace(filtered)
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/_handler_groups.html",
+        {
+            "groups": groups,
+        },
+    )
+
+
+@router.get("/handlers/{facet_name:path}/partial")
+def handler_detail_partial(
+    facet_name: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """HTMX partial for handler detail refresh."""
+    handler = store.get_handler_registration(facet_name)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/_detail_content.html",
+        {
+            "handler": handler,
+        },
+    )
+
+
+@router.post("/handlers/{facet_name:path}/delete")
+def handler_delete(
+    facet_name: str,
+    store=Depends(get_store),
+):
+    """Delete a handler registration and redirect to list."""
+    store.delete_handler_registration(facet_name)
+    return RedirectResponse(url="/v2/handlers", status_code=303)
+
+
+@router.get("/handlers/{facet_name:path}")
+def handler_detail(
+    facet_name: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """Handler detail page."""
+    handler = store.get_handler_registration(facet_name)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/detail.html",
+        {
+            "handler": handler,
+            "active_tab": "handlers",
         },
     )

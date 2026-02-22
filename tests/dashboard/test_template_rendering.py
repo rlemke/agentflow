@@ -133,7 +133,7 @@ class TestNavigationRendering:
         assert 'href="/tasks"' in html
         assert 'href="/v2/servers"' in html
         assert 'href="/events"' in html
-        assert 'href="/handlers"' in html
+        assert 'href="/v2/handlers"' in html
         assert 'href="/sources"' in html
         assert 'href="/locks"' in html
         assert 'href="/namespaces"' in html

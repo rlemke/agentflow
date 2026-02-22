@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from afl.runtime.entities import RunnerDefinition
+    from afl.runtime.entities import HandlerRegistration, RunnerDefinition
 
 
 def extract_namespace(workflow_name: str) -> str:
@@ -94,6 +94,47 @@ def group_runners_by_namespace(
                 "runners": ns_runners,
                 "counts": counts,
                 "total": len(ns_runners),
+            }
+        )
+    return groups
+
+
+def extract_handler_prefix(facet_name: str) -> str:
+    """Extract the top-level namespace prefix from a handler facet name.
+
+    Returns the first dotted segment, or ``(top-level)`` if there are no dots.
+
+    >>> extract_handler_prefix("osm.geo.Cache")
+    'osm'
+    >>> extract_handler_prefix("SimpleHandler")
+    '(top-level)'
+    """
+    if "." in facet_name:
+        return facet_name.split(".", 1)[0]
+    return "(top-level)"
+
+
+def group_handlers_by_namespace(
+    handlers: list[HandlerRegistration],
+) -> list[dict]:
+    """Group handlers by their full namespace (all segments except last).
+
+    Returns a sorted list of dicts:
+        [{"namespace": "osm.geo", "handlers": [...], "total": N}]
+    """
+    ns_map: dict[str, list[HandlerRegistration]] = {}
+    for h in handlers:
+        ns = extract_namespace(h.facet_name)
+        ns_map.setdefault(ns, []).append(h)
+
+    groups = []
+    for ns in sorted(ns_map):
+        ns_handlers = ns_map[ns]
+        groups.append(
+            {
+                "namespace": ns,
+                "handlers": ns_handlers,
+                "total": len(ns_handlers),
             }
         )
     return groups
