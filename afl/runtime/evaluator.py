@@ -86,6 +86,24 @@ class ExecutionContext:
     # Cache for completed steps by name within blocks
     _completed_step_cache: dict[str, StepDefinition] = field(default_factory=dict)
 
+    # Track which block IDs need Continue re-evaluation.
+    # None = all dirty (first iteration), empty set = nothing dirty.
+    _dirty_blocks: set[StepId] | None = field(default=None)
+
+    def mark_block_dirty(self, block_id: StepId | None) -> None:
+        """Mark a block as needing Continue re-evaluation."""
+        if block_id and self._dirty_blocks is not None:
+            self._dirty_blocks.add(block_id)
+
+    def is_block_dirty(self, block_id: StepId) -> bool:
+        """Check if a block needs Continue re-evaluation."""
+        return self._dirty_blocks is None or block_id in self._dirty_blocks
+
+    def mark_block_processed(self, block_id: StepId) -> None:
+        """Remove a block from the dirty set after processing."""
+        if self._dirty_blocks is not None:
+            self._dirty_blocks.discard(block_id)
+
     def get_workflow_ast(self) -> dict | None:
         """Get the workflow AST."""
         return self.workflow_ast
@@ -767,13 +785,29 @@ class Evaluator:
             len(steps),
         )
 
+        # Continue states: blocks polling for child completion
+        CONTINUE_STATES = {
+            StepState.BLOCK_EXECUTION_CONTINUE,
+            StepState.STATEMENT_BLOCKS_CONTINUE,
+            StepState.MIXIN_BLOCKS_CONTINUE,
+        }
+
         # Process existing steps
         for step in steps:
             if step.id in processed_ids:
                 continue
             processed_ids.add(step.id)
-            if self._process_step(step, context):
+
+            # Skip Continue blocks that haven't been dirtied by a child change
+            if step.state in CONTINUE_STATES and not context.is_block_dirty(step.id):
+                continue
+
+            result_progress = self._process_step(step, context)
+            if result_progress:
                 progress = True
+            elif step.state in CONTINUE_STATES:
+                # Processed but no progress — remove from dirty set
+                context.mark_block_processed(step.id)
 
         # Process newly created steps (may be created during processing)
         # Use a list to collect all created steps for this iteration
@@ -844,11 +878,16 @@ class Evaluator:
                 state_before,
                 result.step.state,
             )
+            # Mark parent blocks as needing re-evaluation
+            context.mark_block_dirty(result.step.block_id)
+            context.mark_block_dirty(result.step.container_id)
             context.changes.add_updated_step(result.step)
             return True
 
         # No state change but step was modified (e.g., attributes set)
         if result.step.transition.changed and not result.continue_processing:
+            context.mark_block_dirty(result.step.block_id)
+            context.mark_block_dirty(result.step.container_id)
             context.changes.add_updated_step(result.step)
             return True
 
@@ -1064,6 +1103,18 @@ class Evaluator:
                     len(context.changes.updated_steps),
                 )
 
+                # After first iteration, switch to dirty-block tracking.
+                # Seed the set from steps that changed this iteration
+                # (before commit clears the changes).
+                if context._dirty_blocks is None:
+                    dirty: set[StepId] = set()
+                    for s in context.changes.updated_steps:
+                        if s.block_id:
+                            dirty.add(s.block_id)
+                        if s.container_id:
+                            dirty.add(s.container_id)
+                    context._dirty_blocks = dirty
+
                 self._commit_iteration(context)
 
                 if not progress:
@@ -1142,6 +1193,7 @@ class Evaluator:
             workflow_defaults=defaults,
             program_ast=program_ast,
             runner_id=runner_id,
+            _dirty_blocks=set(),
         )
 
         try:
@@ -1176,6 +1228,15 @@ class Evaluator:
                     if iteration == 1:
                         logger.warning("resume_step: step %s not found", step_id)
                     break
+
+                # Seed dirty set with all Continue-state blocks in the chain
+                for ts in target_steps:
+                    if ts.state in {
+                        StepState.BLOCK_EXECUTION_CONTINUE,
+                        StepState.STATEMENT_BLOCKS_CONTINUE,
+                        StepState.MIXIN_BLOCKS_CONTINUE,
+                    }:
+                        context._dirty_blocks.add(ts.id)
 
                 context.changes = IterationChanges()
 

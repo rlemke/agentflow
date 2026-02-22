@@ -1,5 +1,15 @@
 # Implementation Changelog
 
+## Completed (v0.12.70) - Deduplicate Continue block processing in the evaluator
+- **Dirty-block tracking** in `ExecutionContext`: new `_dirty_blocks: set[StepId] | None` field tracks which block IDs need Continue re-evaluation — `None` = all dirty (first iteration), empty `set()` = nothing dirty, populated set = only those blocks re-evaluated
+- **Three helper methods** on `ExecutionContext`: `mark_block_dirty(block_id)`, `is_block_dirty(block_id)`, `mark_block_processed(block_id)` — manage the dirty set lifecycle
+- **`_run_iteration()` skip logic**: Continue-state blocks (`BLOCK_EXECUTION_CONTINUE`, `STATEMENT_BLOCKS_CONTINUE`, `MIXIN_BLOCKS_CONTINUE`) are skipped when not in the dirty set; blocks processed with no progress are removed from the dirty set
+- **`_process_step()` dirty propagation**: when a step changes state, its `block_id` and `container_id` are marked dirty so parent Continue blocks get re-evaluated in subsequent iterations
+- **`resume()` initialization**: first iteration uses `_dirty_blocks=None` (processes all blocks); after first iteration, switches to `set()` seeded from updated steps' parent block/container IDs (before commit clears changes)
+- **`resume_step()` initialization**: starts with `_dirty_blocks=set()` and seeds Continue-state blocks from the ancestor chain walk
+- **12 new tests** in `TestDirtyBlockTracking`: ExecutionContext helper unit tests (6), _run_iteration skip/process/clean tests (3), _process_step dirty propagation (1), resume() first-iteration semantics (1), resume_step() chain seeding (1)
+- 2 files changed, 446 insertions, 1 deletion; test suite: 2418 passed, 79 skipped; total collected 2497
+
 ## Completed (v0.12.69) - Extract cache-dependent logic into FromCache facets
 - **22 FromCache composition facets** added across two AFL files: `example_routes_visualization.afl` (8 facets) and `osmworkflows_composed.afl` (14 facets, excluding `TransitAnalysis` which has no Cache dependency)
 - **Transformation pattern**: each workflow that previously created a Cache and then ran multi-step logic now delegates to a `facet XFromCache(cache: OSMCache)` that accepts the cache directly — the workflow becomes a thin wrapper (`cache = Cache(region = $.region)`, `f = XFromCache(cache = cache.cache)`, `yield`)

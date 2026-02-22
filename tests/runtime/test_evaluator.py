@@ -4652,3 +4652,387 @@ class TestImplicitDefaults:
         assert retry_step is not None
         # Facet default (3) applies since no implicit exists
         assert retry_step.get_attribute("maxAttempts") == 3
+
+
+# =========================================================================
+# Dirty block deduplication tests
+# =========================================================================
+
+
+class TestDirtyBlockTracking:
+    """Tests for Continue block deduplication via dirty-block tracking."""
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    def test_execution_context_dirty_blocks_none_means_all_dirty(self):
+        """When _dirty_blocks is None, is_block_dirty returns True for any ID."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks=None,
+        )
+
+        assert ctx.is_block_dirty("block-1") is True
+        assert ctx.is_block_dirty("block-999") is True
+
+    def test_execution_context_empty_dirty_set_means_nothing_dirty(self):
+        """When _dirty_blocks is empty set, is_block_dirty returns False."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks=set(),
+        )
+
+        assert ctx.is_block_dirty("block-1") is False
+        assert ctx.is_block_dirty("block-999") is False
+
+    def test_mark_block_dirty_adds_to_set(self):
+        """mark_block_dirty adds block ID to the dirty set."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks=set(),
+        )
+
+        ctx.mark_block_dirty("block-1")
+        assert ctx.is_block_dirty("block-1") is True
+        assert ctx.is_block_dirty("block-2") is False
+
+    def test_mark_block_dirty_noop_when_none(self):
+        """mark_block_dirty is a no-op when _dirty_blocks is None."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks=None,
+        )
+
+        # Should not raise; no-op because already processing all
+        ctx.mark_block_dirty("block-1")
+        assert ctx._dirty_blocks is None
+
+    def test_mark_block_dirty_ignores_none_id(self):
+        """mark_block_dirty ignores None block_id."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks=set(),
+        )
+
+        ctx.mark_block_dirty(None)
+        assert ctx._dirty_blocks == set()
+
+    def test_mark_block_processed_removes_from_set(self):
+        """mark_block_processed removes block from dirty set."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        ctx = ExecutionContext(
+            persistence=MemoryStore(),
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-test",
+            _dirty_blocks={"block-1", "block-2"},
+        )
+
+        ctx.mark_block_processed("block-1")
+        assert ctx.is_block_dirty("block-1") is False
+        assert ctx.is_block_dirty("block-2") is True
+
+    def test_continue_block_skipped_when_not_dirty(self, store, evaluator):
+        """Continue-state blocks are skipped in _run_iteration when not dirty."""
+        from unittest.mock import patch
+
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        wf_id = "wf-skip-clean"
+
+        # Create a block step stuck in BLOCK_EXECUTION_CONTINUE
+        block_step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.BLOCK,
+            facet_name=None,
+        )
+        block_step.state = StepState.BLOCK_EXECUTION_CONTINUE
+        block_step.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
+        store.save_step(block_step)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            _dirty_blocks=set(),  # Empty — nothing dirty
+        )
+
+        # _process_step should NOT be called for this clean block
+        with patch.object(evaluator, "_process_step") as mock_process:
+            evaluator._run_iteration(context)
+            # The block step should be skipped entirely
+            for call in mock_process.call_args_list:
+                assert call[0][0].id != block_step.id, (
+                    "Clean Continue block should not be processed"
+                )
+
+    def test_continue_block_processed_when_dirty(self, store, evaluator):
+        """Continue-state blocks ARE processed when in the dirty set."""
+        from unittest.mock import MagicMock, patch
+
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        wf_id = "wf-dirty-block"
+
+        # Create a block step stuck in BLOCK_EXECUTION_CONTINUE
+        block_step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.BLOCK,
+            facet_name=None,
+        )
+        block_step.state = StepState.BLOCK_EXECUTION_CONTINUE
+        block_step.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
+        store.save_step(block_step)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            _dirty_blocks={block_step.id},  # Block is dirty
+        )
+
+        # _process_step should be called for this dirty block
+        mock_result = MagicMock()
+        mock_result.step = block_step
+        mock_result.step.state = StepState.BLOCK_EXECUTION_CONTINUE  # No change
+        mock_result.step.transition.changed = False
+        mock_result.continue_processing = False
+
+        mock_changer = MagicMock()
+        mock_changer.process.return_value = mock_result
+
+        processed_ids = []
+        original_process = evaluator._process_step
+
+        def tracking_process(step, ctx):
+            processed_ids.append(step.id)
+            return False  # No progress
+
+        with patch.object(evaluator, "_process_step", side_effect=tracking_process):
+            evaluator._run_iteration(context)
+
+        assert block_step.id in processed_ids, (
+            "Dirty Continue block should be processed"
+        )
+
+    def test_continue_block_removed_from_dirty_on_no_progress(self, store, evaluator):
+        """Continue block is removed from dirty set when processed with no progress."""
+        from unittest.mock import patch
+
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        wf_id = "wf-clean-after"
+
+        block_step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.BLOCK,
+            facet_name=None,
+        )
+        block_step.state = StepState.BLOCK_EXECUTION_CONTINUE
+        block_step.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
+        store.save_step(block_step)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            _dirty_blocks={block_step.id},
+        )
+
+        # _process_step returns False (no progress)
+        with patch.object(evaluator, "_process_step", return_value=False):
+            evaluator._run_iteration(context)
+
+        # Block should be removed from dirty set
+        assert not context.is_block_dirty(block_step.id), (
+            "Continue block should be cleaned after no-progress processing"
+        )
+
+    def test_process_step_marks_parent_blocks_dirty(self, store):
+        """_process_step marks block_id and container_id as dirty on progress."""
+        from unittest.mock import MagicMock, patch
+
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        wf_id = "wf-dirty-parent"
+
+        step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Compute",
+        )
+        step.block_id = "parent-block-1"
+        step.container_id = "parent-container-1"
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            _dirty_blocks=set(),
+        )
+
+        # Simulate changer returning a state change.
+        # Use a separate result step so state_before captures original state.
+        result_step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Compute",
+        )
+        result_step.id = step.id
+        result_step.block_id = "parent-block-1"
+        result_step.container_id = "parent-container-1"
+        result_step.state = StepState.STATEMENT_COMPLETE
+
+        mock_result = MagicMock()
+        mock_result.step = result_step
+        mock_result.continue_processing = False
+
+        mock_changer = MagicMock()
+        mock_changer.process.return_value = mock_result
+
+        with patch("afl.runtime.evaluator.get_state_changer", return_value=mock_changer):
+            progress = evaluator._process_step(step, context)
+
+        assert progress is True
+        assert context.is_block_dirty("parent-block-1"), (
+            "block_id should be marked dirty"
+        )
+        assert context.is_block_dirty("parent-container-1"), (
+            "container_id should be marked dirty"
+        )
+
+    def test_resume_first_iteration_processes_all_then_switches(self, store, evaluator):
+        """resume() starts with _dirty_blocks=None, switches to set after first iter."""
+        from unittest.mock import patch
+
+        from afl.runtime.evaluator import ExecutionContext
+
+        captured_contexts = []
+
+        original_run = evaluator._run_iteration
+
+        def capturing_run(context):
+            captured_contexts.append(context._dirty_blocks)
+            return False  # No progress — stop after 1 iteration
+
+        with patch.object(evaluator, "_run_iteration", side_effect=capturing_run):
+            evaluator.resume("wf-test-resume", {"name": "Test", "params": []})
+
+        # First iteration should have _dirty_blocks=None (process everything)
+        assert len(captured_contexts) >= 1
+        assert captured_contexts[0] is None, (
+            "First iteration should have _dirty_blocks=None"
+        )
+
+    def test_resume_step_seeds_dirty_from_chain(self, store, evaluator):
+        """resume_step() seeds dirty set from Continue blocks in the chain."""
+        from afl.runtime.step import StepDefinition
+
+        wf_id = "wf-seed-dirty"
+
+        # Create a workflow root
+        root = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.WORKFLOW,
+            facet_name="TestWf",
+        )
+        root.container_id = None
+        store.save_step(root)
+
+        # Create a block step in Continue state
+        block = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.BLOCK,
+            facet_name=None,
+        )
+        block.state = StepState.BLOCK_EXECUTION_CONTINUE
+        block.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
+        block.container_id = root.id
+        store.save_step(block)
+
+        # Create a child step that was continued
+        child = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Compute",
+        )
+        child.block_id = block.id
+        child.container_id = root.id
+        child.state = StepState.EVENT_TRANSMIT
+        child.transition.current_state = StepState.EVENT_TRANSMIT
+        child.transition.request_transition = True
+        store.save_step(child)
+
+        # resume_step processes the chain; block should be seeded as dirty
+        # We just verify it doesn't error and the block gets in the chain
+        from unittest.mock import patch
+
+        processed_block_ids = []
+        original_process = evaluator._process_step
+
+        def tracking_process(step, ctx):
+            processed_block_ids.append(step.id)
+            return original_process(step, ctx)
+
+        with patch.object(evaluator, "_process_step", side_effect=tracking_process):
+            evaluator.resume_step(
+                wf_id,
+                child.id,
+                {"name": "TestWf", "params": []},
+            )
+
+        # Block should have been processed (it was seeded as dirty)
+        assert block.id in processed_block_ids, (
+            "Continue block in chain should be seeded as dirty and processed"
+        )
