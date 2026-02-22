@@ -9,7 +9,7 @@
 - **Nav link updated**: Servers link in `base.html` changed from `/servers` to `/v2/servers`; old `/servers` route continues working unchanged
 - **4 new templates**: `v2/servers/list.html`, `v2/servers/_server_groups.html`, `v2/servers/detail.html`, `v2/servers/_detail_content.html` — reuses existing `.subnav`, `.ns-group`, `.summary-grid`, `.badge` CSS classes
 - **21 new tests** in `tests/dashboard/test_servers_v2.py`: 5 helper unit tests (grouping, sorting, empty, single group) + 8 list route tests (empty, tabs, filtering, partial, counts) + 5 detail route tests (found, not found, partial, handlers) + 3 nav tests (v2 link, highlighting, old route)
-- 10 files changed, 599 insertions, 6 deletions; test suite: 2362 passed, 79 skipped
+- 10 files changed, 599 insertions, 6 deletions; test suite: 2362 passed, 79 skipped; total collected 2441
 
 ## Completed (v0.12.66) - Redesign dashboard UI with 2-tab nav and namespace-grouped workflows
 - **New `/v2/workflows` routes** with 5 endpoints: workflow list with Running/Completed/Failed sub-tabs, HTMX partial for 5s auto-refresh, workflow detail with step sub-tabs (Running/Error/Complete), step table partial, and inline step expansion partial
