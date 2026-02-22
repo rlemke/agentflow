@@ -217,10 +217,9 @@ class TestComposedZoomWorkflow:
         assert workflow is not None
         assert workflow["name"] == "RoadZoomBuilder"
 
-        # Should have 3 steps: cache, graph, zoom
+        # Should have 2 steps: cache, f (delegates to RoadZoomBuilderFromCache)
         steps = workflow["body"]["steps"]
-        assert len(steps) == 3
+        assert len(steps) == 2
         step_names = [s["name"] for s in steps]
-        assert "cache" in step_names
-        assert "graph" in step_names
-        assert "zoom" in step_names
+        assert step_names == ["cache", "f"]
+        assert steps[1]["call"]["target"] == "RoadZoomBuilderFromCache"

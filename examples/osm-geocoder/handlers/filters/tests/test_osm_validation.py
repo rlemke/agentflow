@@ -200,10 +200,9 @@ class TestComposedValidationWorkflow:
         assert workflow is not None
         assert workflow["name"] == "ValidateAndSummarize"
 
-        # Should have 3 steps: cache, validation, summary
+        # Should have 2 steps: cache, f (delegates to ValidateAndSummarizeFromCache)
         steps = workflow["body"]["steps"]
-        assert len(steps) == 3
+        assert len(steps) == 2
         step_names = [s["name"] for s in steps]
-        assert "cache" in step_names
-        assert "validation" in step_names
-        assert "summary" in step_names
+        assert step_names == ["cache", "f"]
+        assert steps[1]["call"]["target"] == "ValidateAndSummarizeFromCache"

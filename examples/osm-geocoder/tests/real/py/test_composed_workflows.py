@@ -429,7 +429,7 @@ class TestComposedWorkflowsIntegration:
         program = _compile_composed()
         workflow = extract_workflow(program, "TransitAccessibility")
         assert workflow["name"] == "TransitAccessibility"
-        assert len(workflow["body"]["steps"]) == 6
+        assert len(workflow["body"]["steps"]) == 2
 
     # ------------------------------------------------------------------
     # Pattern 15: Low-Zoom Road Infrastructure Builder (compile-only)
@@ -441,4 +441,4 @@ class TestComposedWorkflowsIntegration:
         program = _compile_composed()
         workflow = extract_workflow(program, "RoadZoomBuilder")
         assert workflow["name"] == "RoadZoomBuilder"
-        assert len(workflow["body"]["steps"]) == 3
+        assert len(workflow["body"]["steps"]) == 2

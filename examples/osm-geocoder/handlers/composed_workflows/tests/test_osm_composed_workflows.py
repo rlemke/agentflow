@@ -70,6 +70,18 @@ def _find_wf(node: dict, name: str) -> Optional[dict]:
     return None
 
 
+def _find_facet(node: dict, name: str) -> Optional[dict]:
+    """Recursively search compiled program for a facet by name."""
+    for decl in node.get("declarations", []):
+        if decl.get("type") == "FacetDecl" and decl["name"] == name:
+            return decl
+        if decl.get("type") == "Namespace":
+            found = _find_facet(decl, name)
+            if found is not None:
+                return found
+    return None
+
+
 def _step_call_target(step: dict) -> str:
     """Extract the fully-qualified call target from a step dict."""
     return step["call"]["target"]
@@ -145,6 +157,24 @@ _OPERATIONS_CACHE_WORKFLOWS = [
     "RoadZoomBuilder",
 ]
 
+# FromCache facets corresponding to each cache workflow
+ALL_FROM_CACHE_FACETS = [
+    "VisualizeBicycleRoutesFromCache",
+    "AnalyzeParksFromCache",
+    "LargeCitiesMapFromCache",
+    "TransportOverviewFromCache",
+    "NationalParksAnalysisFromCache",
+    "CityAnalysisFromCache",
+    "TransportMapFromCache",
+    "StateBoundariesWithStatsFromCache",
+    "DiscoverCitiesAndTownsFromCache",
+    "RegionalAnalysisFromCache",
+    "ValidateAndSummarizeFromCache",
+    "OsmoseQualityCheckFromCache",
+    "TransitAccessibilityFromCache",
+    "RoadZoomBuilderFromCache",
+]
+
 
 class TestComposedWorkflows:
     """Integration tests for all 15 composed workflows."""
@@ -154,7 +184,7 @@ class TestComposedWorkflows:
     # ------------------------------------------------------------------
 
     def test_all_workflows_compile(self, program):
-        """All 43 AFL files compile together without errors."""
+        """All AFL files compile together without errors."""
         assert program["type"] == "Program"
 
     def test_all_15_workflows_present(self, program):
@@ -162,6 +192,12 @@ class TestComposedWorkflows:
         for name in ALL_WORKFLOW_NAMES:
             wf = _find_wf(program, name)
             assert wf is not None, f"Workflow {name!r} not found in compiled program"
+
+    def test_all_from_cache_facets_present(self, program):
+        """Every FromCache facet exists in the compiled output."""
+        for name in ALL_FROM_CACHE_FACETS:
+            f = _find_facet(program, name)
+            assert f is not None, f"Facet {name!r} not found in compiled program"
 
     # ------------------------------------------------------------------
     # Pattern 1: Cache → Extract → Visualize
@@ -174,9 +210,18 @@ class TestComposedWorkflows:
         assert _param_dict(wf) == {"region": "String"}
         assert _return_dict(wf) == {"map_path": "String", "route_count": "Long"}
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "routes", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "VisualizeBicycleRoutesFromCache"
+
+    def test_visualize_bicycle_routes_from_cache(self, program):
+        f = _find_facet(program, "VisualizeBicycleRoutesFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert _return_dict(f) == {"map_path": "String", "route_count": "Long"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["routes", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 2: Cache → Extract → Statistics
@@ -194,9 +239,17 @@ class TestComposedWorkflows:
             "state": "Long",
         }
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "parks", "stats"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "AnalyzeParksFromCache"
+
+    def test_analyze_parks_from_cache(self, program):
+        f = _find_facet(program, "AnalyzeParksFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["parks", "stats"]
 
     # ------------------------------------------------------------------
     # Pattern 3: Cache → Extract → Filter → Visualize
@@ -209,9 +262,17 @@ class TestComposedWorkflows:
         assert _param_dict(wf) == {"region": "String", "min_pop": "Long"}
         assert _return_dict(wf) == {"map_path": "String", "city_count": "Long"}
 
-        assert len(_steps(wf)) == 4
-        assert _step_names(wf) == ["cache", "cities", "large", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "LargeCitiesMapFromCache"
+
+    def test_large_cities_map_from_cache(self, program):
+        f = _find_facet(program, "LargeCitiesMapFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "min_pop": "Long"}
+        assert len(_steps(f)) == 3
+        assert _step_names(f) == ["cities", "large", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 4: Cache → Multiple Extractions → Combine Statistics
@@ -229,13 +290,20 @@ class TestComposedWorkflows:
             "bus_routes": "Long",
         }
 
-        assert len(_steps(wf)) == 9
-        assert _step_names(wf) == [
-            "cache",
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
+        assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "TransportOverviewFromCache"
+
+    def test_transport_overview_from_cache(self, program):
+        f = _find_facet(program, "TransportOverviewFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 8
+        assert _step_names(f) == [
             "bicycle", "hiking", "train", "bus",
             "bicycle_stats", "hiking_stats", "train_stats", "bus_stats",
         ]
-        assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
 
     # ------------------------------------------------------------------
     # Pattern 5: Cache → Extract → Filter → Statistics → Visualize
@@ -254,9 +322,17 @@ class TestComposedWorkflows:
             "avg_area": "Double",
         }
 
-        assert len(_steps(wf)) == 5
-        assert _step_names(wf) == ["cache", "all_parks", "national", "stats", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "NationalParksAnalysisFromCache"
+
+    def test_national_parks_analysis_from_cache(self, program):
+        f = _find_facet(program, "NationalParksAnalysisFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 4
+        assert _step_names(f) == ["all_parks", "national", "stats", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 6: Parameterized City Analysis
@@ -273,9 +349,17 @@ class TestComposedWorkflows:
             "total_pop": "Long",
         }
 
-        assert len(_steps(wf)) == 4
-        assert _step_names(wf) == ["cache", "cities", "stats", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "CityAnalysisFromCache"
+
+    def test_city_analysis_from_cache(self, program):
+        f = _find_facet(program, "CityAnalysisFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "min_population": "Long"}
+        assert len(_steps(f)) == 3
+        assert _step_names(f) == ["cities", "stats", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 7: Multi-Layer Visualization
@@ -288,9 +372,17 @@ class TestComposedWorkflows:
         assert _param_dict(wf) == {"region": "String"}
         assert _return_dict(wf) == {"map_path": "String"}
 
-        assert len(_steps(wf)) == 4
-        assert _step_names(wf) == ["cache", "bicycle", "hiking", "bicycle_map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "TransportMapFromCache"
+
+    def test_transport_map_from_cache(self, program):
+        f = _find_facet(program, "TransportMapFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 3
+        assert _step_names(f) == ["bicycle", "hiking", "bicycle_map"]
 
     # ------------------------------------------------------------------
     # Pattern 8: Boundary Analysis Pipeline
@@ -303,9 +395,17 @@ class TestComposedWorkflows:
         assert _param_dict(wf) == {"region": "String"}
         assert _return_dict(wf) == {"map_path": "String", "state_count": "Long"}
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "boundaries", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "StateBoundariesWithStatsFromCache"
+
+    def test_state_boundaries_from_cache(self, program):
+        f = _find_facet(program, "StateBoundariesWithStatsFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["boundaries", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 9: POI Discovery Pipeline
@@ -323,9 +423,17 @@ class TestComposedWorkflows:
             "villages": "Long",
         }
 
-        assert len(_steps(wf)) == 5
-        assert _step_names(wf) == ["cache", "city_data", "town_data", "village_data", "map"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "DiscoverCitiesAndTownsFromCache"
+
+    def test_discover_cities_and_towns_from_cache(self, program):
+        f = _find_facet(program, "DiscoverCitiesAndTownsFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 4
+        assert _step_names(f) == ["city_data", "town_data", "village_data", "map"]
 
     # ------------------------------------------------------------------
     # Pattern 10: Complete Regional Analysis
@@ -344,14 +452,21 @@ class TestComposedWorkflows:
             "map_path": "String",
         }
 
-        assert len(_steps(wf)) == 8
-        assert _step_names(wf) == [
-            "cache",
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
+        assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "RegionalAnalysisFromCache"
+
+    def test_regional_analysis_from_cache(self, program):
+        f = _find_facet(program, "RegionalAnalysisFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache"}
+        assert len(_steps(f)) == 7
+        assert _step_names(f) == [
             "parks", "routes", "cities",
             "park_stats", "route_stats", "city_stats",
             "map",
         ]
-        assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
 
     # ------------------------------------------------------------------
     # Pattern 11: Cache → Validate → Summary
@@ -369,9 +484,17 @@ class TestComposedWorkflows:
             "output_path": "String",
         }
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "validation", "summary"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "ValidateAndSummarizeFromCache"
+
+    def test_validate_and_summarize_from_cache(self, program):
+        f = _find_facet(program, "ValidateAndSummarizeFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "output_dir": "String"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["validation", "summary"]
 
     # ------------------------------------------------------------------
     # Pattern 12: Cache → Local Verify → Summary (OSMOSE)
@@ -391,12 +514,20 @@ class TestComposedWorkflows:
             "output_path": "String",
         }
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "verify", "summary"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "OsmoseQualityCheckFromCache"
+
+    def test_osmose_quality_check_from_cache(self, program):
+        f = _find_facet(program, "OsmoseQualityCheckFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "output_dir": "String"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["verify", "summary"]
 
     # ------------------------------------------------------------------
-    # Pattern 13: GTFS Transit Analysis (no cache step)
+    # Pattern 13: GTFS Transit Analysis (no cache step — unchanged)
     # ------------------------------------------------------------------
 
     def test_transit_analysis(self, program):
@@ -437,9 +568,17 @@ class TestComposedWorkflows:
             "coverage_path": "String",
         }
 
-        assert len(_steps(wf)) == 6
-        assert _step_names(wf) == ["cache", "dl", "buildings", "stops", "access", "gaps"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "TransitAccessibilityFromCache"
+
+    def test_transit_accessibility_from_cache(self, program):
+        f = _find_facet(program, "TransitAccessibilityFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "gtfs_url": "String"}
+        assert len(_steps(f)) == 5
+        assert _step_names(f) == ["dl", "buildings", "stops", "access", "gaps"]
 
     # ------------------------------------------------------------------
     # Pattern 15: Low-Zoom Road Infrastructure Builder
@@ -462,9 +601,17 @@ class TestComposedWorkflows:
             "metrics_path": "String",
         }
 
-        assert len(_steps(wf)) == 3
-        assert _step_names(wf) == ["cache", "graph", "zoom"]
+        assert len(_steps(wf)) == 2
+        assert _step_names(wf) == ["cache", "f"]
         assert _step_call_target(_steps(wf)[0]) == "osm.geo.Operations.Cache"
+        assert _step_call_target(_steps(wf)[1]) == "RoadZoomBuilderFromCache"
+
+    def test_road_zoom_builder_from_cache(self, program):
+        f = _find_facet(program, "RoadZoomBuilderFromCache")
+        assert f is not None
+        assert _param_dict(f) == {"cache": "OSMCache", "output_dir": "String", "max_concurrent": "Long"}
+        assert len(_steps(f)) == 2
+        assert _step_names(f) == ["graph", "zoom"]
 
     # ------------------------------------------------------------------
     # Cross-cutting: all generic cache workflows use Operations.Cache
@@ -482,4 +629,22 @@ class TestComposedWorkflows:
             assert _step_call_target(cache_step) == "osm.geo.Operations.Cache", (
                 f"{name}: cache step should target osm.geo.Operations.Cache, "
                 f"got {_step_call_target(cache_step)!r}"
+            )
+
+    def test_cache_workflows_delegate_to_from_cache(self, program):
+        """All 14 cache workflows delegate to a FromCache facet as second step."""
+        for name in _OPERATIONS_CACHE_WORKFLOWS:
+            wf = _find_wf(program, name)
+            assert wf is not None, f"{name} not found"
+            assert len(_steps(wf)) == 2, (
+                f"{name}: expected 2 steps (cache + FromCache), got {len(_steps(wf))}"
+            )
+            fc_step = _steps(wf)[1]
+            assert fc_step["name"] == "f", (
+                f"{name}: second step should be 'f', got {fc_step['name']!r}"
+            )
+            expected_target = f"{name}FromCache"
+            assert _step_call_target(fc_step) == expected_target, (
+                f"{name}: second step should target {expected_target!r}, "
+                f"got {_step_call_target(fc_step)!r}"
             )
