@@ -1,5 +1,22 @@
 # Implementation Changelog
 
+## Completed (v0.12.72) - Fix concurrent step duplication race condition
+- **Three-layer defense** against duplicate step creation when multiple runners call `evaluator.resume()` concurrently:
+  1. **Application-level idempotency**: `_create_block_steps()` in `blocks.py` now checks `block_step_exists()` and pending creates before creating block steps; `_process_foreach()` in `block_execution.py` now checks `step_exists()` and pending creates before creating foreach sub-blocks
+  2. **Database unique index**: new `step_dedup_index` compound unique index on `(statement_id, block_id, container_id)` with `partialFilterExpression` for non-null `statement_id` — first runner to commit wins
+  3. **Commit-time catch**: `_commit_changes()` in `MongoStore` catches `DuplicateKeyError` on step inserts and logs a debug message instead of crashing
+- **Normalized block `statement_id`**: single-body andThen blocks now produce `statement_id="block-0"` (was `None`, defeating any index-based dedup); foreach sub-blocks now produce `statement_id="foreach-{i}"` (was missing entirely)
+- **New `block_step_exists()` API**: added to `PersistenceAPI` (abstract), `MongoStore` (count_documents query on `statement_id` + `container_id`), and `MemoryStore` (linear scan) — block steps use `container_id` not `block_id` for hierarchy, so need a dedicated check
+- **7 new tests**: 3 in `test_mongo_store.py` (block_step_exists round-trip, duplicate step insert silently skipped, different statement_ids allowed) + 4 in `test_evaluator.py` (single-body block gets statement_id, multi-body indexed IDs, foreach indexed IDs, block step idempotency)
+- 7 files changed, 437 insertions, 3 deletions; test suite: 2430 passed, 79 skipped; total collected 2509
+
+## Completed (v0.12.71) - Store compiled AST on FlowDefinition to eliminate runner recompilation
+- **New `compiled_ast` field** on `FlowDefinition`: stores the full program AST (declarations-format JSON) immutably at flow creation time — runners read it directly instead of recompiling AFL sources on every `resume()`
+- **`seed-examples` script updated**: compiles each example's AFL sources and stores the resulting AST in `flow.compiled_ast` during seeding
+- **MongoStore round-trip**: `compiled_ast` persisted as a native BSON document in `_flow_to_doc()` / `_doc_to_flow()`
+- **5 new tests**: compiled_ast round-trip through MongoStore, legacy flow without compiled_ast, submit endpoint stores compiled_ast
+- 5 files changed; test suite: 2423 passed, 79 skipped; total collected 2502
+
 ## Completed (v0.12.70) - Deduplicate Continue block processing in the evaluator
 - **Dirty-block tracking** in `ExecutionContext`: new `_dirty_blocks: set[StepId] | None` field tracks which block IDs need Continue re-evaluation — `None` = all dirty (first iteration), empty `set()` = nothing dirty, populated set = only those blocks re-evaluated
 - **Three helper methods** on `ExecutionContext`: `mark_block_dirty(block_id)`, `is_block_dirty(block_id)`, `mark_block_processed(block_id)` — manage the dirty set lifecycle
