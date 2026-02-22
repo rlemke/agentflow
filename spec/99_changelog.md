@@ -1,5 +1,18 @@
 # Implementation Changelog
 
+## Completed (v0.12.66) - Redesign dashboard UI with 2-tab nav and namespace-grouped workflows
+- **New `/v2/workflows` routes** with 5 endpoints: workflow list with Running/Completed/Failed sub-tabs, HTMX partial for 5s auto-refresh, workflow detail with step sub-tabs (Running/Error/Complete), step table partial, and inline step expansion partial
+- **Namespace-grouped runner display**: runners grouped by workflow namespace prefix using `<details>` accordion — each group shows a table with short workflow name, truncated ID, state badge, start time, and duration
+- **New `afl/dashboard/helpers.py`** with 4 shared utilities: `extract_namespace()` (splits qualified name on last dot), `short_workflow_name()`, `categorize_step_state()` (maps StepState to running/complete/error), `group_runners_by_namespace()` (groups and sorts runners with per-namespace state counts)
+- **Consolidated navigation**: replaced 10-link nav bar with **Workflows** + **Servers** + **More** dropdown (Handlers, Events, Tasks, Locks, Sources, Flows, Runners, Namespaces, New Workflow); added `{% block subnav %}` to `base.html` for sub-tab bars
+- **Home redirect**: `GET /` now returns 302 to `/v2/workflows` instead of rendering a summary dashboard
+- **3 new Jinja2 filters** in `filters.py`: `short_workflow_name`, `step_category`, `namespace_of`
+- **CSS additions** in `style.css`: `.subnav` pill-style tab bar, `.ns-group` accordion styling, `.wf-expand` inline expansion, `.nav-dropdown` hover menu, `.nav-active` highlighting
+- **Inline step inspection**: "Details" button on each step row loads params table, returns table, associated task info, and retry button (for error steps) via HTMX into a placeholder row
+- **All existing routes unchanged**: `/runners`, `/flows`, `/steps`, `/servers`, etc. continue working at their old URLs
+- **33 new tests** in `tests/dashboard/test_dashboard_v2.py`: helper unit tests (extract_namespace, short_workflow_name, categorize_step_state, group_runners_by_namespace) + route integration tests (list, tabs, partials, detail, step expand, home redirect, nav structure, old routes still work)
+- 14 files changed, 1027 insertions, 54 deletions; test suite: 2341 passed, 79 skipped
+
 ## Completed (v0.12.65) - Reorganize osm-geocoder into functional subdirectories
 - **Restructured `examples/osm-geocoder/handlers/`** from a flat directory (~46 modules) into 16 category subpackages plus a `shared/` package: `amenities`, `boundaries`, `buildings`, `cache`, `composed_workflows`, `downloads`, `filters`, `graphhopper`, `parks`, `poi`, `population`, `roads`, `routes`, `shapefiles`, `visualization`, `voting`
 - Each category contains its own handler `.py` files, `afl/` subdirectory (42 AFL files total), `tests/` subdirectory (36 test files), and `README.md` (renamed from root-level `.md` docs)
