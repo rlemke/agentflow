@@ -1,0 +1,44 @@
+{% if groups %}
+{% for group in groups %}
+<details class="ns-group" open>
+    <summary>
+        <strong>{{ group.group }}</strong>
+        <span class="badge badge-secondary">{{ group.total }}</span>
+    </summary>
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Service</th>
+                <th>State</th>
+                <th>IPs</th>
+                <th>Last Ping</th>
+                <th>Handlers</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for server in group.servers %}
+            <tr>
+                <td>
+                    <a href="/v2/servers/{{ server.uuid }}">
+                        {{ server.server_name }}
+                    </a>
+                </td>
+                <td>{{ server.service_name }}</td>
+                <td>
+                    <span class="badge badge-{{ server.state|state_color }}">
+                        {{ server.state }}
+                    </span>
+                </td>
+                <td class="mono">{{ server.server_ips|join(", ") }}</td>
+                <td>{{ server.ping_time|timestamp }}</td>
+                <td>{{ server.handlers|length }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</details>
+{% endfor %}
+{% else %}
+<p>No servers in this category.</p>
+{% endif %}

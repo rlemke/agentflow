@@ -97,3 +97,28 @@ def group_runners_by_namespace(
             }
         )
     return groups
+
+
+def group_servers_by_group(
+    servers: list,
+) -> list[dict]:
+    """Group servers by their server_group field.
+
+    Returns a sorted list of dicts:
+        [{"group": "osm-geocoder", "servers": [...], "total": N}]
+    """
+    group_map: dict[str, list] = {}
+    for s in servers:
+        group_map.setdefault(s.server_group, []).append(s)
+
+    groups = []
+    for grp in sorted(group_map):
+        grp_servers = group_map[grp]
+        groups.append(
+            {
+                "group": grp,
+                "servers": grp_servers,
+                "total": len(grp_servers),
+            }
+        )
+    return groups

@@ -285,7 +285,7 @@ class TestNavStructure:
     def test_nav_has_servers_link(self, client):
         tc, store = client
         resp = tc.get("/v2/workflows")
-        assert '/servers"' in resp.text
+        assert '/v2/servers"' in resp.text
 
     def test_nav_has_more_dropdown(self, client):
         tc, store = client

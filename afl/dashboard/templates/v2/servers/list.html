@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Servers — AgentFlow Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="container">
+    <div class="subnav">
+        <a href="/v2/servers?tab=running"
+           class="subnav-pill{% if tab == 'running' %} active{% endif %}">
+            Running <span class="subnav-count">{{ tab_counts.running }}</span>
+        </a>
+        <a href="/v2/servers?tab=startup"
+           class="subnav-pill{% if tab == 'startup' %} active{% endif %}">
+            Startup <span class="subnav-count">{{ tab_counts.startup }}</span>
+        </a>
+        <a href="/v2/servers?tab=error"
+           class="subnav-pill{% if tab == 'error' %} active{% endif %}">
+            Error <span class="subnav-count">{{ tab_counts.error }}</span>
+        </a>
+        <a href="/v2/servers?tab=shutdown"
+           class="subnav-pill{% if tab == 'shutdown' %} active{% endif %}">
+            Shutdown <span class="subnav-count">{{ tab_counts.shutdown }}</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Servers</h1>
+
+<div id="server-groups"
+     hx-get="/v2/servers/partial?tab={{ tab }}"
+     hx-trigger="every 5s"
+     hx-swap="innerHTML">
+    {% include "v2/servers/_server_groups.html" %}
+</div>
+{% endblock %}

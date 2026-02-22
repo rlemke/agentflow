@@ -131,7 +131,7 @@ class TestNavigationRendering:
         assert 'href="/runners"' in html
         assert 'href="/flows"' in html
         assert 'href="/tasks"' in html
-        assert 'href="/servers"' in html
+        assert 'href="/v2/servers"' in html
         assert 'href="/events"' in html
         assert 'href="/handlers"' in html
         assert 'href="/sources"' in html
@@ -153,7 +153,7 @@ class TestNavigationRendering:
         assert resp.status_code == 200
         html = resp.text
         assert 'href="/runners"' in html
-        assert 'href="/servers"' in html
+        assert 'href="/v2/servers"' in html
 
     def test_breadcrumb_on_runner_detail(self, client):
         tc, store = client

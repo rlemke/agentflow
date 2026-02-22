@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dashboard v2 routes — namespace-grouped workflow views."""
+"""Dashboard v2 routes — namespace-grouped workflow and server views."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
 from ..dependencies import get_store
-from ..helpers import categorize_step_state, group_runners_by_namespace
+from ..helpers import categorize_step_state, group_runners_by_namespace, group_servers_by_group
 
 router = APIRouter(prefix="/v2")
 
@@ -207,5 +207,114 @@ def step_detail_expand(
             "step": step,
             "task": task,
             "runner": runner,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Server views
+# ---------------------------------------------------------------------------
+
+_SERVER_TAB_STATES = {
+    "running": {"running"},
+    "startup": {"startup"},
+    "error": {"error"},
+    "shutdown": {"shutdown"},
+}
+
+
+def _filter_servers(servers: list, tab: str) -> list:
+    """Filter servers by tab selection."""
+    allowed = _SERVER_TAB_STATES.get(tab, {"running"})
+    return [s for s in servers if s.state in allowed]
+
+
+def _count_servers_by_tab(servers: list) -> dict[str, int]:
+    """Count servers per tab."""
+    counts = {"running": 0, "startup": 0, "error": 0, "shutdown": 0}
+    for s in servers:
+        if s.state in counts:
+            counts[s.state] += 1
+    return counts
+
+
+@router.get("/servers")
+def server_list(
+    request: Request,
+    tab: str = "running",
+    store=Depends(get_store),
+):
+    """Server list with state tabs and group accordion."""
+    all_servers = list(store.get_all_servers())
+    tab_counts = _count_servers_by_tab(all_servers)
+    filtered = _filter_servers(all_servers, tab)
+    groups = group_servers_by_group(filtered)
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/servers/list.html",
+        {
+            "groups": groups,
+            "tab": tab,
+            "tab_counts": tab_counts,
+            "active_tab": "servers",
+        },
+    )
+
+
+@router.get("/servers/partial")
+def server_list_partial(
+    request: Request,
+    tab: str = "running",
+    store=Depends(get_store),
+):
+    """HTMX partial for auto-refresh of server groups."""
+    all_servers = list(store.get_all_servers())
+    tab_counts = _count_servers_by_tab(all_servers)
+    filtered = _filter_servers(all_servers, tab)
+    groups = group_servers_by_group(filtered)
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/servers/_server_groups.html",
+        {
+            "groups": groups,
+            "tab": tab,
+            "tab_counts": tab_counts,
+        },
+    )
+
+
+@router.get("/servers/{server_id}")
+def server_detail(
+    server_id: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """Server detail page."""
+    server = store.get_server(server_id)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/servers/detail.html",
+        {
+            "server": server,
+            "active_tab": "servers",
+        },
+    )
+
+
+@router.get("/servers/{server_id}/partial")
+def server_detail_partial(
+    server_id: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """HTMX partial for server detail refresh."""
+    server = store.get_server(server_id)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/servers/_detail_content.html",
+        {
+            "server": server,
         },
     )
