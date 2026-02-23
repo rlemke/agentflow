@@ -1,5 +1,17 @@
 # Implementation Changelog
 
+## Completed (v0.12.81) - 5-minute server heartbeat timeout detection
+
+### Dashboard-only computed "down" state
+- **`helpers.py`**: added `SERVER_DOWN_TIMEOUT_MS = 300_000` (5 minutes) and `effective_server_state(server)` — returns `"down"` when a `running` or `startup` server's `ping_time` is stale (>5 min) or zero (never pinged); `shutdown`/`error` states pass through unchanged
+- **`dashboard_v2.py`**: added `_apply_effective_state(servers)` helper that mutates `server.state` to the effective value; called in `server_list()`, `server_list_partial()`, `server_detail()`, and `server_detail_partial()`; added `"down": {"down"}` to `_SERVER_TAB_STATES` and `"down": 0` to `_count_servers_by_tab()`
+- **`filters.py`**: added `"down": "danger"` to `_STATE_COLORS` for red badge rendering
+- **`v2/servers/list.html`**: added "Down" tab pill between Error and Shutdown
+
+### Tests
+- **9 new tests** in `test_servers_v2.py`: `TestEffectiveServerState` (6 unit tests — recent ping stays running, stale ping → down, zero ping → down, stale startup → down, shutdown preserved, error preserved) and `TestV2ServerDownDetection` (3 route tests — stale server under down tab, stale server excluded from running tab, tab counts include down)
+- 5 files changed; test suite: 2489 passed, 79 skipped; total collected 2568
+
 ## Completed (v0.12.80) - Splunk-compatible JSON logging and centralized config
 
 ### New shared module: `afl/logging.py`
