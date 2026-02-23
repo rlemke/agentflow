@@ -1,5 +1,31 @@
 # Implementation Changelog
 
+## Completed (v0.12.79) - Dashboard UI overhaul: fonts, tabs, refresh, state colors
+
+### Part 1: Cap font sizes (max ~20px)
+- **`style.css`**: global heading overrides — `h1` 1.25rem (20px), `h2` 1.15rem, `h3` 1.05rem, `hgroup > p` 0.9rem
+- Removed `.summary-card h2 { font-size: 2.5rem }` — now inherits the global 1.15rem cap
+
+### Part 2: Convert pills to traditional tabs
+- **`.subnav` / `.subnav-pill`**: replaced pill style (border-radius: 20px, filled active background) with bottom-border underline tabs — muted inactive text, colored active text with 2px bottom border, no border-radius
+- **`.view-toggle` / `.view-toggle-btn`**: same treatment — removed outer border/radius, tabs use bottom-border indicator instead of filled background
+
+### Part 3: Remove auto-refresh, add manual refresh buttons
+- Removed `hx-get` and `hx-trigger="every 5s"` from **9 locations** across 8 template files: `runners/detail.html` (flat tbody + tree container), `runners/list.html`, `v2/workflows/detail.html`, `v2/workflows/list.html`, `v2/servers/detail.html`, `v2/servers/list.html`, `v2/handlers/detail.html`, `v2/handlers/list.html`
+- Added `.btn-refresh` button with ↻ Unicode icon before each content section — targets content div via `hx-target`/`hx-swap="innerHTML"`
+- **CSS**: `.btn-refresh` with subtle border, `.htmx-request` opacity + spinning icon animation (`@keyframes spin`)
+- **Tree state preservation** (`runners/detail.html`): `htmx:beforeSwap` captures open `<details>` nodes (keyed by step link `href`) and scroll position; `htmx:afterSwap` restores open/closed state and scroll position
+
+### Part 4: State-based row coloring
+- **`filters.py`**: new `step_state_bg()` filter — maps last segment of dotted step state to CSS background class: `Complete` → `state-bg-complete` (#e8f5e9 green), `Error` → `state-bg-error` (#ffebee red), `EventTransmit` → `state-bg-transmit` (#fce4ec pink), `Created` → `state-bg-running` (#e3f2fd blue), `Continue` → `state-bg-continue` (#fff8e1 yellow), else → `state-bg-other` (#f5f5f5 grey)
+- Updated `_STATE_COLORS["created"]` from `"secondary"` to `"primary"` (Created is an active state)
+- **Template changes**: added `class="{{ step.state|step_state_bg }}"` to `<tr>` in `step_row.html` and `_step_rows.html`, and to `<summary>` in `step_tree.html`
+- **`style.css`**: 6 `.state-bg-*` classes with matching `.step-tree-container summary.state-bg-*` variants
+
+### Tests
+- **11 new tests** in `test_filters.py` (`TestStepStateBg`): None/empty/Complete/Error/EventTransmit/Created/Continue/unknown states, simple (non-dotted) state, case insensitivity, `state_color("created")` is now `"primary"`
+- 14 files changed; test suite: 2489 passed, 67 skipped; total collected 2556
+
 ## Completed (v0.12.78) - DownloadStates and AnalyzeStates scaling workflow variants
 
 ### Scaling workflow variants
