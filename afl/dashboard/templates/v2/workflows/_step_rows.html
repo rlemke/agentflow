@@ -11,7 +11,7 @@
     </thead>
     <tbody>
     {% for step in steps %}
-        <tr>
+        <tr class="{{ step.state|step_state_bg }}">
             <td>{{ step.statement_name or '—' }}</td>
             <td>{{ step.facet_name or '—' }}</td>
             <td>

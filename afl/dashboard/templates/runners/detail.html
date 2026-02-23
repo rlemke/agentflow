@@ -75,14 +75,18 @@
 </div>
 
 <div id="step-flat">
+<button class="btn-refresh"
+        hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true"
+        hx-target="#step-flat-body"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
 <figure>
 <table>
     <thead>
         <tr><th>Name</th><th>Facet</th><th>State</th><th>Logs</th><th>Data</th></tr>
     </thead>
-    <tbody hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true"
-           hx-trigger="every 5s"
-           hx-swap="innerHTML">
+    <tbody id="step-flat-body">
         {% for step in steps %}
         {% include "partials/step_row.html" %}
         {% endfor %}
@@ -92,10 +96,13 @@
 </div>
 
 <div id="step-tree" style="display:none">
-<div class="step-tree-container"
-     hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true&view=tree"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true&view=tree"
+        hx-target="#step-tree-content"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div class="step-tree-container" id="step-tree-content">
     {% with tree=tree %}{% include "partials/step_tree.html" %}{% endwith %}
 </div>
 </div>
@@ -172,10 +179,45 @@
         }
     });
 
-    document.body.addEventListener("htmx:afterSwap", function() {
+    document.body.addEventListener("htmx:afterSwap", function(evt) {
         applyStateFilter(currentFilter);
         updateStateCounts();
     });
+
+    /* Tree view state preservation across refresh */
+    var treeOpenSet = {};
+    var treeScrollTop = 0;
+    var treeEl = document.getElementById("step-tree-content");
+    if (treeEl) {
+        treeEl.addEventListener("htmx:beforeSwap", function() {
+            treeOpenSet = {};
+            treeScrollTop = treeEl.scrollTop;
+            var nodes = treeEl.querySelectorAll("details.step-tree-node");
+            for (var i = 0; i < nodes.length; i++) {
+                var link = nodes[i].querySelector("summary a[href]");
+                if (link && nodes[i].open) {
+                    treeOpenSet[link.getAttribute("href")] = true;
+                }
+            }
+        });
+        treeEl.addEventListener("htmx:afterSwap", function() {
+            var nodes = treeEl.querySelectorAll("details.step-tree-node");
+            for (var i = 0; i < nodes.length; i++) {
+                var link = nodes[i].querySelector("summary a[href]");
+                if (link) {
+                    var href = link.getAttribute("href");
+                    if (treeOpenSet[href]) {
+                        nodes[i].open = true;
+                    } else if (!(href in treeOpenSet)) {
+                        /* new node — keep template default */
+                    } else {
+                        nodes[i].open = false;
+                    }
+                }
+            }
+            treeEl.scrollTop = treeScrollTop;
+        });
+    }
 
     updateStateCounts();
 })();

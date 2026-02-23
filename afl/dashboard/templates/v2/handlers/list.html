@@ -22,10 +22,13 @@
 {% block content %}
 <h1>Handlers</h1>
 
-<div id="handler-groups"
-     hx-get="/v2/handlers/partial?tab={{ tab }}"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/v2/handlers/partial?tab={{ tab }}"
+        hx-target="#handler-groups"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div id="handler-groups">
     {% include "v2/handlers/_handler_groups.html" %}
 </div>
 {% endblock %}

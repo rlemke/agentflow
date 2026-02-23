@@ -1,6 +1,6 @@
 {% for node in tree %}
 <details class="step-tree-node" data-state-category="{{ node.step.state|step_category }}" {% if node.depth < 2 %}open{% endif %}>
-    <summary>
+    <summary class="{{ node.step.state|step_state_bg }}">
         <span class="badge badge-{{ node.step.state|state_color }}">{{ node.step.state|state_label }}</span>
         <a href="/steps/{{ node.step.id }}">{{ node.step.statement_name or node.step.id|truncate_uuid }}</a>
         {% if node.step.facet_name %}<span class="tree-facet">{{ node.step.facet_name.split('.')[-1] }}</span>{% endif %}

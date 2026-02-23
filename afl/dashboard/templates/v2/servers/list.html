@@ -28,10 +28,13 @@
 {% block content %}
 <h1>Servers</h1>
 
-<div id="server-groups"
-     hx-get="/v2/servers/partial?tab={{ tab }}"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/v2/servers/partial?tab={{ tab }}"
+        hx-target="#server-groups"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div id="server-groups">
     {% include "v2/servers/_server_groups.html" %}
 </div>
 {% endblock %}

@@ -24,10 +24,13 @@
 {% block content %}
 <h1>Workflows</h1>
 
-<div id="runner-groups"
-     hx-get="/v2/workflows/partial?tab={{ tab }}"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/v2/workflows/partial?tab={{ tab }}"
+        hx-target="#runner-groups"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div id="runner-groups">
     {% include "v2/workflows/_runner_groups.html" %}
 </div>
 {% endblock %}

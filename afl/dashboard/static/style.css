@@ -1,3 +1,9 @@
+/* Global font size caps — override Pico CSS defaults */
+h1 { font-size: 1.25rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1.05rem; }
+hgroup > p { font-size: 0.9rem; }
+
 /* State badge colours */
 .badge {
     display: inline-block;
@@ -26,7 +32,6 @@
 }
 .summary-card h2 {
     margin-bottom: 0.25rem;
-    font-size: 2.5rem;
 }
 .summary-card p {
     margin: 0;
@@ -73,31 +78,38 @@ pre code {
     font-size: 0.85em;
 }
 
-/* View toggle button group */
+/* View toggle — traditional tab style */
 .view-toggle {
     display: inline-flex;
     gap: 0;
     margin-bottom: 1rem;
-    border: 1px solid var(--primary);
-    border-radius: 4px;
-    overflow: hidden;
+    border: none;
+    border-bottom: 2px solid #ddd;
+    border-radius: 0;
+    overflow: visible;
 }
 .view-toggle-btn {
     padding: 0.3em 1em;
     border: none;
     border-radius: 0;
     background: transparent;
-    color: var(--primary);
+    color: var(--muted-color, #6c757d);
     font-size: 0.85em;
     cursor: pointer;
     margin: 0;
+    margin-bottom: -2px;
+    border-bottom: 2px solid transparent;
 }
 .view-toggle-btn.active {
-    background: var(--primary);
-    color: #fff;
+    background: transparent;
+    color: var(--primary);
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary);
 }
 .view-toggle-btn:not(.active):hover {
-    background: var(--primary-focus, rgba(16, 149, 193, 0.1));
+    background: transparent;
+    border-bottom: 2px solid var(--muted-border-color, #ccc);
+    color: var(--color, inherit);
 }
 
 /* Step tree view */
@@ -114,9 +126,10 @@ pre code {
 }
 .step-tree-container details summary {
     cursor: pointer;
-    padding: 0.25em 0;
+    padding: 0.25em 0.4em;
     font-size: 0.9em;
     list-style: revert;
+    border-radius: 3px;
 }
 .step-tree-container details summary .badge {
     margin-right: 0.4em;
@@ -151,29 +164,36 @@ pre code {
     cursor: pointer;
 }
 
-/* Sub-navigation tab bar */
+/* Sub-navigation tab bar — traditional underline style */
 .subnav {
     display: flex;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
+    gap: 0;
+    padding: 0;
     margin-bottom: 1rem;
+    border-bottom: 2px solid #ddd;
 }
 .subnav-pill {
     display: inline-block;
-    padding: 0.3em 1em;
-    border-radius: 20px;
+    padding: 0.4em 1em;
+    border-radius: 0;
     font-size: 0.9em;
     text-decoration: none;
-    color: var(--primary);
-    border: 1px solid var(--primary);
+    color: var(--muted-color, #6c757d);
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
     background: transparent;
 }
 .subnav-pill.active {
-    background: var(--primary);
-    color: #fff;
+    background: transparent;
+    color: var(--primary);
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary);
 }
 .subnav-pill:hover:not(.active) {
-    background: var(--primary-focus, rgba(16, 149, 193, 0.1));
+    background: transparent;
+    border-bottom: 2px solid var(--muted-border-color, #ccc);
+    color: var(--color, inherit);
 }
 .subnav-count {
     font-size: 0.85em;
@@ -259,3 +279,48 @@ pre code {
 .doc-section { margin-top: 0.25rem; padding-left: 0.5rem; border-left: 2px solid var(--muted-border-color, #ddd); }
 .doc-section dl { margin: 0.25rem 0; display: grid; grid-template-columns: auto 1fr; gap: 0.1rem 0.75rem; }
 .doc-section dd { margin: 0; }
+
+/* Manual refresh button */
+.btn-refresh {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.25em 0.75em;
+    font-size: 0.85em;
+    border: 1px solid var(--muted-border-color, #ddd);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--muted-color, #6c757d);
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+.btn-refresh:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.btn-refresh.htmx-request {
+    opacity: 0.6;
+    pointer-events: none;
+}
+.btn-refresh.htmx-request .refresh-icon {
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Step state row/tree background colours */
+.state-bg-complete { background-color: #e8f5e9; }
+.state-bg-error { background-color: #ffebee; }
+.state-bg-transmit { background-color: #fce4ec; }
+.state-bg-running { background-color: #e3f2fd; }
+.state-bg-continue { background-color: #fff8e1; }
+.state-bg-other { background-color: #f5f5f5; }
+/* Tree summary state tints */
+.step-tree-container summary.state-bg-complete { background-color: #e8f5e9; }
+.step-tree-container summary.state-bg-error { background-color: #ffebee; }
+.step-tree-container summary.state-bg-transmit { background-color: #fce4ec; }
+.step-tree-container summary.state-bg-running { background-color: #e3f2fd; }
+.step-tree-container summary.state-bg-continue { background-color: #fff8e1; }
+.step-tree-container summary.state-bg-other { background-color: #f5f5f5; }

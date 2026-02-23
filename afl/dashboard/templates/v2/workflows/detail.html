@@ -76,10 +76,13 @@
 
 <h2>Steps</h2>
 
-<div id="step-rows"
-     hx-get="/v2/workflows/{{ runner.uuid }}/steps/partial?step_tab={{ step_tab }}"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/v2/workflows/{{ runner.uuid }}/steps/partial?step_tab={{ step_tab }}"
+        hx-target="#step-rows"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div id="step-rows">
     {% include "v2/workflows/_step_rows.html" %}
 </div>
 

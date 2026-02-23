@@ -21,6 +21,7 @@ from afl.dashboard.filters import (
     duration_fmt,
     state_color,
     state_label,
+    step_state_bg,
     timestamp_fmt,
     truncate_uuid,
 )
@@ -232,3 +233,46 @@ class TestDocReturns:
 
     def test_dict_without_returns_key(self):
         assert doc_returns({"description": "desc"}) == []
+
+
+# =============================================================================
+# v0.12.79 — step_state_bg filter tests
+# =============================================================================
+
+
+class TestStepStateBg:
+    def test_none_returns_other(self):
+        assert step_state_bg(None) == "state-bg-other"
+
+    def test_empty_string_returns_other(self):
+        assert step_state_bg("") == "state-bg-other"
+
+    def test_complete_state(self):
+        assert step_state_bg("state.facet.completion.Complete") == "state-bg-complete"
+
+    def test_error_state(self):
+        assert step_state_bg("state.facet.error.Error") == "state-bg-error"
+
+    def test_event_transmit_state(self):
+        assert step_state_bg("state.facet.event.EventTransmit") == "state-bg-transmit"
+
+    def test_created_state(self):
+        assert step_state_bg("state.step.Created") == "state-bg-running"
+
+    def test_continue_state(self):
+        assert step_state_bg("state.facet.Continue") == "state-bg-continue"
+
+    def test_unknown_state_returns_other(self):
+        assert step_state_bg("state.facet.SomeWeirdState") == "state-bg-other"
+
+    def test_simple_complete(self):
+        assert step_state_bg("Complete") == "state-bg-complete"
+
+    def test_case_insensitive(self):
+        assert step_state_bg("COMPLETE") == "state-bg-complete"
+        assert step_state_bg("error") == "state-bg-error"
+        assert step_state_bg("EventTransmit") == "state-bg-transmit"
+
+    def test_state_color_created_is_primary(self):
+        """Created state should map to primary (active), not secondary."""
+        assert state_color("created") == "primary"

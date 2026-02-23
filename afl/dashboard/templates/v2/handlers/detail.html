@@ -29,10 +29,13 @@
     </article>
 </div>
 
-<div id="handler-detail-content"
-     hx-get="/v2/handlers/{{ handler.facet_name }}/partial"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
+<button class="btn-refresh"
+        hx-get="/v2/handlers/{{ handler.facet_name }}/partial"
+        hx-target="#handler-detail-content"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
+<div id="handler-detail-content">
     {% include "v2/handlers/_detail_content.html" %}
 </div>
 

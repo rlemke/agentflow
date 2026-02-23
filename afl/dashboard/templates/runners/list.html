@@ -16,6 +16,12 @@
 <p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
 {% endif %}
 
+<button class="btn-refresh"
+        hx-get="/api/runners?partial=true{% if filter_state %}&state={{ filter_state }}{% endif %}"
+        hx-target="#runner-list-body"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+</button>
 <figure>
 <table>
     <thead>
@@ -28,9 +34,7 @@
             <th>Actions</th>
         </tr>
     </thead>
-    <tbody hx-get="/api/runners?partial=true{% if filter_state %}&state={{ filter_state }}{% endif %}"
-           hx-trigger="every 5s"
-           hx-swap="innerHTML">
+    <tbody id="runner-list-body">
         {% for runner in runners %}
         {% include "partials/runner_row.html" %}
         {% endfor %}

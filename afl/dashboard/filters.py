@@ -56,7 +56,7 @@ def duration_fmt(ms: int | float | None) -> str:
 
 _STATE_COLORS: dict[str, str] = {
     # Runner states
-    "created": "secondary",
+    "created": "primary",
     "running": "primary",
     "completed": "success",
     "failed": "danger",
@@ -151,6 +151,23 @@ def step_log_color(level: str | None) -> str:
     return _STEP_LOG_COLORS.get(level.lower(), "secondary")
 
 
+_STEP_STATE_BG: dict[str, str] = {
+    "complete": "state-bg-complete",
+    "error": "state-bg-error",
+    "eventtransmit": "state-bg-transmit",
+    "created": "state-bg-running",
+    "continue": "state-bg-continue",
+}
+
+
+def step_state_bg(state: str | None) -> str:
+    """Return a CSS background class for the given step state string."""
+    if not state:
+        return "state-bg-other"
+    key = state.rsplit(".", 1)[-1].lower()
+    return _STEP_STATE_BG.get(key, "state-bg-other")
+
+
 def short_workflow_name_filter(name: str) -> str:
     """Extract the short name from a qualified workflow name."""
     from .helpers import short_workflow_name
@@ -183,6 +200,7 @@ def register_filters(env: Environment) -> None:
     env.filters["doc_params"] = doc_params
     env.filters["doc_returns"] = doc_returns
     env.filters["step_log_color"] = step_log_color
+    env.filters["step_state_bg"] = step_state_bg
     env.filters["short_workflow_name"] = short_workflow_name_filter
     env.filters["step_category"] = step_category_filter
     env.filters["namespace_of"] = namespace_of_filter
