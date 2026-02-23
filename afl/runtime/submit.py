@@ -103,6 +103,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Log level (default: WARNING)",
     )
 
+    parser.add_argument(
+        "--log-format",
+        default="json",
+        choices=["json", "text"],
+        help="Log format (default: json)",
+    )
+
     return parser
 
 
@@ -133,9 +140,11 @@ def main(args: list[str] | None = None) -> int:
     parsed = parser.parse_args(args)
 
     # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, parsed.log_level),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    from afl.logging import configure_logging
+
+    configure_logging(
+        level=parsed.log_level,
+        log_format=parsed.log_format,
     )
 
     # -------------------------------------------------------------------------

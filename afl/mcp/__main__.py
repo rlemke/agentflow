@@ -46,20 +46,22 @@ def main() -> None:  # pragma: no cover
         metavar="FILE",
         help="Log to file (recommended for stdio transport) instead of stderr",
     )
+    parser.add_argument(
+        "--log-format",
+        default="json",
+        choices=["json", "text"],
+        help="Log format (default: json)",
+    )
     args = parser.parse_args()
 
     # Configure logging — file handler recommended for stdio transport
     # since stderr may interfere with JSON-RPC on some clients
-    log_handlers: list[logging.Handler] = []
-    if args.log_file:
-        log_handlers.append(logging.FileHandler(args.log_file))
-    else:
-        log_handlers.append(logging.StreamHandler())
+    from afl.logging import configure_logging
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        handlers=log_handlers,
+    configure_logging(
+        level=args.log_level,
+        log_file=args.log_file,
+        log_format=args.log_format,
     )
 
     try:

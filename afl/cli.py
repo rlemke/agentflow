@@ -212,19 +212,22 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
         help="Log to file instead of stderr",
     )
 
+    parser.add_argument(
+        "--log-format",
+        default="json",
+        choices=["json", "text"],
+        help="Log format (default: json)",
+    )
+
 
 def _configure_logging(parsed: argparse.Namespace) -> None:
     """Set up logging from parsed CLI args."""
-    log_handlers: list[logging.Handler] = []
-    if parsed.log_file:
-        log_handlers.append(logging.FileHandler(parsed.log_file))
-    else:
-        log_handlers.append(logging.StreamHandler())
+    from .logging import configure_logging
 
-    logging.basicConfig(
-        level=getattr(logging, parsed.log_level),
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        handlers=log_handlers,
+    configure_logging(
+        level=parsed.log_level,
+        log_file=parsed.log_file,
+        log_format=parsed.log_format,
     )
 
 
