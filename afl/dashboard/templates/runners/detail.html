@@ -63,8 +63,8 @@
 
 <h2>Steps</h2>
 <div class="view-toggle">
-    <button class="view-toggle-btn active" onclick="document.getElementById('step-flat').style.display='';document.getElementById('step-tree').style.display='none';this.classList.add('active');this.nextElementSibling.classList.remove('active');">Flat</button>
-    <button class="view-toggle-btn" onclick="document.getElementById('step-tree').style.display='';document.getElementById('step-flat').style.display='none';this.classList.add('active');this.previousElementSibling.classList.remove('active');">Tree</button>
+    <button class="view-toggle-btn" onclick="document.getElementById('step-flat').style.display='';document.getElementById('step-tree').style.display='none';this.classList.add('active');this.nextElementSibling.classList.remove('active');">Flat</button>
+    <button class="view-toggle-btn active" onclick="document.getElementById('step-tree').style.display='';document.getElementById('step-flat').style.display='none';this.classList.add('active');this.previousElementSibling.classList.remove('active');">Tree</button>
 </div>
 <div class="view-toggle state-filter" id="state-tabs">
     <button class="view-toggle-btn active" data-filter="all">All <span class="tab-count" id="count-all"></span></button>
@@ -74,7 +74,7 @@
     <button class="view-toggle-btn" data-filter="other">Other <span class="tab-count" id="count-other"></span></button>
 </div>
 
-<div id="step-flat">
+<div id="step-flat" style="display:none">
 <button class="btn-refresh"
         hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true"
         hx-target="#step-flat-body"
@@ -95,7 +95,7 @@
 </figure>
 </div>
 
-<div id="step-tree" style="display:none">
+<div id="step-tree">
 <button class="btn-refresh"
         hx-get="/api/runners/{{ runner.uuid }}/steps?partial=true&view=tree"
         hx-target="#step-tree-content"
