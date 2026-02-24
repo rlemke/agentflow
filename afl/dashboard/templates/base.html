@@ -18,16 +18,11 @@
         <ul>
             <li><a href="/v2/workflows"{% if active_tab == 'workflows' %} class="nav-active"{% endif %}>Workflows</a></li>
             <li><a href="/v2/servers"{% if active_tab == 'servers' %} class="nav-active"{% endif %}>Servers</a></li>
-            <li class="nav-dropdown-container">
-                <a href="#" class="nav-dropdown-toggle">More</a>
-                <ul class="nav-dropdown">
-                    <li><a href="/tasks">Tasks</a></li>
-                    <li><a href="/flows">Flows</a></li>
-                    <li><a href="/runners">Runners</a></li>
-                    <li><a href="/output"{% if active_tab == 'output' %} class="nav-active"{% endif %}>Output</a></li>
-                    <li><a href="/workflows/new">New Workflow</a></li>
-                </ul>
-            </li>
+            <li><a href="/tasks"{% if active_tab == 'tasks' %} class="nav-active"{% endif %}>Tasks</a></li>
+            <li><a href="/flows"{% if active_tab == 'flows' %} class="nav-active"{% endif %}>Flows</a></li>
+            <li><a href="/runners"{% if active_tab == 'runners' %} class="nav-active"{% endif %}>Runners</a></li>
+            <li><a href="/output"{% if active_tab == 'output' %} class="nav-active"{% endif %}>Output</a></li>
+            <li><a href="/workflows/new"{% if active_tab == 'new_workflow' %} class="nav-active"{% endif %}>New Workflow</a></li>
         </ul>
     </nav>
 
