@@ -1,4 +1,4 @@
-# AgentFlow: The Journey of Building a Distributed Workflow Platform
+# AgentFlow: The Journey of Building a Distributed Workflow Platform - no human coding -- only Claude -- even the docs
 
 *From a grammar file to 500,000-step distributed workflows across 50 US states*
 
