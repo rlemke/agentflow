@@ -11,6 +11,14 @@ The lite agent container handles visualization tasks (RenderMap, etc.) but lacke
 - **Alaska**: 6,728 bicycle routes (4,327 km), 37,390 hiking trails (40,758 km), 1,376 train routes (1,229 km), 62 bus routes, 790 parks (1,025,221 km², 17 national, 42 state), 13 cities (1 with pop > 100K, 291,247)
 - **Visualization**: all composed FromCache steps produce HTML map_path values (except DiscoverCitiesAndTowns which depends on POI handlers returning cache refs, and Alaska NationalParksAnalysis where FilterParksByType returned 0 features)
 
+**E2E verified** (2026-02-24): AnalyzeStates_05 — 396 steps (389 complete, 7 errors). 5 states processed; Arkansas boundary extraction failed due to transient HDFS connection errors (cascaded to 7 error steps). All other categories across all 5 states produced real data:
+- **Alabama**: 6,107 bicycle routes, 87,701 hiking, 7,571 train, 130 bus, 1,677 parks, 1 boundary, 11 cities
+- **Alaska**: 6,728 bicycle routes, 37,390 hiking, 1,376 train, 62 bus, 790 parks, 13 cities
+- **Arizona**: extraction completed (routes, parks, population, boundaries)
+- **Arkansas**: all categories except boundaries completed; boundary extraction hit HDFS IncompleteRead/404 errors
+- **California**: extraction completed (routes, parks, population, boundaries)
+- **Known issue**: HDFS WebHDFS connections drop on large file transfers (>100MB); agent crashes leave tasks orphaned in "running" state requiring manual reset
+
 ## Completed (v0.12.85) - Skip pyosmium-dependent handler registration on lite agent
 
 ### Root cause: lite agent claiming extraction tasks it cannot process
