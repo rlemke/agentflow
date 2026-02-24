@@ -4,7 +4,12 @@
 
 The lite agent container handles visualization tasks (RenderMap, etc.) but lacked `folium`, causing all map rendering steps to return empty `output_path` values. Added `folium` to `Dockerfile.osm-geocoder-lite` dependencies.
 
-**File changed:** `docker/Dockerfile.osm-geocoder-lite`
+**File changed:** `docker/Dockerfile.osm-geocoder-lite`. No new tests; test suite: 2491 passed, 79 skipped.
+
+**E2E verified** (2026-02-24): AnalyzeStates_02 — all 147 steps complete, all extraction categories producing real data:
+- **Alabama**: 6,107 bicycle routes (3,205 km), 87,701 hiking trails (35,622 km), 7,571 train routes (8,460 km), 130 bus routes, 1,677 parks (5,678 km², 7 national, 9 state), 1 state boundary, 11 cities (4 with pop > 100K, total 803,383)
+- **Alaska**: 6,728 bicycle routes (4,327 km), 37,390 hiking trails (40,758 km), 1,376 train routes (1,229 km), 62 bus routes, 790 parks (1,025,221 km², 17 national, 42 state), 13 cities (1 with pop > 100K, 291,247)
+- **Visualization**: all composed FromCache steps produce HTML map_path values (except DiscoverCitiesAndTowns which depends on POI handlers returning cache refs, and Alaska NationalParksAnalysis where FilterParksByType returned 0 features)
 
 ## Completed (v0.12.85) - Skip pyosmium-dependent handler registration on lite agent
 
