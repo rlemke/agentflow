@@ -1,5 +1,20 @@
 # Implementation Changelog
 
+## Completed (v0.12.88) - Redesign New Workflow page with namespace-grouped workflow browser
+
+Redesign the `/workflows/new` page from a bare textarea into a workflow browser backed by the database. All workflows from seeded flows are displayed in a namespace-grouped accordion, and clicking a workflow populates the editor with a generated AFL snippet (namespace wrapper + params with defaults). Also flattens the nav bar and fixes stale nav tests.
+
+### New Workflow page (`/workflows/new`)
+- **`routes/workflows.py`**: `workflow_new()` now fetches all flows via `store.get_all_flows()`, extracts workflows from `compiled_ast` with namespace paths, groups by namespace, and generates AFL source snippets. Added helpers: `_collect_workflows_with_ns()` (recursive namespace-aware collector) and `_build_afl_snippet()` (generates `namespace X { workflow Y(...) => (...) andThen { ... } }`).
+- **`templates/workflows/new.html`**: Added accordion browser using `<details>`/`<summary>` with badge counts per namespace. Each workflow is a clickable link with `data-source` attribute containing the AFL snippet. JavaScript click handler populates the textarea. Editor section (textarea + Compile/Validate buttons) preserved below.
+
+### Nav bar cleanup
+- **`base.html`** (v0.12.87): Flattened nav dropdown into top-level tabs — removed Events, Locks, Sources, Namespaces, Handlers from nav; kept Workflows, Servers, Tasks, Flows, Runners, Output, New Workflow.
+- **Test fixes**: Updated 4 test files (`test_dashboard_v2.py`, `test_handlers_v2.py`, `test_routes.py`, `test_template_rendering.py`) to match the flattened nav structure — replaced assertions for "More" dropdown and removed nav items with assertions for current flat tabs.
+
+### Details
+- 7 files changed (7 modified); 6 new tests (empty DB, workflows from DB, namespace grouping, top-level workflows, AFL snippet in data-source, flow without compiled_ast); test suite: 2529 passed, 79 skipped
+
 ## Completed (v0.12.87) - Host-mounted output directory and dashboard file browser
 
 Introduce `AFL_LOCAL_OUTPUT_DIR` env var (default `/Volumes/afl_data/output`) to redirect handler output (HTML maps, stats, GeoJSON) to a host-mounted directory instead of ephemeral `/tmp` paths inside containers. Add a dashboard file browser at `/output` with directory tree navigation, breadcrumbs, file metadata display, and inline viewing for HTML/image/text files.
