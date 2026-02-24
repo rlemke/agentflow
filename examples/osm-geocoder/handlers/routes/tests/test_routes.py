@@ -300,8 +300,9 @@ class TestHandlerRegistration:
         assert "BusRoutes" in names
         assert "PublicTransport" in names
 
-    def test_register_route_handlers(self):
+    def test_register_route_handlers(self, monkeypatch):
         """Test handler registration with mock poller."""
+        monkeypatch.setitem(register_route_handlers.__globals__, "HAS_OSMIUM", True)
         poller = MagicMock()
         register_route_handlers(poller)
 

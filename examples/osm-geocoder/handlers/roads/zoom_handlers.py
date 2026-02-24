@@ -482,6 +482,8 @@ def register_handlers(runner) -> None:
 
 def register_zoom_handlers(poller) -> None:
     """Register all zoom builder event facet handlers with the poller."""
+    if not HAS_OSMIUM:
+        return
     for facet_name, handler_factory in ZOOM_FACETS:
         qualified_name = f"{NAMESPACE}.{facet_name}"
         poller.register(qualified_name, handler_factory(facet_name))

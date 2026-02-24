@@ -546,8 +546,9 @@ class TestHandlerRegistration:
         assert "Counties" in names
         assert "AllPopulatedPlaces" in names
 
-    def test_register_population_handlers(self):
+    def test_register_population_handlers(self, monkeypatch):
         """Test handler registration with mock poller."""
+        monkeypatch.setitem(register_population_handlers.__globals__, "HAS_OSMIUM", True)
         poller = MagicMock()
         register_population_handlers(poller)
 

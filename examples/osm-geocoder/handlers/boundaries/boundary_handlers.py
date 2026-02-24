@@ -261,6 +261,8 @@ NATURAL_FACETS: dict[str, list[str]] = {
 
 def register_boundary_handlers(poller) -> None:
     """Register all boundary event facet handlers with the poller."""
+    if not HAS_OSMIUM:
+        return
     # Register fixed admin level handlers
     for facet_name, admin_levels in ADMIN_FACETS.items():
         qualified_name = f"{NAMESPACE}.{facet_name}"

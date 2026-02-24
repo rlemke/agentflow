@@ -90,6 +90,8 @@ def handle(payload: dict) -> dict:
 
 def register_postgis_handlers(poller) -> None:
     """Register PostGIS event facet handlers with the poller."""
+    if not HAS_OSMIUM:
+        return
     for facet_name, handler in _DISPATCH.items():
         poller.register(facet_name, handler)
 

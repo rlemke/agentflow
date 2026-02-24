@@ -1,5 +1,15 @@
 # Implementation Changelog
 
+## Completed (v0.12.85) - Skip pyosmium-dependent handler registration on lite agent
+
+### Root cause: lite agent claiming extraction tasks it cannot process
+
+The lite agent container (no pyosmium) registered ALL 182 handlers identically to the full agent. When the lite agent won the race to claim extraction tasks (routes, boundaries, population, parks, amenities, buildings, roads, zoom), it returned `_empty_result()` because `HAS_OSMIUM=False` — silently producing zero-count results.
+
+**Fix:** Added `if not HAS_OSMIUM: return` guard to 9 `register_*_handlers(poller)` functions so the lite agent only registers handlers it can actually process. Updated 4 registration tests to use `monkeypatch.setitem(func.__globals__, "HAS_OSMIUM", True)` to handle the conftest module-purge behavior.
+
+**Files changed:** `route_handlers.py`, `boundary_handlers.py`, `amenity_handlers.py`, `building_handlers.py`, `park_handlers.py`, `road_handlers.py`, `population_handlers.py`, `zoom_handlers.py`, `postgis_handlers.py` + 4 test files. Test suite: 2491 passed, 79 skipped.
+
 ## Completed (v0.12.84) - Fix remaining HDFS URI mangling in OSM handler write/stats/filter paths
 
 ### Comprehensive HDFS compatibility fix across handler files

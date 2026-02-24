@@ -509,8 +509,9 @@ class TestHandlerRegistration:
         assert "ParkStatistics" in names
         assert "LargeParks" in names
 
-    def test_register_park_handlers(self):
+    def test_register_park_handlers(self, monkeypatch):
         """Test handler registration with mock poller."""
+        monkeypatch.setitem(register_park_handlers.__globals__, "HAS_OSMIUM", True)
         poller = MagicMock()
         register_park_handlers(poller)
 

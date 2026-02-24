@@ -795,8 +795,9 @@ class TestHandlerRegistration:
         assert "ExportZoomLayers" in names
         assert "BuildZoomLayers" in names
 
-    def test_register_zoom_handlers(self):
+    def test_register_zoom_handlers(self, monkeypatch):
         """register_zoom_handlers registers 9 handlers with mock poller."""
+        monkeypatch.setitem(register_zoom_handlers.__globals__, "HAS_OSMIUM", True)
         poller = MagicMock()
         register_zoom_handlers(poller)
         assert poller.register.call_count == 9
