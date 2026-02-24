@@ -9,12 +9,19 @@ Provides filtering by configurable units, comparison operators, and thresholds.
 import json
 import logging
 import math
+import posixpath
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from afl.runtime.storage import get_storage_backend
+
+from ..shared._output import uri_stem
+
 log = logging.getLogger(__name__)
+
+_storage = get_storage_backend()
 
 # Check for pyproj availability (optional, provides accurate geodesic area)
 try:
@@ -298,13 +305,15 @@ def filter_geojson(
     if not HAS_SHAPELY:
         raise RuntimeError("shapely is required for GeoJSON filtering")
 
-    input_path = Path(input_path)
+    input_path = str(input_path)
     if output_path is None:
-        output_path = input_path.with_stem(f"{input_path.stem}_filtered")
-    output_path = Path(output_path)
+        stem = uri_stem(input_path)
+        _dir = posixpath.dirname(input_path)
+        output_path = f"{_dir}/{stem}_filtered.geojson"
+    output_path = str(output_path)
 
     # Load input GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

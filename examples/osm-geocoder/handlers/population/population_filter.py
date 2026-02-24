@@ -12,9 +12,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import localize
+from afl.runtime.storage import get_storage_backend, localize
 
-from ..shared._output import ensure_dir, open_output, resolve_output_dir
+from ..shared._output import ensure_dir, open_output, resolve_output_dir, uri_stem
+
+_storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
 
@@ -310,7 +312,7 @@ def filter_geojson_by_population(
     Returns:
         PopulationFilterResult with output path and statistics
     """
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
     # Parse place type and operator
     if isinstance(place_type, str):
@@ -324,13 +326,13 @@ def filter_geojson_by_population(
         suffix = f"_pop_{min_population}"
         if max_population is not None:
             suffix += f"_{max_population}"
-        output_path_str = f"{out_dir}/{input_path.stem}{suffix}.geojson"
+        output_path_str = f"{out_dir}/{uri_stem(input_path)}{suffix}.geojson"
     else:
         output_path_str = str(output_path)
     ensure_dir(output_path_str)
 
     # Load input GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -526,14 +528,14 @@ def calculate_population_stats(
     Returns:
         PopulationStats with counts and totals
     """
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
     # Parse place type
     if isinstance(place_type, str):
         place_type = PlaceType.from_string(place_type)
 
     # Load GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

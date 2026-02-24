@@ -14,9 +14,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from afl.runtime.storage import localize
+from afl.runtime.storage import get_storage_backend, localize
 
-from ..shared._output import ensure_dir, open_output, resolve_output_dir
+from ..shared._output import ensure_dir, open_output, resolve_output_dir, uri_stem
+
+_storage = get_storage_backend()
 
 log = logging.getLogger(__name__)
 
@@ -385,10 +387,10 @@ def filter_geojson_by_osm_type(
     Returns:
         OSMFilterResult with output path and counts
     """
-    input_path = Path(input_path)
+    input_path = str(input_path)
     if output_path is None:
         out_dir = resolve_output_dir("osm-filtered")
-        output_path_str = f"{out_dir}/{input_path.stem}_filtered.geojson"
+        output_path_str = f"{out_dir}/{uri_stem(input_path)}_filtered.geojson"
     else:
         output_path_str = str(output_path)
     ensure_dir(output_path_str)
@@ -398,7 +400,7 @@ def filter_geojson_by_osm_type(
         osm_type = OSMType.from_string(osm_type)
 
     # Load input GeoJSON
-    with open(input_path, encoding="utf-8") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

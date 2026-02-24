@@ -178,10 +178,15 @@ def _make_filter_buildings_handler(facet_name: str):
 
         try:
             import json
-            from pathlib import Path
+            import posixpath
 
-            input_path = Path(input_path)
-            with open(input_path, encoding="utf-8") as f:
+            from afl.runtime.storage import get_storage_backend
+
+            from ..shared._output import uri_stem
+
+            input_path = str(input_path)
+            _st = get_storage_backend(input_path)
+            with _st.open(input_path, "r") as f:
                 geojson = json.load(f)
 
             filtered = []
@@ -190,10 +195,11 @@ def _make_filter_buildings_handler(facet_name: str):
                 if building_type == "all" or props.get("building_type") == building_type:
                     filtered.append(feature)
 
-            output_path = input_path.with_stem(f"{input_path.stem}_{building_type}")
+            _dir = posixpath.dirname(input_path)
+            output_path = f"{_dir}/{uri_stem(input_path)}_{building_type}.geojson"
             output_geojson = {"type": "FeatureCollection", "features": filtered}
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with _st.open(output_path, "w") as f:
                 json.dump(output_geojson, f, indent=2)
 
             total_area = sum(f["properties"].get("area_m2", 0) for f in filtered)

@@ -320,9 +320,9 @@ def calculate_amenity_stats(input_path: str | Path) -> AmenityStats:
 def search_amenities(input_path: str | Path, name_pattern: str,
                      output_path: str | Path | None = None) -> AmenityResult:
     """Search amenities by name pattern."""
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
-    with _storage.open(str(input_path), "r") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     pattern = re.compile(name_pattern, re.IGNORECASE)

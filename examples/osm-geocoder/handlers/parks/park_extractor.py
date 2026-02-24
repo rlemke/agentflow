@@ -18,7 +18,7 @@ from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
-from ..shared._output import ensure_dir, open_output, resolve_output_dir
+from ..shared._output import ensure_dir, open_output, resolve_output_dir, uri_stem
 
 _storage = get_storage_backend()
 
@@ -444,7 +444,7 @@ def filter_parks_by_type(
     Returns:
         ParkResult with output path and statistics
     """
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
     # Parse park type
     if isinstance(park_type, str):
@@ -455,12 +455,14 @@ def filter_parks_by_type(
 
     # Generate output path if not provided
     if output_path is None:
-        suffix = f"_{park_type.value}"
-        output_path = input_path.with_stem(f"{input_path.stem}{suffix}")
-    output_path = Path(output_path)
+        stem = uri_stem(input_path)
+        import posixpath
+        _dir = posixpath.dirname(input_path)
+        output_path = f"{_dir}/{stem}_{park_type.value}.geojson"
+    output_path = str(output_path)
 
     # Load input GeoJSON
-    with _storage.open(str(input_path), "r") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -514,10 +516,10 @@ def calculate_park_stats(input_path: str | Path) -> ParkStats:
     Returns:
         ParkStats with counts and areas by type
     """
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
     # Load GeoJSON
-    with _storage.open(str(input_path), "r") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

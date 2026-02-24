@@ -183,10 +183,15 @@ def _make_filter_by_category_handler(facet_name: str):
 
         try:
             import json
-            from pathlib import Path
+            import posixpath
 
-            input_path = Path(input_path)
-            with open(input_path, encoding="utf-8") as f:
+            from afl.runtime.storage import get_storage_backend
+
+            from ..shared._output import uri_stem
+
+            input_path = str(input_path)
+            _st = get_storage_backend(input_path)
+            with _st.open(input_path, "r") as f:
                 geojson = json.load(f)
 
             filtered = []
@@ -195,10 +200,11 @@ def _make_filter_by_category_handler(facet_name: str):
                 if category == "all" or props.get("category") == category:
                     filtered.append(feature)
 
-            output_path = input_path.with_stem(f"{input_path.stem}_{category}")
+            _dir = posixpath.dirname(input_path)
+            output_path = f"{_dir}/{uri_stem(input_path)}_{category}.geojson"
             output_geojson = {"type": "FeatureCollection", "features": filtered}
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with _st.open(output_path, "w") as f:
                 json.dump(output_geojson, f, indent=2)
 
             all_features = geojson.get("features", [])

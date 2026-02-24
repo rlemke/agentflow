@@ -430,9 +430,9 @@ def filter_roads_by_class(
     output_path: str | Path | None = None,
 ) -> RoadResult:
     """Filter roads by classification."""
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
-    with _storage.open(str(input_path), "r") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     filtered = [
@@ -468,9 +468,9 @@ def filter_by_speed_limit(
     output_path: str | Path | None = None,
 ) -> RoadResult:
     """Filter roads by speed limit range."""
-    input_path = Path(input_path)
+    input_path = str(input_path)
 
-    with _storage.open(str(input_path), "r") as f:
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     filtered = []

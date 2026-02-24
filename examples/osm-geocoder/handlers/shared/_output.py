@@ -33,6 +33,17 @@ def open_output(path: str, mode: str = "w") -> IO:
     return backend.open(path, mode)
 
 
+def uri_stem(path: str) -> str:
+    """Get the stem (filename without extension) from a path or HDFS URI.
+
+    Works with both local paths and ``hdfs://`` URIs because both
+    use ``/`` as the separator.
+    """
+    import posixpath
+
+    return posixpath.splitext(posixpath.basename(path))[0]
+
+
 def ensure_dir(path: str) -> None:
     """Create parent directory for output paths.
 
