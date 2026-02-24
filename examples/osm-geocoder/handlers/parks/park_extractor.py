@@ -494,7 +494,7 @@ def filter_parks_by_type(
     }
 
     # Write output
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(str(output_path)) as f:
         json.dump(output_geojson, f, indent=2)
 
     return ParkResult(

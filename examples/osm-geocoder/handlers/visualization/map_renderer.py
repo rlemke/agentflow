@@ -7,12 +7,17 @@ or static PNG images using contextily + matplotlib.
 import json
 import logging
 import os
+import posixpath
 import tempfile
 import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from afl.runtime.storage import get_storage_backend, localize
+
+from ..shared._output import uri_stem
 
 log = logging.getLogger(__name__)
 
@@ -195,16 +200,20 @@ def render_map_html(
     if not HAS_FOLIUM:
         raise RuntimeError("folium is required for HTML map rendering. Install with: pip install folium")
 
-    geojson_path = Path(geojson_path)
+    geojson_path_str = str(geojson_path)
+    local_geojson = localize(geojson_path_str)
     if output_path is None:
-        output_path = geojson_path.with_suffix(".html")
-    output_path = Path(output_path)
+        output_path = os.path.join(
+            os.path.dirname(local_geojson),
+            uri_stem(geojson_path_str) + ".html",
+        )
+    output_path = str(output_path)
 
     if style is None:
         style = LayerStyle()
 
     # Load GeoJSON
-    with open(geojson_path, encoding="utf-8") as f:
+    with open(local_geojson, encoding="utf-8") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -316,16 +325,20 @@ def render_map_png(
             "Install with: pip install geopandas contextily matplotlib"
         )
 
-    geojson_path = Path(geojson_path)
+    geojson_path_str = str(geojson_path)
+    local_geojson = localize(geojson_path_str)
     if output_path is None:
-        output_path = geojson_path.with_suffix(".png")
-    output_path = Path(output_path)
+        output_path = os.path.join(
+            os.path.dirname(local_geojson),
+            uri_stem(geojson_path_str) + ".png",
+        )
+    output_path = str(output_path)
 
     if style is None:
         style = LayerStyle()
 
     # Load GeoJSON with geopandas
-    gdf = gpd.read_file(geojson_path)
+    gdf = gpd.read_file(local_geojson)
 
     # Ensure WGS84 then convert to Web Mercator for contextily
     if gdf.crs is None:
@@ -435,9 +448,12 @@ def render_layers(
 
     # Determine output path
     if output_path is None:
-        first_path = Path(layer_paths[0])
-        output_path = first_path.with_name(f"{first_path.stem}_layers.html")
-    output_path = Path(output_path)
+        first_local = localize(str(layer_paths[0]))
+        output_path = os.path.join(
+            os.path.dirname(first_local),
+            uri_stem(str(layer_paths[0])) + "_layers.html",
+        )
+    output_path = str(output_path)
 
     # Load all GeoJSON files and calculate combined bounds
     all_bounds = []
@@ -445,14 +461,15 @@ def render_layers(
     layers_data = []
 
     for path in layer_paths:
-        with open(path, encoding="utf-8") as f:
+        local_path = localize(str(path))
+        with open(local_path, encoding="utf-8") as f:
             geojson = json.load(f)
         features = geojson.get("features", [])
         total_features += len(features)
         bounds = calculate_bounds(geojson)
         if bounds:
             all_bounds.append(bounds)
-        layers_data.append((Path(path).stem, geojson))
+        layers_data.append((uri_stem(str(path)), geojson))
 
     # Calculate combined bounds
     if all_bounds:
@@ -526,10 +543,11 @@ def preview_map(geojson_path: str | Path) -> MapResult:
         MapResult with output path and metadata
     """
     # Create temp file for preview
-    geojson_path = Path(geojson_path)
-    output_path = Path(tempfile.gettempdir()) / f"preview_{geojson_path.stem}.html"
+    geojson_path_str = str(geojson_path)
+    stem = uri_stem(geojson_path_str)
+    output_path = os.path.join(tempfile.gettempdir(), f"preview_{stem}.html")
 
-    result = render_map_html(geojson_path, output_path, title=f"Preview: {geojson_path.name}")
+    result = render_map_html(geojson_path_str, output_path, title=f"Preview: {posixpath.basename(geojson_path_str)}")
 
     # Open in browser
     webbrowser.open(f"file://{output_path}")

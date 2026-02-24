@@ -1,5 +1,26 @@
 # Implementation Changelog
 
+## Completed (v0.12.84) - Fix remaining HDFS URI mangling in OSM handler write/stats/filter paths
+
+### Comprehensive HDFS compatibility fix across handler files
+
+Extended the v0.12.83 HDFS fix to cover all remaining `Path()` usages and `_storage.open()` calls that failed on HDFS URIs. The first fix round addressed read paths; this round fixes write paths, output path generation, and stats functions.
+
+**Pattern fixed:** `Path(hdfs_path)` collapses `//` → `/`, producing invalid URIs. `_storage.open()` (module-level local backend) can't read/write HDFS URIs. `.with_stem()` on strings raises `AttributeError`.
+
+- **`visualization/map_renderer.py`** (8 fixes): `render_map_html()`, `render_map_png()`, `render_layers()`, `preview_map()` — replaced `Path()` with `localize()` for GeoJSON input (downloaded from HDFS to local), `uri_stem()` for filename derivation, and `str()` for output paths. HTML/PNG output stays local since it's for browser viewing.
+- **`roads/road_handlers.py`** (2 fixes): `_make_major_roads_handler()` and `_make_special_road_handler()` — replaced `Path().with_stem()` + `open()` with `uri_stem()` + `posixpath` + `get_storage_backend().open()` + `open_output()` for HDFS-safe read/write of filtered GeoJSON.
+- **`roads/road_extractor.py`** (3 fixes): `calculate_road_stats()` — `_storage.open()` → `get_storage_backend(input_path).open()`. `filter_roads_by_class()` and `filter_by_speed_limit()` — replaced broken `input_path.with_stem()` (string has no `.with_stem()`) + `Path()` + `_storage.open()` with `uri_stem()` + `posixpath` + `open_output()`.
+- **`amenities/amenity_extractor.py`** (2 fixes): `calculate_amenity_stats()` — `_storage.open()` → `get_storage_backend(input_path).open()`. `search_amenities()` — replaced broken `input_path.with_stem()` + `Path()` + `_storage.open()` with `uri_stem()` + `posixpath` + `open_output()`.
+- **`routes/route_extractor.py`** (2 fixes): `filter_routes_by_type()` write — `_storage.open()` → `open_output()`. `calculate_route_stats()` — `_storage.open()` → `get_storage_backend(input_path).open()`.
+- **`parks/park_extractor.py`** (1 fix): `filter_parks_by_type()` write — `_storage.open()` → `open_output()`.
+- **`filters/radius_filter.py`** (1 fix): `filter_geojson()` write — `open()` → `open_output()` for HDFS-safe writing.
+
+### Details
+- 7 files changed; no new tests; test suite: 2491 passed, 79 skipped
+- Verified in container: `extract_places_with_population("hdfs://...")` returns 11 cities for Alabama
+- Verified end-to-end: AnalyzeStates_02 workflow shows Alabama 1,674 parks/5,678 km2, Alaska 790 parks/1,025,220 km2
+
 ## Completed (v0.12.83) - Defer yield step creation until all non-yield statements are terminal
 
 ### Yield deferral in DependencyGraph

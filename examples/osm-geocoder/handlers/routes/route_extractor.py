@@ -463,7 +463,7 @@ def filter_routes_by_type(
         "features": filtered,
     }
 
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(str(output_path)) as f:
         json.dump(output_geojson, f, indent=2)
 
     return RouteResult(
@@ -485,7 +485,8 @@ def calculate_route_stats(input_path: str | Path) -> RouteStats:
     Returns:
         RouteStats with counts and total length
     """
-    with _storage.open(str(input_path), "r") as f:
+    input_path = str(input_path)
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])

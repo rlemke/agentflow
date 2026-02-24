@@ -13,7 +13,7 @@ from pathlib import Path
 
 from afl.runtime.storage import get_storage_backend, localize
 
-from ..shared._output import ensure_dir, open_output, resolve_output_dir
+from ..shared._output import ensure_dir, open_output, resolve_output_dir, uri_stem
 
 _storage = get_storage_backend()
 
@@ -268,7 +268,8 @@ def extract_amenities(
 
 def calculate_amenity_stats(input_path: str | Path) -> AmenityStats:
     """Calculate statistics for extracted amenities."""
-    with _storage.open(str(input_path), "r") as f:
+    input_path = str(input_path)
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -334,15 +335,18 @@ def search_amenities(input_path: str | Path, name_pattern: str,
             filtered.append(feature)
 
     if output_path is None:
-        output_path = input_path.with_stem(f"{input_path.stem}_search")
-    output_path = Path(output_path)
+        import posixpath
+        _dir = posixpath.dirname(input_path)
+        output_path_str = f"{_dir}/{uri_stem(input_path)}_search.geojson"
+    else:
+        output_path_str = str(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(output_geojson, f, indent=2)
 
     return AmenityResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(filtered),
         amenity_category="search",
         amenity_types=name_pattern,

@@ -99,9 +99,14 @@ def _make_major_roads_handler(facet_name: str):
             result = extract_roads(pbf_path, road_class="all")
 
             import json
-            from pathlib import Path
+            import posixpath
 
-            with open(result.output_path, encoding="utf-8") as f:
+            from afl.runtime.storage import get_storage_backend
+
+            from ..shared._output import open_output, uri_stem
+
+            _st = get_storage_backend(result.output_path)
+            with _st.open(result.output_path, "r") as f:
                 geojson = json.load(f)
 
             major_classes = {rc.value for rc in MAJOR_ROAD_CLASSES}
@@ -110,12 +115,12 @@ def _make_major_roads_handler(facet_name: str):
                 if f.get("properties", {}).get("road_class") in major_classes
             ]
 
-            output_path = Path(result.output_path).with_stem(
-                Path(result.output_path).stem.replace("_all_roads", "_major_roads")
-            )
+            _dir = posixpath.dirname(result.output_path)
+            _stem = uri_stem(result.output_path).replace("_all_roads", "_major_roads")
+            output_path = f"{_dir}/{_stem}.geojson"
             output_geojson = {"type": "FeatureCollection", "features": filtered}
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with open_output(output_path) as f:
                 json.dump(output_geojson, f, indent=2)
 
             total_length = sum(f["properties"].get("length_km", 0) for f in filtered)
@@ -159,9 +164,14 @@ def _make_special_road_handler(facet_name: str, attribute: str):
             result = extract_roads(pbf_path, road_class="all")
 
             import json
-            from pathlib import Path
+            import posixpath
 
-            with open(result.output_path, encoding="utf-8") as f:
+            from afl.runtime.storage import get_storage_backend
+
+            from ..shared._output import open_output, uri_stem
+
+            _st = get_storage_backend(result.output_path)
+            with _st.open(result.output_path, "r") as f:
                 geojson = json.load(f)
 
             filtered = [
@@ -169,12 +179,12 @@ def _make_special_road_handler(facet_name: str, attribute: str):
                 if f.get("properties", {}).get(attribute)
             ]
 
-            output_path = Path(result.output_path).with_stem(
-                Path(result.output_path).stem.replace("_all_roads", f"_{attribute}s")
-            )
+            _dir = posixpath.dirname(result.output_path)
+            _stem = uri_stem(result.output_path).replace("_all_roads", f"_{attribute}s")
+            output_path = f"{_dir}/{_stem}.geojson"
             output_geojson = {"type": "FeatureCollection", "features": filtered}
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with open_output(output_path) as f:
                 json.dump(output_geojson, f, indent=2)
 
             total_length = sum(f["properties"].get("length_km", 0) for f in filtered)

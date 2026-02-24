@@ -16,7 +16,7 @@ from pathlib import Path
 
 from afl.runtime.storage import get_storage_backend, localize
 
-from ..shared._output import ensure_dir, open_output, resolve_output_dir
+from ..shared._output import ensure_dir, open_output, resolve_output_dir, uri_stem
 
 _storage = get_storage_backend()
 
@@ -371,7 +371,8 @@ def extract_roads(
 
 def calculate_road_stats(input_path: str | Path) -> RoadStats:
     """Calculate statistics for extracted roads."""
-    with _storage.open(str(input_path), "r") as f:
+    input_path = str(input_path)
+    with get_storage_backend(input_path).open(input_path, "r") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -441,18 +442,21 @@ def filter_roads_by_class(
     ]
 
     if output_path is None:
-        output_path = input_path.with_stem(f"{input_path.stem}_{road_class}")
-    output_path = Path(output_path)
+        import posixpath
+        _dir = posixpath.dirname(input_path)
+        output_path_str = f"{_dir}/{uri_stem(input_path)}_{road_class}.geojson"
+    else:
+        output_path_str = str(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(output_geojson, f, indent=2)
 
     total_length = sum(f["properties"].get("length_km", 0) for f in filtered)
     with_speed = sum(1 for f in filtered if f["properties"].get("maxspeed"))
 
     return RoadResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(filtered),
         road_class=road_class,
         total_length_km=round(total_length, 2),
@@ -480,17 +484,20 @@ def filter_by_speed_limit(
             filtered.append(f)
 
     if output_path is None:
-        output_path = input_path.with_stem(f"{input_path.stem}_speed_{min_speed}_{max_speed}")
-    output_path = Path(output_path)
+        import posixpath
+        _dir = posixpath.dirname(input_path)
+        output_path_str = f"{_dir}/{uri_stem(input_path)}_speed_{min_speed}_{max_speed}.geojson"
+    else:
+        output_path_str = str(output_path)
 
     output_geojson = {"type": "FeatureCollection", "features": filtered}
-    with _storage.open(str(output_path), "w") as f:
+    with open_output(output_path_str) as f:
         json.dump(output_geojson, f, indent=2)
 
     total_length = sum(f["properties"].get("length_km", 0) for f in filtered)
 
     return RoadResult(
-        output_path=str(output_path),
+        output_path=output_path_str,
         feature_count=len(filtered),
         road_class="filtered",
         total_length_km=round(total_length, 2),

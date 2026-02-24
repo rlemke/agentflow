@@ -357,7 +357,8 @@ def filter_geojson(
     }
 
     # Write output
-    with open(output_path, "w", encoding="utf-8") as f:
+    from ..shared._output import open_output as _open_output
+    with _open_output(output_path) as f:
         json.dump(output_geojson, f, indent=2)
 
     # Build filter description
