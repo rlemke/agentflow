@@ -200,6 +200,34 @@ pre code {
     opacity: 0.8;
 }
 
+/* New Workflow page — side-by-side layout */
+.wf-new-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+.wf-new-browser {
+    flex: 0 1 auto;
+    max-width: 50%;
+    min-width: 250px;
+    overflow-y: auto;
+}
+.wf-new-editor {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.wf-new-editor textarea {
+    width: 100%;
+}
+@media (max-width: 768px) {
+    .wf-new-layout {
+        flex-direction: column;
+    }
+    .wf-new-browser {
+        max-width: 100%;
+    }
+}
+
 /* Namespace group accordion */
 .ns-group {
     margin-bottom: 1rem;
