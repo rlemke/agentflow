@@ -60,6 +60,8 @@ def _make_render_map_handler(facet_name: str):
                 width=width,
                 height=height,
             )
+            if step_log:
+                step_log(f"{facet_name}: rendered {result.feature_count} features as {format}", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render map: %s", e)
@@ -99,6 +101,8 @@ def _make_render_map_at_handler(facet_name: str):
                 center=(lat, lon),
                 zoom=zoom,
             )
+            if step_log:
+                step_log(f"{facet_name}: rendered {result.feature_count} features at ({lat:.4f}, {lon:.4f})", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render map: %s", e)
@@ -141,6 +145,8 @@ def _make_render_layers_handler(facet_name: str):
                 title=title,
                 format=format,
             )
+            if step_log:
+                step_log(f"{facet_name}: rendered {result.feature_count} features across {len(layers)} layers", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render layers: %s", e)
@@ -183,6 +189,8 @@ def _make_render_styled_map_handler(facet_name: str):
                 format="html",
                 style=style,
             )
+            if step_log:
+                step_log(f"{facet_name}: rendered {result.feature_count} features with custom style", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render styled map: %s", e)
@@ -211,6 +219,8 @@ def _make_preview_map_handler(facet_name: str):
 
         try:
             result = preview_map(geojson_path)
+            if step_log:
+                step_log(f"{facet_name}: previewed {result.feature_count} features", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to preview map: %s", e)

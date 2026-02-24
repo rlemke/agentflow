@@ -78,6 +78,8 @@ def _make_congressional_handler(facet_name: str):
 
         try:
             cache = download_congressional_districts(year, congress_number)
+            if step_log:
+                step_log(f"{facet_name}: downloaded CD (size={cache.get('size', 0)})", level="success")
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download Congressional Districts: %s", e)
@@ -112,6 +114,8 @@ def _make_state_senate_handler(facet_name: str):
 
         try:
             cache = download_state_senate_districts(state_fips, year)
+            if step_log:
+                step_log(f"{facet_name}: downloaded SLDU (size={cache.get('size', 0)})", level="success")
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download State Senate Districts: %s", e)
@@ -146,6 +150,8 @@ def _make_state_house_handler(facet_name: str):
 
         try:
             cache = download_state_house_districts(state_fips, year)
+            if step_log:
+                step_log(f"{facet_name}: downloaded SLDL (size={cache.get('size', 0)})", level="success")
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download State House Districts: %s", e)
@@ -180,6 +186,8 @@ def _make_voting_precincts_handler(facet_name: str):
 
         try:
             cache = download_voting_precincts(state_fips, year)
+            if step_log:
+                step_log(f"{facet_name}: downloaded VTD (size={cache.get('size', 0)})", level="success")
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download Voting Precincts: %s", e)
@@ -239,6 +247,8 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
             # Convert shapefile to GeoJSON
             feature_count = _convert_shapefile_to_geojson(shp_path, output_path)
 
+            if step_log:
+                step_log(f"{facet_name}: converted to GeoJSON ({feature_count} features)", level="success")
             return {
                 "result": {
                     "output_path": output_path,
@@ -326,6 +336,8 @@ def _make_state_fips_handler(facet_name: str):
 
         try:
             fips = resolve_state_fips(state)
+            if step_log:
+                step_log(f"{facet_name}: resolved {state} -> FIPS {fips}", level="success")
             return {"fips": fips}
         except ValueError as e:
             log.error("Failed to resolve state FIPS: %s", e)
@@ -371,6 +383,8 @@ def _make_filter_districts_handler(facet_name: str):
                 if f.get("properties", {}).get(attribute) == value
             ]
 
+            if step_log:
+                step_log(f"{facet_name}: {len(filtered)}/{len(features)} districts matched ({attribute}={value})", level="success")
             # Generate output path
             input_p = Path(input_path)
             output_path = str(input_p.with_stem(f"{input_p.stem}_{attribute}_{value}"))

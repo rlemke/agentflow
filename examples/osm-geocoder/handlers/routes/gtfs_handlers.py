@@ -296,6 +296,8 @@ def _make_download_feed_handler(facet_name: str):
 
         try:
             feed = download_gtfs_feed(url)
+            if step_log:
+                step_log(f"{facet_name}: downloaded feed ({feed.get('agency_name', 'unknown')})", level="success")
             return {"feed": feed}
         except Exception as e:
             log.error("Failed to download GTFS feed: %s", e)
@@ -321,6 +323,8 @@ def _make_extract_stops_handler(facet_name: str):
 
         try:
             result = extract_stops(feed_path)
+            if step_log:
+                step_log(f"{facet_name}: extracted {result.stop_count} stops", level="success")
             return {"result": _stop_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract stops: %s", e)
@@ -346,6 +350,8 @@ def _make_extract_routes_handler(facet_name: str):
 
         try:
             result = extract_routes(feed_path)
+            if step_log:
+                step_log(f"{facet_name}: extracted {result.route_count} routes", level="success")
             return {"result": _route_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract routes: %s", e)
@@ -371,6 +377,8 @@ def _make_service_frequency_handler(facet_name: str):
 
         try:
             result = compute_service_frequency(feed_path)
+            if step_log:
+                step_log(f"{facet_name}: {result.stop_count} stops, avg {result.avg_trips_per_day:.1f} trips/day", level="success")
             return {"result": _frequency_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to compute service frequency: %s", e)
@@ -396,6 +404,8 @@ def _make_transit_statistics_handler(facet_name: str):
 
         try:
             stats = compute_transit_statistics(feed_path)
+            if step_log:
+                step_log(f"{facet_name}: {stats.stop_count} stops, {stats.route_count} routes, {stats.trip_count} trips", level="success")
             return {"stats": _stats_to_dict(stats)}
         except Exception as e:
             log.error("Failed to compute transit statistics: %s", e)
@@ -422,6 +432,8 @@ def _make_nearest_stops_handler(facet_name: str):
 
         try:
             result = find_nearest_stops(osm_path, stops_path, float(max_dist))
+            if step_log:
+                step_log(f"{facet_name}: {result.matched_count}/{result.feature_count} matched (avg {result.avg_distance_m:.0f}m)", level="success")
             return {"result": _nearest_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to find nearest stops: %s", e)
@@ -450,6 +462,8 @@ def _make_stop_accessibility_handler(facet_name: str):
             result = compute_stop_accessibility(
                 osm_path, stops_path, float(threshold)
             )
+            if step_log:
+                step_log(f"{facet_name}: {result.within_400m}/{result.total_features} within 400m ({result.pct_within_400m:.1f}%)", level="success")
             return {"result": _accessibility_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to compute stop accessibility: %s", e)
@@ -476,6 +490,8 @@ def _make_coverage_gaps_handler(facet_name: str):
 
         try:
             result = compute_coverage_gaps(stops_path, osm_path, float(cell_size))
+            if step_log:
+                step_log(f"{facet_name}: {result.covered_cells}/{result.total_cells} cells covered ({result.coverage_pct:.1f}%)", level="success")
             return {"result": _coverage_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to compute coverage gaps: %s", e)
@@ -501,6 +517,8 @@ def _make_route_density_handler(facet_name: str):
 
         try:
             result = compute_route_density(routes_path, float(cell_size))
+            if step_log:
+                step_log(f"{facet_name}: {result.total_cells} cells, max {result.max_routes_per_cell} routes/cell", level="success")
             return {"result": _density_result_to_dict(result)}
         except Exception as e:
             log.error("Failed to compute route density: %s", e)
@@ -527,6 +545,8 @@ def _make_generate_report_handler(facet_name: str):
 
         try:
             report = generate_transit_report(feed_path, osm_path)
+            if step_log:
+                step_log(f"{facet_name}: report generated ({report.get('stop_count', 0)} stops, {report.get('route_count', 0)} routes)", level="success")
             return {"report": report}
         except Exception as e:
             log.error("Failed to generate transit report: %s", e)

@@ -50,6 +50,8 @@ def _postgis_import_handler(payload: dict) -> dict:
         from .postgis_importer import import_to_postgis
 
         result = import_to_postgis(pbf_path, source_url=source_url)
+        if step_log:
+            step_log(f"PostGisImport: imported {result.node_count + result.way_count} elements (nodes={result.node_count}, ways={result.way_count})", level="success")
         return {
             "stats": {
                 "url": source_url,

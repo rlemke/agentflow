@@ -74,6 +74,8 @@ def handle_verify_all(payload: dict) -> dict:
         check_duplicates=payload.get("check_duplicates", True),
     )
 
+    if step_log:
+        step_log(f"VerifyAll: {result.issue_count} issues (geometry={summary.geometry_issues}, tags={summary.tag_issues})", level="success")
     return {"result": _result_dict(result), "summary": _summary_dict(summary)}
 
 
@@ -106,6 +108,8 @@ def handle_verify_geometry(payload: dict) -> dict:
         check_duplicates=False,
     )
 
+    if step_log:
+        step_log(f"VerifyGeometry: {result.issue_count} geometry issues", level="success")
     return {"result": _result_dict(result), "summary": _summary_dict(summary)}
 
 
@@ -143,6 +147,8 @@ def handle_verify_tags(payload: dict) -> dict:
         required_tags=required_tags,
     )
 
+    if step_log:
+        step_log(f"VerifyTags: {result.issue_count} tag issues", level="success")
     return {"result": _result_dict(result), "summary": _summary_dict(summary)}
 
 
@@ -167,6 +173,8 @@ def handle_verify_geojson(payload: dict) -> dict:
 
     result, summary = verify_geojson(input_path)
 
+    if step_log:
+        step_log(f"VerifyGeoJSON: {result.issue_count} issues", level="success")
     return {"result": _result_dict(result), "summary": _summary_dict(summary)}
 
 
@@ -190,6 +198,8 @@ def handle_verify_summary(payload: dict) -> dict:
 
     summary = compute_verify_summary(input_path)
 
+    if step_log:
+        step_log(f"ComputeVerifySummary: {summary.total_issues} total issues", level="success")
     return {"summary": _summary_dict(summary)}
 
 

@@ -69,6 +69,8 @@ def _make_build_logical_graph_handler(facet_name: str):
             graph_path = str(out_dir / "logical_graph.json")
 
             graph = build_logical_graph(pbf_path, output_path=graph_path)
+            if step_log:
+                step_log(f"{facet_name}: built graph with {len(graph.edges)} edges, {len(graph.node_coords)} nodes", level="success")
             return {
                 "edge_count": len(graph.edges),
                 "node_count": len(graph.node_coords),
@@ -105,6 +107,8 @@ def _make_build_anchors_handler(facet_name: str):
             anchors_path = str(out_dir / f"anchors_z{zoom_level}.json")
             save_anchors(anchors, anchors_path)
 
+            if step_log:
+                step_log(f"{facet_name}: built {len(anchors)} anchors for zoom {zoom_level}", level="success")
             return {"anchors_path": anchors_path, "anchor_count": len(anchors)}
         except Exception as e:
             log.error("Failed to build anchors: %s", e)
@@ -147,6 +151,8 @@ def _make_compute_sbs_handler(facet_name: str):
             sbs_path = str(out_dir / f"sbs_z{zoom_level}.json")
             save_sbs(sbs, sbs_path)
 
+            if step_log:
+                step_log(f"{facet_name}: {route_count} routes computed for zoom {zoom_level}", level="success")
             return {"sbs_path": sbs_path, "route_count": route_count}
         except Exception as e:
             log.error("Failed to compute SBS: %s", e)
@@ -197,6 +203,8 @@ def _make_compute_scores_handler(facet_name: str):
                 }
                 json.dump(serializable, f)
 
+            if step_log:
+                step_log(f"{facet_name}: computed scores for {len(scores)} zoom levels", level="success")
             return {"scores_path": scores_path}
         except Exception as e:
             log.error("Failed to compute scores: %s", e)
@@ -233,6 +241,8 @@ def _make_detect_bypasses_handler(facet_name: str):
             save_bypass_flags(flags, bypasses_path)
 
             bypass_count = sum(1 for v in flags.values() if v == "bypass")
+            if step_log:
+                step_log(f"{facet_name}: detected {bypass_count} bypasses", level="success")
             return {"bypasses_path": bypasses_path, "bypass_count": bypass_count}
         except Exception as e:
             log.error("Failed to detect bypasses: %s", e)
@@ -268,6 +278,8 @@ def _make_detect_rings_handler(facet_name: str):
             rings_path = str(out_dir / "ring_flags.json")
             save_ring_flags(flags, rings_path)
 
+            if step_log:
+                step_log(f"{facet_name}: detected {len(flags)} rings", level="success")
             return {"rings_path": rings_path, "ring_count": len(flags)}
         except Exception as e:
             log.error("Failed to detect rings: %s", e)
@@ -324,6 +336,8 @@ def _make_select_edges_handler(facet_name: str):
             with open(assignments_path, "w", encoding="utf-8") as f:
                 json.dump({str(k): v for k, v in assignments.items()}, f)
 
+            if step_log:
+                step_log(f"{facet_name}: selected {len(assignments)} edges", level="success")
             return {
                 "assignments_path": assignments_path,
                 "selected_count": len(assignments),
@@ -366,6 +380,8 @@ def _make_export_zoom_layers_handler(facet_name: str):
                 geojson_path = str(out / f"roads_z{z}.geojson")
                 _export_zoom_geojson(graph, assignments, z, geojson_path)
 
+            if step_log:
+                step_log(f"{facet_name}: exported {len(assignments)} edges across 6 zoom levels to {output_dir}", level="success")
             return {"result": {
                 "output_dir": output_dir,
                 "total_logical_edges": len(graph.edges),
@@ -409,6 +425,8 @@ def _make_build_zoom_layers_handler(facet_name: str):
                 output_dir=output_dir,
                 max_concurrent=max_concurrent,
             )
+            if step_log:
+                step_log(f"{facet_name}: built zoom layers ({result.get('selected_edges', 0)} edges selected)", level="success")
             return {"result": result, "metrics": metrics}
         except Exception as e:
             log.error("Failed to build zoom layers: %s", e)

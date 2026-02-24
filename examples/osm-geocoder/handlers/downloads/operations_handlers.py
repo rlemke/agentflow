@@ -64,8 +64,12 @@ def _make_operation_handler(facet_name: str, return_param: str | None):
         log.info("%s processing cache: %s", facet_name, cache.get("url", "unknown"))
 
         if return_param is None:
+            if step_log:
+                step_log(f"{facet_name}: completed", level="success")
             return {}
 
+        if step_log:
+            step_log(f"{facet_name}: processed (size={cache.get('size', 0)})", level="success")
         return {
             return_param: {
                 "url": cache.get("url", ""),
@@ -116,7 +120,10 @@ def _download_handler(payload: dict) -> dict:
         step_log(f"Download: {url} -> {path}")
 
     log.info("Download: %s -> %s (force=%s)", url, path, force)
-    return {"downloadCache": download_url(url, path, force=force)}
+    result = download_url(url, path, force=force)
+    if step_log:
+        step_log(f"Download: complete (size={result.get('size', 0)})", level="success")
+    return {"downloadCache": result}
 
 
 def _cache_handler(payload: dict) -> dict:
@@ -149,7 +156,7 @@ def _cache_handler(payload: dict) -> dict:
     cache = download(region_path)
     source = cache.get("source", "unknown")
     if step_log:
-        step_log(f"Cache: region '{region}' -> '{region_path}' (source={source})")
+        step_log(f"Cache: region '{region}' -> '{region_path}' (source={source}, size={cache.get('size', 0)})", level="success")
     return {"cache": cache}
 
 

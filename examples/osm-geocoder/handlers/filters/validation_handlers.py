@@ -79,6 +79,8 @@ def handle_validate_cache(payload: dict) -> dict:
         step_log(f"ValidateCache: validating {pbf_path}")
     log.info("ValidateCache: validating %s", pbf_path)
     result, summary = verify_pbf(pbf_path, output_dir)
+    if step_log:
+        step_log(f"ValidateCache: {summary.total_issues} issues (geometry={summary.geometry_issues}, tags={summary.tag_issues})", level="success")
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
 
 
@@ -98,6 +100,8 @@ def handle_validate_geometry(payload: dict) -> dict:
         pbf_path, check_geometry=True, check_tags=False,
         check_references=False, check_coordinates=False, check_duplicates=False,
     )
+    if step_log:
+        step_log(f"ValidateGeometry: {summary.geometry_issues} geometry issues", level="success")
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
 
 
@@ -117,6 +121,8 @@ def handle_validate_tags(payload: dict) -> dict:
         pbf_path, check_geometry=False, check_tags=True,
         check_references=False, check_coordinates=False, check_duplicates=False,
     )
+    if step_log:
+        step_log(f"ValidateTags: {summary.tag_issues} tag issues", level="success")
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
 
 
@@ -136,6 +142,8 @@ def handle_validate_bounds(payload: dict) -> dict:
         pbf_path, check_geometry=False, check_tags=False,
         check_references=False, check_coordinates=True, check_duplicates=False,
     )
+    if step_log:
+        step_log(f"ValidateBounds: {summary.total_issues} coordinate issues", level="success")
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
 
 
@@ -151,6 +159,8 @@ def handle_validation_summary(payload: dict) -> dict:
         return {"stats": _empty_stats()}
 
     summary = compute_verify_summary(input_path)
+    if step_log:
+        step_log(f"ValidationSummary: {summary.total_issues} total issues", level="success")
     return {"stats": _stats_dict(summary)}
 
 

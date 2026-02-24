@@ -145,7 +145,10 @@ def compute_pairwise_routes(payload: dict) -> dict:
     graph = payload.get("graph", {})
     graph_dir = graph.get("graphDir", "")
     profile = graph.get("profile", "car")
+    step_log = payload.get("_step_log")
 
+    if step_log:
+        step_log(f"ComputePairwiseRoutes: computing routes from {cities_path} ({profile} profile)")
     if not cities_path or not os.path.exists(cities_path):
         return {"result": _empty_result(profile)}
 
@@ -198,6 +201,8 @@ def compute_pairwise_routes(payload: dict) -> dict:
         json.dump(geojson, f)
 
     route_count = len(features)
+    if step_log:
+        step_log(f"ComputePairwiseRoutes: {route_count} routes between {len(cities)} cities ({round(total_distance)} km total)", level="success")
     return {
         "result": {
             "output_path": output_path,

@@ -230,7 +230,10 @@ def build_graph_handler(payload: dict) -> dict:
 
     # Check if graph already exists
     if _graph_exists(graph_dir) and not recreate:
-        return {"graph": _make_graph_result(osm_path, graph_dir, profile, True)}
+        graph_result = _make_graph_result(osm_path, graph_dir, profile, True)
+        if step_log:
+            step_log(f"BuildGraph: graph cached ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)", level="success")
+        return {"graph": graph_result}
 
     # Remove existing graph if recreating
     if recreate and _storage.exists(graph_dir):
@@ -241,7 +244,10 @@ def build_graph_handler(payload: dict) -> dict:
     if not success:
         raise RuntimeError(f"Failed to build GraphHopper graph for {osm_path}")
 
-    return {"graph": _make_graph_result(osm_path, graph_dir, profile, False)}
+    graph_result = _make_graph_result(osm_path, graph_dir, profile, False)
+    if step_log:
+        step_log(f"BuildGraph: built graph ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)", level="success")
+    return {"graph": graph_result}
 
 
 def build_multi_profile_handler(payload: dict) -> dict:
@@ -263,6 +269,8 @@ def build_multi_profile_handler(payload: dict) -> dict:
         })
         graphs.append(result["graph"])
 
+    if step_log:
+        step_log(f"BuildMultiProfile: built {len(graphs)} profile graphs", level="success")
     return {"graphs": graphs}
 
 
@@ -285,6 +293,8 @@ def validate_graph_handler(payload: dict) -> dict:
         return {"valid": False, "nodeCount": 0, "edgeCount": 0}
 
     stats = _get_graph_stats(graph_dir)
+    if step_log:
+        step_log(f"ValidateGraph: valid={stats['valid']} ({stats['nodes']} nodes, {stats['edges']} edges)", level="success")
     return {
         "valid": stats["valid"],
         "nodeCount": stats["nodes"],
@@ -303,8 +313,12 @@ def clean_graph_handler(payload: dict) -> dict:
 
     if graph_dir and _storage.exists(graph_dir):
         _storage.rmtree(graph_dir)
+        if step_log:
+            step_log(f"CleanGraph: deleted graph at {graph_dir}", level="success")
         return {"deleted": True}
 
+    if step_log:
+        step_log(f"CleanGraph: no graph found at {graph_dir}", level="success")
     return {"deleted": False}
 
 

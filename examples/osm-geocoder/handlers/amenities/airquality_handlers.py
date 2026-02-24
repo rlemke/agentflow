@@ -146,6 +146,8 @@ def handle_fetch_air_quality(payload: dict) -> dict:
 
         avg_value = sum(values) / len(values) if values else 0.0
 
+        if step_log:
+            step_log(f"FetchAirQuality: fetched {len(features)} {parameter} stations (avg {avg_value:.1f} µg/m³)", level="success")
         return {"result": {
             "output_path": output_path,
             "station_count": len(features),
@@ -259,6 +261,8 @@ def handle_correlate(payload: dict) -> dict:
     matched = len(correlated_features)
     avg_pm25 = sum(pm25_values) / len(pm25_values) if pm25_values else 0.0
 
+    if step_log:
+        step_log(f"CorrelateSchoolAirQuality: {matched}/{len(schools)} schools matched (high={high}, medium={medium}, low={low})", level="success")
     return {"result": {
         "output_path": output_path,
         "school_count": len(schools),
@@ -321,6 +325,9 @@ def handle_exposure_stats(payload: dict) -> dict:
     total = high + medium + low
     matched = len(pm25_values)
 
+    if step_log:
+        avg_pm = sum(pm25_values) / matched if matched else 0.0
+        step_log(f"ExposureStatistics: {total} schools (high={high}, medium={medium}, low={low}, avg PM2.5={avg_pm:.1f})", level="success")
     return {"stats": {
         "total_schools": total,
         "matched_schools": matched,

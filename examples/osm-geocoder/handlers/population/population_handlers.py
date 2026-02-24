@@ -51,6 +51,8 @@ def _make_filter_by_population_handler(facet_name: str):
                 place_type=place_type,
                 operator=operator,
             )
+            if step_log:
+                step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {operator} {min_population})", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter by population: %s", e)
@@ -87,6 +89,8 @@ def _make_filter_by_population_range_handler(facet_name: str):
                 place_type=place_type,
                 operator=Operator.BETWEEN,
             )
+            if step_log:
+                step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {min_population}-{max_population})", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter by population range: %s", e)
@@ -121,6 +125,8 @@ def _make_extract_places_handler(facet_name: str):
                 place_type=place_type,
                 min_population=min_population,
             )
+            if step_log:
+                step_log(f"{facet_name}: extracted {result.feature_count} {place_type} places (min_pop={min_population})", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract places with population: %s", e)
@@ -154,6 +160,8 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
                 place_type=place_type,
                 min_population=min_population,
             )
+            if step_log:
+                step_log(f"{facet_name}: extracted {result.feature_count} {place_type}", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s: %s", place_type, e)
@@ -183,6 +191,8 @@ def _make_admin_handler(facet_name: str, place_type: str):
                 place_type=place_type,
                 min_population=0,
             )
+            if step_log:
+                step_log(f"{facet_name}: extracted {result.feature_count} {place_type}", level="success")
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s: %s", place_type, e)
@@ -208,6 +218,8 @@ def _make_population_stats_handler(facet_name: str):
 
         try:
             stats = calculate_population_stats(input_path, place_type=place_type)
+            if step_log:
+                step_log(f"{facet_name}: {stats.total_places} places, total pop {stats.total_population}", level="success")
             return {"stats": _stats_to_dict(stats)}
         except Exception as e:
             log.error("Failed to calculate population stats: %s", e)
