@@ -1,5 +1,21 @@
 # Implementation Changelog
 
+## Completed (v0.12.89) - Link workflow browser to existing flow run pages
+
+The workflow browser on `/workflows/new` now links directly to the existing flow run pages instead of only generating stub AFL snippets. Each workflow with a matching DB record gets a **"Run"** link (`/flows/{flow_id}/run/{workflow_id}`) that navigates to the real run form with full parameters. The existing "Edit" link is preserved for the write-from-scratch use case.
+
+### Route changes (`routes/workflows.py`)
+- `workflow_new()` now calls `store.get_workflows_by_flow(flow.uuid)` for each flow to build a `name→uuid` mapping
+- Each workflow item gets a `run_url` field when a matching `WorkflowDefinition` record exists in the DB
+
+### Template changes (`templates/workflows/new.html`)
+- Each workflow shows its name followed by two action links: **"Run"** (navigates to flow run page) and **"Edit"** (populates editor textarea)
+- Run links only appear for workflows with DB records; Edit links always appear
+- Updated help text to reflect both actions
+
+### Details
+- 3 files changed (3 modified); 2 new tests (`test_new_page_has_run_links`, `test_new_page_no_run_links_without_workflow_records`); test suite: 2531 passed, 79 skipped
+
 ## Completed (v0.12.88) - Redesign New Workflow page with namespace-grouped workflow browser
 
 Redesign the `/workflows/new` page from a bare textarea into a workflow browser backed by the database. All workflows from seeded flows are displayed in a namespace-grouped accordion, and clicking a workflow populates the editor with a generated AFL snippet (namespace wrapper + params with defaults). Also flattens the nav bar and fixes stale nav tests.
