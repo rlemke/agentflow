@@ -1,5 +1,27 @@
 # Implementation Changelog
 
+## Completed (v0.12.90) - Snapshot compiled AST into RunnerDefinition
+
+Running workflows now capture `compiled_ast` (full program AST) and `workflow_ast` (specific workflow node) at start time, making them self-contained and immune to flow changes during execution. On resume, the runtime prefers the runner-snapshotted ASTs, eliminating the `workflow → flow → compiled_ast` DB lookup chain. Old runners without these fields fall back to the existing flow lookup for backward compatibility.
+
+### Entity changes (`entities.py`)
+- Added `compiled_ast: dict | None = None` and `workflow_ast: dict | None = None` to `RunnerDefinition`
+
+### Persistence changes
+- **`mongo_store.py`**: `_runner_to_doc()` / `_doc_to_runner()` serialize/deserialize the new fields; `doc.get()` returns `None` for old documents
+- **`memory_store.py`**: Added `get_runners_by_workflow()` method (was missing vs MongoStore)
+
+### Runtime changes
+- **`runner/service.py`**: `_handle_execute_workflow()` snapshots ASTs into runner before save; `_load_workflow_ast()` checks runner ASTs first, falls back to flow lookup
+- **`agent_poller.py`**: `_load_workflow_ast()` same runner-first pattern
+
+### Dashboard changes
+- **`routes/flows.py`**: `flow_run_execute()` passes `compiled_ast` and `workflow_ast` to `RunnerDefinition`
+- **`routes/workflows.py`**: `workflow_run()` passes `compiled_ast` and `workflow_ast` to `RunnerDefinition`
+
+### Details
+- 12 files changed (7 source, 5 test); 10 new tests (entity defaults, execute snapshot, resume from runner, backward compat, MongoDB round-trip, AgentPoller preference, dashboard snapshot); test suite: 2541 passed, 79 skipped
+
 ## Completed (v0.12.89) - Link workflow browser to existing flow run pages
 
 The workflow browser on `/workflows/new` now links directly to the existing flow run pages instead of only generating stub AFL snippets. Each workflow with a matching DB record gets a **"Run"** link (`/flows/{flow_id}/run/{workflow_id}`) that navigates to the real run form with full parameters. The existing "Edit" link is preserved for the write-from-scratch use case.

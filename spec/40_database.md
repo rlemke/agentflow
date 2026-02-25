@@ -169,13 +169,15 @@ class RunnerDefinition:
     workflow_id: str
     workflow: WorkflowDefinition
     parameters: list[Parameter] = field(default_factory=list)
-    step_id: Optional[str] = None
-    user: Optional[UserDefinition] = None
+    step_id: str | None = None
+    user: UserDefinition | None = None
     start_time: int = 0  # Execution start timestamp (ms)
     end_time: int = 0    # Execution end timestamp (ms)
     duration: int = 0    # Total execution duration (ms)
     retain: int = 0      # Retention period (ms)
-    state: str = "created"
+    state: str = RunnerState.CREATED
+    compiled_ast: dict | None = None  # Snapshotted program AST at workflow start
+    workflow_ast: dict | None = None  # Snapshotted workflow node AST at workflow start
 ```
 
 ### Fields
@@ -193,6 +195,8 @@ class RunnerDefinition:
 | `duration` | int | Total execution duration (ms) |
 | `retain` | int | Retention period (ms) |
 | `state` | str | Runner state |
+| `compiled_ast` | dict \| None | Snapshotted full program AST at workflow start |
+| `workflow_ast` | dict \| None | Snapshotted workflow node AST at workflow start |
 
 ### Runner States
 
