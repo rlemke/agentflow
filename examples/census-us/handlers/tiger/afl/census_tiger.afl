@@ -1,0 +1,11 @@
+namespace census.TIGER {
+    use census.types
+
+    event facet ExtractCounties(file: CensusFile, state_fips: String) => (result: TIGERResult)
+
+    event facet ExtractTracts(file: CensusFile, state_fips: String) => (result: TIGERResult)
+
+    event facet ExtractBlockGroups(file: CensusFile, state_fips: String) => (result: TIGERResult)
+
+    event facet ExtractPlaces(file: CensusFile, state_fips: String) => (result: TIGERResult)
+}

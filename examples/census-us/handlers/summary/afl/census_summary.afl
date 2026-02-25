@@ -1,0 +1,7 @@
+namespace census.Summary {
+    use census.types
+
+    event facet JoinGeo(acs_path: String, tiger_path: String, join_field: String = "GEOID") => (result: CensusSummary)
+
+    event facet SummarizeState(population: ACSResult, income: ACSResult, housing: ACSResult, education: ACSResult, commuting: ACSResult) => (result: CensusSummary)
+}

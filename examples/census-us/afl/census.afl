@@ -1,0 +1,28 @@
+namespace census.workflows {
+    use census.types
+    use census.Operations
+    use census.ACS
+    use census.TIGER
+    use census.Summary
+
+    workflow AnalyzeState(state_fips: String = "01", state_name: String = "Alabama") => (summary: CensusSummary) andThen {
+        acs = DownloadACS(state_fips = $.state_fips)
+        tiger = DownloadTIGER(state_fips = $.state_fips, geo_level = "COUNTY")
+        pop = ExtractPopulation(file = acs.file, state_fips = $.state_fips)
+        income = ExtractIncome(file = acs.file, state_fips = $.state_fips)
+        housing = ExtractHousing(file = acs.file, state_fips = $.state_fips)
+        education = ExtractEducation(file = acs.file, state_fips = $.state_fips)
+        commuting = ExtractCommuting(file = acs.file, state_fips = $.state_fips)
+        counties = ExtractCounties(file = tiger.file, state_fips = $.state_fips)
+        joined = JoinGeo(acs_path = pop.result.output_path, tiger_path = counties.result.output_path)
+        summary = SummarizeState(population = pop.result, income = income.result, housing = housing.result, education = education.result, commuting = commuting.result)
+        yield AnalyzeState(summary = summary.result)
+    }
+
+    workflow AnalyzeStates_03() => (states_completed: Long) andThen {
+        alabama = AnalyzeState(state_fips = "01", state_name = "Alabama")
+        alaska = AnalyzeState(state_fips = "02", state_name = "Alaska")
+        arizona = AnalyzeState(state_fips = "04", state_name = "Arizona")
+        yield AnalyzeStates_03(states_completed = 3)
+    }
+}

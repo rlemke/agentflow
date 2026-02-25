@@ -1,0 +1,13 @@
+namespace census.ACS {
+    use census.types
+
+    event facet ExtractPopulation(file: CensusFile, state_fips: String, geo_level: String = "county") => (result: ACSResult)
+
+    event facet ExtractIncome(file: CensusFile, state_fips: String, geo_level: String = "county") => (result: ACSResult)
+
+    event facet ExtractHousing(file: CensusFile, state_fips: String, geo_level: String = "county") => (result: ACSResult)
+
+    event facet ExtractEducation(file: CensusFile, state_fips: String, geo_level: String = "county") => (result: ACSResult)
+
+    event facet ExtractCommuting(file: CensusFile, state_fips: String, geo_level: String = "county") => (result: ACSResult)
+}

@@ -1,0 +1,27 @@
+namespace census.types {
+    schema CensusFile {
+        url: String, path: String, date: String,
+        size: Long, wasInCache: Boolean
+    }
+    schema ACSResult {
+        table_id: String, output_path: String, record_count: Long,
+        geography_level: String, year: String, extraction_date: String
+    }
+    schema TIGERResult {
+        output_path: String, feature_count: Long,
+        geography_level: String, year: String, format: String,
+        extraction_date: String
+    }
+    schema CensusSummary {
+        state_fips: String, state_name: String, output_path: String,
+        tables_joined: Long, record_count: Long
+    }
+}
+
+namespace census.Operations {
+    use census.types
+
+    event facet DownloadACS(year: String = "2023", period: String = "5-Year", state_fips: String) => (file: CensusFile)
+
+    event facet DownloadTIGER(year: String = "2024", geo_level: String = "COUNTY", state_fips: String) => (file: CensusFile)
+}
