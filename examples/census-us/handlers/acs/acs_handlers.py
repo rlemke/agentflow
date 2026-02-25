@@ -25,7 +25,7 @@ def _make_acs_handler(facet_name: str, table_id: str):
     """Create a handler for an ACS extraction event facet."""
     def handler(params: dict[str, Any]) -> dict[str, Any]:
         file_info = params.get("file", {})
-        csv_path = file_info.get("path", "")
+        csv_path = file_info.get("path", "") if isinstance(file_info, dict) else ""
         state_fips = params.get("state_fips", "")
         geo_level = params.get("geo_level", "county")
         step_log = params.get("_step_log")
@@ -42,7 +42,8 @@ def _make_acs_handler(facet_name: str, table_id: str):
                 label = ACS_TABLES[table_id]["label"]
                 step_log(
                     f"{facet_name}: {label} — {result.record_count} records "
-                    f"(state={state_fips}, level={geo_level})",
+                    f"(state={state_fips}, level={geo_level}) "
+                    f"output={result.output_path}",
                     level="success",
                 )
 
