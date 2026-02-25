@@ -21,6 +21,12 @@ try:
 except ImportError:
     HAS_FIONA = False
 
+try:
+    import shapefile  # pyshp
+    HAS_PYSHP = True
+except ImportError:
+    HAS_PYSHP = False
+
 # Geography level → TIGER file component and FIPS field name
 _GEO_CONFIG: dict[str, dict[str, str]] = {
     "COUNTY": {"suffix": "county", "fips_field": "STATEFP"},
@@ -86,6 +92,22 @@ def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
                         })
         except Exception as exc:
             logger.warning("Failed to read TIGER ZIP %s: %s", zip_path, exc)
+    elif HAS_PYSHP and os.path.exists(zip_path):
+        try:
+            reader = shapefile.Reader(zip_path)
+            for sr in reader.shapeRecords():
+                props = sr.record.as_dict()
+                if props.get(config["fips_field"]) == state_fips:
+                    geo = sr.shape.__geo_interface__
+                    if geo.get("type") != "Null":
+                        features.append({
+                            "type": "Feature",
+                            "properties": props,
+                            "geometry": geo,
+                        })
+        except Exception as exc:
+            logger.warning("Failed to read TIGER ZIP %s with pyshp: %s",
+                           zip_path, exc)
     elif os.path.exists(zip_path):
         # Fallback: try to find .geojson inside ZIP
         try:

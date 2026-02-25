@@ -8,11 +8,13 @@ number of times.
 
 import importlib
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import shapefile
 
 CENSUS_DIR = str(Path(__file__).resolve().parent.parent)
 
@@ -507,6 +509,161 @@ class TestSummaryHandlers:
         step_log.assert_called_once()
         assert "disk full" in step_log.call_args[0][0]
         assert step_log.call_args[1]["level"] == "error"
+
+
+def _make_tiger_zip(path: Path, records: list[dict]):
+    """Create a minimal TIGER-like shapefile ZIP using pyshp Writer.
+
+    Args:
+        path: Base path (without extension). Creates {path}.zip containing
+              shapefile components (.shp, .dbf, .shx).
+        records: List of dicts with 'fields' (dict of DBF fields) and
+                 optionally 'geometry' (list of polygon parts) or None for null.
+    """
+    import zipfile as _zf
+
+    shp_base = str(path) + "_shp"
+    w = shapefile.Writer(shp_base)
+    # Define fields from first record
+    if records:
+        for fname in records[0]["fields"]:
+            w.field(fname, "C", size=40)
+    for rec in records:
+        fields = rec["fields"]
+        geom = rec.get("geometry")
+        if geom is None:
+            w.null()
+        else:
+            w.poly(geom)
+        w.record(**fields)
+    w.close()
+    # Bundle into a ZIP (as TIGER distributes)
+    zip_path = str(path) + ".zip"
+    with _zf.ZipFile(zip_path, "w") as zf:
+        stem = Path(shp_base).name
+        for ext in (".shp", ".dbf", ".shx"):
+            comp = shp_base + ext
+            if os.path.exists(comp):
+                zf.write(comp, stem + ext)
+
+
+class TestTIGERExtractor:
+    """Tests for pyshp-based TIGER shapefile extraction."""
+
+    def test_extract_with_pyshp(self, tmp_path, monkeypatch):
+        """Pyshp path extracts features from a shapefile ZIP."""
+        mod = _census_import("tiger.tiger_extractor")
+        monkeypatch.setitem(mod.__dict__, "HAS_FIONA", False)
+        monkeypatch.setitem(mod.__dict__, "HAS_PYSHP", True)
+        monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
+
+        zip_base = tmp_path / "counties"
+        _make_tiger_zip(zip_base, [
+            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Autauga"},
+             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
+            {"fields": {"STATEFP": "01", "GEOID": "01003", "NAME": "Baldwin"},
+             "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]]},
+        ])
+        zip_path = str(zip_base) + ".zip"
+
+        result = mod.extract_tiger(zip_path, "COUNTY", "01")
+        assert result.feature_count == 2
+        assert result.geography_level == "COUNTY"
+        with open(result.output_path) as f:
+            data = json.load(f)
+        assert len(data["features"]) == 2
+        assert data["features"][0]["properties"]["NAME"] == "Autauga"
+
+    def test_pyshp_filters_by_statefp(self, tmp_path, monkeypatch):
+        """Only features matching state_fips are extracted."""
+        mod = _census_import("tiger.tiger_extractor")
+        monkeypatch.setitem(mod.__dict__, "HAS_FIONA", False)
+        monkeypatch.setitem(mod.__dict__, "HAS_PYSHP", True)
+        monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
+
+        zip_base = tmp_path / "mixed"
+        _make_tiger_zip(zip_base, [
+            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Alabama Co"},
+             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
+            {"fields": {"STATEFP": "02", "GEOID": "02013", "NAME": "Alaska Co"},
+             "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]]},
+        ])
+        zip_path = str(zip_base) + ".zip"
+
+        result = mod.extract_tiger(zip_path, "COUNTY", "01")
+        assert result.feature_count == 1
+        with open(result.output_path) as f:
+            data = json.load(f)
+        assert data["features"][0]["properties"]["GEOID"] == "01001"
+
+    def test_pyshp_preserves_aland(self, tmp_path, monkeypatch):
+        """ALAND field survives extraction for density calculation."""
+        import zipfile as _zf
+
+        mod = _census_import("tiger.tiger_extractor")
+        monkeypatch.setitem(mod.__dict__, "HAS_FIONA", False)
+        monkeypatch.setitem(mod.__dict__, "HAS_PYSHP", True)
+        monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
+
+        shp_base = str(tmp_path / "aland_shp")
+        w = shapefile.Writer(shp_base)
+        w.field("STATEFP", "C", size=2)
+        w.field("GEOID", "C", size=10)
+        w.field("ALAND", "N", size=14, decimal=0)
+        w.poly([[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]])
+        w.record(STATEFP="01", GEOID="01001", ALAND=100000000)
+        w.close()
+        zip_path = str(tmp_path / "aland") + ".zip"
+        with _zf.ZipFile(zip_path, "w") as zf:
+            for ext in (".shp", ".dbf", ".shx"):
+                zf.write(shp_base + ext, "aland_shp" + ext)
+
+        result = mod.extract_tiger(zip_path, "COUNTY", "01")
+        assert result.feature_count == 1
+        with open(result.output_path) as f:
+            data = json.load(f)
+        aland = data["features"][0]["properties"]["ALAND"]
+        # float() must work — join_geo does float(aland)
+        assert float(aland) == 100000000.0
+
+    def test_no_readers_returns_zero(self, tmp_path, monkeypatch):
+        """With both HAS_FIONA and HAS_PYSHP False, returns 0 features."""
+        mod = _census_import("tiger.tiger_extractor")
+        monkeypatch.setitem(mod.__dict__, "HAS_FIONA", False)
+        monkeypatch.setitem(mod.__dict__, "HAS_PYSHP", False)
+        monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
+
+        zip_base = tmp_path / "noreader"
+        _make_tiger_zip(zip_base, [
+            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Test"},
+             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
+        ])
+        zip_path = str(zip_base) + ".zip"
+
+        result = mod.extract_tiger(zip_path, "COUNTY", "01")
+        assert result.feature_count == 0
+
+    def test_pyshp_skips_null_geometry(self, tmp_path, monkeypatch):
+        """Records with null geometry are skipped."""
+        mod = _census_import("tiger.tiger_extractor")
+        monkeypatch.setitem(mod.__dict__, "HAS_FIONA", False)
+        monkeypatch.setitem(mod.__dict__, "HAS_PYSHP", True)
+        monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
+
+        zip_base = tmp_path / "nullgeo"
+        _make_tiger_zip(zip_base, [
+            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "HasGeo"},
+             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
+            {"fields": {"STATEFP": "01", "GEOID": "01002", "NAME": "NoGeo"},
+             "geometry": None},
+        ])
+        zip_path = str(zip_base) + ".zip"
+
+        result = mod.extract_tiger(zip_path, "COUNTY", "01")
+        assert result.feature_count == 1
+        with open(result.output_path) as f:
+            data = json.load(f)
+        assert data["features"][0]["properties"]["NAME"] == "HasGeo"
 
 
 class TestInitRegistryHandlers:
