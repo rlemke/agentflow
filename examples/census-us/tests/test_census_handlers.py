@@ -7,6 +7,7 @@ number of times.
 """
 
 import importlib
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -223,6 +224,72 @@ class TestTIGERHandlers:
             "state_fips": "01",
         })
         assert result["result"]["geography_level"] == "PLACE"
+
+
+class TestJoinGeoDensity:
+    """Test population density computation in join_geo."""
+
+    def test_density_computed_from_aland_and_population(self, tmp_path):
+        mod = _census_import("summary.summary_builder")
+        # ACS CSV with population estimate
+        acs_csv = tmp_path / "pop.csv"
+        acs_csv.write_text("GEOID,B01003_001E,NAME\n0500000US01001,50000,Autauga\n")
+        # TIGER GeoJSON with ALAND (100 km² = 1e8 m²)
+        tiger_geojson = tmp_path / "counties.geojson"
+        tiger_geojson.write_text(json.dumps({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"GEOID": "0500000US01001", "ALAND": 100000000},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            }],
+        }))
+        result = mod.join_geo(str(acs_csv), str(tiger_geojson))
+        assert result.feature_count == 1
+        # Read output and check density
+        with open(result.output_path) as f:
+            data = json.load(f)
+        props = data["features"][0]["properties"]
+        # 50000 / (1e8 / 1e6) = 50000 / 100 = 500.0
+        assert props["population_density_km2"] == 500.0
+
+    def test_density_skipped_when_aland_missing(self, tmp_path):
+        mod = _census_import("summary.summary_builder")
+        acs_csv = tmp_path / "pop.csv"
+        acs_csv.write_text("GEOID,B01003_001E,NAME\nGEO1,1000,Place\n")
+        tiger_geojson = tmp_path / "geo.geojson"
+        tiger_geojson.write_text(json.dumps({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"GEOID": "GEO1"},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            }],
+        }))
+        result = mod.join_geo(str(acs_csv), str(tiger_geojson))
+        with open(result.output_path) as f:
+            data = json.load(f)
+        props = data["features"][0]["properties"]
+        assert "population_density_km2" not in props
+
+    def test_density_zero_when_aland_is_zero(self, tmp_path):
+        mod = _census_import("summary.summary_builder")
+        acs_csv = tmp_path / "pop.csv"
+        acs_csv.write_text("GEOID,B01003_001E,NAME\nGEO1,500,Place\n")
+        tiger_geojson = tmp_path / "geo.geojson"
+        tiger_geojson.write_text(json.dumps({
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"GEOID": "GEO1", "ALAND": 0},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            }],
+        }))
+        result = mod.join_geo(str(acs_csv), str(tiger_geojson))
+        with open(result.output_path) as f:
+            data = json.load(f)
+        props = data["features"][0]["properties"]
+        assert props["population_density_km2"] == 0.0
 
 
 class TestSummaryHandlers:

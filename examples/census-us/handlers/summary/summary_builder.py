@@ -10,7 +10,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ class JoinResult:
     feature_count: int
     join_field: str
     extraction_date: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 
@@ -39,7 +39,7 @@ class SummaryResult:
     tables_joined: int
     record_count: int
     extraction_date: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 
@@ -75,13 +75,26 @@ def join_geo(acs_path: str, tiger_path: str,
             geojson = json.load(f)
             features = geojson.get("features", [])
 
-    # Join: enrich TIGER features with ACS attributes
+    # Join: enrich TIGER features with ACS attributes + population density
     joined_features: list[dict[str, Any]] = []
     for feat in features:
         props = feat.get("properties", {})
         key = props.get(join_field, "")
         if key in acs_data:
             props.update(acs_data[key])
+        # Compute population density (people per km²) from TIGER ALAND
+        # and ACS population estimate (B01003_001E)
+        aland = props.get("ALAND")
+        pop_est = props.get("B01003_001E")
+        if aland is not None and pop_est is not None:
+            try:
+                area_km2 = float(aland) / 1e6
+                pop = float(pop_est)
+                props["population_density_km2"] = (
+                    round(pop / area_km2, 2) if area_km2 > 0 else 0.0
+                )
+            except (ValueError, TypeError):
+                pass
         joined_features.append({
             "type": "Feature",
             "properties": props,
