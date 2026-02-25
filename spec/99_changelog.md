@@ -1,5 +1,50 @@
 # Implementation Changelog
 
+## Completed (v0.12.94) - Add MongoDB ingestion handlers for census-us ToDB facets
+
+New ingestion pipeline that reads upstream handler output files (GeoJSON, CSV, JSON) and upserts them into MongoDB `handler_output` / `handler_output_meta` collections. Compound unique index on `(dataset_key, feature_key)` ensures re-runs replace data without duplicates. Existing handlers and outputs are untouched — ingestion handlers compose as downstream workflow steps.
+
+### New package: `examples/census-us/handlers/ingestion/`
+
+**`db_ingest.py`** — `OutputStore` class:
+- `ingest_geojson()`: reads FeatureCollection, bulk `ReplaceOne(upsert=True)` in batches of 1000
+- `ingest_csv()`: reads CSV via `DictReader`, bulk upsert rows
+- `ingest_json()`: reads JSON file, single `replace_one(upsert=True)`
+- Indexes: compound unique `(dataset_key, feature_key)` on `handler_output`, `2dsphere` sparse on `geometry`, unique `dataset_key` on `handler_output_meta`
+- `get_mongo_db()` uses same `AFL_MONGODB_URL` / `AFL_MONGODB_DATABASE` env vars as runtime
+
+**`ingestion_handlers.py`** — 8 ToDB handler functions:
+- `PopulationToDB`, `IncomeToDB`, `HousingToDB`, `EducationToDB`, `CommutingToDB` — ACS CSV → MongoDB (factory via `_make_acs_db_handler`)
+- `CountiesToDB` — TIGER GeoJSON → MongoDB
+- `JoinedToDB` — joined ACS+TIGER GeoJSON → MongoDB
+- `SummaryToDB` — state summary JSON → MongoDB
+- Standard dispatch pattern with `handle()`, `register_handlers()`, `register_ingestion_handlers()`
+
+**`afl/census_ingestion.afl`** — `census.Ingestion` namespace:
+- `IngestionResult` schema (dataset_key, record_count, data_type, imported_at)
+- 8 event facets accepting upstream result + `state_fips`
+
+### AFL workflow (`afl/census.afl`)
+- Added `use census.Ingestion` import
+- New `AnalyzeStateWithDB` workflow: same extraction pipeline as `AnalyzeState` plus 8 parallel ToDB steps downstream
+- Existing `AnalyzeState` and `AnalyzeStates_03` unchanged
+
+### Handler registration (`handlers/__init__.py`)
+- Added ingestion handlers to both `register_all_handlers()` (AgentPoller) and `register_all_registry_handlers()` (RegistryRunner)
+- Handler count: 13 → 21 (+8 ingestion)
+
+### Tests (`tests/test_ingestion_handlers.py`)
+- `TestOutputStore`: 6 tests — index creation, GeoJSON/CSV/JSON ingestion, upsert operations verify `ReplaceOne(upsert=True)` filter/doc structure
+- `TestIngestionHandlers`: 10 tests — dispatch keys (8 facets), unknown facet error, register count (8), handler dispatch for CountiesToDB/PopulationToDB/SummaryToDB/JoinedToDB, error step_log
+- `TestInitRegistryHandlersWithIngestion`: 2 tests — verify 21 total handler registrations
+- Updated `TestInitRegistryHandlers` in `test_census_handlers.py`: 13 → 21
+
+### Compiled output
+- `census-us.json` recompiled with all ingestion declarations
+
+### Details
+- 9 files changed (5 new, 3 modified, 1 recompiled); 18 new tests; test suite: 2608 passed, 79 skipped
+
 ## Completed (v0.12.93) - Add pyshp fallback for TIGER shapefile extraction
 
 TIGER ZIPs contain shapefiles (.shp, .dbf, .shx), not .geojson files. When fiona is unavailable, the existing geojson-in-ZIP fallback finds nothing and returns 0 features. Added pyshp (pure-Python, no C deps) as a middle fallback between fiona and the geojson path.
