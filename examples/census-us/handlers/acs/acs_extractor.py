@@ -1,22 +1,20 @@
-"""ACS data extraction from Census Bureau summary files.
+"""ACS data extraction from Census Bureau API downloads.
 
-Reads CSV data from downloaded ACS ZIP archives and extracts columns
+Reads CSV data produced by the Census API downloader and extracts columns
 for specific tables (e.g. B01003 for population, B19013 for income).
 """
 
 import csv
-import io
 import logging
 import os
-import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ACS table ID → human-readable label and estimate column suffix
+# ACS table ID -> human-readable label and estimate column suffix
 ACS_TABLES: dict[str, dict[str, str]] = {
     "B01003": {"label": "Total Population", "column": "B01003_001E"},
     "B19013": {"label": "Median Household Income", "column": "B19013_001E"},
@@ -37,17 +35,20 @@ class ACSExtractionResult:
     geography_level: str
     year: str
     extraction_date: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
 
-def extract_acs_table(zip_path: str, table_id: str, state_fips: str,
+def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
                       geo_level: str = "county",
                       year: str = "2023") -> ACSExtractionResult:
-    """Extract a specific ACS table from a downloaded ZIP archive.
+    """Extract a specific ACS table from a downloaded CSV file.
+
+    The CSV is produced by the Census API downloader with columns:
+    GEOID, NAME, B01003_001E, B19013_001E, etc.
 
     Args:
-        zip_path: Path to downloaded ACS ZIP file.
+        csv_path: Path to downloaded ACS CSV file.
         table_id: ACS table ID (e.g. "B01003").
         state_fips: Two-digit state FIPS code.
         geo_level: Geography level (county, tract, etc.).
@@ -69,27 +70,23 @@ def extract_acs_table(zip_path: str, table_id: str, state_fips: str,
 
     records: list[dict[str, Any]] = []
 
-    if os.path.exists(zip_path):
+    if os.path.exists(csv_path):
         try:
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
-                for csv_name in csv_names:
-                    with zf.open(csv_name) as f:
-                        text = io.TextIOWrapper(f, encoding="utf-8")
-                        reader = csv.DictReader(text)
-                        for row in reader:
-                            geoid = row.get("GEO_ID", "")
-                            if not geoid.startswith(f"0500000US{state_fips}"):
-                                continue
-                            value = row.get(target_col, "")
-                            if value:
-                                records.append({
-                                    "GEOID": geoid,
-                                    target_col: value,
-                                    "NAME": row.get("NAME", ""),
-                                })
-        except (zipfile.BadZipFile, KeyError) as exc:
-            logger.warning("Failed to read ACS ZIP %s: %s", zip_path, exc)
+            with open(csv_path, newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    geoid = row.get("GEOID", "")
+                    if not geoid.startswith(f"0500000US{state_fips}"):
+                        continue
+                    value = row.get(target_col, "")
+                    if value:
+                        records.append({
+                            "GEOID": geoid,
+                            target_col: value,
+                            "NAME": row.get("NAME", ""),
+                        })
+        except (OSError, csv.Error) as exc:
+            logger.warning("Failed to read ACS CSV %s: %s", csv_path, exc)
 
     # Write output CSV
     with open(output_path, "w", newline="") as f:

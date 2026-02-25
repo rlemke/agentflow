@@ -25,36 +25,41 @@ def _make_acs_handler(facet_name: str, table_id: str):
     """Create a handler for an ACS extraction event facet."""
     def handler(params: dict[str, Any]) -> dict[str, Any]:
         file_info = params.get("file", {})
-        zip_path = file_info.get("path", "")
+        csv_path = file_info.get("path", "")
         state_fips = params.get("state_fips", "")
         geo_level = params.get("geo_level", "county")
         step_log = params.get("_step_log")
 
-        result = extract_acs_table(
-            zip_path=zip_path,
-            table_id=table_id,
-            state_fips=state_fips,
-            geo_level=geo_level,
-        )
-
-        if step_log:
-            label = ACS_TABLES[table_id]["label"]
-            step_log(
-                f"{facet_name}: {label} — {result.record_count} records "
-                f"(state={state_fips}, level={geo_level})",
-                level="success",
+        try:
+            result = extract_acs_table(
+                csv_path=csv_path,
+                table_id=table_id,
+                state_fips=state_fips,
+                geo_level=geo_level,
             )
 
-        return {
-            "result": {
-                "table_id": result.table_id,
-                "output_path": result.output_path,
-                "record_count": result.record_count,
-                "geography_level": result.geography_level,
-                "year": result.year,
-                "extraction_date": result.extraction_date,
+            if step_log:
+                label = ACS_TABLES[table_id]["label"]
+                step_log(
+                    f"{facet_name}: {label} — {result.record_count} records "
+                    f"(state={state_fips}, level={geo_level})",
+                    level="success",
+                )
+
+            return {
+                "result": {
+                    "table_id": result.table_id,
+                    "output_path": result.output_path,
+                    "record_count": result.record_count,
+                    "geography_level": result.geography_level,
+                    "year": result.year,
+                    "extraction_date": result.extraction_date,
+                }
             }
-        }
+        except Exception as exc:
+            if step_log:
+                step_log(f"{facet_name}: {exc}", level="error")
+            raise
     return handler
 
 

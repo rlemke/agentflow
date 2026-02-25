@@ -24,27 +24,32 @@ def handle_join_geo(params: dict[str, Any]) -> dict[str, Any]:
     join_field = params.get("join_field", "GEOID")
     step_log = params.get("_step_log")
 
-    result = join_geo(
-        acs_path=acs_path,
-        tiger_path=tiger_path,
-        join_field=join_field,
-    )
-
-    if step_log:
-        step_log(
-            f"JoinGeo: {result.feature_count} features joined on {join_field}",
-            level="success",
+    try:
+        result = join_geo(
+            acs_path=acs_path,
+            tiger_path=tiger_path,
+            join_field=join_field,
         )
 
-    return {
-        "result": {
-            "state_fips": "",
-            "state_name": "",
-            "output_path": result.output_path,
-            "tables_joined": 1,
-            "record_count": result.feature_count,
+        if step_log:
+            step_log(
+                f"JoinGeo: {result.feature_count} features joined on {join_field}",
+                level="success",
+            )
+
+        return {
+            "result": {
+                "state_fips": "",
+                "state_name": "",
+                "output_path": result.output_path,
+                "tables_joined": 1,
+                "record_count": result.feature_count,
+            }
         }
-    }
+    except Exception as exc:
+        if step_log:
+            step_log(f"JoinGeo: {exc}", level="error")
+        raise
 
 
 def handle_summarize_state(params: dict[str, Any]) -> dict[str, Any]:
@@ -64,30 +69,35 @@ def handle_summarize_state(params: dict[str, Any]) -> dict[str, Any]:
     commuting = params.get("commuting", {})
     step_log = params.get("_step_log")
 
-    result = summarize_state(
-        population=population,
-        income=income,
-        housing=housing,
-        education=education,
-        commuting=commuting,
-    )
-
-    if step_log:
-        step_log(
-            f"SummarizeState: {result.tables_joined} tables, "
-            f"{result.record_count} records (state={result.state_fips})",
-            level="success",
+    try:
+        result = summarize_state(
+            population=population,
+            income=income,
+            housing=housing,
+            education=education,
+            commuting=commuting,
         )
 
-    return {
-        "result": {
-            "state_fips": result.state_fips,
-            "state_name": result.state_name,
-            "output_path": result.output_path,
-            "tables_joined": result.tables_joined,
-            "record_count": result.record_count,
+        if step_log:
+            step_log(
+                f"SummarizeState: {result.tables_joined} tables, "
+                f"{result.record_count} records (state={result.state_fips})",
+                level="success",
+            )
+
+        return {
+            "result": {
+                "state_fips": result.state_fips,
+                "state_name": result.state_name,
+                "output_path": result.output_path,
+                "tables_joined": result.tables_joined,
+                "record_count": result.record_count,
+            }
         }
-    }
+    except Exception as exc:
+        if step_log:
+            step_log(f"SummarizeState: {exc}", level="error")
+        raise
 
 
 # RegistryRunner dispatch adapter

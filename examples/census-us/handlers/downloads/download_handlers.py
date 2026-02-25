@@ -25,14 +25,19 @@ def handle_download_acs(params: dict[str, Any]) -> dict[str, Any]:
     state_fips = params["state_fips"]
     step_log = params.get("_step_log")
 
-    result = download_acs(year=year, period=period, state_fips=state_fips)
+    try:
+        result = download_acs(year=year, period=period, state_fips=state_fips)
 
-    source = "cache" if result["wasInCache"] else "download"
-    if step_log:
-        step_log(f"DownloadACS: state={state_fips} year={year} ({source})",
-                 level="success")
+        source = "cache" if result["wasInCache"] else "download"
+        if step_log:
+            step_log(f"DownloadACS: state={state_fips} year={year} ({source})",
+                     level="success")
 
-    return {"file": result}
+        return {"file": result}
+    except Exception as exc:
+        if step_log:
+            step_log(f"DownloadACS: {exc}", level="error")
+        raise
 
 
 def handle_download_tiger(params: dict[str, Any]) -> dict[str, Any]:
@@ -48,15 +53,20 @@ def handle_download_tiger(params: dict[str, Any]) -> dict[str, Any]:
     state_fips = params["state_fips"]
     step_log = params.get("_step_log")
 
-    result = download_tiger(year=year, geo_level=geo_level,
-                            state_fips=state_fips)
+    try:
+        result = download_tiger(year=year, geo_level=geo_level,
+                                state_fips=state_fips)
 
-    source = "cache" if result["wasInCache"] else "download"
-    if step_log:
-        step_log(f"DownloadTIGER: state={state_fips} level={geo_level} ({source})",
-                 level="success")
+        source = "cache" if result["wasInCache"] else "download"
+        if step_log:
+            step_log(f"DownloadTIGER: state={state_fips} level={geo_level} ({source})",
+                     level="success")
 
-    return {"file": result}
+        return {"file": result}
+    except Exception as exc:
+        if step_log:
+            step_log(f"DownloadTIGER: {exc}", level="error")
+        raise
 
 
 # RegistryRunner dispatch adapter

@@ -28,29 +28,34 @@ def _make_tiger_handler(facet_name: str, geo_level: str):
         state_fips = params.get("state_fips", "")
         step_log = params.get("_step_log")
 
-        result = extract_tiger(
-            zip_path=zip_path,
-            geo_level=geo_level,
-            state_fips=state_fips,
-        )
-
-        if step_log:
-            step_log(
-                f"{facet_name}: {result.feature_count} features "
-                f"(state={state_fips}, level={geo_level})",
-                level="success",
+        try:
+            result = extract_tiger(
+                zip_path=zip_path,
+                geo_level=geo_level,
+                state_fips=state_fips,
             )
 
-        return {
-            "result": {
-                "output_path": result.output_path,
-                "feature_count": result.feature_count,
-                "geography_level": result.geography_level,
-                "year": result.year,
-                "format": result.format,
-                "extraction_date": result.extraction_date,
+            if step_log:
+                step_log(
+                    f"{facet_name}: {result.feature_count} features "
+                    f"(state={state_fips}, level={geo_level})",
+                    level="success",
+                )
+
+            return {
+                "result": {
+                    "output_path": result.output_path,
+                    "feature_count": result.feature_count,
+                    "geography_level": result.geography_level,
+                    "year": result.year,
+                    "format": result.format,
+                    "extraction_date": result.extraction_date,
+                }
             }
-        }
+        except Exception as exc:
+            if step_log:
+                step_log(f"{facet_name}: {exc}", level="error")
+            raise
     return handler
 
 

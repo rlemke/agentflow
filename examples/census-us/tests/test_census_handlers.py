@@ -56,8 +56,8 @@ class TestDownloadHandlers:
     def test_handle_dispatches(self):
         mod = _census_import("downloads.download_handlers")
         mock_file = {
-            "url": "https://example.com/acs.zip",
-            "path": "/tmp/acs.zip",
+            "url": "https://example.com/acs.csv",
+            "path": "/tmp/acs.csv",
             "date": "2026-01-01T00:00:00+00:00",
             "size": 1024,
             "wasInCache": True,
@@ -81,6 +81,37 @@ class TestDownloadHandlers:
         runner = MagicMock()
         mod.register_handlers(runner)
         assert runner.register_handler.call_count == 2
+
+    def test_error_step_log_download_acs(self):
+        mod = _census_import("downloads.download_handlers")
+        step_log = MagicMock()
+        with patch.object(mod, "download_acs",
+                          side_effect=RuntimeError("connection timeout")):
+            with pytest.raises(RuntimeError, match="connection timeout"):
+                mod.handle({
+                    "_facet_name": "census.Operations.DownloadACS",
+                    "state_fips": "01",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        call_args = step_log.call_args
+        assert "connection timeout" in call_args[0][0]
+        assert call_args[1]["level"] == "error"
+
+    def test_error_step_log_download_tiger(self):
+        mod = _census_import("downloads.download_handlers")
+        step_log = MagicMock()
+        with patch.object(mod, "download_tiger",
+                          side_effect=ValueError("bad geo_level")):
+            with pytest.raises(ValueError, match="bad geo_level"):
+                mod.handle({
+                    "_facet_name": "census.Operations.DownloadTIGER",
+                    "state_fips": "01",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        assert "bad geo_level" in step_log.call_args[0][0]
+        assert step_log.call_args[1]["level"] == "error"
 
 
 class TestACSHandlers:
@@ -159,6 +190,57 @@ class TestACSHandlers:
         })
         assert result["result"]["table_id"] == "B08301"
 
+    def test_extract_from_csv(self, tmp_path):
+        """ACS extractor reads CSV files produced by Census API."""
+        mod = _census_import("acs.acs_extractor")
+        csv_file = tmp_path / "acs_2023_01.csv"
+        csv_file.write_text(
+            "GEOID,NAME,B01003_001E,B19013_001E\n"
+            "0500000US01001,Autauga County,59285,61756\n"
+            "0500000US01003,Baldwin County,231767,63756\n"
+        )
+        result = mod.extract_acs_table(
+            csv_path=str(csv_file),
+            table_id="B01003",
+            state_fips="01",
+        )
+        assert result.record_count == 2
+        assert result.table_id == "B01003"
+
+    def test_extract_csv_filters_by_state_fips(self, tmp_path):
+        """ACS extractor only returns rows matching state FIPS."""
+        mod = _census_import("acs.acs_extractor")
+        csv_file = tmp_path / "acs_mixed.csv"
+        csv_file.write_text(
+            "GEOID,NAME,B01003_001E\n"
+            "0500000US01001,Autauga County,59285\n"
+            "0500000US02013,Aleutians East,3420\n"
+        )
+        result = mod.extract_acs_table(
+            csv_path=str(csv_file),
+            table_id="B01003",
+            state_fips="01",
+        )
+        assert result.record_count == 1
+
+    def test_error_step_log_acs_handler(self):
+        mod = _census_import("acs.acs_handlers")
+        step_log = MagicMock()
+        with patch.object(
+            mod, "extract_acs_table",
+            side_effect=ValueError("Unknown ACS table: BOGUS"),
+        ):
+            with pytest.raises(ValueError, match="Unknown ACS table"):
+                mod.handle({
+                    "_facet_name": "census.ACS.ExtractPopulation",
+                    "file": {"path": "/tmp/test.csv"},
+                    "state_fips": "01",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        assert "Unknown ACS table" in step_log.call_args[0][0]
+        assert step_log.call_args[1]["level"] == "error"
+
 
 class TestTIGERHandlers:
     def test_dispatch_keys(self):
@@ -225,6 +307,62 @@ class TestTIGERHandlers:
         })
         assert result["result"]["geography_level"] == "PLACE"
 
+    def test_error_step_log_tiger_handler(self):
+        mod = _census_import("tiger.tiger_handlers")
+        step_log = MagicMock()
+        with patch.object(
+            mod, "extract_tiger",
+            side_effect=OSError("Permission denied"),
+        ):
+            with pytest.raises(OSError, match="Permission denied"):
+                mod.handle({
+                    "_facet_name": "census.TIGER.ExtractCounties",
+                    "file": {"path": "/tmp/test.zip"},
+                    "state_fips": "01",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        assert "Permission denied" in step_log.call_args[0][0]
+        assert step_log.call_args[1]["level"] == "error"
+
+
+class TestDownloaderURLs:
+    """Test that download URLs are constructed correctly."""
+
+    def test_tiger_county_uses_national_file(self):
+        mod = _census_import("shared.downloader")
+        # COUNTY should use 'us' instead of state FIPS
+        assert "COUNTY" in mod._TIGER_NATIONAL_GEO
+
+    def test_tiger_tract_is_per_state(self):
+        mod = _census_import("shared.downloader")
+        assert "TRACT" not in mod._TIGER_NATIONAL_GEO
+
+    def test_tiger_county_url_pattern(self):
+        """download_tiger for COUNTY builds a tl_{year}_us_county.zip URL."""
+        mod = _census_import("shared.downloader")
+        with patch.object(mod, "_download_file", return_value=1024):
+            with patch("os.path.exists", return_value=False):
+                result = mod.download_tiger(
+                    year="2024", geo_level="COUNTY", state_fips="01")
+        assert "tl_2024_us_county.zip" in result["url"]
+        assert "tl_2024_01_county.zip" not in result["url"]
+
+    def test_tiger_tract_url_pattern(self):
+        """download_tiger for TRACT builds a per-state URL."""
+        mod = _census_import("shared.downloader")
+        with patch.object(mod, "_download_file", return_value=512):
+            with patch("os.path.exists", return_value=False):
+                result = mod.download_tiger(
+                    year="2024", geo_level="TRACT", state_fips="06")
+        assert "tl_2024_06_tract.zip" in result["url"]
+
+    def test_acs_uses_census_api(self):
+        """download_acs builds a Census API URL, not a ZIP URL."""
+        mod = _census_import("shared.downloader")
+        assert hasattr(mod, "CENSUS_API_BASE")
+        assert "api.census.gov" in mod.CENSUS_API_BASE
+
 
 class TestJoinGeoDensity:
     """Test population density computation in join_geo."""
@@ -234,7 +372,7 @@ class TestJoinGeoDensity:
         # ACS CSV with population estimate
         acs_csv = tmp_path / "pop.csv"
         acs_csv.write_text("GEOID,B01003_001E,NAME\n0500000US01001,50000,Autauga\n")
-        # TIGER GeoJSON with ALAND (100 km² = 1e8 m²)
+        # TIGER GeoJSON with ALAND (100 km2 = 1e8 m2)
         tiger_geojson = tmp_path / "counties.geojson"
         tiger_geojson.write_text(json.dumps({
             "type": "FeatureCollection",
@@ -336,6 +474,39 @@ class TestSummaryHandlers:
         runner = MagicMock()
         mod.register_handlers(runner)
         assert runner.register_handler.call_count == 2
+
+    def test_error_step_log_join_geo(self):
+        mod = _census_import("summary.summary_handlers")
+        step_log = MagicMock()
+        with patch.object(
+            mod, "join_geo",
+            side_effect=json.JSONDecodeError("bad json", "", 0),
+        ):
+            with pytest.raises(json.JSONDecodeError):
+                mod.handle({
+                    "_facet_name": "census.Summary.JoinGeo",
+                    "acs_path": "/tmp/a.csv",
+                    "tiger_path": "/tmp/b.geojson",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        assert step_log.call_args[1]["level"] == "error"
+
+    def test_error_step_log_summarize_state(self):
+        mod = _census_import("summary.summary_handlers")
+        step_log = MagicMock()
+        with patch.object(
+            mod, "summarize_state",
+            side_effect=OSError("disk full"),
+        ):
+            with pytest.raises(OSError, match="disk full"):
+                mod.handle({
+                    "_facet_name": "census.Summary.SummarizeState",
+                    "_step_log": step_log,
+                })
+        step_log.assert_called_once()
+        assert "disk full" in step_log.call_args[0][0]
+        assert step_log.call_args[1]["level"] == "error"
 
 
 class TestInitRegistryHandlers:
