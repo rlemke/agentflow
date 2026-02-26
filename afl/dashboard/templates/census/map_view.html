@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset_key }} — Census Map{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>{{ dataset_key }}</h1>
+    <p>{{ feature_count }} features — <a href="/census/maps">Back to datasets</a></p>
+</hgroup>
+
+{% if numeric_fields %}
+<label for="choropleth-field">Color by:</label>
+<select id="choropleth-field" style="max-width:300px;display:inline-block;margin-left:.5rem">
+    <option value="">None (uniform)</option>
+    {% for field in numeric_fields %}
+    <option value="{{ field }}">{{ field }}</option>
+    {% endfor %}
+</select>
+{% endif %}
+
+<div id="map" style="height:70vh;margin-top:1rem;border:1px solid var(--pico-muted-border-color);border-radius:var(--pico-border-radius)"></div>
+
+<div id="legend" style="margin-top:.5rem;display:none">
+    <small>
+        <span id="legend-min" style="color:#f7fbff"></span>
+        <span style="display:inline-block;width:200px;height:12px;background:linear-gradient(to right,#f7fbff,#08306b);vertical-align:middle;border:1px solid #ccc"></span>
+        <span id="legend-max" style="color:#08306b"></span>
+        <span id="legend-label" style="margin-left:.5rem"></span>
+    </small>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+(function() {
+    var geojsonData = {{ geojson_str | safe }};
+
+    var map = L.map('map').setView([39.8, -98.5], 4);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    var currentField = '';
+
+    function interpolateColor(t) {
+        // White (#f7fbff) to dark blue (#08306b)
+        var r = Math.round(247 + (8 - 247) * t);
+        var g = Math.round(251 + (48 - 251) * t);
+        var b = Math.round(255 + (107 - 255) * t);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
+    function computeRange(field) {
+        var min = Infinity, max = -Infinity;
+        geojsonData.features.forEach(function(f) {
+            var v = f.properties[field];
+            if (typeof v === 'number' && isFinite(v)) {
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+        });
+        return {min: min, max: max};
+    }
+
+    function getStyle(feature) {
+        if (!currentField) {
+            return {color: '#3388ff', weight: 1, fillColor: '#3388ff', fillOpacity: 0.3};
+        }
+        var range = computeRange(currentField);
+        var v = feature.properties[currentField];
+        var t = 0;
+        if (typeof v === 'number' && isFinite(v) && range.max > range.min) {
+            t = (v - range.min) / (range.max - range.min);
+        }
+        return {color: '#333', weight: 1, fillColor: interpolateColor(t), fillOpacity: 0.7};
+    }
+
+    function formatValue(v) {
+        if (typeof v === 'number') {
+            return v.toLocaleString();
+        }
+        return v == null ? '—' : String(v);
+    }
+
+    function onEachFeature(feature, layer) {
+        layer.on('click', function() {
+            var props = feature.properties;
+            var rows = '';
+            for (var key in props) {
+                rows += '<tr><td><strong>' + key + '</strong></td><td>' + formatValue(props[key]) + '</td></tr>';
+            }
+            var html = '<table style="font-size:12px;border-collapse:collapse">' + rows + '</table>';
+            layer.bindPopup(html, {maxWidth: 400, maxHeight: 300}).openPopup();
+        });
+    }
+
+    var geojsonLayer = L.geoJSON(geojsonData, {
+        style: getStyle,
+        onEachFeature: onEachFeature
+    }).addTo(map);
+
+    if (geojsonData.features.length > 0) {
+        map.fitBounds(geojsonLayer.getBounds());
+    }
+
+    // Legend elements
+    var legendEl = document.getElementById('legend');
+    var legendMin = document.getElementById('legend-min');
+    var legendMax = document.getElementById('legend-max');
+    var legendLabel = document.getElementById('legend-label');
+
+    function updateLegend(field, range) {
+        if (!field) {
+            legendEl.style.display = 'none';
+            return;
+        }
+        legendEl.style.display = 'block';
+        legendMin.textContent = range.min.toLocaleString();
+        legendMax.textContent = range.max.toLocaleString();
+        legendLabel.textContent = field;
+    }
+
+    var dropdown = document.getElementById('choropleth-field');
+    if (dropdown) {
+        dropdown.addEventListener('change', function() {
+            currentField = this.value;
+            geojsonLayer.setStyle(getStyle);
+            if (currentField) {
+                updateLegend(currentField, computeRange(currentField));
+            } else {
+                updateLegend('', {});
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

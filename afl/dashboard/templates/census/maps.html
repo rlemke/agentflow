@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Census Maps — AgentFlow Dashboard{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Census Maps</h1>
+    <p>GeoJSON datasets available for map visualization</p>
+</hgroup>
+
+{% if datasets %}
+<table>
+    <thead>
+        <tr>
+            <th>Dataset Key</th>
+            <th>Facet Name</th>
+            <th>Records</th>
+            <th>Imported At</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ds in datasets %}
+        <tr>
+            <td><a href="/census/maps/{{ ds.dataset_key }}">{{ ds.dataset_key }}</a></td>
+            <td>{{ ds.facet_name }}</td>
+            <td>{{ ds.record_count }}</td>
+            <td>
+                {% if ds.imported_at %}
+                <time data-ts="{{ ds.imported_at }}">{{ ds.imported_at }}</time>
+                {% else %}
+                —
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No GeoJSON datasets found. Run a census workflow with DB ingestion to populate data.</p>
+{% endif %}
+{% endblock %}

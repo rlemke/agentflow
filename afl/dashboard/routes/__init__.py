@@ -40,6 +40,7 @@ def register_routes(app: FastAPI) -> None:
     from .tasks import router as tasks_router
     from .dashboard_v2 import router as dashboard_v2_router
     from .output import router as output_router
+    from .census_maps import router as census_maps_router
     from .workflows import router as workflows_router
 
     app.include_router(health_router)
@@ -59,3 +60,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(workflows_router)
     app.include_router(dashboard_v2_router)
     app.include_router(output_router)
+    app.include_router(census_maps_router)
