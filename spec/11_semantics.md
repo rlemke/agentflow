@@ -57,6 +57,8 @@ All AST nodes MUST have a unique UUID (v4) stored in the `node_id` field. This I
 | `ForeachClause` | `foreach var in reference` |
 | `StepStmt` | `name = CallExpr` |
 | `YieldStmt` | `yield CallExpr` |
+| `PromptBlock` | `prompt { system/template/model directives }` for LLM-based facets |
+| `ScriptBlock` | `script [python] "code..."` for inline sandboxed Python execution |
 
 ### Expression Nodes
 | Node | Description |
@@ -91,11 +93,19 @@ Program
 │   │   ├── params: list[Parameter]
 │   │   ├── returns: ReturnClause?
 │   │   └── mixins: list[MixinSig]
-│   └── body: AndThenBlock?
+│   └── body: AndThenBlock? | PromptBlock? | ScriptBlock?
+│       # AndThenBlock:
 │       ├── foreach: ForeachClause?
 │       └── block: Block
 │           ├── steps: list[StepStmt]
 │           └── yield_stmt: YieldStmt?
+│       # PromptBlock:
+│       ├── system: str?
+│       ├── template: str?
+│       └── model: str?
+│       # ScriptBlock:
+│       ├── language: str (default "python")
+│       └── code: str
 ├── event_facets: list[EventFacetDecl]
 ├── workflows: list[WorkflowDecl]
 ├── implicits: list[ImplicitDecl]

@@ -52,10 +52,11 @@ Semantic rules (e.g., dependency scheduling, single-writer, yield merge semantic
 ### 1.6 Reserved Keywords
 The following tokens are reserved:
 - `namespace`, `uses`
-- `facet`, `event`, `workflow`, `implicit`
+- `facet`, `event`, `workflow`, `implicit`, `schema`
 - `with`, `as`
 - `andThen`, `yield`
 - `foreach`, `in`
+- `prompt`, `script`, `python`
 - `true`, `false`, `null`
 
 ---
@@ -112,7 +113,21 @@ step_stmt          := ident "=" call_expr (stmt_sep)? ;
 
 call_expr          := qname "(" named_args? ")" mixin_call* ;
 
-facet_def_tail     := ("andThen" block) | ("andThen" "foreach" ident "in" reference block) ;
+facet_def_tail     := ("andThen" foreach_clause? block more_andthen_block*)
+                   | ("prompt" prompt_block)
+                   | ("script" script_block) ;
+
+more_andthen_block := "andThen" foreach_clause? block ;
+
+foreach_clause     := "foreach" ident "in" reference ;
+
+prompt_block       := "{" prompt_directive* "}" ;
+prompt_directive   := "system" string
+                   | "template" string
+                   | "model" string ;
+
+script_block       := string
+                   | "python" string ;
 
 block              := "{" block_stmt* yield_stmt? "}" ;
 
@@ -181,6 +196,16 @@ workflow ProcessAllRegions(regions: Json) => (results: Json) andThen foreach r i
     processed = ProcessRegion(region = r.name)
     yield ProcessAllRegions(results = processed.result)
 }
+
+### Prompt block (LLM-driven event facet)
+event facet Summarize(text: String) => (summary: String) prompt {
+    system "You are a concise summarizer."
+    template "Summarize: {text}"
+    model "claude-sonnet-4-20250514"
+}
+
+### Script block (inline Python execution)
+event facet AddOne(input: Long) => (output: Long) script python "result['output'] = params['input'] + 1"
 
 ### Schema declaration and instantiation
 schema Config {

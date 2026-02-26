@@ -36,6 +36,8 @@ This repository contains the **AgentFlow** platform:
 - **andThen / yield blocks**: compose multi-step internal logic. Facets/workflows support multiple concurrent `andThen` blocks.
 - **andThen foreach**: iterate over collections with parallel execution.
 - **Statement-level andThen body**: steps can have inline `andThen` blocks (`s = F(x = 1) andThen { ... }`).
+- **prompt blocks**: `prompt { system "..." template "..." model "..." }` for LLM-driven event facets.
+- **script blocks**: `script python "code..."` for inline sandboxed Python execution. Code receives `params` dict and writes to `result` dict.
 
 ### Expression features
 - **Arithmetic operators**: `+`, `-`, `*`, `/`, `%` with standard precedence (`*/%` > `+-` > `++`).

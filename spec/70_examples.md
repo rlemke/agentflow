@@ -20,7 +20,7 @@ In the above example the following stages occur:
     - `Created`
     - `facet.initialization.Begin` — evaluate attributes and place into facet
     - `facet.initialization.End` — record the end of initialization
-    - `facet.scripts.Begin` — evaluate AndThen Python{} of the Facet (TBD feature)
+    - `facet.scripts.Begin` — execute the facet's `script` block if present (inline Python via `script python "code..."` or `script "code..."`)
     - `mixin.blocks.Begin` — start processing mixin blocks (for this example there are none)
     - `mixin.blocks.Continue` — continue processing mixin blocks (if any) until done
     - `mixin.blocks.End` — finish processing mixin blocks
