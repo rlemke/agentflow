@@ -11,6 +11,7 @@ This guide helps you choose the right example as a starting point for your own A
 | [genomics](../genomics/) | Intermediate | foreach fan-out, linear fan-in | 45 | Parallel batch processing pipelines |
 | [jenkins](../jenkins/) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth) |
 | [aws-lambda](../aws-lambda/) | Intermediate | Real cloud calls + mixins | 12 | Cloud service integration with LocalStack |
+| [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
 | [osm-geocoder](../osm-geocoder/) | Advanced | Large-scale event facets | 580+ | Production-scale agent with many namespaces |
 | [continental-lz](../continental-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
 
@@ -23,13 +24,13 @@ Start simple and build up to more complex patterns:
        |
 2. volcano-query        Learn namespace composition (no handlers needed)
        |
-   +---+---+
-   |       |
-3a. genomics          3b. jenkins
-    foreach/fan-in        mixin composition
-       |                     |
-       +--------+------------+
-                |
+   +---+---+---+
+   |       |   |
+3a. genomics  3b. jenkins  3c. census-us
+    foreach       mixins       API + shapefile ETL
+       |           |           + dashboard maps
+       +-----+-----+
+             |
 4. aws-lambda           Real cloud integration + mixins + foreach
        |
 5. osm-geocoder         Full production-scale agent
@@ -54,6 +55,10 @@ Use **[genomics](../genomics/)** as your template. It demonstrates `andThen fore
 ### "I want to add retry, timeout, or other cross-cutting concerns"
 
 Use **[jenkins](../jenkins/)** as your template. It demonstrates the `with` mixin composition pattern at both signature level and call time, plus implicit defaults.
+
+### "I want to build an ETL pipeline with API and shapefile data"
+
+Use **[census-us](../census-us/)** as your template. It downloads ACS demographics from the Census API and TIGER shapefiles, extracts and joins the data, ingests into MongoDB with GeoJSON indexes, and visualizes results on an interactive Leaflet.js map in the dashboard. The choropleth dropdown lets you color counties by population density, income, education, commuting, and more.
 
 ### "I want to integrate with real cloud services"
 
@@ -158,6 +163,7 @@ Every intermediate-to-advanced example uses this pattern:
 | [genomics](../genomics/) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
 | [jenkins](../jenkins/) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
 | [aws-lambda](../aws-lambda/) | `DeployFunction`, `UpdateAndVerify` | Lambda create→invoke→verify steps |
+| [census-us](../census-us/) | `AnalyzeState`, `AnalyzeStateWithDB` | Download→Extract→Join→Ingest pipeline per state |
 | [osm-geocoder](../osm-geocoder/) | `PrepareRegion`, `BuildRoutingData` | Cache→download→tile/graph pipeline |
 
 ### Cross-Namespace Composition
@@ -272,5 +278,6 @@ Each example has its own detailed user guide:
 | genomics | [USER_GUIDE.md](../genomics/USER_GUIDE.md) |
 | jenkins | [USER_GUIDE.md](../jenkins/USER_GUIDE.md) |
 | aws-lambda | [USER_GUIDE.md](../aws-lambda/USER_GUIDE.md) |
+| census-us | *(no user guide yet)* |
 | osm-geocoder | [USER_GUIDE.md](../osm-geocoder/USER_GUIDE.md) |
 | continental-lz | [USER_GUIDE.md](../continental-lz/USER_GUIDE.md) |

@@ -43,7 +43,12 @@ pytestmark = pytest.mark.skipif(
 # Helper unit tests (no server needed)
 # ---------------------------------------------------------------------------
 
-from afl.dashboard.routes.census_maps import _region_label
+from afl.dashboard.routes.census_maps import (
+    _decimate_ring,
+    _region_label,
+    _simplify_geometry,
+    _slim_properties,
+)
 
 
 class TestRegionLabel:
@@ -61,6 +66,67 @@ class TestRegionLabel:
 
     def test_dc(self):
         assert _region_label("census.tiger.county.11") == "District of Columbia"
+
+
+class TestDecimateRing:
+    def test_short_ring_unchanged(self):
+        ring = [[-86.0, 32.0], [-85.0, 32.0], [-85.5, 33.0], [-86.0, 32.0]]
+        assert _decimate_ring(ring, max_points=80) == ring
+
+    def test_long_ring_decimated(self):
+        ring = [[float(i), float(i)] for i in range(200)]
+        result = _decimate_ring(ring, max_points=50)
+        assert len(result) <= 55  # ~50 + possible closure point
+        assert result[0] == ring[0]
+        assert result[-1] == ring[-1]
+
+    def test_ring_closure_preserved(self):
+        ring = [[float(i), 0.0] for i in range(300)]
+        ring[-1] = ring[0]  # closed ring
+        result = _decimate_ring(ring, max_points=50)
+        assert result[-1] == result[0]
+
+
+class TestSimplifyGeometry:
+    def test_polygon(self):
+        geom = {"type": "Polygon", "coordinates": [[[float(i), 0.0] for i in range(200)]]}
+        result = _simplify_geometry(geom, max_points=50)
+        assert result["type"] == "Polygon"
+        assert len(result["coordinates"][0]) < 200
+
+    def test_multipolygon(self):
+        ring = [[float(i), 0.0] for i in range(200)]
+        geom = {"type": "MultiPolygon", "coordinates": [[ring]]}
+        result = _simplify_geometry(geom, max_points=50)
+        assert result["type"] == "MultiPolygon"
+        assert len(result["coordinates"][0][0]) < 200
+
+    def test_point_passthrough(self):
+        geom = {"type": "Point", "coordinates": [1.0, 2.0]}
+        assert _simplify_geometry(geom) == geom
+
+
+class TestSlimProperties:
+    def test_strips_raw_acs(self):
+        props = {"NAME": "Test", "population": 100, "B01003_001E": 100, "B19013_001E": 50000}
+        result = _slim_properties(props)
+        assert "NAME" in result
+        assert "population" in result
+        assert "B01003_001E" not in result
+        assert "B19013_001E" not in result
+
+    def test_strips_tiger_metadata(self):
+        props = {"NAME": "Test", "AWATER": 123, "COUNTYNS": "abc", "MTFCC": "G4020"}
+        result = _slim_properties(props)
+        assert "NAME" in result
+        assert "AWATER" not in result
+        assert "COUNTYNS" not in result
+        assert "MTFCC" not in result
+
+    def test_keeps_friendly_fields(self):
+        props = {"NAME": "Test", "population": 100, "median_income": 50000, "GEOID": "01001"}
+        result = _slim_properties(props)
+        assert result == props
 
 
 # ---------------------------------------------------------------------------
@@ -474,6 +540,168 @@ class TestCensusMapAPI:
         assert len(data_02["features"]) == 1
         assert data_01["features"][0]["properties"]["NAME"] == "Autauga"
         assert data_02["features"][0]["properties"]["NAME"] == "Fairbanks"
+
+
+# ---------------------------------------------------------------------------
+# Nav link
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Combined national map: GET /census/maps/_all
+# ---------------------------------------------------------------------------
+
+
+class TestCensusMapAll:
+    def test_empty_page(self, client):
+        tc, store = client
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert "0 states" in resp.text
+        assert "0 features" in resp.text
+
+    def test_renders_with_data(self, client):
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(store, "census.joined.48", "48001", "Anderson", _TRIANGLE_2, population=58458)
+
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert "2 states" in resp.text
+        assert "2 features" in resp.text
+
+    def test_has_choropleth_dropdown(self, client):
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert '<select id="choropleth-field"' in resp.text
+        assert '<option value="population">' in resp.text
+
+    def test_has_back_link(self, client):
+        tc, store = client
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert 'href="/census/maps"' in resp.text
+
+    def test_loads_via_ajax(self, client):
+        """The combined page should fetch GeoJSON via AJAX, not embed it."""
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert "fetch('/census/api/maps/_all')" in resp.text
+        # GeoJSON should NOT be embedded inline
+        assert "FeatureCollection" not in resp.text
+
+    def test_only_joined_datasets(self, client):
+        """Combined view should only include census.joined.* datasets, not tiger."""
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+
+        resp = tc.get("/census/maps/_all")
+        assert resp.status_code == 200
+        assert "1 states" in resp.text
+        assert "1 features" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Combined national API: GET /census/api/maps/_all
+# ---------------------------------------------------------------------------
+
+
+class TestCensusMapAllAPI:
+    def test_empty_response(self, client):
+        tc, store = client
+        resp = tc.get("/census/api/maps/_all")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["type"] == "FeatureCollection"
+        assert data["features"] == []
+
+    def test_returns_combined_geojson(self, client):
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(store, "census.joined.48", "48001", "Anderson", _TRIANGLE_2, population=58458)
+
+        resp = tc.get("/census/api/maps/_all")
+        data = resp.json()
+        assert len(data["features"]) == 2
+
+    def test_adds_state_name(self, client):
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+
+        resp = tc.get("/census/api/maps/_all")
+        data = resp.json()
+        feat = data["features"][0]
+        assert feat["properties"]["_state"] == "Alabama"
+
+    def test_strips_raw_acs_codes(self, client):
+        tc, store = client
+        store._db.handler_output.insert_one({
+            "dataset_key": "census.joined.01",
+            "feature_key": "01001",
+            "facet_name": "Joined",
+            "data_type": "geojson_feature",
+            "properties": {"NAME": "Autauga", "population": 100, "B01003_001E": 100},
+            "geometry": _TRIANGLE,
+            "imported_at": 1708873045000,
+        })
+
+        resp = tc.get("/census/api/maps/_all")
+        data = resp.json()
+        props = data["features"][0]["properties"]
+        assert "population" in props
+        assert "B01003_001E" not in props
+
+    def test_excludes_tiger_datasets(self, client):
+        tc, store = client
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+
+        resp = tc.get("/census/api/maps/_all")
+        data = resp.json()
+        assert len(data["features"]) == 1
+        assert data["features"][0]["properties"]["_state"] == "Alabama"
+
+    def test_simplifies_geometry(self, client):
+        """Geometry should be decimated for the combined view."""
+        tc, store = client
+        # Create a polygon with many coordinates
+        ring = [[float(i) * 0.01 - 86.0, 32.0 + float(i) * 0.001] for i in range(300)]
+        ring.append(ring[0])
+        big_geom = {"type": "Polygon", "coordinates": [ring]}
+        _seed_feature(store, "census.joined.01", "01001", "Autauga", big_geom, population=55869)
+
+        resp = tc.get("/census/api/maps/_all")
+        data = resp.json()
+        coords = data["features"][0]["geometry"]["coordinates"][0]
+        assert len(coords) < 300  # should be decimated
+
+
+# ---------------------------------------------------------------------------
+# Dataset list: "View All" link
+# ---------------------------------------------------------------------------
+
+
+class TestViewAllLink:
+    def test_view_all_link_present(self, client):
+        tc, store = client
+        _seed_meta(store, "census.joined.01")
+
+        resp = tc.get("/census/maps")
+        assert resp.status_code == 200
+        assert 'href="/census/maps/_all"' in resp.text
+
+    def test_view_all_link_absent_when_empty(self, client):
+        tc, store = client
+        resp = tc.get("/census/maps")
+        assert resp.status_code == 200
+        assert 'href="/census/maps/_all"' not in resp.text
 
 
 # ---------------------------------------------------------------------------

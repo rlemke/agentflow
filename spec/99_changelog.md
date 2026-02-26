@@ -1,5 +1,38 @@
 # Implementation Changelog
 
+## Completed (v0.12.99) - Add combined national county map
+
+New "View All Counties on One Map" page combining all 51 `census.joined.*` datasets into a single national view. Geometries are decimated server-side (~80 points per ring) reducing payload from 260 MB to ~8 MB, loaded via AJAX for fast page load.
+
+### New routes (`afl/dashboard/routes/census_maps.py`)
+- `GET /census/maps/_all` — combined national map page; counts features across all joined datasets, detects numeric fields, renders AJAX-loading template
+- `GET /census/api/maps/_all` — simplified GeoJSON API; decimates polygon coordinates, strips raw ACS codes and TIGER metadata, adds `_state` property with state name
+
+### Helpers (shared with single-dataset view)
+- `_filter_numeric_fields()` — extracts and orders numeric fields for choropleth dropdown (preferred fields first, raw ACS/TIGER excluded)
+- `_decimate_ring()` — reduces coordinate rings to max N points by uniform sampling, preserving ring closure
+- `_simplify_geometry()` — applies decimation to Polygon and MultiPolygon geometries
+- `_slim_properties()` — strips raw ACS variable codes (`B0*`–`B3*`) and verbose TIGER fields from properties
+
+### Template (`afl/dashboard/templates/census/map_all.html`)
+- AJAX loading via `fetch('/census/api/maps/_all')` with loading indicator
+- Same choropleth/legend/popup functionality as single-dataset view
+- Thinner polygon borders (`weight: 0.5`) for national density
+- Range caching for choropleth performance across 3,144 features
+
+### Dataset list (`afl/dashboard/templates/census/maps.html`)
+- "View All Counties on One Map" button links to `/census/maps/_all`
+
+### Examples documentation
+- Added census-us to `examples/README.md` tables
+- Added census-us to `examples/doc/GUIDE.md`: at-a-glance table, learning path, choosing section, composed facets table, detailed docs table
+
+### Tests (`tests/dashboard/test_census_maps.py`)
+- 59 tests (up from 36): added `TestDecimateRing` (3), `TestSimplifyGeometry` (3), `TestSlimProperties` (3), `TestCensusMapAll` (6), `TestCensusMapAllAPI` (6), `TestViewAllLink` (2)
+
+### Details
+- 6 files changed (1 new template, 3 modified route/template/test, 2 updated docs); 23 new tests
+
 ## Completed (v0.12.98) - Filter choropleth dropdown and add state name labels
 
 Choropleth dropdown now shows 19 friendly demographic fields in logical order, filtering out raw ACS variable codes and TIGER metadata. Dataset list and map view show state names derived from FIPS codes.

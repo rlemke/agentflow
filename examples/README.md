@@ -10,6 +10,7 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [genomics](genomics/) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows |
 | [jenkins](jenkins/) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.) |
 | [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
+| [census-us](census-us/) | US Census ACS + TIGER county demographics with dashboard map visualization |
 | [continental-lz](continental-lz/) | Continental-scale road infrastructure and GTFS transit analysis with Docker |
 
 ## User Documentation
@@ -26,6 +27,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | jenkins | [USER_GUIDE.md](jenkins/USER_GUIDE.md) |
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
+| census-us | *(no user guide yet)* |
 | continental-lz | [USER_GUIDE.md](continental-lz/USER_GUIDE.md) |
 
 ## Running an Example

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -54,6 +55,68 @@ def _region_label(dataset_key: str) -> str:
     return _FIPS_TO_STATE.get(suffix, "")
 
 
+# Preferred choropleth fields and skip lists (shared by single + combined views).
+_PREFERRED_FIELDS = [
+    "population", "population_density", "median_income",
+    "housing_units", "total_households", "family_households", "nonfamily_households",
+    "pct_owner_occupied", "pct_renter_occupied",
+    "pct_no_vehicle", "pct_drive_alone", "pct_public_transit", "pct_walk", "pct_work_from_home",
+    "pct_under_18", "pct_18_34", "pct_35_64", "pct_65_plus",
+]
+_SKIP_PREFIXES = ("B0", "B1", "B2", "B3")  # raw ACS variable codes
+_SKIP_FIELDS = {"ALAND", "AWATER", "CBSAFP", "CSAFP", "METDIVFP", "STATEFP", "COUNTYFP"}
+
+# Properties to strip from the combined national view for size reduction.
+_STRIP_PROPS = {
+    "AWATER", "CBSAFP", "CSAFP", "METDIVFP", "COUNTYNS", "GEOIDFQ",
+    "CLASSFP", "FUNCSTAT", "MTFCC", "LSAD", "INTPTLAT", "INTPTLON", "COUNTYFP",
+}
+_STRIP_RE = re.compile(r"^B[0-3]\d")
+
+
+def _filter_numeric_fields(sample_props: dict[str, Any]) -> list[str]:
+    """Return ordered numeric field names suitable for the choropleth dropdown."""
+    all_numeric = {k for k, v in sample_props.items() if isinstance(v, (int, float))}
+    result: list[str] = []
+    for key in _PREFERRED_FIELDS:
+        if key in all_numeric:
+            result.append(key)
+            all_numeric.discard(key)
+    for key in sorted(all_numeric):
+        if key in _SKIP_FIELDS or any(key.startswith(p) for p in _SKIP_PREFIXES):
+            continue
+        result.append(key)
+    return result
+
+
+def _decimate_ring(ring: list, max_points: int = 80) -> list:
+    """Reduce a coordinate ring to at most *max_points* by uniform sampling."""
+    if len(ring) <= max_points:
+        return ring
+    step = max(1, len(ring) // max_points)
+    result = ring[::step]
+    if result[-1] != ring[-1]:
+        result.append(ring[-1])
+    return result
+
+
+def _simplify_geometry(geom: dict[str, Any], max_points: int = 80) -> dict[str, Any]:
+    """Decimate polygon coordinates for the national overview."""
+    gtype = geom.get("type", "")
+    coords = geom.get("coordinates", [])
+    if gtype == "Polygon":
+        return {"type": gtype, "coordinates": [_decimate_ring(r, max_points) for r in coords]}
+    if gtype == "MultiPolygon":
+        return {"type": gtype, "coordinates": [[_decimate_ring(r, max_points) for r in poly] for poly in coords]}
+    return geom
+
+
+def _slim_properties(props: dict[str, Any]) -> dict[str, Any]:
+    """Strip raw ACS codes and verbose TIGER fields for the combined view."""
+    return {k: v for k, v in props.items()
+            if k not in _STRIP_PROPS and not _STRIP_RE.match(k)}
+
+
 @router.get("/maps")
 def census_map_list(request: Request, store=Depends(get_store)):
     """List handler_output_meta entries that have GeoJSON geometry."""
@@ -72,6 +135,68 @@ def census_map_list(request: Request, store=Depends(get_store)):
         "census/maps.html",
         {"datasets": metas, "active_tab": "census_maps"},
     )
+
+
+@router.get("/maps/_all")
+def census_map_all(
+    request: Request,
+    store=Depends(get_store),
+    prefix: str = "census.joined.",
+):
+    """Render a combined national map of all joined county datasets."""
+    db = store._db
+    dataset_keys = sorted(
+        k for k in db.handler_output.distinct("dataset_key")
+        if k.startswith(prefix)
+    )
+    # Count features and detect numeric fields from first non-empty dataset.
+    total_features = 0
+    numeric_fields: list[str] = []
+    for dk in dataset_keys:
+        c = db.handler_output.count_documents({"dataset_key": dk, "geometry": {"$exists": True}})
+        total_features += c
+        if c > 0 and not numeric_fields:
+            sample_doc = db.handler_output.find_one({"dataset_key": dk, "geometry": {"$exists": True}})
+            if sample_doc:
+                numeric_fields = _filter_numeric_fields(
+                    _slim_properties(sample_doc.get("properties", {}))
+                )
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "census/map_all.html",
+        {
+            "dataset_count": len(dataset_keys),
+            "feature_count": total_features,
+            "numeric_fields": numeric_fields,
+            "active_tab": "census_maps",
+        },
+    )
+
+
+@router.get("/api/maps/_all")
+def census_map_all_api(
+    store=Depends(get_store),
+    prefix: str = "census.joined.",
+):
+    """Return simplified GeoJSON for all joined datasets combined."""
+    db = store._db
+    dataset_keys = sorted(
+        k for k in db.handler_output.distinct("dataset_key")
+        if k.startswith(prefix)
+    )
+
+    features: list[dict[str, Any]] = []
+    for dk in dataset_keys:
+        docs = db.handler_output.find({"dataset_key": dk, "geometry": {"$exists": True}})
+        state_name = _region_label(dk)
+        for doc in docs:
+            geom = _simplify_geometry(doc["geometry"])
+            props = _slim_properties(doc.get("properties", {}))
+            props["_state"] = state_name
+            features.append({"type": "Feature", "geometry": geom, "properties": props})
+
+    return JSONResponse({"type": "FeatureCollection", "features": features})
 
 
 @router.get("/maps/{dataset_key:path}")
@@ -94,31 +219,9 @@ def census_map_view(
     geojson: dict[str, Any] = {"type": "FeatureCollection", "features": features}
 
     # Identify numeric property fields for the choropleth dropdown.
-    # Preferred fields are shown first (friendly derived names), then any
-    # remaining numeric fields that don't match raw ACS codes or TIGER IDs.
-    _PREFERRED = [
-        "population", "population_density", "median_income",
-        "housing_units", "total_households", "family_households", "nonfamily_households",
-        "pct_owner_occupied", "pct_renter_occupied",
-        "pct_no_vehicle", "pct_drive_alone", "pct_public_transit", "pct_walk", "pct_work_from_home",
-        "pct_under_18", "pct_18_34", "pct_35_64", "pct_65_plus",
-    ]
-    _SKIP_PREFIXES = ("B0", "B1", "B2", "B3")  # raw ACS variable codes
-    _SKIP_FIELDS = {"ALAND", "AWATER", "CBSAFP", "CSAFP", "METDIVFP", "STATEFP", "COUNTYFP"}
-
     numeric_fields: list[str] = []
     if features:
-        sample = features[0].get("properties", {})
-        all_numeric = {k for k, v in sample.items() if isinstance(v, (int, float))}
-        # Add preferred fields first (in order), then remaining non-skipped fields.
-        for key in _PREFERRED:
-            if key in all_numeric:
-                numeric_fields.append(key)
-                all_numeric.discard(key)
-        for key in sorted(all_numeric):
-            if key in _SKIP_FIELDS or any(key.startswith(p) for p in _SKIP_PREFIXES):
-                continue
-            numeric_fields.append(key)
+        numeric_fields = _filter_numeric_fields(features[0].get("properties", {}))
 
     geojson_str = json.dumps(geojson)
 
