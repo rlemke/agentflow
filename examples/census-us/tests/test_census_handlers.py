@@ -51,9 +51,10 @@ def _census_import(module_name: str):
 class TestDownloadHandlers:
     def test_dispatch_keys(self):
         mod = _census_import("downloads.download_handlers")
-        assert len(mod._DISPATCH) == 2
+        assert len(mod._DISPATCH) == 3
         assert "census.Operations.DownloadACS" in mod._DISPATCH
         assert "census.Operations.DownloadTIGER" in mod._DISPATCH
+        assert "census.Operations.DownloadACSDetailed" in mod._DISPATCH
 
     def test_handle_dispatches(self):
         mod = _census_import("downloads.download_handlers")
@@ -82,7 +83,25 @@ class TestDownloadHandlers:
         mod = _census_import("downloads.download_handlers")
         runner = MagicMock()
         mod.register_handlers(runner)
-        assert runner.register_handler.call_count == 2
+        assert runner.register_handler.call_count == 3
+
+    def test_handle_download_acs_detailed(self):
+        mod = _census_import("downloads.download_handlers")
+        mock_file = {
+            "url": "https://example.com/acs_detailed.csv",
+            "path": "/tmp/acs_detailed.csv",
+            "date": "2026-01-01T00:00:00+00:00",
+            "size": 2048,
+            "wasInCache": False,
+        }
+        with patch.object(mod, "download_acs", return_value=mock_file):
+            result = mod.handle({
+                "_facet_name": "census.Operations.DownloadACSDetailed",
+                "state_fips": "01",
+            })
+        assert isinstance(result, dict)
+        assert "file" in result
+        assert result["file"]["wasInCache"] is False
 
     def test_error_step_log_download_acs(self):
         mod = _census_import("downloads.download_handlers")
@@ -119,7 +138,7 @@ class TestDownloadHandlers:
 class TestACSHandlers:
     def test_dispatch_keys(self):
         mod = _census_import("acs.acs_handlers")
-        assert len(mod._DISPATCH) == 5
+        assert len(mod._DISPATCH) == 9
         for key in mod._DISPATCH:
             assert key.startswith("census.ACS.")
 
@@ -143,7 +162,7 @@ class TestACSHandlers:
         mod = _census_import("acs.acs_handlers")
         runner = MagicMock()
         mod.register_handlers(runner)
-        assert runner.register_handler.call_count == 5
+        assert runner.register_handler.call_count == 9
 
     def test_extract_population(self):
         mod = _census_import("acs.acs_handlers")
@@ -191,6 +210,69 @@ class TestACSHandlers:
             "state_fips": "01",
         })
         assert result["result"]["table_id"] == "B08301"
+
+    def test_extract_tenure(self):
+        mod = _census_import("acs.acs_handlers")
+        result = mod.handle({
+            "_facet_name": "census.ACS.ExtractTenure",
+            "file": {"path": ""},
+            "state_fips": "01",
+        })
+        assert result["result"]["table_id"] == "B25003"
+
+    def test_extract_households(self):
+        mod = _census_import("acs.acs_handlers")
+        result = mod.handle({
+            "_facet_name": "census.ACS.ExtractHouseholds",
+            "file": {"path": ""},
+            "state_fips": "01",
+        })
+        assert result["result"]["table_id"] == "B11001"
+
+    def test_extract_age(self):
+        mod = _census_import("acs.acs_handlers")
+        result = mod.handle({
+            "_facet_name": "census.ACS.ExtractAge",
+            "file": {"path": ""},
+            "state_fips": "01",
+        })
+        assert result["result"]["table_id"] == "B01001"
+
+    def test_extract_vehicles(self):
+        mod = _census_import("acs.acs_handlers")
+        result = mod.handle({
+            "_facet_name": "census.ACS.ExtractVehicles",
+            "file": {"path": ""},
+            "state_fips": "01",
+        })
+        assert result["result"]["table_id"] == "B25044"
+
+    def test_extract_multi_column_csv(self, tmp_path):
+        """ACS extractor handles multi-column tables correctly."""
+        mod = _census_import("acs.acs_extractor")
+        csv_file = tmp_path / "acs_tenure.csv"
+        csv_file.write_text(
+            "GEOID,NAME,B25003_001E,B25003_002E,B25003_003E\n"
+            "0500000US01001,Autauga County,22000,16000,6000\n"
+            "0500000US01003,Baldwin County,85000,65000,20000\n"
+        )
+        result = mod.extract_acs_table(
+            csv_path=str(csv_file),
+            table_id="B25003",
+            state_fips="01",
+        )
+        assert result.record_count == 2
+        assert result.table_id == "B25003"
+        # Verify output has all 3 columns
+        import csv
+        with open(result.output_path, newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        assert len(rows) == 2
+        assert "B25003_001E" in rows[0]
+        assert "B25003_002E" in rows[0]
+        assert "B25003_003E" in rows[0]
+        assert rows[0]["B25003_001E"] == "22000"
 
     def test_extract_from_csv(self, tmp_path):
         """ACS extractor reads CSV files produced by Census API."""
@@ -671,11 +753,11 @@ class TestInitRegistryHandlers:
         mod = _census_import("__init__")
         runner = MagicMock()
         mod.register_all_registry_handlers(runner)
-        # 2 downloads + 5 ACS + 4 TIGER + 2 summary + 8 ingestion = 21
-        assert runner.register_handler.call_count == 21
+        # 3 downloads + 9 ACS + 4 TIGER + 2 summary + 12 ingestion = 30
+        assert runner.register_handler.call_count == 30
 
     def test_register_all_handlers(self):
         mod = _census_import("__init__")
         poller = MagicMock()
         mod.register_all_handlers(poller)
-        assert poller.register.call_count == 21
+        assert poller.register.call_count == 30

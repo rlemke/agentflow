@@ -60,7 +60,7 @@
                       }
                     }
                   ],
-                  "id": "ebc8930d-aeef-4507-91f6-e21899632d73",
+                  "id": "e40962bf-bbcd-48e2-a3d0-01eeffe66201",
                   "location": {
                     "line": 10,
                     "column": 15,
@@ -68,12 +68,45 @@
                     "endColumn": 53
                   }
                 },
-                "id": "ab390262-fe34-4540-a155-75c6cdfebe7d",
+                "id": "58c5cbe9-faf2-4c45-8c56-28aa29782837",
                 "location": {
                   "line": 10,
                   "column": 9,
                   "endLine": 10,
                   "endColumn": 53
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "acs_detail",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "DownloadACSDetailed",
+                  "args": [
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "c3f324e5-26ae-4689-aee7-a7abd0cd5172",
+                  "location": {
+                    "line": 11,
+                    "column": 22,
+                    "endLine": 11,
+                    "endColumn": 68
+                  }
+                },
+                "id": "cfb318e3-4ed9-4ec8-afb4-5656e4420403",
+                "location": {
+                  "line": 11,
+                  "column": 9,
+                  "endLine": 11,
+                  "endColumn": 68
                 }
               },
               {
@@ -100,19 +133,19 @@
                       }
                     }
                   ],
-                  "id": "c3d0a415-3c48-4ee3-8788-42dbaff44cc0",
+                  "id": "aa2b1328-3daf-4ccd-a521-9da772e14c75",
                   "location": {
-                    "line": 11,
+                    "line": 12,
                     "column": 17,
-                    "endLine": 11,
+                    "endLine": 12,
                     "endColumn": 79
                   }
                 },
-                "id": "59818fe4-680b-411e-a284-55b0d5077188",
+                "id": "3c7e5053-2d59-465f-a10e-2054ba75e75f",
                 "location": {
-                  "line": 11,
+                  "line": 12,
                   "column": 9,
-                  "endLine": 11,
+                  "endLine": 12,
                   "endColumn": 79
                 }
               },
@@ -143,19 +176,19 @@
                       }
                     }
                   ],
-                  "id": "704a8be6-c7e1-4163-b4b6-9d9f955bdf42",
+                  "id": "e1663653-b719-4537-8067-f33416ed8817",
                   "location": {
-                    "line": 12,
+                    "line": 13,
                     "column": 15,
-                    "endLine": 12,
+                    "endLine": 13,
                     "endColumn": 76
                   }
                 },
-                "id": "8398e4a9-118b-4db5-8305-ea6709cc1111",
+                "id": "7ce15de9-a544-48ce-ba6b-6d892392f1b8",
                 "location": {
-                  "line": 12,
+                  "line": 13,
                   "column": 9,
-                  "endLine": 12,
+                  "endLine": 13,
                   "endColumn": 76
                 }
               },
@@ -186,19 +219,19 @@
                       }
                     }
                   ],
-                  "id": "108e734d-892e-472e-97a9-20348bb4cd18",
+                  "id": "256db154-8818-4042-a8ff-c6db2942e09b",
                   "location": {
-                    "line": 13,
+                    "line": 14,
                     "column": 18,
-                    "endLine": 13,
+                    "endLine": 14,
                     "endColumn": 75
                   }
                 },
-                "id": "fd938f7b-66e1-43cc-a899-52eb2fc424c0",
+                "id": "edb01762-19ae-4fdc-a075-7586fdba5628",
                 "location": {
-                  "line": 13,
+                  "line": 14,
                   "column": 9,
-                  "endLine": 13,
+                  "endLine": 14,
                   "endColumn": 75
                 }
               },
@@ -229,19 +262,19 @@
                       }
                     }
                   ],
-                  "id": "4d6e3335-8df2-4a25-b912-f9754adf8e19",
+                  "id": "018a2c93-629d-4e90-9677-388f2f80d9b5",
                   "location": {
-                    "line": 14,
+                    "line": 15,
                     "column": 19,
-                    "endLine": 14,
+                    "endLine": 15,
                     "endColumn": 77
                   }
                 },
-                "id": "31bb2f35-4f29-4b5c-b442-5395576cbaff",
+                "id": "fc203c83-9e7c-450c-9d58-8222da2b5d84",
                 "location": {
-                  "line": 14,
+                  "line": 15,
                   "column": 9,
-                  "endLine": 14,
+                  "endLine": 15,
                   "endColumn": 77
                 }
               },
@@ -272,19 +305,19 @@
                       }
                     }
                   ],
-                  "id": "19f74f89-d43b-4d46-a29a-5e52e222437c",
+                  "id": "818197c5-e243-4a13-a2f8-3780c60ac443",
                   "location": {
-                    "line": 15,
+                    "line": 16,
                     "column": 21,
-                    "endLine": 15,
+                    "endLine": 16,
                     "endColumn": 81
                   }
                 },
-                "id": "9bc426cb-9523-4d5a-a86b-886a8bf5c50d",
+                "id": "2b3b311f-fc7f-4462-901e-e1a4f90d43de",
                 "location": {
-                  "line": 15,
+                  "line": 16,
                   "column": 9,
-                  "endLine": 15,
+                  "endLine": 16,
                   "endColumn": 81
                 }
               },
@@ -315,20 +348,192 @@
                       }
                     }
                   ],
-                  "id": "903097b9-32b5-4d7e-a879-563f9978047b",
+                  "id": "c5f6fb05-3345-42ae-8520-f55ecdc5e7ad",
                   "location": {
-                    "line": 16,
+                    "line": 17,
                     "column": 21,
-                    "endLine": 16,
+                    "endLine": 17,
                     "endColumn": 81
                   }
                 },
-                "id": "472f6f16-ab89-4444-9b29-20336e336c29",
+                "id": "3d672815-0f5c-4676-b68a-51b142700f37",
                 "location": {
-                  "line": 16,
+                  "line": 17,
                   "column": 9,
-                  "endLine": 16,
+                  "endLine": 17,
                   "endColumn": 81
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "tenure",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractTenure",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "28daf6fa-e16a-4007-9a09-5fbf4e67e7f1",
+                  "location": {
+                    "line": 18,
+                    "column": 18,
+                    "endLine": 18,
+                    "endColumn": 75
+                  }
+                },
+                "id": "6d12735d-e1eb-48da-bef8-7cf5090c2fb2",
+                "location": {
+                  "line": 18,
+                  "column": 9,
+                  "endLine": 18,
+                  "endColumn": 75
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "households",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractHouseholds",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "74a9b426-0713-4e9a-b450-ea30720bea77",
+                  "location": {
+                    "line": 19,
+                    "column": 22,
+                    "endLine": 19,
+                    "endColumn": 83
+                  }
+                },
+                "id": "2a21c879-6c03-40a7-aaf0-bafd257ad95f",
+                "location": {
+                  "line": 19,
+                  "column": 9,
+                  "endLine": 19,
+                  "endColumn": 83
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "age",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractAge",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs_detail",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "90e7d9e0-db0f-42c1-9679-bd9619aa7e7a",
+                  "location": {
+                    "line": 20,
+                    "column": 15,
+                    "endLine": 20,
+                    "endColumn": 76
+                  }
+                },
+                "id": "5c3cf6e4-05d5-471d-b969-47b443dd443a",
+                "location": {
+                  "line": 20,
+                  "column": 9,
+                  "endLine": 20,
+                  "endColumn": 76
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "vehicles",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractVehicles",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "a93c963b-3f78-4ff1-bba1-056e9692166e",
+                  "location": {
+                    "line": 21,
+                    "column": 20,
+                    "endLine": 21,
+                    "endColumn": 79
+                  }
+                },
+                "id": "8aeadaaa-c68a-44fc-9c3c-428185240d42",
+                "location": {
+                  "line": 21,
+                  "column": 9,
+                  "endLine": 21,
+                  "endColumn": 79
                 }
               },
               {
@@ -358,19 +563,19 @@
                       }
                     }
                   ],
-                  "id": "a496ffec-0a00-4361-9527-a5d49bd23c2a",
+                  "id": "1110e29f-37a6-416c-8060-ab7ec6ba8414",
                   "location": {
-                    "line": 17,
+                    "line": 22,
                     "column": 20,
-                    "endLine": 17,
+                    "endLine": 22,
                     "endColumn": 81
                   }
                 },
-                "id": "c5b1bf9c-5af9-49c6-9f67-3c06cb2fb787",
+                "id": "fa7fb72c-05bc-4acf-8953-e34a1215a119",
                 "location": {
-                  "line": 17,
+                  "line": 22,
                   "column": 9,
-                  "endLine": 17,
+                  "endLine": 22,
                   "endColumn": 81
                 }
               },
@@ -404,19 +609,19 @@
                       }
                     }
                   ],
-                  "id": "67f5aa57-1c04-4a4e-9a99-391aea3caa72",
+                  "id": "8ec7b0df-2043-4248-bae7-4952832cf8c1",
                   "location": {
-                    "line": 18,
+                    "line": 23,
                     "column": 18,
-                    "endLine": 18,
+                    "endLine": 23,
                     "endColumn": 102
                   }
                 },
-                "id": "3bfda22b-32a3-49cf-84ca-77708cf197a5",
+                "id": "8804841a-5b30-40de-adf5-fcf919e4999a",
                 "location": {
-                  "line": 18,
+                  "line": 23,
                   "column": 9,
-                  "endLine": 18,
+                  "endLine": 23,
                   "endColumn": 102
                 }
               },
@@ -478,19 +683,19 @@
                       }
                     }
                   ],
-                  "id": "b93d7881-8fbf-41e3-89a8-a33e0c997c07",
+                  "id": "5ee18979-2a05-4882-be5b-4e15f18d0bdc",
                   "location": {
-                    "line": 19,
+                    "line": 24,
                     "column": 19,
-                    "endLine": 19,
+                    "endLine": 24,
                     "endColumn": 168
                   }
                 },
-                "id": "0d520241-be96-4f18-b2ff-efec61d55cf7",
+                "id": "58be13ae-59dc-4545-9681-80990c8625be",
                 "location": {
-                  "line": 19,
+                  "line": 24,
                   "column": 9,
-                  "endLine": 19,
+                  "endLine": 24,
                   "endColumn": 168
                 }
               }
@@ -512,35 +717,35 @@
                     }
                   }
                 ],
-                "id": "cdb19705-43e3-4454-98b0-17a7a3655155",
+                "id": "c5df0713-4552-4f00-bc4e-5431efbe0374",
                 "location": {
-                  "line": 20,
+                  "line": 25,
                   "column": 15,
-                  "endLine": 20,
+                  "endLine": 25,
                   "endColumn": 53
                 }
               },
-              "id": "a93d5a2c-544d-4cae-9065-f24878b9bb1c",
+              "id": "47154223-4e34-45d5-ad79-09df2550e9ac",
               "location": {
-                "line": 20,
+                "line": 25,
                 "column": 9,
-                "endLine": 20,
+                "endLine": 25,
                 "endColumn": 53
               }
             },
-            "id": "e5f77633-7d4f-4d32-a764-28c7ca3a6b32",
+            "id": "3b6d1d22-eca9-40d6-9018-f9e496def233",
             "location": {
               "line": 9,
               "column": 114,
-              "endLine": 23,
+              "endLine": 28,
               "endColumn": 1
             }
           },
-          "id": "f6fcb166-ba8c-4882-9ec7-6d9233b85e4a",
+          "id": "a28aed22-4774-4fb5-92d4-85f2c80f8139",
           "location": {
             "line": 9,
             "column": 5,
-            "endLine": 23,
+            "endLine": 28,
             "endColumn": 1
           }
         },
@@ -591,20 +796,53 @@
                       }
                     }
                   ],
-                  "id": "82a05fb4-4258-4f83-a4b6-dd9d5b8ff553",
+                  "id": "64f5b8b7-1987-4ed2-83dc-84cc421d1007",
                   "location": {
-                    "line": 24,
+                    "line": 29,
                     "column": 15,
-                    "endLine": 24,
+                    "endLine": 29,
                     "endColumn": 53
                   }
                 },
-                "id": "85af0f9c-8896-453b-9e8b-e92d5fbd8361",
+                "id": "668f5c0d-25c6-43c8-9320-5d6e97b7cf0f",
                 "location": {
-                  "line": 24,
+                  "line": 29,
                   "column": 9,
-                  "endLine": 24,
+                  "endLine": 29,
                   "endColumn": 53
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "acs_detail",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "DownloadACSDetailed",
+                  "args": [
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "350ece68-52f7-4941-8211-affd75fb6989",
+                  "location": {
+                    "line": 30,
+                    "column": 22,
+                    "endLine": 30,
+                    "endColumn": 68
+                  }
+                },
+                "id": "3cf74c8b-69f9-4cac-b02f-6d476dc0cf9d",
+                "location": {
+                  "line": 30,
+                  "column": 9,
+                  "endLine": 30,
+                  "endColumn": 68
                 }
               },
               {
@@ -631,19 +869,19 @@
                       }
                     }
                   ],
-                  "id": "5e28a367-6786-4302-be67-15ef9658cb55",
+                  "id": "72c7a426-fe84-4544-b1a9-f03fdb2881c1",
                   "location": {
-                    "line": 25,
+                    "line": 31,
                     "column": 17,
-                    "endLine": 25,
+                    "endLine": 31,
                     "endColumn": 79
                   }
                 },
-                "id": "ffa26848-3a56-4cb7-927b-922688325d33",
+                "id": "5c0e4046-d867-42b1-96e0-826225396993",
                 "location": {
-                  "line": 25,
+                  "line": 31,
                   "column": 9,
-                  "endLine": 25,
+                  "endLine": 31,
                   "endColumn": 79
                 }
               },
@@ -674,19 +912,19 @@
                       }
                     }
                   ],
-                  "id": "4688212e-f226-4664-b98b-169bb3ae3295",
+                  "id": "fe2ba746-a993-4324-9bb5-3ded3c9d68a1",
                   "location": {
-                    "line": 26,
+                    "line": 32,
                     "column": 15,
-                    "endLine": 26,
+                    "endLine": 32,
                     "endColumn": 76
                   }
                 },
-                "id": "04a95f3e-93fc-4111-a717-8b89421cc078",
+                "id": "10656280-1674-4ab7-b708-300af911afaf",
                 "location": {
-                  "line": 26,
+                  "line": 32,
                   "column": 9,
-                  "endLine": 26,
+                  "endLine": 32,
                   "endColumn": 76
                 }
               },
@@ -717,19 +955,19 @@
                       }
                     }
                   ],
-                  "id": "96a81852-48e4-494d-850e-6cd26f2bf55f",
+                  "id": "98120dd0-a333-4031-8257-ddb320604027",
                   "location": {
-                    "line": 27,
+                    "line": 33,
                     "column": 18,
-                    "endLine": 27,
+                    "endLine": 33,
                     "endColumn": 75
                   }
                 },
-                "id": "e99de8e3-21ae-4421-8dcf-79491c3efefd",
+                "id": "e8a1cbb0-6eee-431e-a627-9ccbb192183e",
                 "location": {
-                  "line": 27,
+                  "line": 33,
                   "column": 9,
-                  "endLine": 27,
+                  "endLine": 33,
                   "endColumn": 75
                 }
               },
@@ -760,19 +998,19 @@
                       }
                     }
                   ],
-                  "id": "63fe5617-0f59-493b-9f59-611afb0945be",
+                  "id": "064d11ab-2dda-40a6-8ddf-3f11e94120ab",
                   "location": {
-                    "line": 28,
+                    "line": 34,
                     "column": 19,
-                    "endLine": 28,
+                    "endLine": 34,
                     "endColumn": 77
                   }
                 },
-                "id": "43bccc7e-27d7-40c6-8867-9fbe4c986f16",
+                "id": "fecff31c-dd67-416c-bf73-8d65f691e6f6",
                 "location": {
-                  "line": 28,
+                  "line": 34,
                   "column": 9,
-                  "endLine": 28,
+                  "endLine": 34,
                   "endColumn": 77
                 }
               },
@@ -803,19 +1041,19 @@
                       }
                     }
                   ],
-                  "id": "67c411ae-b195-4ef8-8a96-da53e50cd770",
+                  "id": "24dd42e7-9c30-4ba2-941a-a15c202b9af5",
                   "location": {
-                    "line": 29,
+                    "line": 35,
                     "column": 21,
-                    "endLine": 29,
+                    "endLine": 35,
                     "endColumn": 81
                   }
                 },
-                "id": "21b67fab-4f45-4eec-8634-342733259597",
+                "id": "e1988d83-0c52-4177-93fe-212586577e27",
                 "location": {
-                  "line": 29,
+                  "line": 35,
                   "column": 9,
-                  "endLine": 29,
+                  "endLine": 35,
                   "endColumn": 81
                 }
               },
@@ -846,20 +1084,192 @@
                       }
                     }
                   ],
-                  "id": "e224f254-c32d-4683-9033-667ec7c2c9e7",
+                  "id": "b1fe0572-34d6-46ee-9c91-8468f6f90833",
                   "location": {
-                    "line": 30,
+                    "line": 36,
                     "column": 21,
-                    "endLine": 30,
+                    "endLine": 36,
                     "endColumn": 81
                   }
                 },
-                "id": "2cacb1ed-b9e3-4c5f-947e-12d4b1cf7728",
+                "id": "5289bc01-49e3-4274-8151-190a4e03dfd1",
                 "location": {
-                  "line": 30,
+                  "line": 36,
                   "column": 9,
-                  "endLine": 30,
+                  "endLine": 36,
                   "endColumn": 81
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "tenure",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractTenure",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "a6b0338a-b07f-4bb1-b82b-02384cd786d3",
+                  "location": {
+                    "line": 37,
+                    "column": 18,
+                    "endLine": 37,
+                    "endColumn": 75
+                  }
+                },
+                "id": "ae83f9dc-01f8-46a2-8124-fb03b8ad9b6a",
+                "location": {
+                  "line": 37,
+                  "column": 9,
+                  "endLine": 37,
+                  "endColumn": 75
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "households",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractHouseholds",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "1bc93c63-7b81-46ca-94ef-fee383164ace",
+                  "location": {
+                    "line": 38,
+                    "column": 22,
+                    "endLine": 38,
+                    "endColumn": 83
+                  }
+                },
+                "id": "7ff73fd7-aee4-45a3-807a-05f3ef22b5ab",
+                "location": {
+                  "line": 38,
+                  "column": 9,
+                  "endLine": 38,
+                  "endColumn": 83
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "age",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractAge",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs_detail",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "c914be63-1f0b-4330-bd40-de6330e699bc",
+                  "location": {
+                    "line": 39,
+                    "column": 15,
+                    "endLine": 39,
+                    "endColumn": 76
+                  }
+                },
+                "id": "a36c6a80-d044-4543-a169-8a1fc20f703d",
+                "location": {
+                  "line": 39,
+                  "column": 9,
+                  "endLine": 39,
+                  "endColumn": 76
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "vehicles",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ExtractVehicles",
+                  "args": [
+                    {
+                      "name": "file",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "acs",
+                          "file"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "47351d1a-210f-4290-954c-ea289337b442",
+                  "location": {
+                    "line": 40,
+                    "column": 20,
+                    "endLine": 40,
+                    "endColumn": 79
+                  }
+                },
+                "id": "a172eacf-0f61-4b02-93ec-5e81fe103dcc",
+                "location": {
+                  "line": 40,
+                  "column": 9,
+                  "endLine": 40,
+                  "endColumn": 79
                 }
               },
               {
@@ -889,19 +1299,19 @@
                       }
                     }
                   ],
-                  "id": "0bbc56aa-8786-49cc-bfaf-d051834405b0",
+                  "id": "33afb252-8994-4960-a534-940a18f4da86",
                   "location": {
-                    "line": 31,
+                    "line": 41,
                     "column": 20,
-                    "endLine": 31,
+                    "endLine": 41,
                     "endColumn": 81
                   }
                 },
-                "id": "6a697c56-c1e4-4877-b57f-d4e93ea13b93",
+                "id": "cf62723f-c87e-44b2-b2ac-3893df97b336",
                 "location": {
-                  "line": 31,
+                  "line": 41,
                   "column": 9,
-                  "endLine": 31,
+                  "endLine": 41,
                   "endColumn": 81
                 }
               },
@@ -935,19 +1345,19 @@
                       }
                     }
                   ],
-                  "id": "5f9f7d6d-5fae-4bfc-84d7-ffe982e012cc",
+                  "id": "cff8358e-5be6-4e12-866e-941fd01864dd",
                   "location": {
-                    "line": 32,
+                    "line": 42,
                     "column": 18,
-                    "endLine": 32,
+                    "endLine": 42,
                     "endColumn": 102
                   }
                 },
-                "id": "d117c7b7-01c7-4778-a059-c7df27ffc232",
+                "id": "47c18a66-02e0-41a1-ae3d-760818cd2f21",
                 "location": {
-                  "line": 32,
+                  "line": 42,
                   "column": 9,
-                  "endLine": 32,
+                  "endLine": 42,
                   "endColumn": 102
                 }
               },
@@ -1009,19 +1419,19 @@
                       }
                     }
                   ],
-                  "id": "f80397bc-b03a-44f9-9b24-dc301f1c9492",
+                  "id": "c8e60e72-fff7-4c20-bc81-a6e3c202f784",
                   "location": {
-                    "line": 33,
+                    "line": 43,
                     "column": 19,
-                    "endLine": 33,
+                    "endLine": 43,
                     "endColumn": 168
                   }
                 },
-                "id": "823b34fb-b627-477b-87e5-f30634085477",
+                "id": "345857f5-4540-4a9c-b925-882021da2ab4",
                 "location": {
-                  "line": 33,
+                  "line": 43,
                   "column": 9,
-                  "endLine": 33,
+                  "endLine": 43,
                   "endColumn": 168
                 }
               },
@@ -1052,19 +1462,19 @@
                       }
                     }
                   ],
-                  "id": "4284a48b-467a-4720-a402-811e76ff0687",
+                  "id": "0491be59-d01f-414c-b384-3d4c2f42b254",
                   "location": {
-                    "line": 34,
+                    "line": 44,
                     "column": 18,
-                    "endLine": 34,
+                    "endLine": 44,
                     "endColumn": 80
                   }
                 },
-                "id": "961999d8-510c-42d8-8113-d5fb7f64c3b7",
+                "id": "41467ae4-0466-4611-9d44-b5f120a453ba",
                 "location": {
-                  "line": 34,
+                  "line": 44,
                   "column": 9,
-                  "endLine": 34,
+                  "endLine": 44,
                   "endColumn": 80
                 }
               },
@@ -1095,19 +1505,19 @@
                       }
                     }
                   ],
-                  "id": "83815e13-40f9-4bba-b129-ae93791761ba",
+                  "id": "105d1186-9d58-4743-906c-2bd180227c99",
                   "location": {
-                    "line": 35,
+                    "line": 45,
                     "column": 21,
-                    "endLine": 35,
+                    "endLine": 45,
                     "endColumn": 82
                   }
                 },
-                "id": "898d692c-4169-41a0-8467-0a02226b0ede",
+                "id": "a56571ff-5fc0-464e-bd8f-7937c58b62e0",
                 "location": {
-                  "line": 35,
+                  "line": 45,
                   "column": 9,
-                  "endLine": 35,
+                  "endLine": 45,
                   "endColumn": 82
                 }
               },
@@ -1138,19 +1548,19 @@
                       }
                     }
                   ],
-                  "id": "860b319f-48ec-43bf-8560-77869aa4c1a4",
+                  "id": "71ade4bc-47f7-4d37-bbbc-68599b3cda19",
                   "location": {
-                    "line": 36,
+                    "line": 46,
                     "column": 22,
-                    "endLine": 36,
+                    "endLine": 46,
                     "endColumn": 85
                   }
                 },
-                "id": "c0dc316f-4a84-4c9e-a58c-80756f55104d",
+                "id": "18fc1068-f882-405c-a5d2-9b81f694c608",
                 "location": {
-                  "line": 36,
+                  "line": 46,
                   "column": 9,
-                  "endLine": 36,
+                  "endLine": 46,
                   "endColumn": 85
                 }
               },
@@ -1181,19 +1591,19 @@
                       }
                     }
                   ],
-                  "id": "4aa3a058-7a1f-4ea2-b2ca-fdc40eb0d8b0",
+                  "id": "b182faeb-8f66-4fe7-97a7-427a67ce5126",
                   "location": {
-                    "line": 37,
+                    "line": 47,
                     "column": 24,
-                    "endLine": 37,
+                    "endLine": 47,
                     "endColumn": 91
                   }
                 },
-                "id": "89a403c7-7717-4c25-b148-03bcfe7ad73b",
+                "id": "837fa621-b9db-438c-a1cd-018a3f64582d",
                 "location": {
-                  "line": 37,
+                  "line": 47,
                   "column": 9,
-                  "endLine": 37,
+                  "endLine": 47,
                   "endColumn": 91
                 }
               },
@@ -1224,20 +1634,192 @@
                       }
                     }
                   ],
-                  "id": "4544faf9-260c-4e03-af3c-d9537354a2e1",
+                  "id": "4322aec6-eab5-48e7-98a8-b68cbacccd3c",
                   "location": {
-                    "line": 38,
+                    "line": 48,
                     "column": 24,
-                    "endLine": 38,
+                    "endLine": 48,
                     "endColumn": 91
                   }
                 },
-                "id": "c2d7a44e-b4e8-405b-b86e-c41b8b4fa8e1",
+                "id": "8746f7a6-6819-4ea7-8aa3-ed58ffd034c9",
                 "location": {
-                  "line": 38,
+                  "line": 48,
                   "column": 9,
-                  "endLine": 38,
+                  "endLine": 48,
                   "endColumn": 91
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "tenure_db",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "TenureToDB",
+                  "args": [
+                    {
+                      "name": "result",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "tenure",
+                          "result"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "c19a3277-ecd9-47cb-aeae-202ca2f29191",
+                  "location": {
+                    "line": 49,
+                    "column": 21,
+                    "endLine": 49,
+                    "endColumn": 82
+                  }
+                },
+                "id": "c17275dc-d4c9-43b0-a7c6-ec2ea90430b5",
+                "location": {
+                  "line": 49,
+                  "column": 9,
+                  "endLine": 49,
+                  "endColumn": 82
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "households_db",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "HouseholdsToDB",
+                  "args": [
+                    {
+                      "name": "result",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "households",
+                          "result"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "30bb15f8-1c87-4d41-86b8-9fa9c0d522ef",
+                  "location": {
+                    "line": 50,
+                    "column": 25,
+                    "endLine": 50,
+                    "endColumn": 94
+                  }
+                },
+                "id": "cc67d58c-b07e-4a4f-9957-2f3e3260d971",
+                "location": {
+                  "line": 50,
+                  "column": 9,
+                  "endLine": 50,
+                  "endColumn": 94
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "age_db",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "AgeToDB",
+                  "args": [
+                    {
+                      "name": "result",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "age",
+                          "result"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "fc78db56-7f63-4979-bedd-8989e2938e4d",
+                  "location": {
+                    "line": 51,
+                    "column": 18,
+                    "endLine": 51,
+                    "endColumn": 73
+                  }
+                },
+                "id": "eee5a82a-9188-4fba-9b69-0700ea309ea7",
+                "location": {
+                  "line": 51,
+                  "column": 9,
+                  "endLine": 51,
+                  "endColumn": 73
+                }
+              },
+              {
+                "type": "StepStmt",
+                "name": "vehicles_db",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "VehiclesToDB",
+                  "args": [
+                    {
+                      "name": "result",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "vehicles",
+                          "result"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state_fips",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state_fips"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "3a09879b-dedf-4b5d-a2fc-9e53ab0ab18e",
+                  "location": {
+                    "line": 52,
+                    "column": 23,
+                    "endLine": 52,
+                    "endColumn": 88
+                  }
+                },
+                "id": "d6c30ac2-9972-45c8-bf30-39f4f65d8380",
+                "location": {
+                  "line": 52,
+                  "column": 9,
+                  "endLine": 52,
+                  "endColumn": 88
                 }
               },
               {
@@ -1267,19 +1849,19 @@
                       }
                     }
                   ],
-                  "id": "76eb7ba4-93b5-41f7-b093-1c80e878758f",
+                  "id": "287b8ddc-df97-4fe0-83ed-0c066dda69cb",
                   "location": {
-                    "line": 39,
+                    "line": 53,
                     "column": 23,
-                    "endLine": 39,
+                    "endLine": 53,
                     "endColumn": 88
                   }
                 },
-                "id": "ca969770-bf03-40ce-81a7-1a6cc262fe1c",
+                "id": "db35257c-c4dd-4438-a2c9-30ca7f305436",
                 "location": {
-                  "line": 39,
+                  "line": 53,
                   "column": 9,
-                  "endLine": 39,
+                  "endLine": 53,
                   "endColumn": 88
                 }
               },
@@ -1310,19 +1892,19 @@
                       }
                     }
                   ],
-                  "id": "443cd643-51b1-4d26-9cc7-bb9adde0e5b4",
+                  "id": "1485e65e-861b-4cc7-8770-6c8da3f7b64e",
                   "location": {
-                    "line": 40,
+                    "line": 54,
                     "column": 21,
-                    "endLine": 40,
+                    "endLine": 54,
                     "endColumn": 82
                   }
                 },
-                "id": "bb3fd40a-96ca-40e9-a221-e11d3e0326b5",
+                "id": "962247ed-51f9-4c7e-bf9b-947b5678922d",
                 "location": {
-                  "line": 40,
+                  "line": 54,
                   "column": 9,
-                  "endLine": 40,
+                  "endLine": 54,
                   "endColumn": 82
                 }
               },
@@ -1353,19 +1935,19 @@
                       }
                     }
                   ],
-                  "id": "b277ede4-c95b-4b98-a8bb-a1601c5dbd0b",
+                  "id": "86c8016d-6741-404c-b298-9632c34b7a47",
                   "location": {
-                    "line": 41,
+                    "line": 55,
                     "column": 22,
-                    "endLine": 41,
+                    "endLine": 55,
                     "endColumn": 85
                   }
                 },
-                "id": "d9e62a60-dc35-412a-92d1-a12d81b6f4e5",
+                "id": "875c17d4-36c8-494e-9465-faff8a1389e4",
                 "location": {
-                  "line": 41,
+                  "line": 55,
                   "column": 9,
-                  "endLine": 41,
+                  "endLine": 55,
                   "endColumn": 85
                 }
               }
@@ -1387,35 +1969,35 @@
                     }
                   }
                 ],
-                "id": "17649e66-04d7-4586-8eb9-2e842e1e1893",
+                "id": "eca342a8-613b-4403-a604-b22025bd1457",
                 "location": {
-                  "line": 42,
+                  "line": 56,
                   "column": 15,
-                  "endLine": 42,
+                  "endLine": 56,
                   "endColumn": 59
                 }
               },
-              "id": "7857330e-8297-4fdb-a495-b91d802e2a9c",
+              "id": "27b745fa-1b3d-4e71-9630-e9182acd4e12",
               "location": {
-                "line": 42,
+                "line": 56,
                 "column": 9,
-                "endLine": 42,
+                "endLine": 56,
                 "endColumn": 59
               }
             },
-            "id": "9e361359-ac91-49f0-ab7f-27d5d47d4425",
+            "id": "26ef25c5-3a50-47d7-9936-c907bd3dfc9d",
             "location": {
-              "line": 23,
+              "line": 28,
               "column": 120,
-              "endLine": 45,
+              "endLine": 59,
               "endColumn": 1
             }
           },
-          "id": "372d27eb-ab38-4a67-9e13-027523be8fb2",
+          "id": "7b467570-3d6a-4039-b3ca-78fdf2afe170",
           "location": {
-            "line": 23,
+            "line": 28,
             "column": 5,
-            "endLine": 45,
+            "endLine": 59,
             "endColumn": 1
           }
         },
@@ -1453,19 +2035,19 @@
                       }
                     }
                   ],
-                  "id": "885811d6-e98e-4b8d-ae92-2a83a0272c59",
+                  "id": "5bf51deb-2606-4805-a449-1d861411f9e9",
                   "location": {
-                    "line": 46,
+                    "line": 60,
                     "column": 19,
-                    "endLine": 46,
+                    "endLine": 60,
                     "endColumn": 74
                   }
                 },
-                "id": "9045860b-0212-44d8-ad31-855fdb14ee53",
+                "id": "65e11c2f-c2ce-467b-b3b5-6bd0325af475",
                 "location": {
-                  "line": 46,
+                  "line": 60,
                   "column": 9,
-                  "endLine": 46,
+                  "endLine": 60,
                   "endColumn": 74
                 }
               },
@@ -1491,19 +2073,19 @@
                       }
                     }
                   ],
-                  "id": "86be0bdc-d622-4c27-8c61-a2076e6f28e1",
+                  "id": "a7147d9d-a981-4735-9995-63094cf49103",
                   "location": {
-                    "line": 47,
+                    "line": 61,
                     "column": 18,
-                    "endLine": 47,
+                    "endLine": 61,
                     "endColumn": 72
                   }
                 },
-                "id": "b7f5c436-915e-4fa6-844b-47f630c32ee9",
+                "id": "9a5e8097-cc8f-47ee-b862-22bdac8b74bf",
                 "location": {
-                  "line": 47,
+                  "line": 61,
                   "column": 9,
-                  "endLine": 47,
+                  "endLine": 61,
                   "endColumn": 72
                 }
               },
@@ -1529,19 +2111,19 @@
                       }
                     }
                   ],
-                  "id": "ae9b84b3-4714-48cf-9cf6-e6ccbf0fb166",
+                  "id": "49887286-304c-4020-928c-b1733490ba23",
                   "location": {
-                    "line": 48,
+                    "line": 62,
                     "column": 19,
-                    "endLine": 48,
+                    "endLine": 62,
                     "endColumn": 74
                   }
                 },
-                "id": "5276ed88-dddc-4c2f-9930-faa2e50da1b7",
+                "id": "7642aac9-1e69-4478-90f0-f8bfce65531b",
                 "location": {
-                  "line": 48,
+                  "line": 62,
                   "column": 9,
-                  "endLine": 48,
+                  "endLine": 62,
                   "endColumn": 74
                 }
               }
@@ -1560,82 +2142,451 @@
                     }
                   }
                 ],
-                "id": "9a29e476-7d42-4dec-96ef-356e23b4af02",
+                "id": "d44bff9e-92af-47fd-9dd0-68b62330ddb7",
                 "location": {
-                  "line": 49,
+                  "line": 63,
                   "column": 15,
-                  "endLine": 49,
+                  "endLine": 63,
                   "endColumn": 53
                 }
               },
-              "id": "de33c4a5-a01a-40c6-83b5-238831b945cc",
+              "id": "b45414b9-2c88-4dd8-b8e5-452a501a45ec",
               "location": {
-                "line": 49,
+                "line": 63,
                 "column": 9,
-                "endLine": 49,
+                "endLine": 63,
                 "endColumn": 53
               }
             },
-            "id": "006195f1-43df-45d2-a3e6-00dc0c374cdb",
+            "id": "070571c6-d356-4912-af86-0fde523cf93d",
             "location": {
-              "line": 45,
+              "line": 59,
               "column": 61,
-              "endLine": 51,
+              "endLine": 65,
               "endColumn": 1
             }
           },
-          "id": "4fb0d3f6-12ad-47ae-9c58-f8aa58009b1d",
+          "id": "90f01247-0de6-4566-8208-a70a2fb20c08",
           "location": {
-            "line": 45,
+            "line": 59,
             "column": 5,
-            "endLine": 51,
+            "endLine": 65,
             "endColumn": 1
           }
         }
       ],
-      "id": "042d70be-a7ca-43c9-8ec4-e6e6bf2184a4",
+      "id": "5fe66d5a-4ea4-426a-9161-a22409daa4b7",
       "location": {
         "line": 1,
         "column": 1,
-        "endLine": 52,
+        "endLine": 66,
         "endColumn": 1
       }
     },
     {
       "type": "Namespace",
-      "name": "census.ACS",
+      "name": "census.Ingestion",
       "uses": [
         "census.types"
       ],
       "declarations": [
         {
           "type": "EventFacetDecl",
-          "name": "ExtractPopulation",
+          "name": "PopulationToDB",
           "params": [
             {
-              "name": "file",
-              "type": "CensusFile"
+              "name": "result",
+              "type": "ACSResult"
             },
             {
               "name": "state_fips",
               "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "75277939-772b-4622-9926-57b5fb4839a1",
+          "location": {
+            "line": 11,
+            "column": 5,
+            "endLine": 13,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "IncomeToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
             },
             {
-              "name": "geo_level",
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "75407296-d7ec-4ffd-9a9d-0d8a8baacf10",
+          "location": {
+            "line": 13,
+            "column": 5,
+            "endLine": 15,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "HousingToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "1889f331-2ac5-40d3-bc5c-2c5bd1186101",
+          "location": {
+            "line": 15,
+            "column": 5,
+            "endLine": 17,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "EducationToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "28e5b8e4-0c92-4791-81dd-c2b476e0cf95",
+          "location": {
+            "line": 17,
+            "column": 5,
+            "endLine": 19,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "CommutingToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "5680d4ca-bc20-4d98-9714-ecf006688442",
+          "location": {
+            "line": 19,
+            "column": 5,
+            "endLine": 21,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "TenureToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "253de2a9-4cfa-4f5d-81ad-4808d0e82b9d",
+          "location": {
+            "line": 21,
+            "column": 5,
+            "endLine": 23,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "HouseholdsToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "b40fdde7-e513-47f1-8f37-10c4b3c9c153",
+          "location": {
+            "line": 23,
+            "column": 5,
+            "endLine": 25,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "AgeToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "7653d551-a58a-428c-8945-d45c8a8b05bd",
+          "location": {
+            "line": 25,
+            "column": 5,
+            "endLine": 27,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "VehiclesToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "d93854f7-0bab-4731-9806-e03c6824f0e6",
+          "location": {
+            "line": 27,
+            "column": 5,
+            "endLine": 29,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "CountiesToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "TIGERResult"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "b1034335-85f8-48ad-b932-d00f991de9f9",
+          "location": {
+            "line": 29,
+            "column": 5,
+            "endLine": 31,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "JoinedToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "CensusSummary"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "e3990f4c-2782-480a-a91f-6afc88a777df",
+          "location": {
+            "line": 31,
+            "column": 5,
+            "endLine": 33,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "SummaryToDB",
+          "params": [
+            {
+              "name": "result",
+              "type": "CensusSummary"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "ingestion",
+              "type": "IngestionResult"
+            }
+          ],
+          "id": "e0b03b29-461b-4053-a4f5-6ce6565846dd",
+          "location": {
+            "line": 33,
+            "column": 5,
+            "endLine": 34,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "IngestionResult",
+          "fields": [
+            {
+              "name": "dataset_key",
+              "type": "String"
+            },
+            {
+              "name": "record_count",
+              "type": "Long"
+            },
+            {
+              "name": "data_type",
+              "type": "String"
+            },
+            {
+              "name": "imported_at",
+              "type": "String"
+            }
+          ],
+          "id": "0f4f0c83-9254-4be2-92f8-3147f64d676c",
+          "location": {
+            "line": 4,
+            "column": 5,
+            "endLine": 11,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "b8095b81-82bd-44db-838c-a77132e92775",
+      "location": {
+        "line": 1,
+        "column": 1,
+        "endLine": 35,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "census.Summary",
+      "uses": [
+        "census.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "JoinGeo",
+          "params": [
+            {
+              "name": "acs_path",
+              "type": "String"
+            },
+            {
+              "name": "tiger_path",
+              "type": "String"
+            },
+            {
+              "name": "join_field",
               "type": "String",
               "default": {
                 "type": "String",
-                "value": "county"
+                "value": "GEOID"
               }
             }
           ],
           "returns": [
             {
               "name": "result",
-              "type": "ACSResult"
+              "type": "CensusSummary"
             }
           ],
-          "id": "f76885ca-5d25-4426-ba28-63e3abc29721",
+          "id": "f888b1e3-f4df-4e7a-a343-9a7c4964bfd5",
           "location": {
             "line": 4,
             "column": 5,
@@ -1645,150 +2596,49 @@
         },
         {
           "type": "EventFacetDecl",
-          "name": "ExtractIncome",
+          "name": "SummarizeState",
           "params": [
             {
-              "name": "file",
-              "type": "CensusFile"
+              "name": "population",
+              "type": "ACSResult"
             },
             {
-              "name": "state_fips",
-              "type": "String"
+              "name": "income",
+              "type": "ACSResult"
             },
             {
-              "name": "geo_level",
-              "type": "String",
-              "default": {
-                "type": "String",
-                "value": "county"
-              }
+              "name": "housing",
+              "type": "ACSResult"
+            },
+            {
+              "name": "education",
+              "type": "ACSResult"
+            },
+            {
+              "name": "commuting",
+              "type": "ACSResult"
             }
           ],
           "returns": [
             {
               "name": "result",
-              "type": "ACSResult"
+              "type": "CensusSummary"
             }
           ],
-          "id": "c277c6f7-b8a0-4472-9220-b8332f658e78",
+          "id": "4826bddb-0247-4c2a-8693-4e96a013a19f",
           "location": {
             "line": 6,
             "column": 5,
-            "endLine": 8,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "ExtractHousing",
-          "params": [
-            {
-              "name": "file",
-              "type": "CensusFile"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            },
-            {
-              "name": "geo_level",
-              "type": "String",
-              "default": {
-                "type": "String",
-                "value": "county"
-              }
-            }
-          ],
-          "returns": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            }
-          ],
-          "id": "476802f1-35e0-4d98-8bf6-2e5de0e383db",
-          "location": {
-            "line": 8,
-            "column": 5,
-            "endLine": 10,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "ExtractEducation",
-          "params": [
-            {
-              "name": "file",
-              "type": "CensusFile"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            },
-            {
-              "name": "geo_level",
-              "type": "String",
-              "default": {
-                "type": "String",
-                "value": "county"
-              }
-            }
-          ],
-          "returns": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            }
-          ],
-          "id": "b8f869c8-d689-4990-a548-3198ecfb91c8",
-          "location": {
-            "line": 10,
-            "column": 5,
-            "endLine": 12,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "ExtractCommuting",
-          "params": [
-            {
-              "name": "file",
-              "type": "CensusFile"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            },
-            {
-              "name": "geo_level",
-              "type": "String",
-              "default": {
-                "type": "String",
-                "value": "county"
-              }
-            }
-          ],
-          "returns": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            }
-          ],
-          "id": "906a12c2-4eba-492f-9818-bf09c4ea9322",
-          "location": {
-            "line": 12,
-            "column": 5,
-            "endLine": 13,
+            "endLine": 7,
             "endColumn": 1
           }
         }
       ],
-      "id": "b188595c-5774-4197-8a17-f6696fe4e82e",
+      "id": "31c4e257-a671-4042-b55d-87295df5c0ba",
       "location": {
         "line": 1,
         "column": 1,
-        "endLine": 14,
+        "endLine": 8,
         "endColumn": 1
       }
     },
@@ -1821,7 +2671,7 @@
               "type": "Boolean"
             }
           ],
-          "id": "3e392a89-3b00-48da-a828-6ecfafff2de2",
+          "id": "e6770c82-ef26-4e84-9905-602544dbdca8",
           "location": {
             "line": 2,
             "column": 5,
@@ -1858,7 +2708,7 @@
               "type": "String"
             }
           ],
-          "id": "f9e92b40-a82f-4a7f-a853-ebedb09af764",
+          "id": "c1e2f133-13f1-43c2-b023-86c86916ab6e",
           "location": {
             "line": 6,
             "column": 5,
@@ -1895,7 +2745,7 @@
               "type": "String"
             }
           ],
-          "id": "16668151-92e3-47ea-a8cf-49f9c6656428",
+          "id": "db4d062c-0583-42a2-a875-2ddde2aa4947",
           "location": {
             "line": 10,
             "column": 5,
@@ -1928,7 +2778,7 @@
               "type": "Long"
             }
           ],
-          "id": "e145b659-6ac4-493e-80b1-fdec40f2ffcc",
+          "id": "259e8c5f-ea9a-4a17-b6f1-94496dde40a7",
           "location": {
             "line": 15,
             "column": 5,
@@ -1937,7 +2787,7 @@
           }
         }
       ],
-      "id": "575817d6-77a9-4c11-a9a5-e6ea15c281f3",
+      "id": "503ea737-46c9-4cc5-bb99-6f7a7687b4b8",
       "location": {
         "line": 1,
         "column": 1,
@@ -1983,7 +2833,7 @@
               "type": "CensusFile"
             }
           ],
-          "id": "13edfcde-b420-4642-abb3-b7eb3a0bf5d6",
+          "id": "6156eb27-5331-41c3-85c5-7e1e2c85664a",
           "location": {
             "line": 24,
             "column": 5,
@@ -2022,319 +2872,81 @@
               "type": "CensusFile"
             }
           ],
-          "id": "a6c19adb-1ae3-4890-8101-83381cd7e463",
+          "id": "e6c91a35-c398-4d3a-b0e1-d9029527730b",
           "location": {
             "line": 26,
             "column": 5,
-            "endLine": 27,
+            "endLine": 28,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "DownloadACSDetailed",
+          "params": [
+            {
+              "name": "state_fips",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            }
+          ],
+          "id": "85f03390-5905-4916-a5da-f0058c88b774",
+          "location": {
+            "line": 28,
+            "column": 5,
+            "endLine": 29,
             "endColumn": 1
           }
         }
       ],
-      "id": "f1dc0051-35b5-4ea4-abe3-1e0900f4b1d7",
+      "id": "511a4f01-4fd4-4c68-94bf-80ee9ef67325",
       "location": {
         "line": 21,
         "column": 1,
-        "endLine": 28,
+        "endLine": 30,
         "endColumn": 1
       }
     },
     {
       "type": "Namespace",
-      "name": "census.Ingestion",
+      "name": "census.ACS",
       "uses": [
         "census.types"
       ],
       "declarations": [
         {
           "type": "EventFacetDecl",
-          "name": "PopulationToDB",
+          "name": "ExtractPopulation",
           "params": [
             {
-              "name": "result",
-              "type": "ACSResult"
+              "name": "file",
+              "type": "CensusFile"
             },
             {
               "name": "state_fips",
               "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "faa10443-b43f-4873-a139-75f1ee736ff7",
-          "location": {
-            "line": 11,
-            "column": 5,
-            "endLine": 13,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "IncomeToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "ACSResult"
             },
             {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "61ec3095-c31b-4590-b307-8c22f5b0cd7d",
-          "location": {
-            "line": 13,
-            "column": 5,
-            "endLine": 15,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "HousingToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "05e9acda-f154-4cf9-b4b9-e5cda337f3f9",
-          "location": {
-            "line": 15,
-            "column": 5,
-            "endLine": 17,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "EducationToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "89e5d048-32cb-45a9-bd0f-740df5cf9c5f",
-          "location": {
-            "line": 17,
-            "column": 5,
-            "endLine": 19,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "CommutingToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "ACSResult"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "f2d0c70f-ff0f-41f9-bf79-22d43afb6064",
-          "location": {
-            "line": 19,
-            "column": 5,
-            "endLine": 21,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "CountiesToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "TIGERResult"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "579b323e-44fb-46db-9102-8cebae0377e2",
-          "location": {
-            "line": 21,
-            "column": 5,
-            "endLine": 23,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "JoinedToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "CensusSummary"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "2696b513-733f-4a7b-9703-6c9cba6963dc",
-          "location": {
-            "line": 23,
-            "column": 5,
-            "endLine": 25,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "EventFacetDecl",
-          "name": "SummaryToDB",
-          "params": [
-            {
-              "name": "result",
-              "type": "CensusSummary"
-            },
-            {
-              "name": "state_fips",
-              "type": "String"
-            }
-          ],
-          "returns": [
-            {
-              "name": "ingestion",
-              "type": "IngestionResult"
-            }
-          ],
-          "id": "f40e2843-3a81-4d12-8f3c-dc86d56a84c2",
-          "location": {
-            "line": 25,
-            "column": 5,
-            "endLine": 26,
-            "endColumn": 1
-          }
-        },
-        {
-          "type": "SchemaDecl",
-          "name": "IngestionResult",
-          "fields": [
-            {
-              "name": "dataset_key",
-              "type": "String"
-            },
-            {
-              "name": "record_count",
-              "type": "Long"
-            },
-            {
-              "name": "data_type",
-              "type": "String"
-            },
-            {
-              "name": "imported_at",
-              "type": "String"
-            }
-          ],
-          "id": "d6b4f66b-7895-4105-ad0f-8cd31dfe36e8",
-          "location": {
-            "line": 4,
-            "column": 5,
-            "endLine": 11,
-            "endColumn": 1
-          }
-        }
-      ],
-      "id": "18b41c50-f6c6-4784-8679-7b155200e1a9",
-      "location": {
-        "line": 1,
-        "column": 1,
-        "endLine": 27,
-        "endColumn": 1
-      }
-    },
-    {
-      "type": "Namespace",
-      "name": "census.Summary",
-      "uses": [
-        "census.types"
-      ],
-      "declarations": [
-        {
-          "type": "EventFacetDecl",
-          "name": "JoinGeo",
-          "params": [
-            {
-              "name": "acs_path",
-              "type": "String"
-            },
-            {
-              "name": "tiger_path",
-              "type": "String"
-            },
-            {
-              "name": "join_field",
+              "name": "geo_level",
               "type": "String",
               "default": {
                 "type": "String",
-                "value": "GEOID"
+                "value": "county"
               }
             }
           ],
           "returns": [
             {
               "name": "result",
-              "type": "CensusSummary"
+              "type": "ACSResult"
             }
           ],
-          "id": "15cd3e31-9573-43ff-b68b-31572a9bcb89",
+          "id": "95fbe4b9-3019-4b28-8551-8adc0c402ba9",
           "location": {
             "line": 4,
             "column": 5,
@@ -2344,49 +2956,290 @@
         },
         {
           "type": "EventFacetDecl",
-          "name": "SummarizeState",
+          "name": "ExtractIncome",
           "params": [
             {
-              "name": "population",
-              "type": "ACSResult"
+              "name": "file",
+              "type": "CensusFile"
             },
             {
-              "name": "income",
-              "type": "ACSResult"
+              "name": "state_fips",
+              "type": "String"
             },
             {
-              "name": "housing",
-              "type": "ACSResult"
-            },
-            {
-              "name": "education",
-              "type": "ACSResult"
-            },
-            {
-              "name": "commuting",
-              "type": "ACSResult"
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
             }
           ],
           "returns": [
             {
               "name": "result",
-              "type": "CensusSummary"
+              "type": "ACSResult"
             }
           ],
-          "id": "15d53cb7-a7b2-4ddf-bd33-3c047ca37610",
+          "id": "16891a68-a831-4992-a5b0-95a915c22868",
           "location": {
             "line": 6,
             "column": 5,
-            "endLine": 7,
+            "endLine": 8,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractHousing",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "4d8ecb72-414d-48b3-8d77-92defb4682c7",
+          "location": {
+            "line": 8,
+            "column": 5,
+            "endLine": 10,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractEducation",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "59ce74db-7dc0-4d20-8301-b4afb056675e",
+          "location": {
+            "line": 10,
+            "column": 5,
+            "endLine": 12,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractCommuting",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "fe91a1d4-f499-41e7-93eb-890c0584a0f7",
+          "location": {
+            "line": 12,
+            "column": 5,
+            "endLine": 14,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractTenure",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "d3b55158-4a14-4a64-97c5-90acc8c1e885",
+          "location": {
+            "line": 14,
+            "column": 5,
+            "endLine": 16,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractHouseholds",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "1d98212e-36be-4068-8c8d-cca1b59e9d64",
+          "location": {
+            "line": 16,
+            "column": 5,
+            "endLine": 18,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractAge",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "78f6bf23-5a34-425f-b869-cf60feb24262",
+          "location": {
+            "line": 18,
+            "column": 5,
+            "endLine": 20,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ExtractVehicles",
+          "params": [
+            {
+              "name": "file",
+              "type": "CensusFile"
+            },
+            {
+              "name": "state_fips",
+              "type": "String"
+            },
+            {
+              "name": "geo_level",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "county"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "ACSResult"
+            }
+          ],
+          "id": "45d68cef-0beb-4a8d-ac03-f282c735a299",
+          "location": {
+            "line": 20,
+            "column": 5,
+            "endLine": 21,
             "endColumn": 1
           }
         }
       ],
-      "id": "20f63fe1-feab-4b60-9577-1958accb7e82",
+      "id": "38a8c68d-eb93-491f-ba6c-402cf2a50bb3",
       "location": {
         "line": 1,
         "column": 1,
-        "endLine": 8,
+        "endLine": 22,
         "endColumn": 1
       }
     },
@@ -2416,7 +3269,7 @@
               "type": "TIGERResult"
             }
           ],
-          "id": "75fd8e6b-0850-4098-bb02-baf5e1857d6e",
+          "id": "a1d9185c-288e-4c39-86c9-ea5d964abaa7",
           "location": {
             "line": 4,
             "column": 5,
@@ -2443,7 +3296,7 @@
               "type": "TIGERResult"
             }
           ],
-          "id": "c31256a4-3e81-4dc6-8843-881e97cce83b",
+          "id": "64157f39-7288-4e3b-84d4-bdecf59c0254",
           "location": {
             "line": 6,
             "column": 5,
@@ -2470,7 +3323,7 @@
               "type": "TIGERResult"
             }
           ],
-          "id": "372d0452-cc0c-43d7-b464-b0987ed6fd64",
+          "id": "36f97502-988a-4c7b-a721-50a34c3bdcef",
           "location": {
             "line": 8,
             "column": 5,
@@ -2497,7 +3350,7 @@
               "type": "TIGERResult"
             }
           ],
-          "id": "0fd696d9-20db-4de3-a8c2-65335dfc93bf",
+          "id": "c5240d7e-66d9-47ac-86eb-cd4136db1633",
           "location": {
             "line": 10,
             "column": 5,
@@ -2506,7 +3359,7 @@
           }
         }
       ],
-      "id": "750d5caa-de14-48ec-bbd6-5cfdb8a00643",
+      "id": "085f5409-efe9-4ac3-8335-05a6bc37a352",
       "location": {
         "line": 1,
         "column": 1,
@@ -2515,5 +3368,5 @@
       }
     }
   ],
-  "id": "93c3d603-5834-4862-a00c-06221a960237"
+  "id": "fdad29d0-d1b8-490d-97fe-d65ea32eb922"
 }

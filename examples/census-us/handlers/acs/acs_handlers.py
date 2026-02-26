@@ -18,6 +18,10 @@ _FACET_TABLE_MAP = {
     "ExtractHousing": "B25001",
     "ExtractEducation": "B15003",
     "ExtractCommuting": "B08301",
+    "ExtractTenure": "B25003",
+    "ExtractHouseholds": "B11001",
+    "ExtractAge": "B01001",
+    "ExtractVehicles": "B25044",
 }
 
 

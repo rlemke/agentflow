@@ -78,22 +78,52 @@ def _download_file(url: str, dest: str) -> int:
 def download_acs(year: str = "2023", period: str = "5-Year",
                  state_fips: str = "01",
                  columns: str = "B01003_001E,B19013_001E,B25001_001E,"
-                                "B15003_001E,B08301_001E") -> dict[str, Any]:
+                                "B15003_001E,B08301_001E,"
+                                "B25003_001E,B25003_002E,B25003_003E,"
+                                "B11001_001E,B11001_002E,B11001_003E,"
+                                "B11001_004E,B11001_005E,B11001_006E,"
+                                "B11001_007E,B11001_008E,B11001_009E,"
+                                "B25044_001E,B25044_002E,B25044_003E,"
+                                "B25044_004E,B25044_005E,B25044_006E,"
+                                "B25044_007E,B25044_008E,B25044_009E,"
+                                "B25044_010E,B25044_011E,B25044_012E,"
+                                "B25044_013E,B25044_014E,B25044_015E",
+                 tag: str = "default") -> dict[str, Any]:
     """Download ACS data for a state via the Census Bureau REST API.
 
     The API returns JSON: [[header...], [row1...], ...].
     We write a CSV with columns: GEOID, NAME, plus requested columns.
 
+    Args:
+        year: ACS survey year.
+        period: Survey period.
+        state_fips: Two-digit state FIPS code.
+        columns: Comma-separated list of ACS estimate columns.
+        tag: Cache filename tag for differentiating downloads.
+
     Returns a CensusFile dict with url, path, date, size, wasInCache.
     """
-    filename = f"acs_{year}_{state_fips}.csv"
+    filename = f"acs_{year}_{state_fips}_{tag}.csv"
     dest = os.path.join(_CACHE_DIR, "acs", year, filename)
     url = (f"{CENSUS_API_BASE}/{year}/acs/acs5"
            f"?get=NAME,{columns}&for=county:*&in=state:{state_fips}")
 
+    requested_cols = {c.strip() for c in columns.split(",")}
+
     lock = _get_lock(dest)
     with lock:
         was_cached = os.path.exists(dest)
+        if was_cached:
+            # Validate cache has all requested columns
+            try:
+                with open(dest, newline="") as f:
+                    header = next(csv.reader(f))
+                if not requested_cols.issubset(set(header)):
+                    logger.info("ACS cache stale (missing columns): %s", dest)
+                    was_cached = False
+            except (OSError, StopIteration):
+                was_cached = False
+
         if was_cached:
             size = os.path.getsize(dest)
             logger.info("ACS cache hit: %s (%d bytes)", dest, size)

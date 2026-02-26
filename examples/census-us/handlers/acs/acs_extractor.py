@@ -14,13 +14,41 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ACS table ID -> human-readable label and estimate column suffix
-ACS_TABLES: dict[str, dict[str, str]] = {
-    "B01003": {"label": "Total Population", "column": "B01003_001E"},
-    "B19013": {"label": "Median Household Income", "column": "B19013_001E"},
-    "B25001": {"label": "Housing Units", "column": "B25001_001E"},
-    "B15003": {"label": "Educational Attainment", "column": "B15003_001E"},
-    "B08301": {"label": "Means of Transportation", "column": "B08301_001E"},
+# ACS table ID -> human-readable label and estimate columns
+ACS_TABLES: dict[str, dict] = {
+    "B01003": {"label": "Total Population", "columns": ["B01003_001E"]},
+    "B19013": {"label": "Median Household Income", "columns": ["B19013_001E"]},
+    "B25001": {"label": "Housing Units", "columns": ["B25001_001E"]},
+    "B15003": {"label": "Educational Attainment", "columns": ["B15003_001E"]},
+    "B08301": {"label": "Means of Transportation", "columns": ["B08301_001E"]},
+    "B25003": {
+        "label": "Housing Tenure",
+        "columns": ["B25003_001E", "B25003_002E", "B25003_003E"],
+    },
+    "B11001": {
+        "label": "Household Type",
+        "columns": [
+            "B11001_001E", "B11001_002E", "B11001_003E",
+            "B11001_004E", "B11001_005E", "B11001_006E",
+            "B11001_007E", "B11001_008E", "B11001_009E",
+        ],
+    },
+    "B01001": {
+        "label": "Sex by Age",
+        "columns": [
+            f"B01001_{i:03d}E" for i in range(1, 50)
+        ],
+    },
+    "B25044": {
+        "label": "Vehicles Available",
+        "columns": [
+            "B25044_001E", "B25044_002E", "B25044_003E",
+            "B25044_004E", "B25044_005E", "B25044_006E",
+            "B25044_007E", "B25044_008E", "B25044_009E",
+            "B25044_010E", "B25044_011E", "B25044_012E",
+            "B25044_013E", "B25044_014E", "B25044_015E",
+        ],
+    },
 }
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
@@ -64,7 +92,7 @@ def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
         raise ValueError(f"Unknown ACS table: {table_id}. "
                          f"Supported: {list(ACS_TABLES.keys())}")
 
-    target_col = table_info["column"]
+    target_cols = table_info["columns"]
     output_dir = os.path.join(_OUTPUT_DIR, "acs", table_id.lower())
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_path = os.path.join(output_dir,
@@ -80,19 +108,18 @@ def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
                     geoid = row.get("GEOID", "")
                     if not geoid.startswith(f"0500000US{state_fips}"):
                         continue
-                    value = row.get(target_col, "")
-                    if value:
-                        records.append({
-                            "GEOID": geoid,
-                            target_col: value,
-                            "NAME": row.get("NAME", ""),
-                        })
+                    # Check that at least one target column has a value
+                    values = {c: row.get(c, "") for c in target_cols}
+                    if any(values.values()):
+                        record: dict[str, Any] = {"GEOID": geoid, "NAME": row.get("NAME", "")}
+                        record.update(values)
+                        records.append(record)
         except (OSError, csv.Error) as exc:
             logger.warning("Failed to read ACS CSV %s: %s", csv_path, exc)
 
     # Write output CSV
     with open(output_path, "w", newline="") as f:
-        fieldnames = ["GEOID", target_col, "NAME"]
+        fieldnames = ["GEOID", "NAME"] + target_cols
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(records)

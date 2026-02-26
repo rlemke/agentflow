@@ -69,10 +69,45 @@ def handle_download_tiger(params: dict[str, Any]) -> dict[str, Any]:
         raise
 
 
+def handle_download_acs_detailed(params: dict[str, Any]) -> dict[str, Any]:
+    """Download ACS detailed (B01001 Sex by Age) file for a state.
+
+    B01001 has 49 columns which exceeds the API limit when combined
+    with the standard download, so it uses a separate request.
+
+    Params:
+        state_fips: Two-digit FIPS code
+    """
+    state_fips = params["state_fips"]
+    step_log = params.get("_step_log")
+
+    # B01001 Sex by Age: 49 columns (001E through 049E)
+    columns = ",".join(f"B01001_{i:03d}E" for i in range(1, 50))
+
+    try:
+        result = download_acs(
+            state_fips=state_fips,
+            columns=columns,
+            tag="detailed",
+        )
+
+        source = "cache" if result["wasInCache"] else "download"
+        if step_log:
+            step_log(f"DownloadACSDetailed: state={state_fips} ({source})",
+                     level="success")
+
+        return {"file": result}
+    except Exception as exc:
+        if step_log:
+            step_log(f"DownloadACSDetailed: {exc}", level="error")
+        raise
+
+
 # RegistryRunner dispatch adapter
 _DISPATCH: dict[str, Any] = {
     f"{NAMESPACE}.DownloadACS": handle_download_acs,
     f"{NAMESPACE}.DownloadTIGER": handle_download_tiger,
+    f"{NAMESPACE}.DownloadACSDetailed": handle_download_acs_detailed,
 }
 
 

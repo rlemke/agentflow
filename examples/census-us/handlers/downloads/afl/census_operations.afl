@@ -24,4 +24,6 @@ namespace census.Operations {
     event facet DownloadACS(year: String = "2023", period: String = "5-Year", state_fips: String) => (file: CensusFile)
 
     event facet DownloadTIGER(year: String = "2024", geo_level: String = "COUNTY", state_fips: String) => (file: CensusFile)
+
+    event facet DownloadACSDetailed(state_fips: String) => (file: CensusFile)
 }
