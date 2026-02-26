@@ -43,12 +43,12 @@ array_type: "[" type "]"
 mixin_sig: "with" QNAME "(" [named_args] ")"
 
 // andThen blocks, prompt blocks, and script blocks
-facet_def_tail: _NL* "script" script_block andthen_clause*
+facet_def_tail: _NL* "script" script_block _NL* andthen_clause*
               | andthen_clause+
               | _NL* "prompt" prompt_block
 
 andthen_clause: "andThen" foreach_clause? block
-              | "andThen" _NL* "script" script_block  -> andthen_script
+              | "andThen" _NL* "script" script_block _NL*  -> andthen_script
 
 foreach_clause: "foreach" IDENT "in" reference
 

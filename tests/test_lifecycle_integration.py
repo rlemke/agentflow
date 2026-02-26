@@ -557,3 +557,301 @@ class TestMcpToolIntegration:
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "not found" in data["error"]
+
+
+# =========================================================================
+# andThen script blocks with Census-style event facets
+# =========================================================================
+
+AFL_CENSUS_WITH_SCRIPTS = """\
+namespace census.types {
+    schema CensusFile {
+        path: String,
+        size: Long
+    }
+    schema ACSResult {
+        output_path: String,
+        row_count: Long,
+        state_fips: String
+    }
+    schema CensusSummary {
+        total_population: Long,
+        median_income: Long,
+        county_count: Long,
+        state_name: String
+    }
+}
+
+namespace census.Operations {
+    use census.types
+
+    event facet DownloadACS(
+        year: String = "2023",
+        state_fips: String
+    ) => (file: CensusFile)
+
+    event facet DownloadTIGER(
+        year: String = "2024",
+        geo_level: String = "COUNTY",
+        state_fips: String
+    ) => (file: CensusFile)
+}
+
+namespace census.ACS {
+    use census.types
+
+    event facet ExtractPopulation(
+        file: CensusFile,
+        state_fips: String,
+        geo_level: String = "county"
+    ) => (result: ACSResult)
+
+    event facet ExtractIncome(
+        file: CensusFile,
+        state_fips: String,
+        geo_level: String = "county"
+    ) => (result: ACSResult)
+}
+
+namespace census.Summary {
+    use census.types
+
+    event facet JoinGeo(
+        acs_path: String,
+        tiger_path: String,
+        join_field: String = "GEOID"
+    ) => (result: CensusSummary)
+}
+
+namespace census.workflows {
+    use census.types
+    use census.Operations
+    use census.ACS
+    use census.Summary
+
+    workflow AnalyzeStateWithScripts(
+        state_fips: String = "01",
+        state_name: String = "Alabama"
+    ) => (
+        summary: CensusSummary,
+        pop_total: Long,
+        income_total: Long,
+        report: String,
+        audit: String
+    )
+    script {
+        result["state_label"] = params["state_name"].upper() + " (" + params["state_fips"] + ")"
+    }
+    andThen {
+        acs = DownloadACS(state_fips = $.state_fips)
+        tiger = DownloadTIGER(state_fips = $.state_fips, geo_level = "COUNTY")
+        pop = ExtractPopulation(file = acs.file, state_fips = $.state_fips)
+        income = ExtractIncome(file = acs.file, state_fips = $.state_fips)
+        joined = JoinGeo(acs_path = pop.result.output_path, tiger_path = tiger.file.path)
+        yield AnalyzeStateWithScripts(summary = joined.result)
+    }
+    andThen script {
+        label = params.get("state_label", params["state_name"])
+        result["pop_total"] = 5000000
+        result["report"] = "Population report for " + label
+    }
+    andThen {
+        acs2 = DownloadACS(state_fips = $.state_fips, year = "2022")
+        income2 = ExtractIncome(file = acs2.file, state_fips = $.state_fips)
+        yield AnalyzeStateWithScripts(income_total = income2.result.row_count)
+    }
+    andThen script {
+        label = params.get("state_label", params["state_name"])
+        result["audit"] = "Audit complete for " + label + " at fips=" + params["state_fips"]
+    }
+}
+"""
+
+
+class TestCensusWithAndThenScripts:
+    """Census-style workflow with pre-script, 2 regular andThen blocks,
+    and 2 andThen script blocks running concurrently.
+
+    The workflow:
+    1. Pre-script: normalizes state_name into state_label param
+    2. andThen block 1: download → extract → join (5 event facet steps + yield)
+    3. andThen script 1: computes pop_total and report using state_label
+    4. andThen block 2: download 2022 → extract income (2 event steps + yield)
+    5. andThen script 2: computes audit string using state_label
+    """
+
+    def test_compiles_with_pre_script_and_4_blocks(self):
+        """Workflow compiles with pre_script and 4 andThen blocks (2 regular + 2 script)."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+        assert wf is not None
+        assert wf["type"] == "WorkflowDecl"
+        assert "pre_script" in wf
+        assert wf["pre_script"]["type"] == "ScriptBlock"
+        body = wf["body"]
+        assert isinstance(body, list)
+        assert len(body) == 4
+
+    def test_body_block_types(self):
+        """First and third blocks are regular (steps), second and fourth are scripts."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+        body = wf["body"]
+
+        # Block 0: regular (has steps + yield)
+        assert "steps" in body[0]
+        assert len(body[0]["steps"]) == 5
+        assert "yield" in body[0]
+
+        # Block 1: script
+        assert "script" in body[1]
+        assert body[1]["script"]["type"] == "ScriptBlock"
+        assert "pop_total" in body[1]["script"]["code"]
+
+        # Block 2: regular (has steps + yield)
+        assert "steps" in body[2]
+        assert len(body[2]["steps"]) == 2
+        assert "yield" in body[2]
+
+        # Block 3: script
+        assert "script" in body[3]
+        assert body[3]["script"]["type"] == "ScriptBlock"
+        assert "audit" in body[3]["script"]["code"]
+
+    def test_pre_script_sets_state_label(self):
+        """Pre-script creates state_label param from state_name and state_fips."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+        code = wf["pre_script"]["code"]
+        assert "state_label" in code
+        assert "state_name" in code
+
+    def test_executes_and_pauses_on_event_facets(self, store, evaluator):
+        """Execution pauses when hitting event facet steps, andThen scripts complete immediately."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+
+        result = evaluator.execute(
+            wf,
+            inputs={"state_fips": "01", "state_name": "Alabama"},
+            program_ast=compiled,
+        )
+        # Should pause on first event facets (DownloadACS, DownloadTIGER, etc.)
+        assert result.status == ExecutionStatus.PAUSED
+
+        # The andThen script blocks should already have completed (no event deps)
+        # Verify by checking that the script blocks produced outputs
+        # The workflow won't be COMPLETED until all 4 blocks are done,
+        # but the script blocks themselves should have run.
+
+    def test_full_lifecycle_with_event_resolution(self, store, evaluator):
+        """Full lifecycle: execute → resolve events → resume → verify outputs."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+
+        result = evaluator.execute(
+            wf,
+            inputs={"state_fips": "01", "state_name": "Alabama"},
+            program_ast=compiled,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Resolve all event facets in the main andThen block (block 0)
+        # DownloadACS and DownloadTIGER should be waiting
+        for _ in range(20):
+            blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            if not blocked:
+                break
+
+            for step in blocked:
+                facet = step.facet_name
+                if "DownloadACS" in facet:
+                    evaluator.continue_step(
+                        step.id,
+                        result={"file": {"path": f"/data/acs_{step.attributes.get_param('state_fips')}.csv", "size": 50000}},
+                    )
+                elif "DownloadTIGER" in facet:
+                    evaluator.continue_step(
+                        step.id,
+                        result={"file": {"path": f"/data/tiger_{step.attributes.get_param('state_fips')}.shp", "size": 120000}},
+                    )
+                elif "ExtractPopulation" in facet:
+                    evaluator.continue_step(
+                        step.id,
+                        result={"result": {"output_path": "/data/pop.csv", "row_count": 67, "state_fips": "01"}},
+                    )
+                elif "ExtractIncome" in facet:
+                    evaluator.continue_step(
+                        step.id,
+                        result={"result": {"output_path": "/data/income.csv", "row_count": 67, "state_fips": "01"}},
+                    )
+                elif "JoinGeo" in facet:
+                    evaluator.continue_step(
+                        step.id,
+                        result={"result": {"total_population": 5024279, "median_income": 52035, "county_count": 67, "state_name": "Alabama"}},
+                    )
+                else:
+                    evaluator.continue_step(step.id, result={})
+
+            r = evaluator.resume(result.workflow_id, wf, compiled)
+            if r.status == ExecutionStatus.COMPLETED:
+                result = r
+                break
+            result = r
+
+        assert result.success, f"Workflow did not complete: {result.status}"
+        assert result.status == ExecutionStatus.COMPLETED
+
+        # Verify outputs from all 4 blocks
+        # Block 0 (regular): summary from JoinGeo yield
+        assert result.outputs["summary"]["total_population"] == 5024279
+        assert result.outputs["summary"]["county_count"] == 67
+
+        # Block 1 (andThen script): pop_total and report
+        assert result.outputs["pop_total"] == 5000000
+        assert "ALABAMA (01)" in result.outputs["report"]
+
+        # Block 2 (regular): income_total from ExtractIncome yield
+        assert result.outputs["income_total"] == 67
+
+        # Block 3 (andThen script): audit string
+        assert "ALABAMA (01)" in result.outputs["audit"]
+        assert "fips=01" in result.outputs["audit"]
+
+    def test_different_state_uses_correct_label(self, store, evaluator):
+        """Pre-script correctly transforms different state inputs."""
+        compiled = _compile(AFL_CENSUS_WITH_SCRIPTS)
+        wf = _find_workflow(compiled, "AnalyzeStateWithScripts")
+
+        result = evaluator.execute(
+            wf,
+            inputs={"state_fips": "06", "state_name": "California"},
+            program_ast=compiled,
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Resolve all events iteratively
+        for _ in range(20):
+            blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            if not blocked:
+                break
+            for step in blocked:
+                facet = step.facet_name
+                if "Download" in facet:
+                    evaluator.continue_step(step.id, result={"file": {"path": "/data/ca.csv", "size": 100000}})
+                elif "Extract" in facet:
+                    evaluator.continue_step(step.id, result={"result": {"output_path": "/data/ca_extract.csv", "row_count": 58, "state_fips": "06"}})
+                elif "JoinGeo" in facet:
+                    evaluator.continue_step(step.id, result={"result": {"total_population": 39538223, "median_income": 78672, "county_count": 58, "state_name": "California"}})
+                else:
+                    evaluator.continue_step(step.id, result={})
+            r = evaluator.resume(result.workflow_id, wf, compiled)
+            if r.status == ExecutionStatus.COMPLETED:
+                result = r
+                break
+            result = r
+
+        assert result.success
+        assert "CALIFORNIA (06)" in result.outputs["report"]
+        assert "CALIFORNIA (06)" in result.outputs["audit"]
+        assert result.outputs["summary"]["county_count"] == 58

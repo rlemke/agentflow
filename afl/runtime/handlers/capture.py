@@ -109,8 +109,18 @@ class StatementCaptureBeginHandler(StateHandler):
         return StateChangeResult(step=self.step)
 
     def _merge_yields_from_block(self, block: "StepDefinition") -> None:
-        """Merge yield results from a block into the step."""
+        """Merge yield results from a block into the step.
+
+        For regular blocks, merges yield step attributes.
+        For andThen script blocks, merges the block step's own returns
+        (set by ScriptExecutor in _execute_script_block).
+        """
         from ..types import ObjectType
+
+        # Check if block itself has returns (andThen script blocks)
+        if block.attributes.returns:
+            for name, attr in block.attributes.returns.items():
+                self.step.attributes.set_return(name, attr.value, attr.type_hint)
 
         # Get yield steps from the block
         steps = self.context.persistence.get_steps_by_block(block.id)
