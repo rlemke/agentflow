@@ -72,9 +72,21 @@ def _make_runner(store, evaluator):
 
 
 def _register_file_handler(store, tmp_path, facet_name, code):
-    """Write a handler module to a temp file and register it."""
-    f = tmp_path / f"{facet_name.replace('.', '_')}_handler.py"
+    """Write a handler module to a temp file and register it.
+
+    Purges ``sys.modules`` for the generated module name so that
+    ``importlib.import_module`` loads the new code instead of returning
+    a stale cached version from a prior test using the same facet name.
+    """
+    import sys as _sys
+
+    module_name = f"{facet_name.replace('.', '_')}_handler"
+    f = tmp_path / f"{module_name}.py"
     f.write_text(code)
+
+    # Evict stale module so the dispatcher reimports from the new file
+    _sys.modules.pop(module_name, None)
+
     reg = HandlerRegistration(
         facet_name=facet_name,
         module_uri=f"file://{f}",
