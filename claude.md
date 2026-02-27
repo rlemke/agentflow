@@ -86,6 +86,7 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 | `tests/` | Core tests (compiler, runtime, dashboard, MCP) |
 | `agents/` | Multi-language agent libraries (Python, Scala, Go, TypeScript, Java) |
 | `examples/osm-geocoder/` | OSM geocoding example (42 AFL files, 16 handler categories, ~80 handler modules) |
+| `examples/monte-carlo-risk/` | Monte Carlo portfolio risk analysis (GBM simulation, VaR/CVaR, Greeks, stress testing) |
 | `spec/` | Language and runtime specifications |
 | `docker/` | Dockerfiles for all services |
 | `scripts/` | Convenience scripts (setup, compile, runner, dashboard, etc.) |
