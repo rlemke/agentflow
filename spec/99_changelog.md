@@ -1,5 +1,37 @@
 # Implementation Changelog
 
+## Completed (v0.16.0) - ML Hyperparameter Sweep Example
+
+New example at `examples/ml-hyperparam-sweep/` showcasing AFL features not yet
+demonstrated in existing examples: statement-level andThen, prompt blocks,
+map literals, and andThen foreach as a central pattern.
+
+### AFL definitions
+- `sweep.afl`: 8 schemas, 6 event facets across 4 namespaces, 4 mixin facets, 3 implicits, 2 workflows
+- `HyperparamSweep`: pre-script → data prep → 4× parallel train-with-mixins (each with statement-level andThen for evaluation) → compare → LLM report → yield, plus andThen script for post-sweep aggregation
+- `GridSearchSweep`: data prep with Retry mixin + andThen foreach over dynamic config list with statement-level andThen per training run
+- Features demonstrated: statement-level andThen (4 instances), prompt block (GenerateSweepReport), map literals (`#{"learning_rate": 0.001, ...}`, 10+ usages), andThen foreach, call-site mixins (`with Timeout() with GPU()`), implicit facets, pre-script, andThen script, arithmetic, array literals, schemas, doc comments
+
+### Handler modules (4 categories, 6 event facets)
+- **Data**: PrepareDataset (synthetic dataset generation), SplitDataset (train/val/test partitioning)
+- **Training**: TrainModel (deterministic metrics from hyperparams via sigmoid + hash noise)
+- **Evaluation**: EvaluateModel (hash-based metric generation), CompareToBestModel (ranking by configurable metric)
+- **Reporting**: GenerateSweepReport (synthetic fallback; prompt block used by ClaudeAgentRunner)
+
+### Implementation notes
+- Pure Python standard library only (`math`, `random`, `hashlib`) — no external dependencies
+- Deterministic training stub: loss = f(lr, epochs, dropout) + hash noise; accuracy via sigmoid
+- Follows monte-carlo-risk pattern: conftest sys.modules purge, RegistryRunner dispatch tables
+
+### Tests: 33 new (2904 passed, 84 skipped, 2988 collected)
+- `TestMLUtils` (8): dataset shape/determinism, split ratios/remainder, train loss/accuracy range, eval metrics range, compare best selection
+- `TestDataHandlers` (4): prepare default/max_samples, split ratios, JSON string params
+- `TestTrainingHandlers` (3): result structure, JSON string params, different configs → different metrics
+- `TestEvaluationHandlers` (4): eval fields, confusion matrix, compare selects highest, default metric
+- `TestReportingHandlers` (2): report structure, total_configs matches
+- `TestDispatch` (5): 4 namespace dispatch tables, total handler count (6)
+- `TestCompilation` (7): AFL parses, 8 schemas, 6 event facets, 2 workflows, 4 mixin facets, 3 implicits, prompt block present
+
 ## Completed (v0.15.1) - Monte Carlo Portfolio Risk Analysis Example
 
 New example at `examples/monte-carlo-risk/` showcasing AFL's distributed
