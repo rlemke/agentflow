@@ -1,0 +1,2 @@
+# No external dependencies required.
+# All math utilities use only the Python standard library (math, random).

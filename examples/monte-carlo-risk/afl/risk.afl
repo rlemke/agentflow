@@ -1,0 +1,147 @@
+// Monte Carlo Portfolio Risk Analysis
+// Demonstrates: schemas, pre-scripts, andThen scripts, concurrent blocks,
+// deep dependency chains, multi-namespace composition.
+
+namespace risk.types {
+    schema Portfolio {
+        name: String,
+        positions: Json,
+        base_currency: String,
+        valuation_date: String,
+        total_value: Long
+    }
+    schema CorrelationMatrix {
+        matrix: Json,
+        asset_ids: Json,
+        cholesky: Json
+    }
+    schema SimulationConfig {
+        num_paths: Long,
+        time_horizon_days: Long,
+        confidence_levels: Json,
+        random_seed: Long
+    }
+    schema BatchResult {
+        batch_id: Long,
+        num_paths: Long,
+        pnl_distribution: Json,
+        mean_pnl: Long,
+        worst_pnl: Long
+    }
+    schema RiskMetrics {
+        var_95: Long,
+        var_99: Long,
+        cvar_95: Long,
+        cvar_99: Long,
+        expected_shortfall: Long,
+        max_drawdown: Long,
+        sharpe_ratio: Long
+    }
+    schema StressResult {
+        scenario_name: String,
+        portfolio_pnl: Long,
+        worst_position: String,
+        best_position: String
+    }
+    schema Greeks {
+        delta: Json,
+        gamma: Json,
+        vega: Json,
+        portfolio_delta: Long,
+        portfolio_vega: Long
+    }
+    schema RiskReport {
+        report_path: String,
+        summary: Json,
+        timestamp: String
+    }
+}
+
+namespace risk.MarketData {
+    use risk.types
+
+    event facet LoadPortfolio(portfolio_name: String = "default") => (portfolio: Portfolio)
+
+    event facet FetchHistoricalData(asset_ids: Json, lookback_days: Long = 252) => (correlation: CorrelationMatrix)
+}
+
+namespace risk.Simulation {
+    use risk.types
+
+    event facet SimulateBatch(positions: Json, cholesky: Json, num_paths: Long = 1000, time_horizon_days: Long = 10, batch_id: Long = 0, random_seed: Long = 42) => (result: BatchResult)
+
+    event facet SimulateStress(positions: Json, scenario_name: String, shock_factors: Json) => (result: StressResult)
+}
+
+namespace risk.Analytics {
+    use risk.types
+
+    event facet ComputeVaR(pnl_distributions: Json, confidence_levels: Json = "[0.95, 0.99]") => (metrics: RiskMetrics)
+
+    event facet ComputeGreeks(positions: Json, cholesky: Json) => (greeks: Greeks)
+}
+
+namespace risk.Reporting {
+    use risk.types
+
+    event facet GenerateReport(portfolio: Portfolio, metrics: RiskMetrics, greeks: Greeks, stress_results: Json) => (report: RiskReport)
+}
+
+namespace risk.workflows {
+    use risk.types
+    use risk.MarketData
+    use risk.Simulation
+    use risk.Analytics
+    use risk.Reporting
+
+    /** Full portfolio risk analysis with parallel simulation batches, concurrent Greeks computation, and stress testing. */
+    workflow AnalyzePortfolio(portfolio_name: String = "default", num_batches: Long = 10, paths_per_batch: Long = 1000, time_horizon_days: Long = 10) => (metrics: RiskMetrics, greeks: Greeks, stress_results: Json, report: RiskReport, total_paths: Long, risk_summary: String) script {
+        result["total_paths"] = params["num_batches"] * params["paths_per_batch"]
+        result["sim_description"] = (
+            str(params["num_batches"]) + " batches x "
+            + str(params["paths_per_batch"]) + " paths = "
+            + str(result["total_paths"]) + " total simulations"
+        )
+    } andThen {
+        port = LoadPortfolio(portfolio_name = $.portfolio_name)
+        hist = FetchHistoricalData(asset_ids = port.portfolio.positions, lookback_days = 252)
+        b0 = SimulateBatch(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky, num_paths = $.paths_per_batch, time_horizon_days = $.time_horizon_days, batch_id = 0, random_seed = 100)
+        b1 = SimulateBatch(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky, num_paths = $.paths_per_batch, time_horizon_days = $.time_horizon_days, batch_id = 1, random_seed = 200)
+        b2 = SimulateBatch(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky, num_paths = $.paths_per_batch, time_horizon_days = $.time_horizon_days, batch_id = 2, random_seed = 300)
+        b3 = SimulateBatch(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky, num_paths = $.paths_per_batch, time_horizon_days = $.time_horizon_days, batch_id = 3, random_seed = 400)
+        b4 = SimulateBatch(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky, num_paths = $.paths_per_batch, time_horizon_days = $.time_horizon_days, batch_id = 4, random_seed = 500)
+        var = ComputeVaR(pnl_distributions = b0.result.pnl_distribution, confidence_levels = "[0.95, 0.99]")
+        gk = ComputeGreeks(positions = port.portfolio.positions, cholesky = hist.correlation.cholesky)
+        s1 = SimulateStress(positions = port.portfolio.positions, scenario_name = "market_crash", shock_factors = "[-0.20, -0.30, -0.15, -0.25, -0.10]")
+        s2 = SimulateStress(positions = port.portfolio.positions, scenario_name = "rate_spike", shock_factors = "[0.02, -0.05, 0.01, -0.08, 0.03]")
+        s3 = SimulateStress(positions = port.portfolio.positions, scenario_name = "vol_surge", shock_factors = "[0.0, 0.0, 0.50, 0.40, 0.30]")
+        rpt = GenerateReport(portfolio = port.portfolio, metrics = var.metrics, greeks = gk.greeks, stress_results = s1.result.scenario_name)
+        yield AnalyzePortfolio(metrics = var.metrics, greeks = gk.greeks, report = rpt.report)
+    } andThen script {
+        result["stress_results"] = [
+            {"scenario": "market_crash", "description": "Broad market decline of 15-30%"},
+            {"scenario": "rate_spike", "description": "Interest rate shock with equity impact"},
+            {"scenario": "vol_surge", "description": "Volatility increase of 30-50%"}
+        ]
+    } andThen script {
+        total = params.get("total_paths", 10000)
+        result["risk_summary"] = (
+            "Monte Carlo VaR analysis: " + str(total) + " simulated paths, "
+            + str(params.get("time_horizon_days", 10)) + "-day horizon, "
+            + "portfolio: " + params.get("portfolio_name", "default")
+        )
+    }
+
+    /** Stress test portfolio against multiple scenarios in parallel. */
+    workflow StressTestPortfolio(portfolio_name: String = "default", scenarios: Json = "[]") => (portfolio: Portfolio, stress_results: Json, summary: String) andThen {
+        port = LoadPortfolio(portfolio_name = $.portfolio_name)
+        hist = FetchHistoricalData(asset_ids = port.portfolio.positions, lookback_days = 252)
+        crash = SimulateStress(positions = port.portfolio.positions, scenario_name = "market_crash", shock_factors = "[-0.20, -0.30, -0.15, -0.25, -0.10]")
+        rates = SimulateStress(positions = port.portfolio.positions, scenario_name = "rate_spike", shock_factors = "[0.02, -0.05, 0.01, -0.08, 0.03]")
+        vol = SimulateStress(positions = port.portfolio.positions, scenario_name = "vol_surge", shock_factors = "[0.0, 0.0, 0.50, 0.40, 0.30]")
+        yield StressTestPortfolio(portfolio = port.portfolio)
+    } andThen script {
+        result["stress_results"] = []
+        result["summary"] = "Stress test complete for " + params.get("portfolio_name", "default") + ": 3 scenarios analyzed"
+    }
+}
