@@ -1,5 +1,36 @@
 # Implementation Changelog
 
+## Completed (v0.15.1) - Monte Carlo Portfolio Risk Analysis Example
+
+New example at `examples/monte-carlo-risk/` showcasing AFL's distributed
+computing features for financial risk analysis.
+
+### AFL definitions
+- `risk.afl`: 8 schemas, 7 event facets across 4 namespaces, 2 workflows
+- `AnalyzePortfolio`: full pipeline — load portfolio → fetch correlations → 5 parallel batch simulations → VaR/CVaR → Greeks → 3 stress tests → report → yield
+- `StressTestPortfolio`: parallel stress testing across 3 scenarios
+- Features demonstrated: pre-script (parameter derivation), concurrent andThen blocks, andThen scripts (inline aggregation), deep dependency chains, schema typing, multi-namespace composition
+
+### Handler modules (4 categories, 7 event facets)
+- **Market Data**: LoadPortfolio (5-asset synthetic: SPY, AAPL, GOOGL, TLT, GLD), FetchHistoricalData (realistic equity/bond/commodity correlation matrix + Cholesky decomposition)
+- **Simulation**: SimulateBatch (Geometric Brownian Motion with Cholesky-correlated random walks), SimulateStress (shock factor application)
+- **Analytics**: ComputeVaR (95%/99% VaR + CVaR/Expected Shortfall + Sharpe ratio), ComputeGreeks (delta/gamma/vega via finite differences)
+- **Reporting**: GenerateReport (JSON summary compilation)
+
+### Implementation notes
+- Pure Python standard library only (`math`, `random`) — no numpy dependency required
+- Custom Cholesky-Banachiewicz decomposition, matrix-vector multiplication
+- Follows site-selection pattern: conftest sys.modules purge, RegistryRunner dispatch tables
+
+### Tests: 26 new (2871 passed, 84 skipped, 2955 collected)
+- `TestMathUtils` (6): GBM path shape/mean, Cholesky validity (L@L^T reconstruction), VaR on known distribution, CVaR ≥ VaR, Greeks structure
+- `TestMarketData` (3): portfolio loading, custom name, correlation matrix + Cholesky
+- `TestSimulation` (3): batch result structure, JSON string params, stress result fields
+- `TestAnalytics` (3): VaR computation, CVaR ≥ VaR in handler, Greeks arrays
+- `TestReporting` (2): report structure, timestamp present
+- `TestDispatch` (5): 4 namespace dispatch tables, total handler count (7)
+- `TestCompilation` (4): AFL parses, 8 schemas, 7 event facets, 2 workflows
+
 ## Completed (v0.15.0) - Script Block Refactor: Two Distinct Uses
 
 Refactored script blocks to support two distinct use cases:
