@@ -35,12 +35,12 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | jenkins | [USER_GUIDE.md](jenkins/USER_GUIDE.md) |
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
-| census-us | *(no user guide yet)* |
+| census-us | [USER_GUIDE.md](census-us/USER_GUIDE.md) |
 | continental-lz | [USER_GUIDE.md](continental-lz/USER_GUIDE.md) |
-| site-selection | *(no user guide yet)* |
-| monte-carlo-risk | *(no user guide yet)* |
-| ml-hyperparam-sweep | *(no user guide yet)* |
-| research-agent | *(no user guide yet)* |
+| site-selection | [USER_GUIDE.md](site-selection/USER_GUIDE.md) |
+| monte-carlo-risk | [USER_GUIDE.md](monte-carlo-risk/USER_GUIDE.md) |
+| ml-hyperparam-sweep | [USER_GUIDE.md](ml-hyperparam-sweep/USER_GUIDE.md) |
+| research-agent | [USER_GUIDE.md](research-agent/USER_GUIDE.md) |
 | multi-agent-debate | [USER_GUIDE.md](multi-agent-debate/USER_GUIDE.md) |
 | multi-round-debate | [USER_GUIDE.md](multi-round-debate/USER_GUIDE.md) |
 | tool-use-agent | [USER_GUIDE.md](tool-use-agent/USER_GUIDE.md) |
