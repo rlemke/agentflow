@@ -69,8 +69,7 @@ No other parsing, compiler, or DSL libraries are permitted in v1:
 - No global mutable state
 
 ### Testing
-- 302 tests total (including 26 MongoDB persistence tests via mongomock)
-- 81% code coverage
+- 3065 tests collected (2981 passed, 84 skipped) as of v0.18.0
 - Tests for all grammar constructs
 - Tests for error reporting
 - MongoDB store tests using mongomock (no real database required)

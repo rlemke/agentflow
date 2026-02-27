@@ -12,6 +12,11 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
 | [census-us](census-us/) | US Census ACS + TIGER county demographics with dashboard map visualization |
 | [continental-lz](continental-lz/) | Continental-scale road infrastructure and GTFS transit analysis with Docker |
+| [site-selection](site-selection/) | Restaurant site selection with OSM + Census scoring pipeline |
+| [monte-carlo-risk](monte-carlo-risk/) | Monte Carlo portfolio risk analysis (GBM simulation, VaR/CVaR, Greeks, stress testing) |
+| [ml-hyperparam-sweep](ml-hyperparam-sweep/) | ML hyperparameter sweep (statement-level andThen, prompt blocks, map literals, andThen foreach) |
+| [research-agent](research-agent/) | AI research agent — first LLM integration showcase (prompt blocks, ClaudeAgentRunner) |
+| [multi-agent-debate](multi-agent-debate/) | Multi-agent debate — first multi-agent interaction example (3 debate agents, scoring/voting) |
 
 ## User Documentation
 
@@ -29,6 +34,11 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
 | census-us | *(no user guide yet)* |
 | continental-lz | [USER_GUIDE.md](continental-lz/USER_GUIDE.md) |
+| site-selection | *(no user guide yet)* |
+| monte-carlo-risk | *(no user guide yet)* |
+| ml-hyperparam-sweep | *(no user guide yet)* |
+| research-agent | *(no user guide yet)* |
+| multi-agent-debate | *(no user guide yet)* |
 
 ## Running an Example
 

@@ -14,6 +14,11 @@ This guide helps you choose the right example as a starting point for your own A
 | [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
 | [osm-geocoder](../osm-geocoder/) | Advanced | Large-scale event facets | 580+ | Production-scale agent with many namespaces |
 | [continental-lz](../continental-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
+| [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
+| [monte-carlo-risk](../monte-carlo-risk/) | Intermediate | Pure-Python math stubs | 8 | Financial risk simulation |
+| [ml-hyperparam-sweep](../ml-hyperparam-sweep/) | Intermediate | Statement-level andThen, prompt blocks | 6 | ML training pipelines |
+| [research-agent](../research-agent/) | Intermediate | Prompt blocks, ClaudeAgentRunner | 8 | LLM-driven research workflows |
+| [multi-agent-debate](../multi-agent-debate/) | Intermediate | Multi-agent personas, scoring/voting | 8 | Multi-agent interaction patterns |
 
 ## Learning Path
 
@@ -24,18 +29,27 @@ Start simple and build up to more complex patterns:
        |
 2. volcano-query        Learn namespace composition (no handlers needed)
        |
-   +---+---+---+
-   |       |   |
-3a. genomics  3b. jenkins  3c. census-us
-    foreach       mixins       API + shapefile ETL
-       |           |           + dashboard maps
+   +---+---+---+---+
+   |       |   |   |
+3a. genomics  3b. jenkins  3c. census-us  3d. site-selection
+    foreach       mixins       API + ETL       OSM + Census scoring
+       |           |           + maps
        +-----+-----+
              |
 4. aws-lambda           Real cloud integration + mixins + foreach
        |
-5. osm-geocoder         Full production-scale agent
+   +---+---+---+
+   |       |   |
+5a. monte-carlo-risk  5b. ml-hyperparam-sweep  5c. research-agent
+    math stubs             prompt blocks             LLM integration
+       |                   + andThen foreach          + ClaudeAgentRunner
+       +--------+----------+
+                |
+6. multi-agent-debate   Multi-agent personas + scoring/voting
        |
-6. continental-lz       Docker-orchestrated multi-region pipeline
+7. osm-geocoder         Full production-scale agent
+       |
+8. continental-lz       Docker-orchestrated multi-region pipeline
 ```
 
 ## Choosing an Example
@@ -67,6 +81,26 @@ Use **[aws-lambda](../aws-lambda/)** as your template. The handlers make real bo
 ### "I want to build a large-scale agent with many event facets"
 
 Study **[osm-geocoder](../osm-geocoder/)**. With 580+ handlers across 15 modules and 44 AFL files, it demonstrates how to organize a production-scale agent with factory-built handlers, geographic registries, and namespace-per-domain architecture.
+
+### "I want to simulate financial risk or run pure-Python analytics"
+
+Use **[monte-carlo-risk](../monte-carlo-risk/)**. It demonstrates GBM simulation, VaR/CVaR, Greeks, and stress testing using deterministic pure-Python stubs with no external dependencies.
+
+### "I want to sweep hyperparameters or train ML models"
+
+Use **[ml-hyperparam-sweep](../ml-hyperparam-sweep/)**. It showcases statement-level andThen, prompt blocks, map literals, and andThen foreach as a central pattern for parallel training runs.
+
+### "I want to build LLM-driven research workflows"
+
+Use **[research-agent](../research-agent/)**. Every event facet has a prompt block, making it the showcase for ClaudeAgentRunner / LLMHandler. It demonstrates chained LLM steps across planning, gathering, analysis, and writing.
+
+### "I want to build multi-agent interaction patterns"
+
+Use **[multi-agent-debate](../multi-agent-debate/)**. Three debate agents (proposer, critic, synthesizer) with distinct personas argue, rebut, score, and synthesize positions. It demonstrates agent-to-agent output dependency, scoring/voting mechanisms, and multi-agent persona patterns.
+
+### "I want to score and rank spatial locations"
+
+Use **[site-selection](../site-selection/)**. It combines OSM amenity extraction with Census demographics to score and rank counties for restaurant site selection.
 
 ### "I want to run a pipeline in Docker with MongoDB persistence"
 
@@ -281,3 +315,8 @@ Each example has its own detailed user guide:
 | census-us | *(no user guide yet)* |
 | osm-geocoder | [USER_GUIDE.md](../osm-geocoder/USER_GUIDE.md) |
 | continental-lz | [USER_GUIDE.md](../continental-lz/USER_GUIDE.md) |
+| site-selection | *(no user guide yet)* |
+| monte-carlo-risk | *(no user guide yet)* |
+| ml-hyperparam-sweep | *(no user guide yet)* |
+| research-agent | *(no user guide yet)* |
+| multi-agent-debate | *(no user guide yet)* |
