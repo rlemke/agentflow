@@ -1,0 +1,275 @@
+// Multi-Round Debate -- iterative debate with composed facets and convergence metrics.
+//
+// Demonstrates:
+//   - Composed facets as PRIMARY pattern (DebateRound encapsulates 12 steps)
+//   - Cross-round state passing (r1 -> r2 -> r3)
+//   - Convergence metrics (score_delta, agreement via arithmetic)
+//   - String concatenation (++) and arithmetic (%, /)
+//   - Mixins, implicits, pre-scripts, andThen scripts, andThen foreach,
+//     statement-level andThen, prompt blocks
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
+namespace rounds.types {
+    schema RoundState {
+        round_num: Int,
+        topic: String,
+        agents: Json,
+        prev_synthesis: String,
+        prev_scores: Json
+    }
+
+    schema RefinedArgument {
+        agent: String,
+        stance: String,
+        argument: String,
+        confidence: Double
+    }
+
+    schema RoundScore {
+        agent: String,
+        score: Double,
+        improvement: Double
+    }
+
+    schema ConvergenceMetrics {
+        score_delta: Double,
+        position_drift: Double,
+        agreement_level: Double,
+        converged: Boolean
+    }
+
+    schema DebateOutcome {
+        winner: String,
+        final_synthesis: String,
+        convergence_trajectory: Json,
+        total_rounds: Int
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mixins and implicits
+// ---------------------------------------------------------------------------
+namespace rounds.mixins {
+    facet RoundConfig(max_rounds: Int = 3, convergence_threshold: Double = 0.1)
+    facet ConvergenceThreshold(min_agreement: Double = 0.7, max_drift: Double = 0.2)
+
+    implicit defaultRoundConfig = RoundConfig(max_rounds = 3, convergence_threshold = 0.1)
+    implicit defaultConvergenceThreshold = ConvergenceThreshold(min_agreement = 0.7, max_drift = 0.2)
+}
+
+// ---------------------------------------------------------------------------
+// Setup -- InitiateRound, AssignPositions
+// ---------------------------------------------------------------------------
+namespace rounds.Setup {
+    use rounds.types
+
+    /** Initialize a debate round with context from previous rounds. */
+    event facet InitiateRound(
+        topic: String,
+        round_num: Int = 1,
+        num_agents: Int = 3,
+        prev_synthesis: String = "",
+        prev_scores: Json = []
+    ) => (round_state: RoundState) prompt {
+        system "You are a debate round coordinator managing iterative multi-round debates."
+        template "Initialize round {round_num} for debate on '{topic}'. Previous synthesis: {prev_synthesis}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Assign positions to agents with stance cycling based on round number. */
+    event facet AssignPositions(
+        round_state: RoundState,
+        round_num: Int = 1
+    ) => (assignments: Json) prompt {
+        system "You are a debate position assigner that cycles stances across rounds."
+        template "Assign positions for round {round_num}. State: {round_state}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Argumentation -- RefineArgument, ChallengeArgument
+// ---------------------------------------------------------------------------
+namespace rounds.Argumentation {
+    use rounds.types
+
+    /** Refine an argument incorporating feedback from previous rounds. */
+    event facet RefineArgument(
+        agent: String,
+        topic: String,
+        stance: String,
+        round_num: Int = 1,
+        prev_synthesis: String = ""
+    ) => (refined: RefinedArgument) prompt {
+        system "You are a debate agent refining arguments across rounds."
+        template "Agent '{agent}' refines {stance} argument on '{topic}' for round {round_num}. Prior synthesis: {prev_synthesis}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Challenge another agent's argument with counter-points. */
+    event facet ChallengeArgument(
+        agent: String,
+        target_agent: String,
+        target_argument: String,
+        round_num: Int = 1
+    ) => (challenge: String, weaknesses: Json) prompt {
+        system "You are a debate challenger identifying weaknesses in arguments."
+        template "Agent '{agent}' challenges '{target_agent}' argument: {target_argument}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scoring -- ScoreRound, EvaluateConvergence
+// ---------------------------------------------------------------------------
+namespace rounds.Scoring {
+    use rounds.types
+
+    /** Score the current round comparing against previous performance. */
+    event facet ScoreRound(
+        arguments: Json,
+        challenges: Json,
+        prev_scores: Json = [],
+        round_num: Int = 1
+    ) => (scores: Json) prompt {
+        system "You are a debate scorer evaluating argument quality and improvement."
+        template "Score round {round_num} arguments: {arguments}. Challenges: {challenges}. Previous scores: {prev_scores}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Evaluate whether the debate has converged based on score trends. */
+    event facet EvaluateConvergence(
+        current_scores: Json,
+        prev_scores: Json = [],
+        round_num: Int = 1
+    ) => (metrics: ConvergenceMetrics) prompt {
+        system "You are a convergence evaluator analyzing debate trajectories."
+        template "Evaluate convergence at round {round_num}. Current: {current_scores}. Previous: {prev_scores}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Synthesis -- SummarizeRound, DeclareOutcome
+// ---------------------------------------------------------------------------
+namespace rounds.Synthesis {
+    use rounds.types
+
+    /** Summarize a round capturing key shifts and new insights. */
+    event facet SummarizeRound(
+        arguments: Json,
+        challenges: Json,
+        scores: Json,
+        round_num: Int = 1
+    ) => (synthesis: String, key_shifts: Json) prompt {
+        system "You are a debate summarizer capturing round-by-round evolution."
+        template "Summarize round {round_num}. Arguments: {arguments}. Challenges: {challenges}. Scores: {scores}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Declare the final debate outcome based on all rounds. */
+    event facet DeclareOutcome(
+        round_syntheses: Json,
+        final_scores: Json,
+        convergence_trajectory: Json,
+        topic: String
+    ) => (outcome: DebateOutcome) prompt {
+        system "You are a debate judge declaring the final outcome."
+        template "Declare outcome for debate on '{topic}'. Syntheses: {round_syntheses}. Final scores: {final_scores}. Convergence: {convergence_trajectory}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Composed facet -- DebateRound (12 steps)
+// ---------------------------------------------------------------------------
+namespace rounds.composition {
+    use rounds.types
+    use rounds.mixins
+    use rounds.Setup
+    use rounds.Argumentation
+    use rounds.Scoring
+    use rounds.Synthesis
+
+    /** A complete debate round: init -> assign -> 3x refine -> 3x challenge -> score -> converge -> summarize. */
+    facet DebateRound(
+        topic: String,
+        round_num: Int = 1,
+        num_agents: Int = 3,
+        prev_synthesis: String = "",
+        prev_scores: Json = []
+    ) => (synthesis: String, scores: Json, convergence: ConvergenceMetrics, key_shifts: Json) andThen {
+        init = InitiateRound(topic = $.topic, round_num = $.round_num, num_agents = $.num_agents, prev_synthesis = $.prev_synthesis, prev_scores = $.prev_scores)
+        assign = AssignPositions(round_state = init.round_state, round_num = $.round_num)
+        a0 = RefineArgument(agent = "agent_0", topic = $.topic, stance = "for", round_num = $.round_num, prev_synthesis = $.prev_synthesis) with RoundConfig()
+        a1 = RefineArgument(agent = "agent_1", topic = $.topic, stance = "against", round_num = $.round_num, prev_synthesis = $.prev_synthesis) with RoundConfig()
+        a2 = RefineArgument(agent = "agent_2", topic = $.topic, stance = "neutral", round_num = $.round_num, prev_synthesis = $.prev_synthesis) with RoundConfig()
+        c0 = ChallengeArgument(agent = "agent_0", target_agent = "agent_1", target_argument = a1.refined, round_num = $.round_num)
+        c1 = ChallengeArgument(agent = "agent_1", target_agent = "agent_2", target_argument = a2.refined, round_num = $.round_num)
+        c2 = ChallengeArgument(agent = "agent_2", target_agent = "agent_0", target_argument = a0.refined, round_num = $.round_num)
+        sc = ScoreRound(arguments = [a0.refined, a1.refined, a2.refined], challenges = [c0.challenge, c1.challenge, c2.challenge], prev_scores = $.prev_scores, round_num = $.round_num)
+        conv = EvaluateConvergence(current_scores = sc.scores, prev_scores = $.prev_scores, round_num = $.round_num)
+        summ = SummarizeRound(arguments = [a0.refined, a1.refined, a2.refined], challenges = [c0.challenge, c1.challenge, c2.challenge], scores = sc.scores, round_num = $.round_num)
+        yield DebateRound(synthesis = summ.synthesis, scores = sc.scores, convergence = conv.metrics, key_shifts = summ.key_shifts)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workflows
+// ---------------------------------------------------------------------------
+namespace rounds.workflows {
+    use rounds.types
+    use rounds.mixins
+    use rounds.Setup
+    use rounds.Argumentation
+    use rounds.Scoring
+    use rounds.Synthesis
+    use rounds.composition
+
+    /** Three-round iterative debate with cross-round state and convergence tracking. */
+    workflow IterativeDebate(
+        topic: String,
+        num_agents: Int = 3
+    ) => (
+        outcome: DebateOutcome,
+        total_rounds: Int,
+        summary: String
+    ) script {
+        result["total_rounds"] = int(params.get("num_agents", 3))
+        result["summary"] = "Iterative debate on: " + params.get("topic", "unknown")
+    } andThen {
+        r1 = DebateRound(topic = $.topic, round_num = 1, num_agents = $.num_agents)
+        r2 = DebateRound(topic = $.topic, round_num = 2, num_agents = $.num_agents, prev_synthesis = r1.synthesis, prev_scores = r1.scores)
+        r3 = DebateRound(topic = $.topic, round_num = 3, num_agents = $.num_agents, prev_synthesis = r2.synthesis, prev_scores = r2.scores)
+        out = DeclareOutcome(round_syntheses = [r1.synthesis, r2.synthesis, r3.synthesis], final_scores = r3.scores, convergence_trajectory = [r1.convergence, r2.convergence, r3.convergence], topic = $.topic)
+        yield IterativeDebate(outcome = out.outcome, total_rounds = 3, summary = "Debate on: " ++ $.topic ++ " completed 3 rounds")
+    } andThen script {
+        result["summary"] = (
+            "Completed iterative debate on: " + params.get("topic", "unknown")
+            + " with " + str(params.get("total_rounds", 3))
+            + " rounds"
+        )
+    }
+
+    /** Single-round debate with per-agent post-processing via andThen foreach. */
+    workflow AgentFocusedDebate(
+        topic: String,
+        num_agents: Int = 3,
+        agent_ids: Json = ["agent_0", "agent_1", "agent_2"]
+    ) => (
+        synthesis: String,
+        key_shifts: Json,
+        summary: String
+    ) andThen {
+        r1 = DebateRound(topic = $.topic, round_num = 1, num_agents = $.num_agents)
+        summ = SummarizeRound(arguments = r1.scores, challenges = r1.key_shifts, scores = r1.scores, round_num = 1)
+        yield AgentFocusedDebate(synthesis = summ.synthesis ++ " [agent-focused]", key_shifts = summ.key_shifts, summary = "Agent-focused debate on: " ++ $.topic)
+    } andThen foreach agent in $.agent_ids {
+        ref = RefineArgument(agent = $.agent, topic = $.topic, stance = "for", round_num = 2) andThen {
+            ch = ChallengeArgument(agent = $.agent, target_agent = "agent_0", target_argument = ref.refined, round_num = 2)
+        }
+        yield AgentFocusedDebate(summary = $.agent ++ " processed")
+    }
+}

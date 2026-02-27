@@ -19,6 +19,8 @@ This guide helps you choose the right example as a starting point for your own A
 | [ml-hyperparam-sweep](../ml-hyperparam-sweep/) | Intermediate | Statement-level andThen, prompt blocks | 6 | ML training pipelines |
 | [research-agent](../research-agent/) | Intermediate | Prompt blocks, ClaudeAgentRunner | 8 | LLM-driven research workflows |
 | [multi-agent-debate](../multi-agent-debate/) | Intermediate | Multi-agent personas, scoring/voting | 8 | Multi-agent interaction patterns |
+| [multi-round-debate](../multi-round-debate/) | Intermediate | Composed facets, cross-round state | 8 | Iterative rounds with convergence |
+| [tool-use-agent](../tool-use-agent/) | Intermediate | Tool-as-event-facet, planning | 8 | Tool-use agent orchestration |
 
 ## Learning Path
 
@@ -47,6 +49,14 @@ Start simple and build up to more complex patterns:
                 |
 6. multi-agent-debate   Multi-agent personas + scoring/voting
        |
+   +---+---+
+   |       |
+6a. multi-round-debate  6b. tool-use-agent
+    composed facets          tool-as-event-facet
+    + convergence            + planning
+       |                     |
+       +----------+----------+
+                  |
 7. osm-geocoder         Full production-scale agent
        |
 8. continental-lz       Docker-orchestrated multi-region pipeline
@@ -97,6 +107,14 @@ Use **[research-agent](../research-agent/)**. Every event facet has a prompt blo
 ### "I want to build multi-agent interaction patterns"
 
 Use **[multi-agent-debate](../multi-agent-debate/)**. Three debate agents (proposer, critic, synthesizer) with distinct personas argue, rebut, score, and synthesize positions. It demonstrates agent-to-agent output dependency, scoring/voting mechanisms, and multi-agent persona patterns.
+
+### "I want to build iterative multi-round systems with convergence"
+
+Use **[multi-round-debate](../multi-round-debate/)**. It demonstrates composed facets as the primary architectural pattern — a `DebateRound` facet encapsulates 12 steps. The workflow calls it 3 times with cross-round state (synthesis and scores flow from round to round). Convergence metrics use arithmetic (`/`, `%`) to detect stabilization.
+
+### "I want to model tools as event facets with planned orchestration"
+
+Use **[tool-use-agent](../tool-use-agent/)**. Six tools (web search, deep search, calculator, code executor, synthesizer, formatter) are modeled as event facets. A planning facet decides tool order and strategy. Demonstrates statement-level andThen for chaining tool calls, `++` concatenation, and andThen foreach for parallel subtopic searches.
 
 ### "I want to score and rank spatial locations"
 
@@ -320,3 +338,5 @@ Each example has its own detailed user guide:
 | ml-hyperparam-sweep | *(no user guide yet)* |
 | research-agent | *(no user guide yet)* |
 | multi-agent-debate | [USER_GUIDE.md](../multi-agent-debate/USER_GUIDE.md) |
+| multi-round-debate | [USER_GUIDE.md](../multi-round-debate/USER_GUIDE.md) |
+| tool-use-agent | [USER_GUIDE.md](../tool-use-agent/USER_GUIDE.md) |

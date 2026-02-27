@@ -17,6 +17,8 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [ml-hyperparam-sweep](ml-hyperparam-sweep/) | ML hyperparameter sweep (statement-level andThen, prompt blocks, map literals, andThen foreach) |
 | [research-agent](research-agent/) | AI research agent — first LLM integration showcase (prompt blocks, ClaudeAgentRunner) |
 | [multi-agent-debate](multi-agent-debate/) | Multi-agent debate — first multi-agent interaction example (3 debate agents, scoring/voting) |
+| [multi-round-debate](multi-round-debate/) | Multi-round debate — composed facets as primary pattern (DebateRound encapsulates 12 steps, cross-round state, convergence) |
+| [tool-use-agent](tool-use-agent/) | Tool-use agent — tool-as-event-facet pattern (6 tools as event facets, planning facet, `++` and `%`/`/` arithmetic) |
 
 ## User Documentation
 
@@ -39,6 +41,8 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | ml-hyperparam-sweep | *(no user guide yet)* |
 | research-agent | *(no user guide yet)* |
 | multi-agent-debate | [USER_GUIDE.md](multi-agent-debate/USER_GUIDE.md) |
+| multi-round-debate | [USER_GUIDE.md](multi-round-debate/USER_GUIDE.md) |
+| tool-use-agent | [USER_GUIDE.md](tool-use-agent/USER_GUIDE.md) |
 
 ## Running an Example
 

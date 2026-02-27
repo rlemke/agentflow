@@ -1,0 +1,245 @@
+// Tool-Use Agent -- LLM agent with tool-as-event-facet pattern.
+//
+// Demonstrates:
+//   - Tool-as-event-facet pattern (tools modeled as event facets)
+//   - Planning facet for tool orchestration
+//   - String concatenation (++) and arithmetic (%, /)
+//   - Mixins, implicits, pre-scripts, andThen scripts, andThen foreach,
+//     statement-level andThen, prompt blocks
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
+namespace tools.types {
+    schema ToolPlan {
+        strategy: String,
+        search_queries: Json,
+        calculation: String,
+        code_snippet: String,
+        tool_order: Json
+    }
+
+    schema SearchResult {
+        query: String,
+        results: Json,
+        relevance: Double,
+        source_count: Int
+    }
+
+    schema Calculation {
+        expression: String,
+        result: Double,
+        steps: Json,
+        precision: Int
+    }
+
+    schema CodeResult {
+        code: String,
+        output: String,
+        exit_code: Int,
+        runtime_ms: Long
+    }
+
+    schema KnowledgeEntry {
+        topic: String,
+        summary: String,
+        confidence: Double,
+        sources: Json
+    }
+
+    schema FormattedAnswer {
+        answer: String,
+        citations: Json,
+        confidence: Double,
+        tool_usage: Json
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mixins and implicits
+// ---------------------------------------------------------------------------
+namespace tools.mixins {
+    facet ToolConfig(max_results: Int = 5, timeout_ms: Long = 30000)
+    facet SafetyCheck(allow_code_exec: Boolean = false, allow_web: Boolean = true)
+
+    implicit defaultToolConfig = ToolConfig(max_results = 5, timeout_ms = 30000)
+    implicit defaultSafetyCheck = SafetyCheck(allow_code_exec = false, allow_web = true)
+}
+
+// ---------------------------------------------------------------------------
+// Planning -- PlanToolUse, SelectNextTool
+// ---------------------------------------------------------------------------
+namespace tools.Planning {
+    use tools.types
+
+    /** Analyze a query and create a tool usage plan. */
+    event facet PlanToolUse(
+        query: String,
+        available_tools: Json = ["search", "calculate", "execute"]
+    ) => (plan: ToolPlan) prompt {
+        system "You are a tool-use planner that determines which tools to invoke and in what order."
+        template "Create a tool usage plan for query: '{query}'. Available tools: {available_tools}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Select the next tool to use based on completed results. */
+    event facet SelectNextTool(
+        plan: ToolPlan,
+        completed_tools: Json = [],
+        results_so_far: Json = []
+    ) => (next_tool: String, tool_params: Json) prompt {
+        system "You are a tool selector that picks the next tool based on current progress."
+        template "Select next tool from plan: {plan}. Completed: {completed_tools}. Results: {results_so_far}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Search -- WebSearch, DeepSearch
+// ---------------------------------------------------------------------------
+namespace tools.Search {
+    use tools.types
+
+    /** Perform a web search and return ranked results. */
+    event facet WebSearch(
+        query: String,
+        max_results: Int = 5
+    ) => (search_result: SearchResult) prompt {
+        system "You are a web search tool that finds relevant information."
+        template "Search the web for: '{query}'. Return up to {max_results} results."
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Perform a deep search expanding on initial results. */
+    event facet DeepSearch(
+        query: String,
+        initial_results: Json = [],
+        depth: Int = 2
+    ) => (search_result: SearchResult, knowledge: KnowledgeEntry) prompt {
+        system "You are a deep research tool that expands initial search results."
+        template "Deep search on '{query}' with depth {depth}. Initial results: {initial_results}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compute -- Calculate, ExecuteCode
+// ---------------------------------------------------------------------------
+namespace tools.Compute {
+    use tools.types
+
+    /** Evaluate a mathematical expression with step-by-step breakdown. */
+    event facet Calculate(
+        expression: String,
+        precision: Int = 2
+    ) => (calculation: Calculation) prompt {
+        system "You are a calculator tool that evaluates expressions with precision."
+        template "Calculate: {expression} with precision {precision}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Execute a code snippet in a sandboxed environment. */
+    event facet ExecuteCode(
+        code: String,
+        language: String = "python"
+    ) => (code_result: CodeResult) prompt {
+        system "You are a sandboxed code execution tool."
+        template "Execute {language} code: {code}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Output -- SynthesizeResults, FormatAnswer
+// ---------------------------------------------------------------------------
+namespace tools.Output {
+    use tools.types
+
+    /** Synthesize results from multiple tool invocations. */
+    event facet SynthesizeResults(
+        search_results: Json = [],
+        calculations: Json = [],
+        code_results: Json = [],
+        query: String
+    ) => (synthesis: String, confidence: Double, key_findings: Json) prompt {
+        system "You are a result synthesizer combining tool outputs into coherent findings."
+        template "Synthesize results for query '{query}'. Searches: {search_results}. Calculations: {calculations}. Code: {code_results}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Format the final answer with citations and tool usage metadata. */
+    event facet FormatAnswer(
+        synthesis: String,
+        key_findings: Json,
+        confidence: Double,
+        query: String
+    ) => (answer: FormattedAnswer) prompt {
+        system "You are an answer formatter creating well-cited responses."
+        template "Format answer for '{query}'. Synthesis: {synthesis}. Findings: {key_findings}. Confidence: {confidence}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workflows
+// ---------------------------------------------------------------------------
+namespace tools.workflows {
+    use tools.types
+    use tools.mixins
+    use tools.Planning
+    use tools.Search
+    use tools.Compute
+    use tools.Output
+
+    /** Solve a query using planned tool invocations in sequence. */
+    workflow SolveWithTools(
+        query: String,
+        max_results: Int = 5
+    ) => (
+        answer: FormattedAnswer,
+        tools_used: Long,
+        summary: String
+    ) script {
+        result["tools_used"] = 4
+        result["summary"] = "Solving: " + params.get("query", "unknown")
+    } andThen {
+        plan = PlanToolUse(query = $.query)
+        ws = WebSearch(query = $.query, max_results = $.max_results) andThen {
+            ds = DeepSearch(query = $.query, initial_results = [ws.search_result], depth = 2)
+            calc = Calculate(expression = "relevance / 100", precision = 2)
+            code = ExecuteCode(code = "print('analysis')", language = "python")
+        }
+        synth = SynthesizeResults(search_results = [ws.search_result], calculations = [calc.calculation], code_results = [code.code_result], query = $.query)
+        fmt = FormatAnswer(synthesis = synth.synthesis, key_findings = synth.key_findings, confidence = synth.confidence, query = $.query)
+        yield SolveWithTools(answer = fmt.answer, tools_used = 4, summary = "Solved: " ++ $.query ++ " using 4 tools")
+    } andThen script {
+        result["summary"] = (
+            "Completed tool-use for: " + params.get("query", "unknown")
+            + " with " + str(params.get("tools_used", 0))
+            + " tools"
+        )
+    }
+
+    /** Research-heavy workflow with parallel searches and computation. */
+    workflow ResearchAndCompute(
+        query: String,
+        subtopics: Json = ["overview", "details", "analysis"]
+    ) => (
+        answer: FormattedAnswer,
+        synthesis: String,
+        summary: String
+    ) andThen {
+        plan = PlanToolUse(query = $.query)
+        s1 = WebSearch(query = $.query, max_results = 5)
+        s2 = WebSearch(query = $.query ++ " detailed", max_results = 5)
+        synth = SynthesizeResults(search_results = [s1.search_result, s2.search_result], query = $.query)
+        calc = Calculate(expression = "confidence % 100 / 10", precision = 2)
+        fmt = FormatAnswer(synthesis = synth.synthesis, key_findings = synth.key_findings, confidence = synth.confidence, query = $.query)
+        yield ResearchAndCompute(answer = fmt.answer, synthesis = synth.synthesis ++ " [researched]", summary = "Research on: " ++ $.query)
+    } andThen foreach sq in $.subtopics {
+        search = WebSearch(query = $.query ++ " " ++ $.sq, max_results = 3) andThen {
+            deep = DeepSearch(query = $.query ++ " " ++ $.sq, initial_results = [search.search_result])
+        }
+        yield ResearchAndCompute(summary = "Searched: " ++ $.sq)
+    }
+}

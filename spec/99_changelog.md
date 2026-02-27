@@ -1,5 +1,75 @@
 # Implementation Changelog
 
+## Completed (v0.19.0) - Multi-Round Debate + Tool-Use Agent Examples
+
+Two new examples extending the AgentFlow example suite. The multi-agent-debate
+(v0.18.0) demonstrated multi-agent personas and scoring. These two examples
+showcase composed facets as the primary pattern and the tool-as-event-facet pattern.
+
+### Example 1: Multi-Round Debate (`examples/multi-round-debate/`)
+
+First example where **composed facets** are the PRIMARY architectural pattern.
+A `DebateRound` composed facet encapsulates a full round (12 steps); the workflow
+calls it 3 times sequentially with cross-round state. Also demonstrates convergence
+metrics, arithmetic (`%`, `/`), and `++` string concatenation.
+
+#### AFL definitions
+- `rounds.afl`: 5 schemas, 8 event facets across 4 namespaces (Setup, Argumentation, Scoring, Synthesis), 2 mixin facets + 1 composed facet (DebateRound), 2 implicits, 2 workflows
+- `DebateRound` (composed facet): 12 steps — init → assign → 3× refine with RoundConfig mixin → 3× challenge (agent-to-agent) → score → converge → summarize
+- `IterativeDebate`: pre-script → r1=DebateRound → r2=DebateRound(prev_synthesis=r1.synthesis, prev_scores=r1.scores) → r3=DebateRound(prev=r2) → DeclareOutcome → yield with `++` → andThen script
+- `AgentFocusedDebate`: DebateRound → SummarizeRound → yield with `++` + andThen foreach per agent with statement-level andThen (RefineArgument → ChallengeArgument)
+- Features demonstrated: composed facets (primary), cross-round state (r1→r2→r3), convergence metrics (score_delta, agreement), prompt blocks (8×), `++` string concat, `/` and `%` arithmetic, statement-level andThen, andThen foreach, pre-script, andThen script, mixins, implicits, schemas (5)
+
+#### Handler modules (4 categories, 8 event facets)
+- **Setup**: InitiateRound (context with prev_synthesis, agents list), AssignPositions (stance cycling via `round_num % 3`)
+- **Argumentation**: RefineArgument (confidence = base + round_num × 0.05), ChallengeArgument (counter-claims, weaknesses)
+- **Scoring**: ScoreRound (improvement = current/prev via division), EvaluateConvergence (score_delta = abs(curr-prev)/max(prev,1), converged if < 0.1)
+- **Synthesis**: SummarizeRound (synthesis_str + key_shifts), DeclareOutcome (winner, convergence trajectory)
+
+#### Tests: 38 new
+- `TestRoundsUtils` (8): initiate structure, assign cycling, refine confidence/determinism, challenge weaknesses, score improvement, convergence metrics, declare outcome
+- `TestSetupHandlers` (3): initiate default, assign default, assign JSON string
+- `TestArgumentationHandlers` (4): refine default/custom round, challenge default/JSON string
+- `TestScoringHandlers` (4): score default/JSON string, convergence default/JSON string
+- `TestSynthesisHandlers` (4): summarize default/JSON string, declare default/JSON string
+- `TestDispatch` (5): 4 namespace dispatch tables, total count (8)
+- `TestCompilation` (8): AFL parses, 5 schemas, 8 event facets, 2 workflows, 8 prompts, 2 mixins, 2 implicits, foreach present
+- `TestAgentIntegration` (2): ToolRegistry dispatches all 8, ClaudeAgentRunner completes workflow
+
+### Example 2: Tool-Use Agent (`examples/tool-use-agent/`)
+
+First example focused on the **tool-as-event-facet** pattern. Tools (web search,
+calculator, code execution) modeled as event facets with a planning facet for
+orchestration. Also demonstrates `++` concatenation and `%`/`/` arithmetic.
+
+#### AFL definitions
+- `toolbox.afl`: 6 schemas, 8 event facets across 4 namespaces (Planning, Search, Compute, Output), 2 mixin facets, 2 implicits, 2 workflows
+- `SolveWithTools`: pre-script → PlanToolUse → WebSearch with statement-level andThen (DeepSearch + Calculate + ExecuteCode) → SynthesizeResults → FormatAnswer → yield with `++` → andThen script
+- `ResearchAndCompute`: PlanToolUse → 2× parallel WebSearch → SynthesizeResults → Calculate → FormatAnswer with `++` + andThen foreach over subtopics with statement-level andThen (WebSearch → DeepSearch)
+- Features demonstrated: tool-as-event-facet (6 tools), planning facet (PlanToolUse decides order), prompt blocks (8×), `++` string concat, `%` and `/` arithmetic, statement-level andThen, andThen foreach, pre-script, andThen script, mixins (ToolConfig, SafetyCheck), implicits, schemas (6)
+
+#### Handler modules (4 categories, 8 event facets)
+- **Planning**: PlanToolUse (strategy + search_queries + tool_order), SelectNextTool (len(completed) % len(tools))
+- **Search**: WebSearch (hash-based results capped at max_results), DeepSearch (expanded results with higher relevance + KnowledgeEntry)
+- **Compute**: Calculate (safe eval, step breakdown, `/` for normalization), ExecuteCode (deterministic output, exit_code 0)
+- **Output**: SynthesizeResults (synthesis + confidence + key_findings), FormatAnswer (FormattedAnswer with citations)
+
+#### Tests: 38 new
+- `TestToolUtils` (8): plan structure, select cycling, search capped/determinism, deep search relevance, calculate steps, execute exit zero, format citations
+- `TestPlanningHandlers` (3): plan default, select default, plan JSON string
+- `TestSearchHandlers` (4): web search default/custom max, deep search default/JSON string
+- `TestComputeHandlers` (4): calculate default/precision, execute default/custom language
+- `TestOutputHandlers` (4): synthesize default/JSON string, format default/JSON string
+- `TestDispatch` (5): 4 namespace dispatch tables, total count (8)
+- `TestCompilation` (8): AFL parses, 6 schemas, 8 event facets, 2 workflows, 8 prompts, 2 mixins, 2 implicits, foreach present
+- `TestAgentIntegration` (2): ToolRegistry dispatches all 8, ClaudeAgentRunner completes workflow
+
+### Implementation notes (both examples)
+- Pure Python standard library only (`hashlib`, `json`) — no external dependencies
+- Deterministic stubs: all output derived from MD5 hashes of inputs for reproducibility
+- Follows multi-agent-debate pattern: conftest sys.modules purge, RegistryRunner dispatch tables
+- 17 files each: AFL, 4 handler modules + utils, conftest pair, tests, requirements, USER_GUIDE
+
 ## Completed (v0.18.0) - Multi-Agent Debate Example
 
 New example at `examples/multi-agent-debate/` — the **first multi-agent
