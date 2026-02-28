@@ -27,7 +27,12 @@ def handle_prepare_dataset(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Prepared dataset '{dataset_name}' with {num_samples} samples", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Prepared dataset '{dataset_name}' with {num_samples} samples",
+                "level": "success",
+            }
+        )
 
     return {"dataset": dataset}
 
@@ -56,7 +61,12 @@ def handle_split_dataset(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Split {num_samples} samples: train={result['train_count']}, val={result['val_count']}, test={result['test_count']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Split {num_samples} samples: train={result['train_count']}, val={result['val_count']}, test={result['test_count']}",
+                "level": "success",
+            }
+        )
 
     return result
 

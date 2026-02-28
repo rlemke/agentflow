@@ -313,9 +313,7 @@ class TestManageHandlersTool:
         assert data["handler"]["module_uri"] == "my.handlers"
 
     def test_get_not_found(self, store):
-        result = _tool_manage_handlers(
-            {"action": "get", "facet_name": "ns.Missing"}, lambda: store
-        )
+        result = _tool_manage_handlers({"action": "get", "facet_name": "ns.Missing"}, lambda: store)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "not found" in data["error"]
@@ -368,17 +366,13 @@ class TestManageHandlersTool:
         assert data["handler"]["updated"] > 1000
 
     def test_register_missing_facet_name(self, store):
-        result = _tool_manage_handlers(
-            {"action": "register", "module_uri": "m"}, lambda: store
-        )
+        result = _tool_manage_handlers({"action": "register", "module_uri": "m"}, lambda: store)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "facet_name is required" in data["error"]
 
     def test_register_missing_module_uri(self, store):
-        result = _tool_manage_handlers(
-            {"action": "register", "facet_name": "ns.X"}, lambda: store
-        )
+        result = _tool_manage_handlers({"action": "register", "facet_name": "ns.X"}, lambda: store)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "module_uri is required" in data["error"]
@@ -409,9 +403,7 @@ class TestManageHandlersTool:
         assert "facet_name is required" in data["error"]
 
     def test_invalid_action(self):
-        result = _tool_manage_handlers(
-            {"action": "destroy"}, lambda: None
-        )
+        result = _tool_manage_handlers({"action": "destroy"}, lambda: None)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "Invalid action" in data["error"]

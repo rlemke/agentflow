@@ -17,66 +17,109 @@ Uses mock handlers (no network calls). Run from the repo root:
     PYTHONPATH=. python examples/osm-geocoder/tests/mocked/py/test_france_cityroutes.py
 """
 
-from itertools import combinations
-
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
-
 
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Population", "declarations": [
-                    _ef("ExtractPlacesWithPopulation",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "place_type", "type": "String"},
-                         {"name": "min_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                    _ef("FilterByPopulationRange",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "min_population", "type": "Long"},
-                         {"name": "max_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Routing", "declarations": [
-                    _ef("BuildRoutesBetweenCities",
-                        [{"name": "cities_path", "type": "String"},
-                         {"name": "profile", "type": "String"},
-                         {"name": "cache", "type": "OSMCache"}],
-                        [{"name": "result", "type": "RoutingResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Population",
+                            "declarations": [
+                                _ef(
+                                    "ExtractPlacesWithPopulation",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "place_type", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByPopulationRange",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                        {"name": "max_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Routing",
+                            "declarations": [
+                                _ef(
+                                    "BuildRoutesBetweenCities",
+                                    [
+                                        {"name": "cities_path", "type": "String"},
+                                        {"name": "profile", "type": "String"},
+                                        {"name": "cache", "type": "OSMCache"},
+                                    ],
+                                    [{"name": "result", "type": "RoutingResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -149,20 +192,92 @@ def compile_workflow() -> dict:
 # ---------------------------------------------------------------------------
 
 FRENCH_CITIES = [
-    {"name": "Paris", "region": "Ile-de-France", "population": 11_078_000, "lat": 48.857, "lon": 2.352},
-    {"name": "Lyon", "region": "Auvergne-Rhone-Alpes", "population": 2_300_000, "lat": 45.764, "lon": 4.836},
-    {"name": "Marseille", "region": "Provence-Alpes-Cote d'Azur", "population": 1_900_000, "lat": 43.297, "lon": 5.381},
-    {"name": "Toulouse", "region": "Occitanie", "population": 1_400_000, "lat": 43.605, "lon": 1.444},
-    {"name": "Bordeaux", "region": "Nouvelle-Aquitaine", "population": 1_300_000, "lat": 44.838, "lon": -0.579},
-    {"name": "Lille", "region": "Hauts-de-France", "population": 1_200_000, "lat": 50.629, "lon": 3.057},
-    {"name": "Nice", "region": "Provence-Alpes-Cote d'Azur", "population": 1_006_000, "lat": 43.710, "lon": 7.262},
-    {"name": "Nantes", "region": "Pays de la Loire", "population": 1_010_000, "lat": 47.218, "lon": -1.554},
-    {"name": "Strasbourg", "region": "Grand Est", "population": 800_000, "lat": 48.574, "lon": 7.753},
-    {"name": "Montpellier", "region": "Occitanie", "population": 780_000, "lat": 43.611, "lon": 3.877},
+    {
+        "name": "Paris",
+        "region": "Ile-de-France",
+        "population": 11_078_000,
+        "lat": 48.857,
+        "lon": 2.352,
+    },
+    {
+        "name": "Lyon",
+        "region": "Auvergne-Rhone-Alpes",
+        "population": 2_300_000,
+        "lat": 45.764,
+        "lon": 4.836,
+    },
+    {
+        "name": "Marseille",
+        "region": "Provence-Alpes-Cote d'Azur",
+        "population": 1_900_000,
+        "lat": 43.297,
+        "lon": 5.381,
+    },
+    {
+        "name": "Toulouse",
+        "region": "Occitanie",
+        "population": 1_400_000,
+        "lat": 43.605,
+        "lon": 1.444,
+    },
+    {
+        "name": "Bordeaux",
+        "region": "Nouvelle-Aquitaine",
+        "population": 1_300_000,
+        "lat": 44.838,
+        "lon": -0.579,
+    },
+    {
+        "name": "Lille",
+        "region": "Hauts-de-France",
+        "population": 1_200_000,
+        "lat": 50.629,
+        "lon": 3.057,
+    },
+    {
+        "name": "Nice",
+        "region": "Provence-Alpes-Cote d'Azur",
+        "population": 1_006_000,
+        "lat": 43.710,
+        "lon": 7.262,
+    },
+    {
+        "name": "Nantes",
+        "region": "Pays de la Loire",
+        "population": 1_010_000,
+        "lat": 47.218,
+        "lon": -1.554,
+    },
+    {
+        "name": "Strasbourg",
+        "region": "Grand Est",
+        "population": 800_000,
+        "lat": 48.574,
+        "lon": 7.753,
+    },
+    {
+        "name": "Montpellier",
+        "region": "Occitanie",
+        "population": 780_000,
+        "lat": 43.611,
+        "lon": 3.877,
+    },
     {"name": "Rennes", "region": "Bretagne", "population": 750_000, "lat": 48.114, "lon": -1.681},
-    {"name": "Grenoble", "region": "Auvergne-Rhone-Alpes", "population": 690_000, "lat": 45.188, "lon": 5.724},
+    {
+        "name": "Grenoble",
+        "region": "Auvergne-Rhone-Alpes",
+        "population": 690_000,
+        "lat": 45.188,
+        "lon": 5.724,
+    },
     {"name": "Rouen", "region": "Normandie", "population": 660_000, "lat": 49.443, "lon": 1.100},
-    {"name": "Toulon", "region": "Provence-Alpes-Cote d'Azur", "population": 580_000, "lat": 43.124, "lon": 5.928},
+    {
+        "name": "Toulon",
+        "region": "Provence-Alpes-Cote d'Azur",
+        "population": 580_000,
+        "lat": 43.124,
+        "lon": 5.928,
+    },
 ]
 
 MIN_POP = 1_100_000
@@ -172,26 +287,86 @@ RANGE_CITIES = [c for c in FRENCH_CITIES if MIN_POP <= c["population"] <= MAX_PO
 # All-pairs driving routes between the 5 cities in range.
 # Every city connects to every other city.
 ROUTES = [
-    {"from": "Lyon", "to": "Marseille", "distance_km": 315, "duration_min": 190,
-     "waypoints": 498, "via": "A7 Autoroute du Soleil"},
-    {"from": "Lyon", "to": "Toulouse", "distance_km": 540, "duration_min": 300,
-     "waypoints": 856, "via": "A47 - A75 via Clermont-Ferrand"},
-    {"from": "Lyon", "to": "Bordeaux", "distance_km": 555, "duration_min": 330,
-     "waypoints": 879, "via": "A89 via Clermont-Ferrand"},
-    {"from": "Lyon", "to": "Lille", "distance_km": 665, "duration_min": 360,
-     "waypoints": 1053, "via": "A6 - A1 via Paris"},
-    {"from": "Marseille", "to": "Toulouse", "distance_km": 405, "duration_min": 240,
-     "waypoints": 641, "via": "A9 via Montpellier - Narbonne"},
-    {"from": "Marseille", "to": "Bordeaux", "distance_km": 645, "duration_min": 375,
-     "waypoints": 1021, "via": "A9 - A61 - A62 via Toulouse"},
-    {"from": "Marseille", "to": "Lille", "distance_km": 1005, "duration_min": 555,
-     "waypoints": 1591, "via": "A7 - A6 - A1 via Lyon - Paris"},
-    {"from": "Toulouse", "to": "Bordeaux", "distance_km": 245, "duration_min": 150,
-     "waypoints": 388, "via": "A62 Autoroute des Deux Mers"},
-    {"from": "Toulouse", "to": "Lille", "distance_km": 880, "duration_min": 480,
-     "waypoints": 1394, "via": "A20 - A71 - A1 via Limoges - Paris"},
-    {"from": "Bordeaux", "to": "Lille", "distance_km": 800, "duration_min": 450,
-     "waypoints": 1267, "via": "A10 - A1 via Tours - Paris"},
+    {
+        "from": "Lyon",
+        "to": "Marseille",
+        "distance_km": 315,
+        "duration_min": 190,
+        "waypoints": 498,
+        "via": "A7 Autoroute du Soleil",
+    },
+    {
+        "from": "Lyon",
+        "to": "Toulouse",
+        "distance_km": 540,
+        "duration_min": 300,
+        "waypoints": 856,
+        "via": "A47 - A75 via Clermont-Ferrand",
+    },
+    {
+        "from": "Lyon",
+        "to": "Bordeaux",
+        "distance_km": 555,
+        "duration_min": 330,
+        "waypoints": 879,
+        "via": "A89 via Clermont-Ferrand",
+    },
+    {
+        "from": "Lyon",
+        "to": "Lille",
+        "distance_km": 665,
+        "duration_min": 360,
+        "waypoints": 1053,
+        "via": "A6 - A1 via Paris",
+    },
+    {
+        "from": "Marseille",
+        "to": "Toulouse",
+        "distance_km": 405,
+        "duration_min": 240,
+        "waypoints": 641,
+        "via": "A9 via Montpellier - Narbonne",
+    },
+    {
+        "from": "Marseille",
+        "to": "Bordeaux",
+        "distance_km": 645,
+        "duration_min": 375,
+        "waypoints": 1021,
+        "via": "A9 - A61 - A62 via Toulouse",
+    },
+    {
+        "from": "Marseille",
+        "to": "Lille",
+        "distance_km": 1005,
+        "duration_min": 555,
+        "waypoints": 1591,
+        "via": "A7 - A6 - A1 via Lyon - Paris",
+    },
+    {
+        "from": "Toulouse",
+        "to": "Bordeaux",
+        "distance_km": 245,
+        "duration_min": 150,
+        "waypoints": 388,
+        "via": "A62 Autoroute des Deux Mers",
+    },
+    {
+        "from": "Toulouse",
+        "to": "Lille",
+        "distance_km": 880,
+        "duration_min": 480,
+        "waypoints": 1394,
+        "via": "A20 - A71 - A1 via Limoges - Paris",
+    },
+    {
+        "from": "Bordeaux",
+        "to": "Lille",
+        "distance_km": 800,
+        "duration_min": 450,
+        "waypoints": 1267,
+        "via": "A10 - A1 via Tours - Paris",
+    },
 ]
 
 TOTAL_DISTANCE = sum(r["distance_km"] for r in ROUTES)
@@ -227,8 +402,9 @@ MOCK_HANDLERS = {
     "ExtractPlacesWithPopulation": lambda p: {
         "result": {
             "output_path": "/tmp/france_cities.geojson",
-            "feature_count": len([c for c in FRENCH_CITIES
-                                  if c["population"] >= p.get("min_population", 0)]),
+            "feature_count": len(
+                [c for c in FRENCH_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "original_count": 3412,
             "place_type": "city",
             "min_population": p.get("min_population", 0),
@@ -240,15 +416,17 @@ MOCK_HANDLERS = {
     },
     "FilterByPopulationRange": lambda p: {
         "result": {
-            "output_path": f"/tmp/france_cities_{p.get('min_population', 0)//1000}k_{p.get('max_population', 0)//1000}k.geojson",
+            "output_path": f"/tmp/france_cities_{p.get('min_population', 0) // 1000}k_{p.get('max_population', 0) // 1000}k.geojson",
             "feature_count": len(RANGE_CITIES),
-            "original_count": len([c for c in FRENCH_CITIES
-                                   if c["population"] >= p.get("min_population", 0)]),
+            "original_count": len(
+                [c for c in FRENCH_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "place_type": "city",
             "min_population": p.get("min_population", 0),
             "max_population": p.get("max_population", 0),
-            "filter_applied": (f"{p.get('min_population', 0):,} <= population "
-                               f"<= {p.get('max_population', 0):,}"),
+            "filter_applied": (
+                f"{p.get('min_population', 0):,} <= population <= {p.get('max_population', 0):,}"
+            ),
             "format": "geojson",
             "extraction_date": "2026-02-06T12:00:02+00:00",
         },
@@ -287,7 +465,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -295,6 +475,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the France city route map workflow end-to-end with mock handlers."""
@@ -306,8 +487,10 @@ def main() -> None:
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
 
     # 1. Execute workflow
-    print('Executing: CityRouteMapByRegion(region="France", '
-          f'min_population={MIN_POP:,}, max_population={MAX_POP:,}, profile="car")')
+    print(
+        'Executing: CityRouteMapByRegion(region="France", '
+        f'min_population={MIN_POP:,}, max_population={MAX_POP:,}, profile="car")'
+    )
     print("  Pipeline: ResolveRegion -> ExtractPlacesWithPopulation")
     print("            -> FilterByPopulationRange -> BuildRoutesBetweenCities -> RenderMap\n")
 
@@ -351,11 +534,13 @@ def main() -> None:
     outputs = result.outputs
     n = outputs.get("city_count")
     print(f"\n{'=' * 70}")
-    print(f"RESULTS: French Cities {MIN_POP / 1e6:.1f}-{MAX_POP / 1e6:.1f}M - All-Pairs Driving Routes")
+    print(
+        f"RESULTS: French Cities {MIN_POP / 1e6:.1f}-{MAX_POP / 1e6:.1f}M - All-Pairs Driving Routes"
+    )
     print(f"{'=' * 70}")
     print(f"  Region:                 {outputs.get('region_name')}")
     print(f"  Cities in range:        {n}")
-    print(f"  All-pairs routes:       {outputs.get('route_count')}  (C({n},2) = {n}*{n-1}/2)")
+    print(f"  All-pairs routes:       {outputs.get('route_count')}  (C({n},2) = {n}*{n - 1}/2)")
     print(f"  Total driving distance: {outputs.get('total_distance_km'):,} km")
     print(f"  Average route length:   {outputs.get('avg_distance_km'):,} km")
     print(f"  Map output:             {outputs.get('map_path')}")
@@ -369,18 +554,23 @@ def main() -> None:
         print(f"    {city['name']:.<14} {city['population']:>10,}  {city['region']:<30} {bar}")
 
     # Show the full route matrix
-    city_names = [c["name"] for c in sorted(RANGE_CITIES, key=lambda c: c["population"], reverse=True)]
+    city_names = [
+        c["name"] for c in sorted(RANGE_CITIES, key=lambda c: c["population"], reverse=True)
+    ]
     route_map = {}
     for r in ROUTES:
         route_map[(r["from"], r["to"])] = r
         route_map[(r["to"], r["from"])] = {
-            "distance_km": r["distance_km"], "duration_min": r["duration_min"],
-            "via": r["via"], "waypoints": r["waypoints"],
-            "from": r["to"], "to": r["from"],
+            "distance_km": r["distance_km"],
+            "duration_min": r["duration_min"],
+            "via": r["via"],
+            "waypoints": r["waypoints"],
+            "from": r["to"],
+            "to": r["from"],
         }
 
     col_w = 12
-    print(f"\n  Distance matrix (km):")
+    print("\n  Distance matrix (km):")
     header = "    " + "".ljust(14) + "".join(c[:col_w].rjust(col_w) for c in city_names)
     print(header)
     print("    " + "-" * (14 + col_w * len(city_names)))
@@ -394,7 +584,7 @@ def main() -> None:
                 cells.append(f"{r['distance_km']:,}".rjust(col_w) if r else "?".rjust(col_w))
         print(f"    {row_city:.<14}" + "".join(cells))
 
-    print(f"\n  Duration matrix (hours):")
+    print("\n  Duration matrix (hours):")
     header = "    " + "".ljust(14) + "".join(c[:col_w].rjust(col_w) for c in city_names)
     print(header)
     print("    " + "-" * (14 + col_w * len(city_names)))
@@ -416,22 +606,26 @@ def main() -> None:
     # Show all routes sorted by distance
     print(f"\n  All {NUM_ROUTES} routes (sorted by distance):")
     print(f"    {'Route':<28} {'Distance':>10} {'Duration':>10} {'Via'}")
-    print(f"    {'-'*28} {'-'*10} {'-'*10} {'-'*35}")
+    print(f"    {'-' * 28} {'-' * 10} {'-' * 10} {'-' * 35}")
     for route in sorted(ROUTES, key=lambda r: r["distance_km"], reverse=True):
         label = f"{route['from']} -> {route['to']}"
         hours = route["duration_min"] // 60
         mins = route["duration_min"] % 60
-        print(f"    {label:<28} {route['distance_km']:>7,} km  "
-              f"{hours}h {mins:02d}m      {route['via']}")
-    print(f"    {'-'*28} {'-'*10} {'-'*10}")
+        print(
+            f"    {label:<28} {route['distance_km']:>7,} km  "
+            f"{hours}h {mins:02d}m      {route['via']}"
+        )
+    print(f"    {'-' * 28} {'-' * 10} {'-' * 10}")
     total_h = TOTAL_DURATION // 60
     total_m = TOTAL_DURATION % 60
     print(f"    {'Total':<28} {TOTAL_DISTANCE:>7,} km  {total_h}h {total_m:02d}m")
-    print(f"    {'Average':<28} {AVG_DISTANCE:>7,} km  "
-          f"{TOTAL_DURATION // NUM_ROUTES // 60}h {TOTAL_DURATION // NUM_ROUTES % 60:02d}m")
+    print(
+        f"    {'Average':<28} {AVG_DISTANCE:>7,} km  "
+        f"{TOTAL_DURATION // NUM_ROUTES // 60}h {TOTAL_DURATION // NUM_ROUTES % 60:02d}m"
+    )
 
     # Per-city connectivity summary
-    print(f"\n  Per-city connectivity:")
+    print("\n  Per-city connectivity:")
     for city_name in city_names:
         city_routes = [r for r in ROUTES if r["from"] == city_name or r["to"] == city_name]
         total_km = sum(r["distance_km"] for r in city_routes)
@@ -439,14 +633,16 @@ def main() -> None:
         farthest = max(city_routes, key=lambda r: r["distance_km"])
         nearest_city = nearest["to"] if nearest["from"] == city_name else nearest["from"]
         farthest_city = farthest["to"] if farthest["from"] == city_name else farthest["from"]
-        print(f"    {city_name}: {len(city_routes)} routes, {total_km:,} km total  "
-              f"(nearest: {nearest_city} {nearest['distance_km']} km, "
-              f"farthest: {farthest_city} {farthest['distance_km']} km)")
+        print(
+            f"    {city_name}: {len(city_routes)} routes, {total_km:,} km total  "
+            f"(nearest: {nearest_city} {nearest['distance_km']} km, "
+            f"farthest: {farthest_city} {farthest['distance_km']} km)"
+        )
 
     # Show which cities are excluded and why
     too_big = [c for c in FRENCH_CITIES if c["population"] > MAX_POP]
     too_small = [c for c in FRENCH_CITIES if c["population"] < MIN_POP]
-    print(f"\n  Excluded cities:")
+    print("\n  Excluded cities:")
     for c in too_big:
         print(f"    {c['name']:.<14} {c['population']:>10,}  (above {MAX_POP / 1e6:.1f}M)")
     for c in sorted(too_small, key=lambda x: x["population"], reverse=True):

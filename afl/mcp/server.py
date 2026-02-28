@@ -25,6 +25,7 @@ from mcp.types import (
     TextContent,
     Tool,
 )
+from pydantic import AnyUrl
 
 from .serializers import (
     serialize_execution_result,
@@ -278,54 +279,62 @@ def create_server(
     async def list_resources() -> list[Resource]:
         return [
             Resource(
-                uri="afl://runners",
+                uri=AnyUrl("afl://runners"),
                 name="List all runners",
                 description="List all runners (most recent first)",
             ),
             Resource(
-                uri="afl://runners/{runner_id}",
+                uri=AnyUrl("afl://runners/{runner_id}"),
                 name="Runner detail",
                 description="Runner detail with workflow info",
             ),
             Resource(
-                uri="afl://runners/{runner_id}/steps",
+                uri=AnyUrl("afl://runners/{runner_id}/steps"),
                 name="Runner steps",
                 description="Steps for a runner's workflow",
             ),
             Resource(
-                uri="afl://runners/{runner_id}/logs",
+                uri=AnyUrl("afl://runners/{runner_id}/logs"),
                 name="Runner logs",
                 description="Log entries for a runner",
             ),
             Resource(
-                uri="afl://steps/{step_id}",
+                uri=AnyUrl("afl://steps/{step_id}"),
                 name="Step detail",
                 description="Step detail with state and attributes",
             ),
             Resource(
-                uri="afl://flows", name="List all flows", description="List all compiled flows"
+                uri=AnyUrl("afl://flows"),
+                name="List all flows",
+                description="List all compiled flows",
             ),
             Resource(
-                uri="afl://flows/{flow_id}",
+                uri=AnyUrl("afl://flows/{flow_id}"),
                 name="Flow detail",
                 description="Flow detail with workflows",
             ),
             Resource(
-                uri="afl://flows/{flow_id}/source",
+                uri=AnyUrl("afl://flows/{flow_id}/source"),
                 name="Flow source",
                 description="AFL source code for a flow",
             ),
             Resource(
-                uri="afl://servers", name="List servers", description="List all registered servers"
+                uri=AnyUrl("afl://servers"),
+                name="List servers",
+                description="List all registered servers",
             ),
-            Resource(uri="afl://tasks", name="List tasks", description="List pending/active tasks"),
             Resource(
-                uri="afl://handlers",
+                uri=AnyUrl("afl://tasks"),
+                name="List tasks",
+                description="List pending/active tasks",
+            ),
+            Resource(
+                uri=AnyUrl("afl://handlers"),
                 name="List handler registrations",
                 description="List all handler registrations",
             ),
             Resource(
-                uri="afl://handlers/{facet_name}",
+                uri=AnyUrl("afl://handlers/{facet_name}"),
                 name="Handler registration detail",
                 description="Handler registration detail by facet name",
             ),
@@ -435,7 +444,7 @@ def _tool_continue_step(
         store = get_store()
         evaluator = Evaluator(store)
         evaluator.continue_step(step_id, result=result_data)
-        result = {"success": True}
+        result: dict[str, Any] = {"success": True}
     except Exception as e:
         result = {"success": False, "error": str(e)}
     return [TextContent(type="text", text=json.dumps(result, default=str))]
@@ -454,7 +463,7 @@ def _tool_retry_step(
         store = get_store()
         evaluator = Evaluator(store)
         evaluator.retry_step(step_id)
-        result = {"success": True}
+        result: dict[str, Any] = {"success": True}
     except Exception as e:
         result = {"success": False, "error": str(e)}
     return [TextContent(type="text", text=json.dumps(result, default=str))]
@@ -549,7 +558,7 @@ def _tool_manage_runner(
                 )
             ]
         store.update_runner_state(runner_id, action_map[action])
-        result = {"success": True}
+        result: dict[str, Any] = {"success": True}
     except Exception as e:
         result = {"success": False, "error": str(e)}
     return [TextContent(type="text", text=json.dumps(result, default=str))]
@@ -584,9 +593,7 @@ def _tool_manage_handlers(
             return [
                 TextContent(
                     type="text",
-                    text=json.dumps(
-                        {"success": False, "error": "facet_name is required for get"}
-                    ),
+                    text=json.dumps({"success": False, "error": "facet_name is required for get"}),
                 )
             ]
         try:
@@ -768,9 +775,7 @@ def _handle_resource(uri: str, get_store: Any) -> str:
     elif parts[0] == "handlers":
         if len(parts) == 1:
             handlers = store.list_handler_registrations()
-            return json.dumps(
-                [serialize_handler_registration(h) for h in handlers], default=str
-            )
+            return json.dumps([serialize_handler_registration(h) for h in handlers], default=str)
         facet_name = parts[1]
         handler = store.get_handler_registration(facet_name)
         if not handler:

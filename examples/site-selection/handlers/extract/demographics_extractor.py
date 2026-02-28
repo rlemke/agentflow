@@ -14,12 +14,14 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_SITESEL_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "sitesel-output"))
+_OUTPUT_DIR = os.environ.get(
+    "AFL_SITESEL_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "sitesel-output")
+)
 
 
-def _safe_pct(num_key: str, den_key: str, props: dict[str, Any],
-              *, scale: float = 100.0) -> float | None:
+def _safe_pct(
+    num_key: str, den_key: str, props: dict[str, Any], *, scale: float = 100.0
+) -> float | None:
     """Compute num/den * scale, returning None if missing/zero."""
     num = props.get(num_key)
     den = props.get(den_key)
@@ -76,8 +78,7 @@ def _compute_derived_metrics(props: dict[str, Any]) -> dict[str, Any]:
                     if v is not None:
                         num_vals.append(float(v))
                 if num_vals:
-                    derived["pct_bachelors_plus"] = round(
-                        sum(num_vals) / den * 100.0, 2)
+                    derived["pct_bachelors_plus"] = round(sum(num_vals) / den * 100.0, 2)
         except (ValueError, TypeError):
             pass
 
@@ -97,8 +98,7 @@ def _load_acs_csv(path: str) -> dict[str, dict[str, str]]:
     return data
 
 
-def join_demographics(acs_path: str, tiger_path: str,
-                      state_fips: str) -> dict[str, Any]:
+def join_demographics(acs_path: str, tiger_path: str, state_fips: str) -> dict[str, Any]:
     """Join ACS CSV data with TIGER GeoJSON features.
 
     Reads county-level ACS data and TIGER boundaries, filters by
@@ -147,28 +147,26 @@ def join_demographics(acs_path: str, tiger_path: str,
             try:
                 area_km2 = float(aland) / 1e6
                 pop = float(pop_est)
-                props["population_density_km2"] = (
-                    round(pop / area_km2, 2) if area_km2 > 0 else 0.0
-                )
+                props["population_density_km2"] = round(pop / area_km2, 2) if area_km2 > 0 else 0.0
             except (ValueError, TypeError):
                 pass
 
         # Compute derived metrics
         props.update(_compute_derived_metrics(props))
 
-        joined_features.append({
-            "type": "Feature",
-            "properties": props,
-            "geometry": feat.get("geometry"),
-        })
+        joined_features.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": feat.get("geometry"),
+            }
+        )
 
-    output_path = os.path.join(output_dir,
-                               f"{state_fips}_demographics.geojson")
+    output_path = os.path.join(output_dir, f"{state_fips}_demographics.geojson")
     with open(output_path, "w") as f:
         json.dump({"type": "FeatureCollection", "features": joined_features}, f)
 
-    logger.info("Joined demographics: %d features for state %s",
-                len(joined_features), state_fips)
+    logger.info("Joined demographics: %d features for state %s", len(joined_features), state_fips)
 
     return {
         "output_path": output_path,

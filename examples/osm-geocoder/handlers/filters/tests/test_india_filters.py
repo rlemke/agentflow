@@ -16,65 +16,106 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Filters", "declarations": [
-                    _ef("ExtractAndFilterByRadius",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "admin_levels", "type": "Long"},
-                         {"name": "natural_types", "type": "String"},
-                         {"name": "radius", "type": "Double"},
-                         {"name": "unit", "type": "String"},
-                         {"name": "operator", "type": "String"}],
-                        [{"name": "result", "type": "FilterResult"}]),
-                    _ef("FilterByTypeAndRadius",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "boundary_type", "type": "String"},
-                         {"name": "radius", "type": "Double"},
-                         {"name": "unit", "type": "String"},
-                         {"name": "operator", "type": "String"}],
-                        [{"name": "result", "type": "FilterResult"}]),
-                    _ef("FilterByRadius",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "radius", "type": "Double"},
-                         {"name": "unit", "type": "String"},
-                         {"name": "operator", "type": "String"}],
-                        [{"name": "result", "type": "FilterResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Filters",
+                            "declarations": [
+                                _ef(
+                                    "ExtractAndFilterByRadius",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "admin_levels", "type": "Long"},
+                                        {"name": "natural_types", "type": "String"},
+                                        {"name": "radius", "type": "Double"},
+                                        {"name": "unit", "type": "String"},
+                                        {"name": "operator", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "FilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByTypeAndRadius",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "boundary_type", "type": "String"},
+                                        {"name": "radius", "type": "Double"},
+                                        {"name": "unit", "type": "String"},
+                                        {"name": "operator", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "FilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByRadius",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "radius", "type": "Double"},
+                                        {"name": "unit", "type": "String"},
+                                        {"name": "operator", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "FilterResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -246,7 +287,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -254,6 +297,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the India filter workflow end-to-end with mock handlers."""
@@ -317,19 +361,23 @@ def main() -> None:
     print(f"  Map output:             {outputs.get('map_path')}")
 
     # Show filter pipeline
-    print(f"\n  Filter pipeline:")
-    print(f"    All boundaries:                   12,436")
+    print("\n  Filter pipeline:")
+    print("    All boundaries:                   12,436")
     print(f"    After radius >= 50 km:            {outputs.get('extracted_count'):>6,}")
     print(f"    After administrative type filter:  {outputs.get('filtered_count'):>6}")
     print(f"    After radius >= 100 km:           {outputs.get('type_filtered_count'):>6}")
 
     # Show states sorted by area
     total_area = sum(s["area_km2"] for s in LARGE_STATES)
-    print(f"\n  Large Indian states (radius >= 100 km, {len(LARGE_STATES)} states, {total_area:,} km2):")
+    print(
+        f"\n  Large Indian states (radius >= 100 km, {len(LARGE_STATES)} states, {total_area:,} km2):"
+    )
     print(f"  {'State':<24} {'Capital':<22} {'Area (km2)':>12} {'Radius (km)':>12}")
-    print(f"  {'-'*24} {'-'*22} {'-'*12} {'-'*12}")
+    print(f"  {'-' * 24} {'-' * 22} {'-' * 12} {'-' * 12}")
     for state in sorted(LARGE_STATES, key=lambda s: s["area_km2"], reverse=True):
-        print(f"  {state['name']:<24} {state['capital']:<22} {state['area_km2']:>10,}   {state['radius_km']:>9.1f}")
+        print(
+            f"  {state['name']:<24} {state['capital']:<22} {state['area_km2']:>10,}   {state['radius_km']:>9.1f}"
+        )
 
     assert result.success
     assert outputs["region_name"] == "India"

@@ -11,7 +11,6 @@ import os
 import random
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -105,9 +104,9 @@ class SegmentIndex:
 
             self._edge_segments[edge.edge_id] = segs
 
-    def _point_to_segment_dist_m(self, px: float, py: float,
-                                  x1: float, y1: float,
-                                  x2: float, y2: float) -> float:
+    def _point_to_segment_dist_m(
+        self, px: float, py: float, x1: float, y1: float, x2: float, y2: float
+    ) -> float:
         """Perpendicular distance from point to line segment in meters.
 
         Uses flat-earth approximation with cos(lat) scaling.
@@ -126,8 +125,7 @@ class SegmentIndex:
         proj_lat = y1 + t * (y2 - y1)
         return _haversine_m(px, py, proj_lon, proj_lat)
 
-    def snap_route(self, route_coords: list[list[float]],
-                   tolerance_m: float = 50.0) -> set[int]:
+    def snap_route(self, route_coords: list[list[float]], tolerance_m: float = 50.0) -> set[int]:
         """Snap route coordinates to logical edge IDs within tolerance."""
         matched_edges: set[int] = set()
 
@@ -157,8 +155,7 @@ class SegmentIndex:
         return matched_edges
 
 
-def build_anchors(graph: RoadGraph, cities_path: str,
-                  zoom_level: int) -> list[int]:
+def build_anchors(graph: RoadGraph, cities_path: str, zoom_level: int) -> list[int]:
     """Build anchor node set for a zoom level from city data.
 
     Args:
@@ -207,8 +204,9 @@ def build_anchors(graph: RoadGraph, cities_path: str,
 
     # Fallback: if too few anchors, add high-degree nodes
     if len(anchors) < max(10, target_count // 10):
-        log.info("Sparse anchor set (%d) for z%d, adding high-degree nodes",
-                 len(anchors), zoom_level)
+        log.info(
+            "Sparse anchor set (%d) for z%d, adding high-degree nodes", len(anchors), zoom_level
+        )
         degree_nodes = sorted(
             graph.adj.keys(),
             key=lambda n: len(graph.adj[n]),
@@ -220,13 +218,15 @@ def build_anchors(graph: RoadGraph, cities_path: str,
             if len(anchors) >= target_count:
                 break
 
-    log.info("Built %d anchors for zoom %d (pop threshold %d)",
-             len(anchors), zoom_level, pop_threshold)
+    log.info(
+        "Built %d anchors for zoom %d (pop threshold %d)", len(anchors), zoom_level, pop_threshold
+    )
     return anchors
 
 
-def _snap_to_nearest_node(graph: RoadGraph, lon: float, lat: float,
-                          max_dist_m: float = 50_000.0) -> int | None:
+def _snap_to_nearest_node(
+    graph: RoadGraph, lon: float, lat: float, max_dist_m: float = 50_000.0
+) -> int | None:
     """Find the nearest graph node to a (lon, lat) point."""
     best_dist = max_dist_m
     best_node = None
@@ -238,9 +238,9 @@ def _snap_to_nearest_node(graph: RoadGraph, lon: float, lat: float,
     return best_node
 
 
-def sample_od_pairs(anchors: list[int], zoom_level: int,
-                    graph: RoadGraph,
-                    k_pairs: int | None = None) -> list[tuple[int, int]]:
+def sample_od_pairs(
+    anchors: list[int], zoom_level: int, graph: RoadGraph, k_pairs: int | None = None
+) -> list[tuple[int, int]]:
     """Sample origin-destination pairs from anchors for SBS.
 
     Args:
@@ -263,7 +263,7 @@ def sample_od_pairs(anchors: list[int], zoom_level: int,
     # Generate all valid pairs
     valid_pairs: list[tuple[int, int]] = []
     for i, a in enumerate(anchors):
-        for b in anchors[i + 1:]:
+        for b in anchors[i + 1 :]:
             if a in graph.node_coords and b in graph.node_coords:
                 alon, alat = graph.node_coords[a]
                 blon, blat = graph.node_coords[b]
@@ -277,14 +277,23 @@ def sample_od_pairs(anchors: list[int], zoom_level: int,
         valid_pairs = valid_pairs[:k_pairs]
 
     valid_pairs.sort()
-    log.info("Sampled %d OD pairs for zoom %d from %d anchors (min %.0f km)",
-             len(valid_pairs), zoom_level, len(anchors), min_dist_km)
+    log.info(
+        "Sampled %d OD pairs for zoom %d from %d anchors (min %.0f km)",
+        len(valid_pairs),
+        zoom_level,
+        len(anchors),
+        min_dist_km,
+    )
     return valid_pairs
 
 
-def _route_pair(from_node: int, to_node: int,
-                node_coords: dict[int, tuple[float, float]],
-                graph_dir: str, profile: str) -> list[list[float]] | None:
+def _route_pair(
+    from_node: int,
+    to_node: int,
+    node_coords: dict[int, tuple[float, float]],
+    graph_dir: str,
+    profile: str,
+) -> list[list[float]] | None:
     """Query GraphHopper HTTP API for fastest route between two nodes."""
     if not HAS_REQUESTS:
         return None
@@ -320,9 +329,13 @@ def _route_pair(from_node: int, to_node: int,
     return None
 
 
-def _route_pair_with_time(from_node: int, to_node: int,
-                          node_coords: dict[int, tuple[float, float]],
-                          graph_dir: str, profile: str) -> tuple[list[list[float]] | None, float]:
+def _route_pair_with_time(
+    from_node: int,
+    to_node: int,
+    node_coords: dict[int, tuple[float, float]],
+    graph_dir: str,
+    profile: str,
+) -> tuple[list[list[float]] | None, float]:
     """Route and return (coordinates, time_ms)."""
     if not HAS_REQUESTS:
         return None, 0.0
@@ -427,7 +440,7 @@ def normalize_sbs(bc: dict[int, int]) -> dict[int, float]:
     p95 = values[min(p95_idx, len(values) - 1)]
 
     if p95 == 0:
-        return {eid: 0.0 for eid in bc}
+        return dict.fromkeys(bc, 0.0)
 
     denom = math.log(1 + p95)
     result: dict[int, float] = {}
@@ -456,7 +469,11 @@ def compute_sbs_for_zoom(
 
     segment_index = SegmentIndex(graph)
     routes = route_batch_parallel(
-        pairs, graph.node_coords, graph_dir, profile, max_concurrent,
+        pairs,
+        graph.node_coords,
+        graph_dir,
+        profile,
+        max_concurrent,
     )
 
     bc = accumulate_votes(routes, segment_index)

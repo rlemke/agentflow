@@ -34,7 +34,7 @@ SEED_PATH = "docker:seed"
 
 # Inline example AFL sources
 INLINE_SOURCES = {
-    "addone-example": '''
+    "addone-example": """
 /** Core handler namespace with arithmetic and greeting facets. */
 namespace handlers {
     /** Increments a value by one. */
@@ -75,8 +75,8 @@ namespace handlers {
         yield GreetAndCount(greeting = hello.message, count = one.result)
     }
 }
-''',
-    "chain-example": '''
+""",
+    "chain-example": """
 // Chain workflow - multiple steps in sequence
 namespace chain {
     use handlers
@@ -88,8 +88,8 @@ namespace chain {
         yield ChainOfThree(final = step3.result)
     }
 }
-''',
-    "parallel-example": '''
+""",
+    "parallel-example": """
 // Parallel workflow - demonstrates concurrent step execution
 namespace parallel {
     use handlers
@@ -104,7 +104,7 @@ namespace parallel {
         yield ParallelAdd(sumPlusTwo = product.result)
     }
 }
-''',
+""",
 }
 
 
@@ -153,9 +153,13 @@ def _extract_flow_structure(program_dict: dict):
     def _walk_namespace(ns: dict, prefix: str = "") -> None:
         ns_id = generate_id()
         ns_name = f"{prefix}{ns['name']}" if prefix else ns["name"]
-        namespaces.append(NamespaceDefinition(
-            uuid=ns_id, name=ns_name, documentation=ns.get("doc"),
-        ))
+        namespaces.append(
+            NamespaceDefinition(
+                uuid=ns_id,
+                name=ns_name,
+                documentation=ns.get("doc"),
+            )
+        )
 
         # Walk declarations only (superset of eventFacets + workflows)
         for decl in ns.get("declarations", []):
@@ -169,14 +173,16 @@ def _extract_flow_structure(program_dict: dict):
                 if decl.get("returns"):
                     ret_names = [r.get("name", "") for r in decl["returns"]]
                     ret_type = ", ".join(ret_names)
-                facets.append(FacetDefinition(
-                    uuid=decl.get("id", generate_id()),
-                    name=f"{ns_name}.{decl['name']}",
-                    namespace_id=ns_id,
-                    parameters=params,
-                    return_type=ret_type,
-                    documentation=decl.get("doc"),
-                ))
+                facets.append(
+                    FacetDefinition(
+                        uuid=decl.get("id", generate_id()),
+                        name=f"{ns_name}.{decl['name']}",
+                        namespace_id=ns_id,
+                        parameters=params,
+                        return_type=ret_type,
+                        documentation=decl.get("doc"),
+                    )
+                )
             elif decl_type == "WorkflowDecl":
                 _walk_workflow_body(decl, ns_name)
             elif decl_type == "Namespace":
@@ -189,26 +195,32 @@ def _extract_flow_structure(program_dict: dict):
         blk_type = body.get("type", "")
         if blk_type in ("AndThenBlock", "AndMapBlock", "AndMatchBlock"):
             blk_id = generate_id()
-            blocks.append(BlockDefinition(
-                uuid=blk_id,
-                name=f"{ns_name}.{wf['name']}.body",
-                block_type=blk_type.replace("Block", ""),
-            ))
+            blocks.append(
+                BlockDefinition(
+                    uuid=blk_id,
+                    name=f"{ns_name}.{wf['name']}.body",
+                    block_type=blk_type.replace("Block", ""),
+                )
+            )
             for step in body.get("steps", []):
-                statements.append(StatementDefinition(
-                    uuid=step.get("id", generate_id()),
-                    name=step.get("name", ""),
-                    statement_type="VariableAssignment",
-                    block_id=blk_id,
-                ))
+                statements.append(
+                    StatementDefinition(
+                        uuid=step.get("id", generate_id()),
+                        name=step.get("name", ""),
+                        statement_type="VariableAssignment",
+                        block_id=blk_id,
+                    )
+                )
             if body.get("yield"):
                 y = body["yield"]
-                statements.append(StatementDefinition(
-                    uuid=y.get("id", generate_id()),
-                    name="yield",
-                    statement_type="YieldAssignment",
-                    block_id=blk_id,
-                ))
+                statements.append(
+                    StatementDefinition(
+                        uuid=y.get("id", generate_id()),
+                        name="yield",
+                        statement_type="YieldAssignment",
+                        block_id=blk_id,
+                    )
+                )
 
     # Use only 'namespaces' at top level (avoids duplicates with 'declarations')
     for ns in program_dict.get("namespaces", []):
@@ -399,7 +411,6 @@ def seed_sample_runner(flow_id: str, store) -> tuple[str, list[str]]:
         AttributeValue,
         FacetAttributes,
         ObjectType,
-        StepId,
         WorkflowId,
         event_id,
         generate_id,
@@ -590,9 +601,7 @@ def clean_seeds(store) -> tuple[int, int]:
     workflows_deleted = 0
     seed_workflow_ids = []
     if flow_ids:
-        wf_docs = list(db.workflows.find(
-            {"flow_id": {"$in": flow_ids}}, {"uuid": 1}
-        ))
+        wf_docs = list(db.workflows.find({"flow_id": {"$in": flow_ids}}, {"uuid": 1}))
         seed_workflow_ids = [doc["uuid"] for doc in wf_docs]
 
         result = db.workflows.delete_many({"flow_id": {"$in": flow_ids}})
@@ -601,9 +610,9 @@ def clean_seeds(store) -> tuple[int, int]:
     # Clean runners and their dependent data
     seed_runner_ids = []
     if seed_workflow_ids:
-        runner_docs = list(db.runners.find(
-            {"workflow_id": {"$in": seed_workflow_ids}}, {"uuid": 1}
-        ))
+        runner_docs = list(
+            db.runners.find({"workflow_id": {"$in": seed_workflow_ids}}, {"uuid": 1})
+        )
         seed_runner_ids = [doc["uuid"] for doc in runner_docs]
 
         db.steps.delete_many({"workflow_id": {"$in": seed_workflow_ids}})
@@ -659,7 +668,9 @@ def seed_database():
     combined_source = "\n".join(INLINE_SOURCES.values())
     try:
         inline_flow_id, wf_count = seed_inline_source(
-            "inline-examples", combined_source, store,
+            "inline-examples",
+            combined_source,
+            store,
         )
         total_flows += 1
         total_workflows += wf_count
@@ -685,11 +696,11 @@ def seed_database():
                 if wf_count > 0:
                     total_flows += 1
                     total_workflows += wf_count
-                    logger.info("  %-20s %2d files  %3d workflows   OK",
-                                entry, len(afl_files), wf_count)
+                    logger.info(
+                        "  %-20s %2d files  %3d workflows   OK", entry, len(afl_files), wf_count
+                    )
                 else:
-                    logger.info("  %-20s %2d files    0 workflows   SKIP",
-                                entry, len(afl_files))
+                    logger.info("  %-20s %2d files    0 workflows   SKIP", entry, len(afl_files))
             except Exception as e:
                 logger.warning("  %-20s ERROR: %s", entry, e)
 

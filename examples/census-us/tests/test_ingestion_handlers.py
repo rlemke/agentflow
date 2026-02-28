@@ -34,8 +34,7 @@ def _census_import(module_name: str):
         pkg = sys.modules["handlers"]
         pkg_file = getattr(pkg, "__file__", "")
         if pkg_file and "census-us" not in pkg_file:
-            stale = [k for k in sys.modules
-                     if k == "handlers" or k.startswith("handlers.")]
+            stale = [k for k in sys.modules if k == "handlers" or k.startswith("handlers.")]
             for k in stale:
                 del sys.modules[k]
 
@@ -45,6 +44,7 @@ def _census_import(module_name: str):
 # ------------------------------------------------------------------
 # OutputStore tests (mongomock)
 # ------------------------------------------------------------------
+
 
 class TestOutputStore:
     """Test OutputStore with mocked MongoDB collections."""
@@ -79,21 +79,25 @@ class TestOutputStore:
     def test_ingest_geojson(self, store, tmp_path):
         output_store, db = store
         geojson_file = tmp_path / "counties.geojson"
-        geojson_file.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [
+        geojson_file.write_text(
+            json.dumps(
                 {
-                    "type": "Feature",
-                    "properties": {"GEOID": "01001", "NAME": "Autauga"},
-                    "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
-                },
-                {
-                    "type": "Feature",
-                    "properties": {"GEOID": "01003", "NAME": "Baldwin"},
-                    "geometry": {"type": "Point", "coordinates": [-87.7, 30.7]},
-                },
-            ],
-        }))
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "01001", "NAME": "Autauga"},
+                            "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "01003", "NAME": "Baldwin"},
+                            "geometry": {"type": "Point", "coordinates": [-87.7, 30.7]},
+                        },
+                    ],
+                }
+            )
+        )
 
         count = output_store.ingest_geojson(
             path=str(geojson_file),
@@ -116,14 +120,20 @@ class TestOutputStore:
         """bulk_write operations use upsert=True for idempotency."""
         output_store, db = store
         geojson_file = tmp_path / "counties.geojson"
-        geojson_file.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {"GEOID": "01001", "NAME": "Autauga"},
-                "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
-            }],
-        }))
+        geojson_file.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "01001", "NAME": "Autauga"},
+                            "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
+                        }
+                    ],
+                }
+            )
+        )
 
         output_store.ingest_geojson(
             path=str(geojson_file),
@@ -145,9 +155,7 @@ class TestOutputStore:
         output_store, db = store
         csv_file = tmp_path / "population.csv"
         csv_file.write_text(
-            "GEOID,NAME,B01003_001E\n"
-            "0500000US01001,Autauga,59285\n"
-            "0500000US01003,Baldwin,231767\n"
+            "GEOID,NAME,B01003_001E\n0500000US01001,Autauga,59285\n0500000US01003,Baldwin,231767\n"
         )
 
         count = output_store.ingest_csv(
@@ -185,12 +193,16 @@ class TestOutputStore:
     def test_ingest_json(self, store, tmp_path):
         output_store, db = store
         json_file = tmp_path / "summary.json"
-        json_file.write_text(json.dumps({
-            "state_fips": "01",
-            "state_name": "Alabama",
-            "tables_joined": 5,
-            "record_count": 67,
-        }))
+        json_file.write_text(
+            json.dumps(
+                {
+                    "state_fips": "01",
+                    "state_name": "Alabama",
+                    "tables_joined": 5,
+                    "record_count": 67,
+                }
+            )
+        )
 
         count = output_store.ingest_json(
             path=str(json_file),
@@ -214,6 +226,7 @@ class TestOutputStore:
 # ------------------------------------------------------------------
 # Ingestion handler dispatch tests
 # ------------------------------------------------------------------
+
 
 class TestIngestionHandlers:
     def test_dispatch_keys(self):
@@ -264,30 +277,36 @@ class TestIngestionHandlers:
         """CountiesToDB reads GeoJSON and calls OutputStore.ingest_geojson."""
         mod = _census_import("ingestion.ingestion_handlers")
         geojson_file = tmp_path / "counties.geojson"
-        geojson_file.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [
+        geojson_file.write_text(
+            json.dumps(
                 {
-                    "type": "Feature",
-                    "properties": {"GEOID": "01001", "NAME": "Autauga"},
-                    "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
-                },
-            ],
-        }))
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "01001", "NAME": "Autauga"},
+                            "geometry": {"type": "Point", "coordinates": [-86.6, 32.5]},
+                        },
+                    ],
+                }
+            )
+        )
 
         mock_store = MagicMock()
         mock_store.ingest_geojson.return_value = 1
 
         with patch.object(mod, "get_mongo_db"):
             with patch.object(mod, "OutputStore", return_value=mock_store):
-                result = mod.handle({
-                    "_facet_name": "census.Ingestion.CountiesToDB",
-                    "result": {
-                        "output_path": str(geojson_file),
-                        "feature_count": 1,
-                    },
-                    "state_fips": "01",
-                })
+                result = mod.handle(
+                    {
+                        "_facet_name": "census.Ingestion.CountiesToDB",
+                        "result": {
+                            "output_path": str(geojson_file),
+                            "feature_count": 1,
+                        },
+                        "state_fips": "01",
+                    }
+                )
 
         assert "ingestion" in result
         assert result["ingestion"]["dataset_key"] == "census.tiger.county.01"
@@ -305,15 +324,17 @@ class TestIngestionHandlers:
 
         with patch.object(mod, "get_mongo_db"):
             with patch.object(mod, "OutputStore", return_value=mock_store):
-                result = mod.handle({
-                    "_facet_name": "census.Ingestion.PopulationToDB",
-                    "result": {
-                        "output_path": str(csv_file),
-                        "table_id": "B01003",
-                        "record_count": 1,
-                    },
-                    "state_fips": "01",
-                })
+                result = mod.handle(
+                    {
+                        "_facet_name": "census.Ingestion.PopulationToDB",
+                        "result": {
+                            "output_path": str(csv_file),
+                            "table_id": "B01003",
+                            "record_count": 1,
+                        },
+                        "state_fips": "01",
+                    }
+                )
 
         assert "ingestion" in result
         assert result["ingestion"]["dataset_key"] == "census.acs.b01003.01"
@@ -323,25 +344,33 @@ class TestIngestionHandlers:
         """SummaryToDB reads JSON and calls OutputStore.ingest_json."""
         mod = _census_import("ingestion.ingestion_handlers")
         json_file = tmp_path / "summary.json"
-        json_file.write_text(json.dumps({
-            "state_fips": "01", "state_name": "Alabama",
-            "tables_joined": 5, "record_count": 67,
-        }))
+        json_file.write_text(
+            json.dumps(
+                {
+                    "state_fips": "01",
+                    "state_name": "Alabama",
+                    "tables_joined": 5,
+                    "record_count": 67,
+                }
+            )
+        )
 
         mock_store = MagicMock()
         mock_store.ingest_json.return_value = 1
 
         with patch.object(mod, "get_mongo_db"):
             with patch.object(mod, "OutputStore", return_value=mock_store):
-                result = mod.handle({
-                    "_facet_name": "census.Ingestion.SummaryToDB",
-                    "result": {
-                        "output_path": str(json_file),
+                result = mod.handle(
+                    {
+                        "_facet_name": "census.Ingestion.SummaryToDB",
+                        "result": {
+                            "output_path": str(json_file),
+                            "state_fips": "01",
+                            "state_name": "Alabama",
+                        },
                         "state_fips": "01",
-                        "state_name": "Alabama",
-                    },
-                    "state_fips": "01",
-                })
+                    }
+                )
 
         assert "ingestion" in result
         assert result["ingestion"]["dataset_key"] == "census.summary.01"
@@ -355,11 +384,13 @@ class TestIngestionHandlers:
 
         with patch.object(mod, "get_mongo_db"):
             with patch.object(mod, "OutputStore", return_value=mock_store):
-                result = mod.handle({
-                    "_facet_name": "census.Ingestion.JoinedToDB",
-                    "result": {"output_path": ""},
-                    "state_fips": "01",
-                })
+                result = mod.handle(
+                    {
+                        "_facet_name": "census.Ingestion.JoinedToDB",
+                        "result": {"output_path": ""},
+                        "state_fips": "01",
+                    }
+                )
 
         assert result["ingestion"]["record_count"] == 0
         mock_store.ingest_geojson.assert_not_called()
@@ -369,15 +400,16 @@ class TestIngestionHandlers:
         mod = _census_import("ingestion.ingestion_handlers")
         step_log = MagicMock()
 
-        with patch.object(mod, "get_mongo_db",
-                          side_effect=RuntimeError("connection refused")):
+        with patch.object(mod, "get_mongo_db", side_effect=RuntimeError("connection refused")):
             with pytest.raises(RuntimeError, match="connection refused"):
-                mod.handle({
-                    "_facet_name": "census.Ingestion.CountiesToDB",
-                    "result": {"output_path": "/tmp/test.geojson"},
-                    "state_fips": "01",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.Ingestion.CountiesToDB",
+                        "result": {"output_path": "/tmp/test.geojson"},
+                        "state_fips": "01",
+                        "_step_log": step_log,
+                    }
+                )
 
         step_log.assert_called_once()
         assert "connection refused" in step_log.call_args[0][0]
@@ -387,6 +419,7 @@ class TestIngestionHandlers:
 # ------------------------------------------------------------------
 # Registration count tests (updated totals)
 # ------------------------------------------------------------------
+
 
 class TestInitRegistryHandlersWithIngestion:
     def test_register_all_registry_handlers(self):

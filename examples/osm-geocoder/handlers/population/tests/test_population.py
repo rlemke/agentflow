@@ -6,7 +6,6 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from handlers.population.population_filter import (
     HAS_OSMIUM,
     Operator,

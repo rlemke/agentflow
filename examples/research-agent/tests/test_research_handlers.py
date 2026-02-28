@@ -122,7 +122,13 @@ class TestPlanningHandlers:
     def test_decompose_json_string_topic(self):
         from handlers.planning.planning_handlers import handle_decompose_into_subtopics
 
-        topic = {"name": "robotics", "depth": 2, "keywords": ["nav"], "summary": "test", "max_subtopics": 3}
+        topic = {
+            "name": "robotics",
+            "depth": 2,
+            "keywords": ["nav"],
+            "summary": "test",
+            "max_subtopics": 3,
+        }
         result = handle_decompose_into_subtopics({"topic": json.dumps(topic), "max_subtopics": 3})
         assert len(result["subtopics"]) == 3
         assert result["subtopics"][0]["parent_topic"] == "robotics"
@@ -135,10 +141,12 @@ class TestGatheringHandlers:
     def test_sources_list(self):
         from handlers.gathering.gathering_handlers import handle_gather_sources
 
-        result = handle_gather_sources({
-            "subtopic": {"name": "deep learning", "description": "DL methods"},
-            "max_sources": 4,
-        })
+        result = handle_gather_sources(
+            {
+                "subtopic": {"name": "deep learning", "description": "DL methods"},
+                "max_sources": 4,
+            }
+        )
         assert len(result["sources"]) == 4
         for s in result["sources"]:
             assert "title" in s
@@ -147,27 +155,36 @@ class TestGatheringHandlers:
     def test_json_string_subtopic(self):
         from handlers.gathering.gathering_handlers import handle_gather_sources
 
-        subtopic = {"name": "RL", "parent_topic": "AI", "description": "reinforcement learning", "priority": 1}
+        subtopic = {
+            "name": "RL",
+            "parent_topic": "AI",
+            "description": "reinforcement learning",
+            "priority": 1,
+        }
         result = handle_gather_sources({"subtopic": json.dumps(subtopic), "max_sources": 2})
         assert len(result["sources"]) == 2
 
     def test_findings_structure(self):
         from handlers.gathering.gathering_handlers import handle_extract_findings
 
-        result = handle_extract_findings({
-            "subtopic": {"name": "testing"},
-            "sources": [{"title": "S1"}, {"title": "S2"}],
-        })
+        result = handle_extract_findings(
+            {
+                "subtopic": {"name": "testing"},
+                "sources": [{"title": "S1"}, {"title": "S2"}],
+            }
+        )
         assert len(result["findings"]) == 2
         assert all("confidence" in f for f in result["findings"])
 
     def test_empty_sources(self):
         from handlers.gathering.gathering_handlers import handle_extract_findings
 
-        result = handle_extract_findings({
-            "subtopic": {"name": "empty test"},
-            "sources": [],
-        })
+        result = handle_extract_findings(
+            {
+                "subtopic": {"name": "empty test"},
+                "sources": [],
+            }
+        )
         assert result["findings"] == []
 
 
@@ -178,10 +195,12 @@ class TestAnalysisHandlers:
     def test_synthesis_output(self):
         from handlers.analysis.analysis_handlers import handle_synthesize_findings
 
-        result = handle_synthesize_findings({
-            "topic": {"name": "climate"},
-            "all_findings": [[{"claim": "f1"}, {"claim": "f2"}], [{"claim": "f3"}]],
-        })
+        result = handle_synthesize_findings(
+            {
+                "topic": {"name": "climate"},
+                "all_findings": [[{"claim": "f1"}, {"claim": "f2"}], [{"claim": "f3"}]],
+            }
+        )
         analysis = result["analysis"]
         assert "themes" in analysis
         assert "summary" in analysis
@@ -192,19 +211,23 @@ class TestAnalysisHandlers:
 
         # JSON string all_findings
         findings = json.dumps([[{"claim": "a"}], [{"claim": "b"}, {"claim": "c"}]])
-        result = handle_synthesize_findings({
-            "topic": {"name": "test"},
-            "all_findings": findings,
-        })
+        result = handle_synthesize_findings(
+            {
+                "topic": {"name": "test"},
+                "all_findings": findings,
+            }
+        )
         assert len(result["analysis"]["themes"]) == 3  # 3 findings = min(3, 3) themes
 
     def test_gaps_returns_lists(self):
         from handlers.analysis.analysis_handlers import handle_identify_gaps
 
-        result = handle_identify_gaps({
-            "analysis": {"gaps": ["Gap A", "Gap B"], "themes": [], "contradictions": []},
-            "topic": {"name": "test"},
-        })
+        result = handle_identify_gaps(
+            {
+                "analysis": {"gaps": ["Gap A", "Gap B"], "themes": [], "contradictions": []},
+                "topic": {"name": "test"},
+            }
+        )
         assert isinstance(result["gaps"], list)
         assert isinstance(result["recommendations"], list)
         assert len(result["gaps"]) == 2
@@ -213,11 +236,19 @@ class TestAnalysisHandlers:
     def test_json_string_analysis(self):
         from handlers.analysis.analysis_handlers import handle_identify_gaps
 
-        analysis = {"gaps": ["G1"], "themes": ["T1"], "contradictions": [], "summary": "ok", "confidence_score": 0.8}
-        result = handle_identify_gaps({
-            "analysis": json.dumps(analysis),
-            "topic": json.dumps({"name": "test"}),
-        })
+        analysis = {
+            "gaps": ["G1"],
+            "themes": ["T1"],
+            "contradictions": [],
+            "summary": "ok",
+            "confidence_score": 0.8,
+        }
+        result = handle_identify_gaps(
+            {
+                "analysis": json.dumps(analysis),
+                "topic": json.dumps({"name": "test"}),
+            }
+        )
         assert len(result["gaps"]) == 1
 
 
@@ -228,11 +259,18 @@ class TestWritingHandlers:
     def test_draft_sections(self):
         from handlers.writing.writing_handlers import handle_draft_report
 
-        result = handle_draft_report({
-            "topic": {"name": "AI"},
-            "analysis": {"themes": ["T1", "T2"], "summary": "Analysis summary", "confidence_score": 0.8, "gaps": []},
-            "gaps": [{"description": "Gap 1"}],
-        })
+        result = handle_draft_report(
+            {
+                "topic": {"name": "AI"},
+                "analysis": {
+                    "themes": ["T1", "T2"],
+                    "summary": "Analysis summary",
+                    "confidence_score": 0.8,
+                    "gaps": [],
+                },
+                "gaps": [{"description": "Gap 1"}],
+            }
+        )
         draft = result["draft"]
         assert len(draft["sections"]) == 5
         assert draft["sections"][0]["title"] == "Introduction"
@@ -241,21 +279,25 @@ class TestWritingHandlers:
     def test_word_count(self):
         from handlers.writing.writing_handlers import handle_draft_report
 
-        result = handle_draft_report({
-            "topic": {"name": "testing"},
-            "analysis": {"themes": [], "summary": "short", "gaps": []},
-            "gaps": [],
-        })
+        result = handle_draft_report(
+            {
+                "topic": {"name": "testing"},
+                "analysis": {"themes": [], "summary": "short", "gaps": []},
+                "gaps": [],
+            }
+        )
         assert result["draft"]["word_count"] > 0
 
     def test_review_score(self):
         from handlers.writing.writing_handlers import handle_review_draft
 
-        result = handle_review_draft({
-            "draft": {"title": "Report", "sections": [], "word_count": 500, "citations": []},
-            "topic": {"name": "testing"},
-            "analysis": {"confidence_score": 0.85, "themes": []},
-        })
+        result = handle_review_draft(
+            {
+                "draft": {"title": "Report", "sections": [], "word_count": 500, "citations": []},
+                "topic": {"name": "testing"},
+                "analysis": {"confidence_score": 0.85, "themes": []},
+            }
+        )
         review = result["review"]
         assert 55 <= review["score"] <= 94
         assert isinstance(review["approved"], bool)
@@ -263,11 +305,13 @@ class TestWritingHandlers:
     def test_approved_threshold(self):
         from handlers.writing.writing_handlers import handle_review_draft
 
-        result = handle_review_draft({
-            "draft": {"title": "Report", "sections": [], "word_count": 500, "citations": []},
-            "topic": {"name": "threshold_test"},
-            "analysis": {"confidence_score": 0.9, "themes": []},
-        })
+        result = handle_review_draft(
+            {
+                "draft": {"title": "Report", "sections": [], "word_count": 500, "citations": []},
+                "topic": {"name": "threshold_test"},
+                "analysis": {"confidence_score": 0.9, "themes": []},
+            }
+        )
         review = result["review"]
         assert review["approved"] == (review["score"] >= 70)
 
@@ -305,9 +349,9 @@ class TestDispatch:
         assert "research.Writing.ReviewDraft" in _DISPATCH
 
     def test_total_handler_count(self):
-        from handlers.planning.planning_handlers import _DISPATCH as d1
-        from handlers.gathering.gathering_handlers import _DISPATCH as d2
         from handlers.analysis.analysis_handlers import _DISPATCH as d3
+        from handlers.gathering.gathering_handlers import _DISPATCH as d2
+        from handlers.planning.planning_handlers import _DISPATCH as d1
         from handlers.writing.writing_handlers import _DISPATCH as d4
 
         assert len(d1) + len(d2) + len(d3) + len(d4) == 8
@@ -371,10 +415,7 @@ class TestCompilation:
         workflows_ns = [ns for ns in parsed_ast.namespaces if ns.name == "research.workflows"][0]
         deep_dive = [w for w in workflows_ns.workflows if w.sig.name == "DeepDive"][0]
         # DeepDive has an andThen foreach block
-        has_foreach = any(
-            block.foreach is not None
-            for block in deep_dive.body
-        )
+        has_foreach = any(block.foreach is not None for block in deep_dive.body)
         assert has_foreach
 
 
@@ -383,11 +424,12 @@ class TestCompilation:
 # ---------------------------------------------------------------------------
 class TestAgentIntegration:
     def test_tool_registry_dispatches_all_handlers(self):
-        from afl.runtime.agent import ToolRegistry
-        from handlers.planning.planning_handlers import _DISPATCH as d1
-        from handlers.gathering.gathering_handlers import _DISPATCH as d2
         from handlers.analysis.analysis_handlers import _DISPATCH as d3
+        from handlers.gathering.gathering_handlers import _DISPATCH as d2
+        from handlers.planning.planning_handlers import _DISPATCH as d1
         from handlers.writing.writing_handlers import _DISPATCH as d4
+
+        from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
         for dispatch in [d1, d2, d3, d4]:
@@ -398,17 +440,23 @@ class TestAgentIntegration:
 
         # Verify all 8 handlers registered
         tool_names = [
-            "PlanResearch", "DecomposeIntoSubtopics", "GatherSources",
-            "ExtractFindings", "SynthesizeFindings", "IdentifyGaps",
-            "DraftReport", "ReviewDraft",
+            "PlanResearch",
+            "DecomposeIntoSubtopics",
+            "GatherSources",
+            "ExtractFindings",
+            "SynthesizeFindings",
+            "IdentifyGaps",
+            "DraftReport",
+            "ReviewDraft",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
 
     def test_claude_agent_runner_with_custom_handlers(self):
+        from handlers.planning.planning_handlers import handle_plan_research
+
         from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
         from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
-        from handlers.planning.planning_handlers import handle_plan_research
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))

@@ -30,8 +30,7 @@ def handle_download_acs(params: dict[str, Any]) -> dict[str, Any]:
 
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadACS: state={state_fips} year={year} ({source})",
-                     level="success")
+            step_log(f"DownloadACS: state={state_fips} year={year} ({source})", level="success")
 
         return {"file": result}
     except Exception as exc:
@@ -54,13 +53,13 @@ def handle_download_tiger(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
 
     try:
-        result = download_tiger(year=year, geo_level=geo_level,
-                                state_fips=state_fips)
+        result = download_tiger(year=year, geo_level=geo_level, state_fips=state_fips)
 
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadTIGER: state={state_fips} level={geo_level} ({source})",
-                     level="success")
+            step_log(
+                f"DownloadTIGER: state={state_fips} level={geo_level} ({source})", level="success"
+            )
 
         return {"file": result}
     except Exception as exc:
@@ -93,8 +92,7 @@ def handle_download_acs_detailed(params: dict[str, Any]) -> dict[str, Any]:
 
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadACSDetailed: state={state_fips} ({source})",
-                     level="success")
+            step_log(f"DownloadACSDetailed: state={state_fips} ({source})", level="success")
 
         return {"file": result}
     except Exception as exc:

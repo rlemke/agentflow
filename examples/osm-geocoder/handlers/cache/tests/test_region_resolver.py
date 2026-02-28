@@ -7,7 +7,6 @@ Run from the repo root:
 """
 
 import pytest
-
 from handlers.shared.region_resolver import (
     ALIASES,
     GEOGRAPHIC_FEATURES,
@@ -19,10 +18,10 @@ from handlers.shared.region_resolver import (
     resolve,
 )
 
-
 # ---------------------------------------------------------------------------
 # _normalize
 # ---------------------------------------------------------------------------
+
 
 class TestNormalize:
     def test_lowercase(self):
@@ -60,6 +59,7 @@ class TestNormalize:
 # RegionMatch
 # ---------------------------------------------------------------------------
 
+
 class TestRegionMatch:
     def test_continent_extraction(self):
         m = RegionMatch(
@@ -91,6 +91,7 @@ class TestRegionMatch:
 # Direct name resolution
 # ---------------------------------------------------------------------------
 
+
 class TestDirectResolution:
     def test_simple_country(self):
         result = resolve("France")
@@ -100,8 +101,7 @@ class TestDirectResolution:
     def test_us_state(self):
         result = resolve("Colorado")
         assert len(result.matches) >= 1
-        assert any(m.geofabrik_path == "north-america/us/colorado"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/colorado" for m in result.matches)
 
     def test_case_insensitive(self):
         result = resolve("france")
@@ -109,23 +109,21 @@ class TestDirectResolution:
 
     def test_with_hyphens(self):
         result = resolve("Czech-Republic")
-        assert any(m.geofabrik_path == "europe/czech-republic"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/czech-republic" for m in result.matches)
 
     def test_with_spaces(self):
         result = resolve("New York")
-        assert any(m.geofabrik_path == "north-america/us/new-york"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/new-york" for m in result.matches)
 
     def test_leading_the(self):
         result = resolve("the Netherlands")
-        assert any(m.geofabrik_path == "europe/netherlands"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/netherlands" for m in result.matches)
 
     def test_canadian_province(self):
         result = resolve("British Columbia")
-        assert any(m.geofabrik_path == "north-america/canada/british-columbia"
-                    for m in result.matches)
+        assert any(
+            m.geofabrik_path == "north-america/canada/british-columbia" for m in result.matches
+        )
 
     def test_african_country(self):
         result = resolve("Kenya")
@@ -137,18 +135,15 @@ class TestDirectResolution:
 
     def test_south_american_country(self):
         result = resolve("Brazil")
-        assert any(m.geofabrik_path == "south-america/brazil"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "south-america/brazil" for m in result.matches)
 
     def test_central_american_country(self):
         result = resolve("Panama")
-        assert any(m.geofabrik_path == "central-america/panama"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "central-america/panama" for m in result.matches)
 
     def test_oceania_country(self):
         result = resolve("New Zealand")
-        assert any(m.geofabrik_path == "australia-oceania/new-zealand"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "australia-oceania/new-zealand" for m in result.matches)
 
     def test_query_preserved(self):
         result = resolve("France")
@@ -159,11 +154,11 @@ class TestDirectResolution:
 # Alias resolution
 # ---------------------------------------------------------------------------
 
+
 class TestAliasResolution:
     def test_uk(self):
         result = resolve("UK")
-        assert any(m.geofabrik_path == "europe/great-britain"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/great-britain" for m in result.matches)
 
     def test_usa(self):
         result = resolve("USA")
@@ -171,18 +166,15 @@ class TestAliasResolution:
 
     def test_great_britain(self):
         result = resolve("Great Britain")
-        assert any(m.geofabrik_path == "europe/great-britain"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/great-britain" for m in result.matches)
 
     def test_czechia(self):
         result = resolve("Czechia")
-        assert any(m.geofabrik_path == "europe/czech-republic"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/czech-republic" for m in result.matches)
 
     def test_holland(self):
         result = resolve("Holland")
-        assert any(m.geofabrik_path == "europe/netherlands"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/netherlands" for m in result.matches)
 
     def test_burma(self):
         result = resolve("Burma")
@@ -190,63 +182,59 @@ class TestAliasResolution:
 
     def test_oceania(self):
         result = resolve("Oceania")
-        assert any(m.geofabrik_path == "australia-oceania"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "australia-oceania" for m in result.matches)
 
     def test_us_state_postal_code_co(self):
         result = resolve("CO")
-        assert any(m.geofabrik_path == "north-america/us/colorado"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/colorado" for m in result.matches)
 
     def test_us_state_postal_code_ny(self):
         result = resolve("NY")
-        assert any(m.geofabrik_path == "north-america/us/new-york"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/new-york" for m in result.matches)
 
     def test_us_state_postal_code_ca(self):
         result = resolve("CA")
-        assert any(m.geofabrik_path == "north-america/us/california"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/california" for m in result.matches)
 
     def test_us_state_postal_code_tx(self):
         result = resolve("TX")
-        assert any(m.geofabrik_path == "north-america/us/texas"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/texas" for m in result.matches)
 
     def test_canadian_province_bc(self):
         result = resolve("BC")
-        assert any(m.geofabrik_path == "north-america/canada/british-columbia"
-                    for m in result.matches)
+        assert any(
+            m.geofabrik_path == "north-america/canada/british-columbia" for m in result.matches
+        )
 
     def test_canadian_province_qc(self):
         result = resolve("QC")
-        assert any(m.geofabrik_path == "north-america/canada/quebec"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/canada/quebec" for m in result.matches)
 
     def test_canadian_province_on(self):
         result = resolve("ON")
-        assert any(m.geofabrik_path == "north-america/canada/ontario"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/canada/ontario" for m in result.matches)
 
     def test_dc(self):
         result = resolve("DC")
-        assert any(m.geofabrik_path == "north-america/us/district-of-columbia"
-                    for m in result.matches)
+        assert any(
+            m.geofabrik_path == "north-america/us/district-of-columbia" for m in result.matches
+        )
 
     def test_washington_dc(self):
         result = resolve("Washington DC")
-        assert any(m.geofabrik_path == "north-america/us/district-of-columbia"
-                    for m in result.matches)
+        assert any(
+            m.geofabrik_path == "north-america/us/district-of-columbia" for m in result.matches
+        )
 
     def test_england(self):
         result = resolve("England")
-        assert any(m.geofabrik_path == "europe/great-britain"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/great-britain" for m in result.matches)
 
 
 # ---------------------------------------------------------------------------
 # Ambiguity and disambiguation
 # ---------------------------------------------------------------------------
+
 
 class TestAmbiguity:
     def test_georgia_is_ambiguous(self):
@@ -255,17 +243,13 @@ class TestAmbiguity:
 
     def test_georgia_prefer_us(self):
         result = resolve("Georgia", prefer_continent="UnitedStates")
-        assert any(m.geofabrik_path == "north-america/us/georgia"
-                    for m in result.matches)
-        assert not any(m.geofabrik_path == "europe/georgia"
-                       for m in result.matches)
+        assert any(m.geofabrik_path == "north-america/us/georgia" for m in result.matches)
+        assert not any(m.geofabrik_path == "europe/georgia" for m in result.matches)
 
     def test_georgia_prefer_europe(self):
         result = resolve("Georgia", prefer_continent="Europe")
-        assert any(m.geofabrik_path == "europe/georgia"
-                    for m in result.matches)
-        assert not any(m.geofabrik_path == "north-america/us/georgia"
-                       for m in result.matches)
+        assert any(m.geofabrik_path == "europe/georgia" for m in result.matches)
+        assert not any(m.geofabrik_path == "north-america/us/georgia" for m in result.matches)
 
     def test_unambiguous_country(self):
         result = resolve("France")
@@ -281,6 +265,7 @@ class TestAmbiguity:
 # ---------------------------------------------------------------------------
 # Geographic features
 # ---------------------------------------------------------------------------
+
 
 class TestGeographicFeatures:
     def test_alps(self):
@@ -383,6 +368,7 @@ class TestGeographicFeatures:
 # List functions
 # ---------------------------------------------------------------------------
 
+
 class TestListRegions:
     def test_list_all(self):
         regions = list_regions()
@@ -439,6 +425,7 @@ class TestListGeographicFeatures:
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_empty_string(self):
         result = resolve("")
@@ -465,8 +452,7 @@ class TestEdgeCases:
     def test_geofabrik_leaf_match(self):
         # "czech-republic" is a Geofabrik path leaf
         result = resolve("czech-republic")
-        assert any(m.geofabrik_path == "europe/czech-republic"
-                    for m in result.matches)
+        assert any(m.geofabrik_path == "europe/czech-republic" for m in result.matches)
 
     def test_resolution_result_defaults(self):
         r = ResolutionResult(matches=[], query="test")
@@ -484,6 +470,5 @@ class TestEdgeCases:
         """Every geographic feature should resolve to at least one match."""
         for feature_name in GEOGRAPHIC_FEATURES:
             result = resolve(feature_name)
-            assert len(result.matches) >= 1, \
-                f"Geographic feature '{feature_name}' has no matches"
+            assert len(result.matches) >= 1, f"Geographic feature '{feature_name}' has no matches"
             assert result.is_geographic_feature

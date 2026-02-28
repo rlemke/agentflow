@@ -42,9 +42,7 @@ class WebHDFSClient:
         return urlunparse(parsed)
 
     def mkdirs(self, path: str) -> bool:
-        r = requests.put(
-            self._url(path), params=self._params(op="MKDIRS"), allow_redirects=True
-        )
+        r = requests.put(self._url(path), params=self._params(op="MKDIRS"), allow_redirects=True)
         r.raise_for_status()
         return r.json()["boolean"]
 
@@ -76,18 +74,14 @@ class WebHDFSClient:
         return r.content
 
     def status(self, path: str) -> dict | None:
-        r = requests.get(
-            self._url(path), params=self._params(op="GETFILESTATUS")
-        )
+        r = requests.get(self._url(path), params=self._params(op="GETFILESTATUS"))
         if r.status_code == 404:
             return None
         r.raise_for_status()
         return r.json()["FileStatus"]
 
     def listdir(self, path: str) -> list[dict]:
-        r = requests.get(
-            self._url(path), params=self._params(op="LISTSTATUS")
-        )
+        r = requests.get(self._url(path), params=self._params(op="LISTSTATUS"))
         r.raise_for_status()
         return r.json()["FileStatuses"]["FileStatus"]
 
@@ -127,9 +121,7 @@ def hdfs():
     """Return a WebHDFS client, skipping if the cluster is unreachable."""
     client = WebHDFSClient()
     try:
-        requests.get(
-            f"{WEBHDFS_BASE}/?op=GETFILESTATUS&user.name={HDFS_USER}", timeout=5
-        )
+        requests.get(f"{WEBHDFS_BASE}/?op=GETFILESTATUS&user.name={HDFS_USER}", timeout=5)
     except requests.ConnectionError:
         pytest.skip("HDFS namenode not reachable on localhost:9870")
     return client

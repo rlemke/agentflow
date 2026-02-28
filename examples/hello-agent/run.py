@@ -26,9 +26,9 @@ What you'll see:
 
 from pathlib import Path
 
-from afl import parse, emit_dict
+from afl import emit_dict, parse
 from afl.ast_utils import find_all_workflows
-from afl.runtime import Evaluator, MemoryStore, Telemetry, ExecutionStatus
+from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
 

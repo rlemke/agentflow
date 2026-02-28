@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.quality_utils import plan_remediation, generate_report
+from handlers.shared.quality_utils import generate_report, plan_remediation
 
 NAMESPACE = "dq.Remediation"
 
@@ -24,7 +24,9 @@ def handle_plan_remediation(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Planned {len(actions)} remediation actions", "level": "success"})
+        step_log.append(
+            {"message": f"Planned {len(actions)} remediation actions", "level": "success"}
+        )
 
     return {"actions": actions}
 

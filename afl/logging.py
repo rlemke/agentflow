@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _TEXT_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 
@@ -43,7 +43,7 @@ class SplunkJsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         # Build UTC ISO 8601 timestamp with ms precision
-        dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        dt = datetime.fromtimestamp(record.created, tz=UTC)
         timestamp = dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{int(dt.microsecond / 1000):03d}Z"
 
         obj: dict[str, str] = {

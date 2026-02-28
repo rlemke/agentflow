@@ -6,12 +6,11 @@ under osm.geo.Population namespace.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .population_filter import (
     HAS_OSMIUM,
     Operator,
-    PlaceType,
     PopulationFilterResult,
     PopulationStats,
     calculate_population_stats,
@@ -35,10 +34,16 @@ def _make_filter_by_population_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: filtering {input_path} for {place_type} with population {operator} {min_population}")
+            step_log(
+                f"{facet_name}: filtering {input_path} for {place_type} with population {operator} {min_population}"
+            )
         log.info(
             "%s filtering %s for %s with population %s %d",
-            facet_name, input_path, place_type, operator, min_population
+            facet_name,
+            input_path,
+            place_type,
+            operator,
+            min_population,
         )
 
         if not input_path:
@@ -52,7 +57,10 @@ def _make_filter_by_population_handler(facet_name: str):
                 operator=operator,
             )
             if step_log:
-                step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {operator} {min_population})", level="success")
+                step_log(
+                    f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {operator} {min_population})",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter by population: %s", e)
@@ -72,10 +80,16 @@ def _make_filter_by_population_range_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: filtering {input_path} for {place_type} with population {min_population}-{max_population}")
+            step_log(
+                f"{facet_name}: filtering {input_path} for {place_type} with population {min_population}-{max_population}"
+            )
         log.info(
             "%s filtering %s for %s with population %d-%d",
-            facet_name, input_path, place_type, min_population, max_population
+            facet_name,
+            input_path,
+            place_type,
+            min_population,
+            max_population,
         )
 
         if not input_path:
@@ -90,7 +104,10 @@ def _make_filter_by_population_range_handler(facet_name: str):
                 operator=Operator.BETWEEN,
             )
             if step_log:
-                step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {min_population}-{max_population})", level="success")
+                step_log(
+                    f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {min_population}-{max_population})",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter by population range: %s", e)
@@ -110,10 +127,15 @@ def _make_extract_places_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})")
+            step_log(
+                f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})"
+            )
         log.info(
             "%s extracting %s from %s (min_pop=%d)",
-            facet_name, place_type, pbf_path, min_population
+            facet_name,
+            place_type,
+            pbf_path,
+            min_population,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -126,7 +148,10 @@ def _make_extract_places_handler(facet_name: str):
                 min_population=min_population,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {place_type} places (min_pop={min_population})", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {place_type} places (min_pop={min_population})",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract places with population: %s", e)
@@ -145,11 +170,10 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})")
-        log.info(
-            "%s extracting from %s (min_pop=%d)",
-            facet_name, pbf_path, min_population
-        )
+            step_log(
+                f"{facet_name}: extracting {place_type} from {pbf_path} (min_pop={min_population})"
+            )
+        log.info("%s extracting from %s (min_pop=%d)", facet_name, pbf_path, min_population)
 
         if not HAS_OSMIUM or not pbf_path:
             return {"result": _empty_result(place_type, min_population, 0)}
@@ -161,7 +185,9 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
                 min_population=min_population,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {place_type}", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {place_type}", level="success"
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s: %s", place_type, e)
@@ -192,7 +218,9 @@ def _make_admin_handler(facet_name: str, place_type: str):
                 min_population=0,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {place_type}", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {place_type}", level="success"
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s: %s", place_type, e)
@@ -219,7 +247,10 @@ def _make_population_stats_handler(facet_name: str):
         try:
             stats = calculate_population_stats(input_path, place_type=place_type)
             if step_log:
-                step_log(f"{facet_name}: {stats.total_places} places, total pop {stats.total_population}", level="success")
+                step_log(
+                    f"{facet_name}: {stats.total_places} places, total pop {stats.total_population}",
+                    level="success",
+                )
             return {"stats": _stats_to_dict(stats)}
         except Exception as e:
             log.error("Failed to calculate population stats: %s", e)
@@ -266,7 +297,7 @@ def _empty_result(place_type: str, min_pop: int, max_pop: int) -> dict:
         "max_population": max_pop,
         "filter_applied": "",
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

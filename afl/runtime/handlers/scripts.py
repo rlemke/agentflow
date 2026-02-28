@@ -49,7 +49,11 @@ class FacetScriptsBeginHandler(StateHandler):
 
         if script_def is None:
             body = facet_def.get("body")
-            if body is not None and not isinstance(body, list) and body.get("type") == "ScriptBlock":
+            if (
+                body is not None
+                and not isinstance(body, list)
+                and body.get("type") == "ScriptBlock"
+            ):
                 script_def = body
 
         if script_def is None:

@@ -81,15 +81,17 @@ def _aggregate_namespaces(store) -> dict[str, NamespaceSummary]:
                 short = facet.name
                 prefix = ns_name + "."
                 if short.startswith(prefix):
-                    short = short[len(prefix):]
+                    short = short[len(prefix) :]
                 ns_map[ns_name].facet_count += 1
-                ns_map[ns_name].facets.append(FacetEntry(
-                    name=facet.name,
-                    short_name=short,
-                    parameters=list(facet.parameters),
-                    return_type=facet.return_type,
-                    documentation=getattr(facet, "documentation", None),
-                ))
+                ns_map[ns_name].facets.append(
+                    FacetEntry(
+                        name=facet.name,
+                        short_name=short,
+                        parameters=list(facet.parameters),
+                        return_type=facet.return_type,
+                        documentation=getattr(facet, "documentation", None),
+                    )
+                )
 
         # Collect embedded workflows (from flow.workflows field)
         for wf in flow.workflows:
@@ -118,16 +120,18 @@ def _add_workflow(ns: NamespaceSummary, wf, flow_id: str) -> None:
     short = wf.name
     prefix = ns.name + "."
     if short.startswith(prefix):
-        short = short[len(prefix):]
+        short = short[len(prefix) :]
     ns.workflow_count += 1
-    ns.workflows.append(WorkflowEntry(
-        name=wf.name,
-        short_name=short,
-        uuid=wf.uuid,
-        flow_id=flow_id,
-        version=getattr(wf, "version", ""),
-        documentation=getattr(wf, "documentation", None),
-    ))
+    ns.workflows.append(
+        WorkflowEntry(
+            name=wf.name,
+            short_name=short,
+            uuid=wf.uuid,
+            flow_id=flow_id,
+            version=getattr(wf, "version", ""),
+            documentation=getattr(wf, "documentation", None),
+        )
+    )
 
 
 def _match_ns_by_name(qualified_name: str, ns_map: dict[str, NamespaceSummary]) -> str | None:

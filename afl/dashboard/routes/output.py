@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -44,10 +43,12 @@ def _build_breadcrumbs(subpath: str) -> list[dict]:
         return crumbs
     parts = Path(subpath).parts
     for i, part in enumerate(parts):
-        crumbs.append({
-            "name": part,
-            "path": str(Path(*parts[: i + 1])),
-        })
+        crumbs.append(
+            {
+                "name": part,
+                "path": str(Path(*parts[: i + 1])),
+            }
+        )
     return crumbs
 
 
@@ -71,13 +72,15 @@ def _build_tree(dir_path: Path) -> list[dict]:
         except OSError:
             continue
         rel = child.resolve().relative_to(base)
-        entries.append({
-            "name": child.name,
-            "path": str(rel),
-            "is_dir": child.is_dir(),
-            "size": stat.st_size if child.is_file() else 0,
-            "mtime": stat.st_mtime,
-        })
+        entries.append(
+            {
+                "name": child.name,
+                "path": str(rel),
+                "is_dir": child.is_dir(),
+                "size": stat.st_size if child.is_file() else 0,
+                "mtime": stat.st_mtime,
+            }
+        )
     return entries
 
 

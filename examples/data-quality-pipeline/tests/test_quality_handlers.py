@@ -14,6 +14,7 @@ import pytest
 class TestQualityUtils:
     def test_profile_dataset_structure(self):
         from handlers.shared.quality_utils import profile_dataset
+
         profiles, row_count = profile_dataset("sales", ["price", "quantity"])
         assert len(profiles) == 2
         assert row_count > 0
@@ -24,6 +25,7 @@ class TestQualityUtils:
 
     def test_detect_anomalies_flags_high_missing(self):
         from handlers.shared.quality_utils import detect_anomalies
+
         profiles = [
             {"column_name": "a", "missing_count": 50},
             {"column_name": "b", "missing_count": 5},
@@ -34,6 +36,7 @@ class TestQualityUtils:
 
     def test_validate_completeness_score(self):
         from handlers.shared.quality_utils import validate_completeness
+
         profiles = [
             {"column_name": "x", "missing_count": 10},
             {"column_name": "y", "missing_count": 0},
@@ -45,6 +48,7 @@ class TestQualityUtils:
 
     def test_validate_accuracy_determinism(self):
         from handlers.shared.quality_utils import validate_accuracy
+
         profiles = [{"column_name": "col_a", "dtype": "integer"}]
         r1, s1 = validate_accuracy(profiles, 5)
         r2, s2 = validate_accuracy(profiles, 5)
@@ -53,6 +57,7 @@ class TestQualityUtils:
 
     def test_compute_scores_weighted(self):
         from handlers.shared.quality_utils import compute_scores
+
         scores, overall = compute_scores(0.9, 0.8, 0.4, 0.35, 0.25)
         assert len(scores) == 3
         assert all("dimension" in s for s in scores)
@@ -60,6 +65,7 @@ class TestQualityUtils:
 
     def test_assign_grade_mapping(self):
         from handlers.shared.quality_utils import assign_grade
+
         assert assign_grade(0.95)[0] == "A"
         assert assign_grade(0.85)[0] == "B"
         assert assign_grade(0.75)[0] == "C"
@@ -68,6 +74,7 @@ class TestQualityUtils:
 
     def test_plan_remediation_actions(self):
         from handlers.shared.quality_utils import plan_remediation
+
         results = [
             {"check_name": "completeness:col_a", "passed": False, "score": 0.5},
             {"check_name": "accuracy:col_b", "passed": True, "score": 0.9},
@@ -79,6 +86,7 @@ class TestQualityUtils:
 
     def test_generate_report_structure(self):
         from handlers.shared.quality_utils import generate_report
+
         scores = [
             {"dimension": "completeness", "raw_score": 0.9, "weighted_score": 0.36},
             {"dimension": "accuracy", "raw_score": 0.8, "weighted_score": 0.28},
@@ -97,6 +105,7 @@ class TestQualityUtils:
 class TestProfilingHandlers:
     def test_profile_dataset_default(self):
         from handlers.profiling.profiling_handlers import handle_profile_dataset
+
         result = handle_profile_dataset({"dataset": "orders", "columns": ["id", "amount"]})
         assert "profiles" in result
         assert "row_count" in result
@@ -104,17 +113,23 @@ class TestProfilingHandlers:
 
     def test_detect_anomalies_default(self):
         from handlers.profiling.profiling_handlers import handle_detect_anomalies
+
         profiles = [{"column_name": "col", "missing_count": 500}]
-        result = handle_detect_anomalies({"profiles": profiles, "row_count": 1000, "missing_threshold": 0.1})
+        result = handle_detect_anomalies(
+            {"profiles": profiles, "row_count": 1000, "missing_threshold": 0.1}
+        )
         assert "anomaly_count" in result
         assert "flagged_columns" in result
 
     def test_profile_dataset_json_string(self):
         from handlers.profiling.profiling_handlers import handle_profile_dataset
-        result = handle_profile_dataset({
-            "dataset": "test",
-            "columns": json.dumps(["a", "b"]),
-        })
+
+        result = handle_profile_dataset(
+            {
+                "dataset": "test",
+                "columns": json.dumps(["a", "b"]),
+            }
+        )
         assert len(result["profiles"]) == 2
 
 
@@ -124,6 +139,7 @@ class TestProfilingHandlers:
 class TestValidationHandlers:
     def test_validate_completeness_default(self):
         from handlers.validation.validation_handlers import handle_validate_completeness
+
         profiles = [{"column_name": "x", "missing_count": 5}]
         result = handle_validate_completeness({"profiles": profiles, "row_count": 100})
         assert "results" in result
@@ -131,15 +147,19 @@ class TestValidationHandlers:
 
     def test_validate_completeness_json_string(self):
         from handlers.validation.validation_handlers import handle_validate_completeness
+
         profiles = [{"column_name": "x", "missing_count": 5}]
-        result = handle_validate_completeness({
-            "profiles": json.dumps(profiles),
-            "row_count": 100,
-        })
+        result = handle_validate_completeness(
+            {
+                "profiles": json.dumps(profiles),
+                "row_count": 100,
+            }
+        )
         assert "results" in result
 
     def test_validate_accuracy_default(self):
         from handlers.validation.validation_handlers import handle_validate_accuracy
+
         profiles = [{"column_name": "col", "dtype": "integer"}]
         result = handle_validate_accuracy({"profiles": profiles})
         assert "results" in result
@@ -147,6 +167,7 @@ class TestValidationHandlers:
 
     def test_validate_accuracy_custom_max(self):
         from handlers.validation.validation_handlers import handle_validate_accuracy
+
         profiles = [{"column_name": "col", "dtype": "float"}]
         result = handle_validate_accuracy({"profiles": profiles, "type_error_max": 10})
         assert "accuracy_score" in result
@@ -158,33 +179,41 @@ class TestValidationHandlers:
 class TestScoringHandlers:
     def test_compute_scores_default(self):
         from handlers.scoring.scoring_handlers import handle_compute_scores
-        result = handle_compute_scores({
-            "completeness_score": 0.9,
-            "accuracy_score": 0.8,
-        })
+
+        result = handle_compute_scores(
+            {
+                "completeness_score": 0.9,
+                "accuracy_score": 0.8,
+            }
+        )
         assert "scores" in result
         assert "overall" in result
         assert len(result["scores"]) == 3
 
     def test_compute_scores_custom_weights(self):
         from handlers.scoring.scoring_handlers import handle_compute_scores
-        result = handle_compute_scores({
-            "completeness_score": 0.9,
-            "accuracy_score": 0.8,
-            "w_completeness": 0.5,
-            "w_accuracy": 0.3,
-            "w_freshness": 0.2,
-        })
+
+        result = handle_compute_scores(
+            {
+                "completeness_score": 0.9,
+                "accuracy_score": 0.8,
+                "w_completeness": 0.5,
+                "w_accuracy": 0.3,
+                "w_freshness": 0.2,
+            }
+        )
         assert "overall" in result
 
     def test_assign_grade_default(self):
         from handlers.scoring.scoring_handlers import handle_assign_grade
+
         result = handle_assign_grade({"overall": 0.85})
         assert result["grade"] == "B"
         assert result["passed"] is True
 
     def test_assign_grade_failing(self):
         from handlers.scoring.scoring_handlers import handle_assign_grade
+
         result = handle_assign_grade({"overall": 0.5, "min_score": 0.7})
         assert result["grade"] == "F"
         assert result["passed"] is False
@@ -196,6 +225,7 @@ class TestScoringHandlers:
 class TestRemediationHandlers:
     def test_plan_remediation_default(self):
         from handlers.remediation.remediation_handlers import handle_plan_remediation
+
         results = [{"check_name": "completeness:col", "passed": False, "score": 0.4}]
         result = handle_plan_remediation({"results": results})
         assert "actions" in result
@@ -203,37 +233,46 @@ class TestRemediationHandlers:
 
     def test_plan_remediation_json_string(self):
         from handlers.remediation.remediation_handlers import handle_plan_remediation
+
         results = [{"check_name": "accuracy:col", "passed": False, "score": 0.3}]
-        result = handle_plan_remediation({
-            "results": json.dumps(results),
-            "flagged_columns": json.dumps([{"column": "col", "missing_rate": 0.5}]),
-        })
+        result = handle_plan_remediation(
+            {
+                "results": json.dumps(results),
+                "flagged_columns": json.dumps([{"column": "col", "missing_rate": 0.5}]),
+            }
+        )
         assert "actions" in result
 
     def test_generate_report_default(self):
         from handlers.remediation.remediation_handlers import handle_generate_report
+
         scores = [{"dimension": "completeness", "raw_score": 0.9, "weighted_score": 0.36}]
-        result = handle_generate_report({
-            "dataset": "sales",
-            "grade": "B",
-            "passed": True,
-            "overall": 0.85,
-            "scores": scores,
-            "actions": [],
-        })
+        result = handle_generate_report(
+            {
+                "dataset": "sales",
+                "grade": "B",
+                "passed": True,
+                "overall": 0.85,
+                "scores": scores,
+                "actions": [],
+            }
+        )
         assert "report" in result
         assert result["report"]["grade"] == "B"
 
     def test_generate_report_json_string(self):
         from handlers.remediation.remediation_handlers import handle_generate_report
-        result = handle_generate_report({
-            "dataset": "test",
-            "grade": "A",
-            "passed": "true",
-            "overall": "0.95",
-            "scores": json.dumps([]),
-            "actions": json.dumps([]),
-        })
+
+        result = handle_generate_report(
+            {
+                "dataset": "test",
+                "grade": "A",
+                "passed": "true",
+                "overall": "0.95",
+                "scores": json.dumps([]),
+                "actions": json.dumps([]),
+            }
+        )
         assert "report" in result
 
 
@@ -243,33 +282,38 @@ class TestRemediationHandlers:
 class TestDispatch:
     def test_profiling_dispatch(self):
         from handlers.profiling.profiling_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "dq.Profiling.ProfileDataset" in _DISPATCH
         assert "dq.Profiling.DetectAnomalies" in _DISPATCH
 
     def test_validation_dispatch(self):
         from handlers.validation.validation_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "dq.Validation.ValidateCompleteness" in _DISPATCH
         assert "dq.Validation.ValidateAccuracy" in _DISPATCH
 
     def test_scoring_dispatch(self):
         from handlers.scoring.scoring_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "dq.Scoring.ComputeScores" in _DISPATCH
         assert "dq.Scoring.AssignGrade" in _DISPATCH
 
     def test_remediation_dispatch(self):
         from handlers.remediation.remediation_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "dq.Remediation.PlanRemediation" in _DISPATCH
         assert "dq.Remediation.GenerateReport" in _DISPATCH
 
     def test_total_handler_count(self):
         from handlers.profiling.profiling_handlers import _DISPATCH as d1
-        from handlers.validation.validation_handlers import _DISPATCH as d2
-        from handlers.scoring.scoring_handlers import _DISPATCH as d3
         from handlers.remediation.remediation_handlers import _DISPATCH as d4
+        from handlers.scoring.scoring_handlers import _DISPATCH as d3
+        from handlers.validation.validation_handlers import _DISPATCH as d2
+
         assert len(d1) + len(d2) + len(d3) + len(d4) == 8
 
 
@@ -280,6 +324,7 @@ class TestCompilation:
     @pytest.fixture()
     def parsed_ast(self):
         from afl.parser import AFLParser
+
         afl_path = os.path.join(os.path.dirname(__file__), "..", "afl", "quality.afl")
         with open(afl_path) as f:
             source = f.read()
@@ -308,6 +353,7 @@ class TestCompilation:
 
     def test_prompt_block_count(self, parsed_ast):
         from afl.ast import PromptBlock
+
         count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -327,6 +373,7 @@ class TestCompilation:
 
     def test_array_type_present(self, parsed_ast):
         from afl.ast import ArrayType
+
         array_count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -349,11 +396,12 @@ class TestCompilation:
 # ---------------------------------------------------------------------------
 class TestAgentIntegration:
     def test_quality_registry_dispatches_all_handlers(self):
-        from afl.runtime.agent import ToolRegistry
         from handlers.profiling.profiling_handlers import _DISPATCH as d1
-        from handlers.validation.validation_handlers import _DISPATCH as d2
-        from handlers.scoring.scoring_handlers import _DISPATCH as d3
         from handlers.remediation.remediation_handlers import _DISPATCH as d4
+        from handlers.scoring.scoring_handlers import _DISPATCH as d3
+        from handlers.validation.validation_handlers import _DISPATCH as d2
+
+        from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
         for dispatch in [d1, d2, d3, d4]:
@@ -362,18 +410,23 @@ class TestAgentIntegration:
                 registry.register(tool_name, handler)
 
         tool_names = [
-            "ProfileDataset", "DetectAnomalies",
-            "ValidateCompleteness", "ValidateAccuracy",
-            "ComputeScores", "AssignGrade",
-            "PlanRemediation", "GenerateReport",
+            "ProfileDataset",
+            "DetectAnomalies",
+            "ValidateCompleteness",
+            "ValidateAccuracy",
+            "ComputeScores",
+            "AssignGrade",
+            "PlanRemediation",
+            "GenerateReport",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
 
     def test_claude_agent_runner_with_custom_handlers(self):
+        from handlers.profiling.profiling_handlers import handle_profile_dataset
+
         from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
         from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
-        from handlers.profiling.profiling_handlers import handle_profile_dataset
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))

@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 def register_routes(app: FastAPI) -> None:
     """Include all route modules."""
     from .api import router as api_router
+    from .census_maps import router as census_maps_router
+    from .dashboard_v2 import router as dashboard_v2_router
     from .events import router as events_router
     from .flows import router as flows_router
     from .handlers import router as handlers_router
@@ -33,15 +35,13 @@ def register_routes(app: FastAPI) -> None:
     from .locks import router as locks_router
     from .logs import router as logs_router
     from .namespaces import router as namespaces_router
+    from .output import router as output_router
     from .runners import router as runners_router
     from .servers import router as servers_router
+    from .site_selection import router as site_selection_router
     from .sources import router as sources_router
     from .steps import router as steps_router
     from .tasks import router as tasks_router
-    from .dashboard_v2 import router as dashboard_v2_router
-    from .output import router as output_router
-    from .census_maps import router as census_maps_router
-    from .site_selection import router as site_selection_router
     from .workflows import router as workflows_router
 
     app.include_router(health_router)

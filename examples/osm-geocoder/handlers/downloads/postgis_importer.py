@@ -9,7 +9,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from afl.runtime.storage import localize
 
@@ -70,12 +70,8 @@ CREATE_NODES_GEOM_IDX = (
 CREATE_NODES_TAGS_IDX = (
     "CREATE INDEX IF NOT EXISTS idx_osm_nodes_tags ON osm_nodes USING GIN (tags)"
 )
-CREATE_WAYS_GEOM_IDX = (
-    "CREATE INDEX IF NOT EXISTS idx_osm_ways_geom ON osm_ways USING GIST (geom)"
-)
-CREATE_WAYS_TAGS_IDX = (
-    "CREATE INDEX IF NOT EXISTS idx_osm_ways_tags ON osm_ways USING GIN (tags)"
-)
+CREATE_WAYS_GEOM_IDX = "CREATE INDEX IF NOT EXISTS idx_osm_ways_geom ON osm_ways USING GIST (geom)"
+CREATE_WAYS_TAGS_IDX = "CREATE INDEX IF NOT EXISTS idx_osm_ways_tags ON osm_ways USING GIN (tags)"
 
 UPSERT_NODES_SQL = """
 INSERT INTO osm_nodes (osm_id, tags, geom)
@@ -297,7 +293,10 @@ def import_to_postgis(
                     was_prior = True
                     log.info(
                         "Prior import found (id=%d, nodes=%d, ways=%d, at=%s)",
-                        row[0], row[1], row[2], row[3],
+                        row[0],
+                        row[1],
+                        row[2],
+                        row[3],
                     )
 
         # Pass 1: import nodes
@@ -315,7 +314,7 @@ def import_to_postgis(
         log.info("Imported %d ways", way_count)
 
         # Log the import
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with conn.cursor() as cur:
             cur.execute(INSERT_LOG_SQL, (source_url, pbf_path, node_count, way_count))
         conn.commit()

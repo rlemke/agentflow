@@ -239,7 +239,6 @@ class TestAddOneAgent:
         """The agent registers as a server with its handler name."""
         # Start/stop to trigger registration
         import threading
-
         import time
 
         poller._config.poll_interval_ms = 50

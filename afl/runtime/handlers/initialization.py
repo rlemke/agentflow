@@ -80,7 +80,7 @@ class FacetInitializationBeginHandler(StateHandler):
             evaluated = evaluate_args(args, ctx)
 
             # Evaluate call-site mixin args
-            for mixin in (stmt_def.mixins or []):
+            for mixin in stmt_def.mixins or []:
                 mixin_args = mixin.get("args", [])
                 mixin_alias = mixin.get("alias")
                 mixin_evaluated = evaluate_args(mixin_args, ctx)
@@ -108,9 +108,7 @@ class FacetInitializationBeginHandler(StateHandler):
                     for param in facet_def.get("params", []):
                         param_name = param.get("name", "")
                         if param_name not in evaluated and "default" in param:
-                            evaluated[param_name] = expr_eval.evaluate(
-                                param["default"], ctx
-                            )
+                            evaluated[param_name] = expr_eval.evaluate(param["default"], ctx)
 
             # For schema instantiation, store values as returns (accessible via step.field)
             # For facet calls, store values as params

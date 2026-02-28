@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 try:
@@ -33,7 +31,6 @@ pytestmark = pytest.mark.skipif(
 from afl.dashboard.routes.site_selection import (
     _FIELD_LABELS,
     _PREFERRED_FIELDS,
-    _POPUP_FIELDS,
     _filter_numeric_fields,
     _get_field_label,
 )
@@ -110,20 +107,20 @@ def client():
     store.close()
 
 
-def _seed_meta(store, dataset_key: str, facet_name: str = "ExportScored",
-               record_count: int = 67):
+def _seed_meta(store, dataset_key: str, facet_name: str = "ExportScored", record_count: int = 67):
     """Insert a handler_output_meta document."""
-    store._db.handler_output_meta.insert_one({
-        "dataset_key": dataset_key,
-        "facet_name": facet_name,
-        "record_count": record_count,
-        "data_type": "geojson_feature",
-        "imported_at": 1708873045000,
-    })
+    store._db.handler_output_meta.insert_one(
+        {
+            "dataset_key": dataset_key,
+            "facet_name": facet_name,
+            "record_count": record_count,
+            "data_type": "geojson_feature",
+            "imported_at": 1708873045000,
+        }
+    )
 
 
-def _seed_feature(store, dataset_key: str, geoid: str, name: str,
-                  geometry: dict, **extra_props):
+def _seed_feature(store, dataset_key: str, geoid: str, name: str, geometry: dict, **extra_props):
     """Insert a handler_output_data document with scored data."""
     props = {
         "GEOID": geoid,
@@ -136,15 +133,17 @@ def _seed_feature(store, dataset_key: str, geoid: str, name: str,
         "median_income": 55000,
         **extra_props,
     }
-    store._db.handler_output.insert_one({
-        "dataset_key": dataset_key,
-        "feature_key": geoid,
-        "facet_name": "ExportScored",
-        "data_type": "geojson_feature",
-        "properties": props,
-        "geometry": geometry,
-        "imported_at": 1708873045000,
-    })
+    store._db.handler_output.insert_one(
+        {
+            "dataset_key": dataset_key,
+            "feature_key": geoid,
+            "facet_name": "ExportScored",
+            "data_type": "geojson_feature",
+            "properties": props,
+            "geometry": geometry,
+            "imported_at": 1708873045000,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -178,24 +177,21 @@ class TestSiteSelectionList:
 class TestSiteSelectionMap:
     def test_map_renders(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga",
-                      _TRIANGLE)
+        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga", _TRIANGLE)
         resp = tc.get("/site-selection/01")
         assert resp.status_code == 200
         assert "Leaflet" in resp.text or "leaflet" in resp.text
 
     def test_choropleth_js_present(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga",
-                      _TRIANGLE)
+        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga", _TRIANGLE)
         resp = tc.get("/site-selection/01")
         assert resp.status_code == 200
         assert "choropleth-field" in resp.text
 
     def test_field_labels_in_view(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga",
-                      _TRIANGLE)
+        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga", _TRIANGLE)
         resp = tc.get("/site-selection/01")
         assert resp.status_code == 200
         assert "fieldLabels" in resp.text
@@ -209,10 +205,12 @@ class TestSiteSelectionMap:
 class TestSiteSelectionTable:
     def test_table_renders(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga",
-                      _TRIANGLE, suitability_score=80.0)
-        _seed_feature(store, "sitesel.scored.01", "01002", "Baldwin",
-                      _TRIANGLE, suitability_score=60.0)
+        _seed_feature(
+            store, "sitesel.scored.01", "01001", "Autauga", _TRIANGLE, suitability_score=80.0
+        )
+        _seed_feature(
+            store, "sitesel.scored.01", "01002", "Baldwin", _TRIANGLE, suitability_score=60.0
+        )
         resp = tc.get("/site-selection/01/table")
         assert resp.status_code == 200
         assert "Autauga" in resp.text
@@ -220,8 +218,7 @@ class TestSiteSelectionTable:
 
     def test_table_has_headers(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Test",
-                      _TRIANGLE)
+        _seed_feature(store, "sitesel.scored.01", "01001", "Test", _TRIANGLE)
         resp = tc.get("/site-selection/01/table")
         assert resp.status_code == 200
         assert "Suitability Score" in resp.text
@@ -236,8 +233,7 @@ class TestSiteSelectionTable:
 class TestSiteSelectionAPI:
     def test_geojson_endpoint(self, client):
         tc, store = client
-        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga",
-                      _TRIANGLE)
+        _seed_feature(store, "sitesel.scored.01", "01001", "Autauga", _TRIANGLE)
         resp = tc.get("/site-selection/api/01")
         assert resp.status_code == 200
         data = resp.json()

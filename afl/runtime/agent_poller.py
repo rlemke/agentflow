@@ -58,7 +58,7 @@ import time
 from collections.abc import Awaitable, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from .entities import (
     RunnerState,
@@ -69,16 +69,16 @@ from .entities import (
     StepLogSource,
     TaskState,
 )
-from .evaluator import Evaluator, ExecutionStatus
+from .evaluator import Evaluator, ExecutionResult, ExecutionStatus
 from .persistence import PersistenceAPI
-from .types import generate_id
+from .types import AttributeValue, generate_id
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for sync and async callbacks
 SyncCallback = Callable[[dict], dict]
 AsyncCallback = Callable[[dict], Awaitable[dict]]
-AnyCallback = Union[SyncCallback, AsyncCallback]
+AnyCallback = SyncCallback | AsyncCallback
 
 
 def _current_time_ms() -> int:
@@ -204,11 +204,11 @@ class AgentPoller:
 
         # Merge partial results into existing returns
         for name, value in partial_result.items():
-            step.attributes.returns[name] = {
-                "name": name,
-                "value": value,
-                "type_hint": self._infer_type_hint(value),
-            }
+            step.attributes.returns[name] = AttributeValue(
+                name=name,
+                value=value,
+                type_hint=self._infer_type_hint(value),
+            )
 
         self._persistence.save_step(step)
 
@@ -364,7 +364,13 @@ class AgentPoller:
                 ast = parser.parse(flow.compiled_sources[0].content)
                 emitter = JSONEmitter(include_locations=False)
                 program_dict = json.loads(emitter.emit(ast))
-                logger.warning("Flow '%s' has no compiled_ast, fell back to recompilation", wf.flow_id)
+                logger.warning(
+                    "Flow '%s' has no compiled_ast, fell back to recompilation", wf.flow_id
+                )
+
+            # At this point program_dict is guaranteed non-None (guarded above)
+            if program_dict is None:
+                return None
 
             # Cache program AST for facet definition lookups during resume
             self._program_ast_cache[workflow_id] = program_dict
@@ -666,9 +672,7 @@ class AgentPoller:
     # Workflow Resume
     # =========================================================================
 
-    def _resume_workflow(
-        self, workflow_id: str, runner_id: str = "", step_id: str = ""
-    ) -> None:
+    def _resume_workflow(self, workflow_id: str, runner_id: str = "", step_id: str = "") -> None:
         """Resume a paused workflow after step completion.
 
         Uses a per-workflow lock to prevent concurrent evaluator resumes.
@@ -749,9 +753,8 @@ class AgentPoller:
         ):
             self._update_runner_state(runner_id, result)
 
-    def _update_runner_state(self, runner_id: str, result: "ExecutionResult") -> None:
+    def _update_runner_state(self, runner_id: str, result: ExecutionResult) -> None:
         """Update runner state based on execution result."""
-        from .evaluator import ExecutionResult  # noqa: F811 (type hint)
 
         try:
             runner = self._persistence.get_runner(runner_id)

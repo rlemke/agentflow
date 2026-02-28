@@ -110,7 +110,7 @@ def preprocess_script_braces(source: str) -> str:
             # check for opening brace
             if i < length and source[i] == "{":
                 # Count how many lines the `script ... {` prefix consumed
-                prefix_text = source[kw_start:i + 1]
+                prefix_text = source[kw_start : i + 1]
                 prefix_lines = prefix_text.count("\n")
 
                 brace_open_line = source[:i].count("\n") + 1
@@ -251,7 +251,7 @@ def _skip_python_string(source: str, pos: int) -> int:
             if source[i] == "\\" and i + 1 < length:
                 i += 2
                 continue
-            if source[i:i + 3] == end_delim:
+            if source[i : i + 3] == end_delim:
                 return i + 3
             i += 1
         return length  # unterminated — let Python's own parser complain

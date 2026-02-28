@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from .planning.planning_handlers import register_planning_handlers
-from .search.search_handlers import register_search_handlers
 from .compute.compute_handlers import register_compute_handlers
 from .output.output_handlers import register_output_handlers
+from .planning.planning_handlers import register_planning_handlers
+from .search.search_handlers import register_search_handlers
 
 
 def register_all_handlers(poller) -> None:
@@ -18,10 +18,10 @@ def register_all_handlers(poller) -> None:
 
 def register_all_registry_handlers(runner) -> None:
     """Register all handlers with a RegistryRunner."""
-    from .planning.planning_handlers import register_handlers as reg_planning
-    from .search.search_handlers import register_handlers as reg_search
     from .compute.compute_handlers import register_handlers as reg_compute
     from .output.output_handlers import register_handlers as reg_output
+    from .planning.planning_handlers import register_handlers as reg_planning
+    from .search.search_handlers import register_handlers as reg_search
 
     reg_planning(runner)
     reg_search(runner)

@@ -22,9 +22,8 @@ Validates AST for semantic correctness:
 - Unambiguous facet references (qualified names when needed)
 """
 
-from dataclasses import dataclass, field
-
 import re
+from dataclasses import dataclass, field
 
 from .ast import (
     AndThenBlock,
@@ -41,12 +40,10 @@ from .ast import (
     Literal,
     MapLiteral,
     Namespace,
-    Parameter,
     Program,
     PromptBlock,
     Reference,
     SchemaDecl,
-    SchemaField,
     ScriptBlock,
     SourceLocation,
     TypeRef,
@@ -473,7 +470,7 @@ class AFLValidator:
 
     def _validate_top_level_uniqueness(self, program: Program) -> None:
         """Validate that top-level names are unique."""
-        names: dict[str, SourceLocation] = {}
+        names: dict[str, SourceLocation | None] = {}
 
         for facet in program.facets:
             self._check_name_unique(facet.sig.name, facet.location, names, "facet")
@@ -491,7 +488,7 @@ class AFLValidator:
         """Validate a namespace."""
         self._current_namespace = namespace.name
         self._current_imports = set()
-        names: dict[str, SourceLocation] = {}
+        names: dict[str, SourceLocation | None] = {}
 
         # Validate use statements
         for uses_decl in namespace.uses:
@@ -533,7 +530,7 @@ class AFLValidator:
         self,
         name: str,
         location: SourceLocation | None,
-        names: dict[str, SourceLocation],
+        names: dict[str, SourceLocation | None],
         kind: str,
     ) -> None:
         """Check if a name is unique within a scope."""
@@ -708,9 +705,7 @@ class AFLValidator:
                     step_returns[step.name] = facet_info.returns
                 else:
                     # Try to resolve as schema instantiation
-                    schema_info = self._resolve_schema_name(
-                        step.call.name, step.call.location
-                    )
+                    schema_info = self._resolve_schema_name(step.call.name, step.call.location)
                     if schema_info:
                         # Schema fields become the step's "returns" (accessible via step.field)
                         step_returns[step.name] = schema_info.fields
@@ -720,8 +715,8 @@ class AFLValidator:
                         step_returns[step.name] = set()  # Unknown facet or schema
 
             # Validate mixin references in step call (only for non-schema instantiations)
-            for mixin in step.call.mixins:
-                self._resolve_facet_name(mixin.name, step.call.location)
+            for mixin_call in step.call.mixins:
+                self._resolve_facet_name(mixin_call.name, step.call.location)
 
             # Validate references in step's call arguments
             self._validate_call_references(
@@ -838,13 +833,13 @@ class AFLValidator:
             if operand_type != "Unknown":
                 if operand_type == "String":
                     self._result.add_error(
-                        f"Type error: cannot negate String operand",
+                        "Type error: cannot negate String operand",
                         getattr(expr, "location", None),
                     )
                     return "Unknown"
                 if operand_type == "Boolean":
                     self._result.add_error(
-                        f"Type error: cannot negate Boolean operand",
+                        "Type error: cannot negate Boolean operand",
                         getattr(expr, "location", None),
                     )
                     return "Unknown"
@@ -1003,7 +998,7 @@ class AFLValidator:
 
     def _validate_schema_decl(self, schema: SchemaDecl) -> None:
         """Validate a schema declaration for field name uniqueness and type references."""
-        field_names: dict[str, SourceLocation] = {}
+        field_names: dict[str, SourceLocation | None] = {}
         for f in schema.fields:
             self._check_name_unique(f.name, f.location, field_names, "schema field")
             # Validate field type reference

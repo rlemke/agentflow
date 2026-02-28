@@ -37,13 +37,19 @@ def handle_compute_var(params: dict[str, Any]) -> dict[str, Any]:
     sorted_pnl = sorted(pnl_distributions) if pnl_distributions else [0]
     max_drawdown = abs(sorted_pnl[0]) if sorted_pnl else 0
     mean_pnl = sum(pnl_distributions) / len(pnl_distributions) if pnl_distributions else 0
-    std_pnl = (sum((x - mean_pnl) ** 2 for x in pnl_distributions) / max(len(pnl_distributions) - 1, 1)) ** 0.5 if pnl_distributions else 1
+    std_pnl = (
+        (sum((x - mean_pnl) ** 2 for x in pnl_distributions) / max(len(pnl_distributions) - 1, 1))
+        ** 0.5
+        if pnl_distributions
+        else 1
+    )
     sharpe = mean_pnl / std_pnl if std_pnl > 0 else 0
 
     if step_log:
-        step_log(f"ComputeVaR: VaR95={var_95:,.0f} VaR99={var_99:,.0f} "
-                 f"CVaR95={cvar_95:,.0f}",
-                 level="success")
+        step_log(
+            f"ComputeVaR: VaR95={var_95:,.0f} VaR99={var_99:,.0f} CVaR95={cvar_95:,.0f}",
+            level="success",
+        )
 
     return {
         "metrics": {
@@ -72,9 +78,11 @@ def handle_compute_greeks(params: dict[str, Any]) -> dict[str, Any]:
     greeks = compute_finite_difference_greeks(positions, cholesky)
 
     if step_log:
-        step_log(f"ComputeGreeks: portfolio_delta={greeks['portfolio_delta']:,.2f} "
-                 f"portfolio_vega={greeks['portfolio_vega']:,.2f}",
-                 level="success")
+        step_log(
+            f"ComputeGreeks: portfolio_delta={greeks['portfolio_delta']:,.2f} "
+            f"portfolio_vega={greeks['portfolio_vega']:,.2f}",
+            level="success",
+        )
 
     return {"greeks": greeks}
 

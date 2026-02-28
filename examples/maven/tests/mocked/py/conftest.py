@@ -1,4 +1,5 @@
 """Conftest for maven mocked tests."""
+
 import os
 import sys
 

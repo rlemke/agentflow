@@ -101,9 +101,12 @@ def _stream_to_file(url: str, path: str, storage) -> None:
             f.write(chunk)
             written += len(chunk)
             if written >= next_log:
-                log.info("download: %s — %s / %s",
-                         os.path.basename(path), _fmt_bytes(written),
-                         _fmt_bytes(total) if total else "?")
+                log.info(
+                    "download: %s — %s / %s",
+                    os.path.basename(path),
+                    _fmt_bytes(written),
+                    _fmt_bytes(total) if total else "?",
+                )
                 next_log += _LOG_INTERVAL
     log.info("download: finished %s (%s)", os.path.basename(path), _fmt_bytes(written))
 
@@ -139,11 +142,14 @@ def _copy_to_cache(src_path: str, dst_path: str) -> None:
                     dst.write(chunk)
                     copied += len(chunk)
                     if copied >= next_log:
-                        log.info("cache-copy: %s — %s / %s buffered",
-                                 fname, _fmt_bytes(copied), _fmt_bytes(src_size))
+                        log.info(
+                            "cache-copy: %s — %s / %s buffered",
+                            fname,
+                            _fmt_bytes(copied),
+                            _fmt_bytes(src_size),
+                        )
                         next_log += _LOG_INTERVAL
-                log.info("cache-copy: %s — uploading %s to HDFS...",
-                         fname, _fmt_bytes(copied))
+                log.info("cache-copy: %s — uploading %s to HDFS...", fname, _fmt_bytes(copied))
             # dst.close() happens here — the actual HDFS upload
         log.info("cache-copy: %s — upload complete", fname)
     log.info("cache-copy: finished %s (%s)", fname, _fmt_bytes(src_size))
@@ -197,7 +203,9 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
                 if _storage.exists(local_path):
                     result = _cache_hit(url, local_path)
                     result["source"] = "cache"
-                    log.info("cache-hit: %s (after lock, %s)", region_path, _fmt_bytes(result["size"]))
+                    log.info(
+                        "cache-hit: %s (after lock, %s)", region_path, _fmt_bytes(result["size"])
+                    )
                     return result
                 _copy_to_cache(mirror_path, local_path)
             result = _cache_miss(url, local_path)

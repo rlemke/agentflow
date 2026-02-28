@@ -53,9 +53,7 @@ PROGRAM_AST = {
                                     "type": "EventFacetDecl",
                                     "name": "CountryBoundaries",
                                     "params": [{"name": "cache", "type": "OSMCache"}],
-                                    "returns": [
-                                        {"name": "result", "type": "BoundaryResult"}
-                                    ],
+                                    "returns": [{"name": "result", "type": "BoundaryResult"}],
                                 },
                                 {
                                     "type": "EventFacetDecl",
@@ -68,17 +66,13 @@ PROGRAM_AST = {
                                             "default": 2,
                                         },
                                     ],
-                                    "returns": [
-                                        {"name": "result", "type": "BoundaryResult"}
-                                    ],
+                                    "returns": [{"name": "result", "type": "BoundaryResult"}],
                                 },
                                 {
                                     "type": "EventFacetDecl",
                                     "name": "LakeBoundaries",
                                     "params": [{"name": "cache", "type": "OSMCache"}],
-                                    "returns": [
-                                        {"name": "result", "type": "BoundaryResult"}
-                                    ],
+                                    "returns": [{"name": "result", "type": "BoundaryResult"}],
                                 },
                             ],
                         },
@@ -134,7 +128,7 @@ WORKFLOW_AST = {
 
 def mock_country_boundaries_handler(payload: dict) -> dict:
     """Mock handler that returns a simulated boundary extraction result."""
-    cache = payload.get("cache", {})
+    _cache = payload.get("cache", {})
     return {
         "result": {
             "output_path": "/tmp/osm-boundaries/test_admin2.geojson",

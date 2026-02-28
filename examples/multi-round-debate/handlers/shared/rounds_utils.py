@@ -10,12 +10,11 @@ these stubs provide synthetic fallback for testing.
 from __future__ import annotations
 
 import hashlib
-import json
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
     """Deterministic integer from seed string."""
@@ -38,6 +37,7 @@ _AGENTS = ["agent_0", "agent_1", "agent_2"]
 # Public API (one per event facet)
 # ---------------------------------------------------------------------------
 
+
 def initiate_round(
     topic: str,
     round_num: int = 1,
@@ -52,7 +52,7 @@ def initiate_round(
     if prev_scores is None:
         prev_scores = []
     agents = [f"agent_{i}" for i in range(num_agents)]
-    seed = f"initiate:{topic}:{round_num}"
+    _seed = f"initiate:{topic}:{round_num}"
     return {
         "round_num": round_num,
         "topic": topic,
@@ -73,11 +73,13 @@ def assign_positions(
     for i, agent in enumerate(agents):
         stance_idx = (i + round_num) % 3
         stance = _STANCES[stance_idx]
-        assignments.append({
-            "agent": agent,
-            "stance": stance,
-            "round_num": round_num,
-        })
+        assignments.append(
+            {
+                "agent": agent,
+                "stance": stance,
+                "round_num": round_num,
+            }
+        )
     return assignments
 
 
@@ -113,9 +115,7 @@ def challenge_argument(
         target_argument = target_argument.get("argument", str(target_argument))
     return {
         "challenge": f"{agent} challenges {target_agent}: '{target_argument}' has gaps",
-        "weaknesses": [
-            f"weakness_{i}_by_{agent}" for i in range(n_weaknesses)
-        ],
+        "weaknesses": [f"weakness_{i}_by_{agent}" for i in range(n_weaknesses)],
     }
 
 
@@ -135,11 +135,13 @@ def score_round(
         current = _hash_float(seed, 60.0, 95.0)
         prev = prev_scores[i]["score"] if i < len(prev_scores) else 50.0
         improvement = round(current / max(prev, 1.0), 4)
-        scores.append({
-            "agent": agent,
-            "score": round(current, 2),
-            "improvement": improvement,
-        })
+        scores.append(
+            {
+                "agent": agent,
+                "score": round(current, 2),
+                "improvement": improvement,
+            }
+        )
     return scores
 
 

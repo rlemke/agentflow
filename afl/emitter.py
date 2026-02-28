@@ -202,9 +202,9 @@ class JSONEmitter:
             data["location"] = self._location(node.location)
         return data
 
-    def _location(self, loc: SourceLocation) -> dict:
+    def _location(self, loc: SourceLocation) -> dict[str, Any]:
         """Convert source location with optional provenance."""
-        result = {"line": loc.line, "column": loc.column}
+        result: dict[str, Any] = {"line": loc.line, "column": loc.column}
         if loc.end_line is not None:
             result["endLine"] = loc.end_line
         if loc.end_column is not None:
@@ -243,9 +243,9 @@ class JSONEmitter:
         else:
             return {"type": "unknown"}
 
-    def _program(self, node: Program) -> dict:
+    def _program(self, node: Program) -> dict[str, Any]:
         """Convert Program node."""
-        data = {"type": "Program"}
+        data: dict[str, Any] = {"type": "Program"}
 
         declarations: list = []
         if node.namespaces:
@@ -273,9 +273,9 @@ class JSONEmitter:
             "returns": [{"name": r.name, "description": r.description} for r in doc.returns],
         }
 
-    def _namespace(self, node: Namespace) -> dict:
+    def _namespace(self, node: Namespace) -> dict[str, Any]:
         """Convert Namespace node."""
-        data = {
+        data: dict[str, Any] = {
             "type": "Namespace",
             "name": node.name,
         }
@@ -317,9 +317,9 @@ class JSONEmitter:
             return self._convert(body)
         return self._convert(body)
 
-    def _facet_decl(self, node: FacetDecl) -> dict:
+    def _facet_decl(self, node: FacetDecl) -> dict[str, Any]:
         """Convert FacetDecl node."""
-        data = {
+        data: dict[str, Any] = {
             "type": "FacetDecl",
             "name": node.sig.name,
         }
@@ -339,9 +339,9 @@ class JSONEmitter:
 
         return self._add_metadata(data, node)
 
-    def _event_facet_decl(self, node: EventFacetDecl) -> dict:
+    def _event_facet_decl(self, node: EventFacetDecl) -> dict[str, Any]:
         """Convert EventFacetDecl node."""
-        data = {
+        data: dict[str, Any] = {
             "type": "EventFacetDecl",
             "name": node.sig.name,
         }
@@ -361,9 +361,9 @@ class JSONEmitter:
 
         return self._add_metadata(data, node)
 
-    def _workflow_decl(self, node: WorkflowDecl) -> dict:
+    def _workflow_decl(self, node: WorkflowDecl) -> dict[str, Any]:
         """Convert WorkflowDecl node."""
-        data = {
+        data: dict[str, Any] = {
             "type": "WorkflowDecl",
             "name": node.sig.name,
         }
@@ -552,9 +552,9 @@ class JSONEmitter:
         else:
             return {"type": "StepRef", "path": node.path}
 
-    def _schema_decl(self, node: SchemaDecl) -> dict:
+    def _schema_decl(self, node: SchemaDecl) -> dict[str, Any]:
         """Convert SchemaDecl node."""
-        data = {
+        data: dict[str, Any] = {
             "type": "SchemaDecl",
             "name": node.name,
         }

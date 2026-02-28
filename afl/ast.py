@@ -223,7 +223,7 @@ class AndThenBlock(ASTNode):
 
     block: Block | None = None
     foreach: ForeachClause | None = None
-    script: ScriptBlock | None = None
+    script: "ScriptBlock | None" = None
 
 
 @dataclass

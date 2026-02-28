@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from handlers.visualization.map_renderer import (
     HAS_FOLIUM,
     LayerStyle,
@@ -26,9 +25,7 @@ from handlers.visualization.visualization_handlers import (
 )
 
 # Skip marker for tests requiring folium
-requires_folium = pytest.mark.skipif(
-    not HAS_FOLIUM, reason="folium not installed"
-)
+requires_folium = pytest.mark.skipif(not HAS_FOLIUM, reason="folium not installed")
 
 
 class TestCalculateBounds:
@@ -39,7 +36,7 @@ class TestCalculateBounds:
             "type": "FeatureCollection",
             "features": [
                 {"type": "Feature", "geometry": {"type": "Point", "coordinates": [10, 20]}}
-            ]
+            ],
         }
         bounds = calculate_bounds(geojson)
         assert bounds == (10, 20, 10, 20)
@@ -48,11 +45,11 @@ class TestCalculateBounds:
         geojson = {
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "geometry": {
-                    "type": "LineString",
-                    "coordinates": [[0, 0], [10, 10], [20, 5]]
-                }}
-            ]
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "LineString", "coordinates": [[0, 0], [10, 10], [20, 5]]},
+                }
+            ],
         }
         bounds = calculate_bounds(geojson)
         assert bounds == (0, 0, 20, 10)
@@ -61,11 +58,14 @@ class TestCalculateBounds:
         geojson = {
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]
-                }}
-            ]
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]],
+                    },
+                }
+            ],
         }
         bounds = calculate_bounds(geojson)
         assert bounds == (0, 0, 10, 10)
@@ -76,7 +76,7 @@ class TestCalculateBounds:
             "features": [
                 {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-10, -20]}},
                 {"type": "Feature", "geometry": {"type": "Point", "coordinates": [30, 40]}},
-            ]
+            ],
         }
         bounds = calculate_bounds(geojson)
         assert bounds == (-10, -20, 30, 40)
@@ -87,10 +87,7 @@ class TestCalculateBounds:
         assert bounds is None
 
     def test_no_geometry(self):
-        geojson = {
-            "type": "FeatureCollection",
-            "features": [{"type": "Feature", "geometry": None}]
-        }
+        geojson = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": None}]}
         bounds = calculate_bounds(geojson)
         assert bounds is None
 
@@ -185,10 +182,12 @@ class TestRenderMapHtml:
                     "properties": {"name": "Test Polygon"},
                     "geometry": {
                         "type": "Polygon",
-                        "coordinates": [[[-122, 37], [-121, 37], [-121, 38], [-122, 38], [-122, 37]]]
-                    }
+                        "coordinates": [
+                            [[-122, 37], [-121, 37], [-121, 38], [-122, 38], [-122, 37]]
+                        ],
+                    },
                 }
-            ]
+            ],
         }
         path = tmp_path / "test.geojson"
         with open(path, "w") as f:
@@ -255,16 +254,22 @@ class TestRenderLayers:
         geojson1 = {
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "properties": {"name": "Layer 1"},
-                 "geometry": {"type": "Point", "coordinates": [0, 0]}}
-            ]
+                {
+                    "type": "Feature",
+                    "properties": {"name": "Layer 1"},
+                    "geometry": {"type": "Point", "coordinates": [0, 0]},
+                }
+            ],
         }
         geojson2 = {
             "type": "FeatureCollection",
             "features": [
-                {"type": "Feature", "properties": {"name": "Layer 2"},
-                 "geometry": {"type": "Point", "coordinates": [10, 10]}}
-            ]
+                {
+                    "type": "Feature",
+                    "properties": {"name": "Layer 2"},
+                    "geometry": {"type": "Point", "coordinates": [10, 10]},
+                }
+            ],
         }
 
         path1 = tmp_path / "layer1.geojson"
@@ -307,11 +312,13 @@ class TestVisualizationHandlers:
         handler = _make_render_map_handler("RenderMap")
 
         with patch("handlers.visualization_handlers.HAS_FOLIUM", False):
-            result = handler({
-                "geojson_path": "/some/file.geojson",
-                "title": "Test Map",
-                "format": "html",
-            })
+            result = handler(
+                {
+                    "geojson_path": "/some/file.geojson",
+                    "title": "Test Map",
+                    "format": "html",
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert result["result"]["output_path"] == ""
@@ -322,10 +329,12 @@ class TestVisualizationHandlers:
 
         handler = _make_render_map_handler("RenderMap")
 
-        result = handler({
-            "geojson_path": "",
-            "title": "Test",
-        })
+        result = handler(
+            {
+                "geojson_path": "",
+                "title": "Test",
+            }
+        )
 
         assert result["result"]["feature_count"] == 0
 
@@ -335,10 +344,12 @@ class TestVisualizationHandlers:
 
         handler = _make_render_layers_handler("RenderLayers")
 
-        result = handler({
-            "layers": [],
-            "title": "Test",
-        })
+        result = handler(
+            {
+                "layers": [],
+                "title": "Test",
+            }
+        )
 
         assert result["result"]["feature_count"] == 0
 

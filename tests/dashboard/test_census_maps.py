@@ -196,17 +196,25 @@ def client():
     store.close()
 
 
-def _seed_meta(store, dataset_key, facet_name="ExtractCounty", data_type="geojson_feature",
-               record_count=67, imported_at=1708873045000):
+def _seed_meta(
+    store,
+    dataset_key,
+    facet_name="ExtractCounty",
+    data_type="geojson_feature",
+    record_count=67,
+    imported_at=1708873045000,
+):
     """Insert a handler_output_meta document."""
-    store._db.handler_output_meta.insert_one({
-        "dataset_key": dataset_key,
-        "facet_name": facet_name,
-        "record_count": record_count,
-        "data_type": data_type,
-        "imported_at": imported_at,
-        "source_path": f"/tmp/{dataset_key}.geojson",
-    })
+    store._db.handler_output_meta.insert_one(
+        {
+            "dataset_key": dataset_key,
+            "facet_name": facet_name,
+            "record_count": record_count,
+            "data_type": data_type,
+            "imported_at": imported_at,
+            "source_path": f"/tmp/{dataset_key}.geojson",
+        }
+    )
 
 
 def _seed_feature(store, dataset_key, feature_key, name, geometry, population=None):
@@ -214,15 +222,17 @@ def _seed_feature(store, dataset_key, feature_key, name, geometry, population=No
     props = {"GEOID": feature_key, "NAME": name}
     if population is not None:
         props["population"] = population
-    store._db.handler_output.insert_one({
-        "dataset_key": dataset_key,
-        "feature_key": feature_key,
-        "facet_name": "ExtractCounty",
-        "data_type": "geojson_feature",
-        "properties": props,
-        "geometry": geometry,
-        "imported_at": 1708873045000,
-    })
+    store._db.handler_output.insert_one(
+        {
+            "dataset_key": dataset_key,
+            "feature_key": feature_key,
+            "facet_name": "ExtractCounty",
+            "data_type": "geojson_feature",
+            "properties": props,
+            "geometry": geometry,
+            "imported_at": 1708873045000,
+        }
+    )
 
 
 # A simple triangle polygon for testing
@@ -341,8 +351,12 @@ class TestCensusMapView:
 
     def test_renders_with_features(self, client):
         tc, store = client
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
-        _seed_feature(store, "census.tiger.county.01", "01003", "Baldwin", _TRIANGLE_2, population=223234)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
+        _seed_feature(
+            store, "census.tiger.county.01", "01003", "Baldwin", _TRIANGLE_2, population=223234
+        )
 
         resp = tc.get("/census/maps/census.tiger.county.01")
         assert resp.status_code == 200
@@ -361,7 +375,9 @@ class TestCensusMapView:
     def test_numeric_fields_detected(self, client):
         """Numeric properties should appear in the choropleth dropdown."""
         tc, store = client
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
 
         resp = tc.get("/census/maps/census.tiger.county.01")
         assert resp.status_code == 200
@@ -371,15 +387,17 @@ class TestCensusMapView:
         """String-only properties should not appear as choropleth options."""
         tc, store = client
         # Seed a feature with only string properties (NAME, GEOID)
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.strings.only",
-            "feature_key": "01001",
-            "facet_name": "Test",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "Autauga", "GEOID": "01001"},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.strings.only",
+                "feature_key": "01001",
+                "facet_name": "Test",
+                "data_type": "geojson_feature",
+                "properties": {"NAME": "Autauga", "GEOID": "01001"},
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/census.strings.only")
         assert resp.status_code == 200
@@ -389,20 +407,26 @@ class TestCensusMapView:
     def test_raw_acs_codes_filtered_from_dropdown(self, client):
         """Raw ACS variable codes (B*) should not clutter the choropleth dropdown."""
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {
-                "NAME": "Autauga", "GEOID": "01001",
-                "population": 59285, "median_income": 69841,
-                "B01003_001E": 59285, "B19013_001E": 69841,
-                "ALAND": 1539631459, "STATEFP": 1,
-            },
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "NAME": "Autauga",
+                    "GEOID": "01001",
+                    "population": 59285,
+                    "median_income": 69841,
+                    "B01003_001E": 59285,
+                    "B19013_001E": 69841,
+                    "ALAND": 1539631459,
+                    "STATEFP": 1,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/census.joined.01")
         assert resp.status_code == 200
@@ -419,18 +443,23 @@ class TestCensusMapView:
     def test_preferred_fields_ordered_first(self, client):
         """Preferred fields like population should appear before other numeric fields."""
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.02",
-            "feature_key": "02001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {
-                "NAME": "Test", "GEOID": "02001",
-                "population": 100, "zzz_custom": 42, "median_income": 50000,
-            },
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.02",
+                "feature_key": "02001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "NAME": "Test",
+                    "GEOID": "02001",
+                    "population": 100,
+                    "zzz_custom": 42,
+                    "median_income": 50000,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/census.joined.02")
         assert resp.status_code == 200
@@ -446,14 +475,16 @@ class TestCensusMapView:
         tc, store = client
         _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE)
         # Insert a doc with no geometry
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.tiger.county.01",
-            "feature_key": "01099",
-            "facet_name": "ExtractCounty",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "NoGeo"},
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.tiger.county.01",
+                "feature_key": "01099",
+                "facet_name": "ExtractCounty",
+                "data_type": "geojson_feature",
+                "properties": {"NAME": "NoGeo"},
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/census.tiger.county.01")
         assert resp.status_code == 200
@@ -514,8 +545,12 @@ class TestCensusMapAPI:
 
     def test_returns_geojson(self, client):
         tc, store = client
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
-        _seed_feature(store, "census.tiger.county.01", "01003", "Baldwin", _TRIANGLE_2, population=223234)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
+        _seed_feature(
+            store, "census.tiger.county.01", "01003", "Baldwin", _TRIANGLE_2, population=223234
+        )
 
         resp = tc.get("/census/api/maps/census.tiger.county.01")
         assert resp.status_code == 200
@@ -525,7 +560,9 @@ class TestCensusMapAPI:
 
     def test_feature_structure(self, client):
         tc, store = client
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
 
         resp = tc.get("/census/api/maps/census.tiger.county.01")
         data = resp.json()
@@ -538,14 +575,16 @@ class TestCensusMapAPI:
     def test_excludes_docs_without_geometry(self, client):
         tc, store = client
         _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE)
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.tiger.county.01",
-            "feature_key": "01099",
-            "facet_name": "ExtractCounty",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "NoGeo"},
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.tiger.county.01",
+                "feature_key": "01099",
+                "facet_name": "ExtractCounty",
+                "data_type": "geojson_feature",
+                "properties": {"NAME": "NoGeo"},
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/census.tiger.county.01")
         data = resp.json()
@@ -642,7 +681,9 @@ class TestCensusMapAll:
         """Combined view should only include census.joined.* datasets, not tiger."""
         tc, store = client
         _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
 
         resp = tc.get("/census/maps/_all")
         assert resp.status_code == 200
@@ -684,15 +725,17 @@ class TestCensusMapAllAPI:
 
     def test_strips_raw_acs_codes(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "Autauga", "population": 100, "B01003_001E": 100},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {"NAME": "Autauga", "population": 100, "B01003_001E": 100},
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/_all")
         data = resp.json()
@@ -703,7 +746,9 @@ class TestCensusMapAllAPI:
     def test_excludes_tiger_datasets(self, client):
         tc, store = client
         _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
 
         resp = tc.get("/census/api/maps/_all")
         data = resp.json()
@@ -736,8 +781,11 @@ class TestFeaturesToCSV:
 
     def test_flattens_properties(self):
         features = [
-            {"type": "Feature", "properties": {"GEOID": "01001", "NAME": "Autauga", "population": 55869},
-             "geometry": {"type": "Point", "coordinates": [0, 0]}},
+            {
+                "type": "Feature",
+                "properties": {"GEOID": "01001", "NAME": "Autauga", "population": 55869},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            },
         ]
         result = _features_to_csv(features)
         lines = result.strip().split("\n")
@@ -749,7 +797,11 @@ class TestFeaturesToCSV:
 
     def test_excludes_geometry(self):
         features = [
-            {"type": "Feature", "properties": {"GEOID": "01001"}, "geometry": {"type": "Point", "coordinates": [0, 0]}},
+            {
+                "type": "Feature",
+                "properties": {"GEOID": "01001"},
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            },
         ]
         result = _features_to_csv(features)
         assert "geometry" not in result
@@ -834,14 +886,16 @@ class TestCensusMapDownload:
     def test_excludes_docs_without_geometry(self, client):
         tc, store = client
         _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE)
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.tiger.county.01",
-            "feature_key": "01099",
-            "facet_name": "ExtractCounty",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "NoGeo"},
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.tiger.county.01",
+                "feature_key": "01099",
+                "facet_name": "ExtractCounty",
+                "data_type": "geojson_feature",
+                "properties": {"NAME": "NoGeo"},
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/census.tiger.county.01/download?format=geojson")
         data = json.loads(resp.content)
@@ -880,7 +934,9 @@ class TestCensusMapAllDownload:
     def test_only_joined_prefix(self, client):
         tc, store = client
         _seed_feature(store, "census.joined.01", "01001", "Autauga", _TRIANGLE, population=55869)
-        _seed_feature(store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869)
+        _seed_feature(
+            store, "census.tiger.county.01", "01001", "Autauga", _TRIANGLE, population=55869
+        )
 
         resp = tc.get("/census/api/maps/_all/download?format=geojson")
         data = json.loads(resp.content)
@@ -894,15 +950,22 @@ class TestCensusMapAllDownload:
 
     def test_slim_properties_applied(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"NAME": "Autauga", "population": 100, "B01003_001E": 100, "AWATER": 999},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "NAME": "Autauga",
+                    "population": 100,
+                    "B01003_001E": 100,
+                    "AWATER": 999,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/_all/download?format=geojson")
         data = json.loads(resp.content)
@@ -1058,10 +1121,24 @@ class TestAggregateStateStats:
 
     def test_single_state(self):
         features = [
-            {"properties": {"STATEFP": "01", "population": 100, "housing_units": 50,
-                             "median_income": 40000, "ALAND": 1000000}},
-            {"properties": {"STATEFP": "01", "population": 200, "housing_units": 80,
-                             "median_income": 60000, "ALAND": 2000000}},
+            {
+                "properties": {
+                    "STATEFP": "01",
+                    "population": 100,
+                    "housing_units": 50,
+                    "median_income": 40000,
+                    "ALAND": 1000000,
+                }
+            },
+            {
+                "properties": {
+                    "STATEFP": "01",
+                    "population": 200,
+                    "housing_units": 80,
+                    "median_income": 60000,
+                    "ALAND": 2000000,
+                }
+            },
         ]
         result = _aggregate_state_stats(features)
         assert len(result) == 1
@@ -1123,17 +1200,25 @@ class TestCensusMapStates:
 
     def test_renders_with_data(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "NAME": "Autauga", "GEOID": "01001",
-                           "population": 55869, "housing_units": 22000, "median_income": 55000,
-                           "ALAND": 1539631459},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "STATEFP": "01",
+                    "NAME": "Autauga",
+                    "GEOID": "01001",
+                    "population": 55869,
+                    "housing_units": 22000,
+                    "median_income": 55000,
+                    "ALAND": 1539631459,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/states")
         assert resp.status_code == 200
@@ -1142,15 +1227,17 @@ class TestCensusMapStates:
 
     def test_choropleth_dropdown(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/states")
         assert resp.status_code == 200
@@ -1159,16 +1246,22 @@ class TestCensusMapStates:
 
     def test_summary_table(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "NAME": "Autauga", "GEOID": "01001",
-                           "population": 55869},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "STATEFP": "01",
+                    "NAME": "Autauga",
+                    "GEOID": "01001",
+                    "population": 55869,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/maps/states")
         assert resp.status_code == 200
@@ -1197,16 +1290,22 @@ class TestCensusMapStatesAPI:
 
     def test_features_have_state_value(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "NAME": "Autauga", "GEOID": "01001",
-                           "population": 55869},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "STATEFP": "01",
+                    "NAME": "Autauga",
+                    "GEOID": "01001",
+                    "population": 55869,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/states?field=total_population")
         data = resp.json()
@@ -1216,16 +1315,23 @@ class TestCensusMapStatesAPI:
 
     def test_field_parameter(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "NAME": "Autauga", "GEOID": "01001",
-                           "population": 100, "housing_units": 50},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {
+                    "STATEFP": "01",
+                    "NAME": "Autauga",
+                    "GEOID": "01001",
+                    "population": 100,
+                    "housing_units": 50,
+                },
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/states?field=total_housing_units")
         data = resp.json()
@@ -1233,24 +1339,28 @@ class TestCensusMapStatesAPI:
 
     def test_only_joined_datasets(self, client):
         tc, store = client
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.joined.01",
-            "feature_key": "01001",
-            "facet_name": "Joined",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
-        store._db.handler_output.insert_one({
-            "dataset_key": "census.tiger.county.01",
-            "feature_key": "01001",
-            "facet_name": "Tiger",
-            "data_type": "geojson_feature",
-            "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
-            "geometry": _TRIANGLE,
-            "imported_at": 1708873045000,
-        })
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.joined.01",
+                "feature_key": "01001",
+                "facet_name": "Joined",
+                "data_type": "geojson_feature",
+                "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
+        store._db.handler_output.insert_one(
+            {
+                "dataset_key": "census.tiger.county.01",
+                "feature_key": "01001",
+                "facet_name": "Tiger",
+                "data_type": "geojson_feature",
+                "properties": {"STATEFP": "01", "population": 100, "GEOID": "01001"},
+                "geometry": _TRIANGLE,
+                "imported_at": 1708873045000,
+            }
+        )
 
         resp = tc.get("/census/api/maps/states")
         data = resp.json()
@@ -1443,7 +1553,7 @@ class TestNavLink:
         tc, store = client
         resp = tc.get("/census/maps")
         assert resp.status_code == 200
-        assert 'sidebar-link active' in resp.text
+        assert "sidebar-link active" in resp.text
 
 
 class TestColorLegend:

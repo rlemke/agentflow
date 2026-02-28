@@ -14,6 +14,7 @@ import pytest
 class TestSensorUtils:
     def test_ingest_reading_structure(self):
         from handlers.shared.sensor_utils import ingest_reading
+
         reading, quality = ingest_reading("sensor_001", 25.5, "celsius")
         assert reading["sensor_id"] == "sensor_001"
         assert reading["value"] == 25.5
@@ -23,22 +24,26 @@ class TestSensorUtils:
 
     def test_ingest_reading_null_last(self):
         from handlers.shared.sensor_utils import ingest_reading
+
         _, quality = ingest_reading("s1", 10.0, "fahrenheit", last_reading=None)
         assert quality == "initial"
 
     def test_ingest_reading_with_last(self):
         from handlers.shared.sensor_utils import ingest_reading
+
         _, quality = ingest_reading("s1", 10.0, "celsius", last_reading={"value": 9.0})
         assert quality == "continuous"
 
     def test_validate_reading_no_config(self):
         from handlers.shared.sensor_utils import validate_reading
+
         valid, calibrated = validate_reading({"value": 25.0})
         assert valid is True
         assert calibrated == 25.0
 
     def test_validate_reading_with_config(self):
         from handlers.shared.sensor_utils import validate_reading
+
         config = {"calibration_offset": 1.0, "calibration_scale": 1.1, "min": -50, "max": 100}
         valid, calibrated = validate_reading({"value": 20.0}, config)
         assert valid is True
@@ -46,10 +51,13 @@ class TestSensorUtils:
 
     def test_detect_anomaly_negative_threshold(self):
         from handlers.shared.sensor_utils import detect_anomaly
+
         result = detect_anomaly(
             {"value": -45.0},
-            threshold_low=-10.0, threshold_high=50.0,
-            critical_low=-40.0, critical_high=80.0,
+            threshold_low=-10.0,
+            threshold_high=50.0,
+            critical_low=-40.0,
+            critical_high=80.0,
         )
         assert result["is_anomaly"] is True
         assert result["severity"] == "critical"
@@ -58,16 +66,20 @@ class TestSensorUtils:
 
     def test_detect_anomaly_normal(self):
         from handlers.shared.sensor_utils import detect_anomaly
+
         result = detect_anomaly(
             {"value": 25.0},
-            threshold_low=-10.0, threshold_high=50.0,
-            critical_low=-40.0, critical_high=80.0,
+            threshold_low=-10.0,
+            threshold_high=50.0,
+            critical_low=-40.0,
+            critical_high=80.0,
         )
         assert result["is_anomaly"] is False
         assert result["severity"] == "normal"
 
     def test_classify_alert_null_override(self):
         from handlers.shared.sensor_utils import classify_alert
+
         anomaly = {"severity": "critical"}
         alert = classify_alert(anomaly, "s1", override_config=None)
         assert alert["priority"] == 1
@@ -81,40 +93,54 @@ class TestSensorUtils:
 class TestIngestionHandlers:
     def test_ingest_reading_default(self):
         from handlers.ingestion.ingestion_handlers import handle_ingest_reading
-        result = handle_ingest_reading({
-            "sensor_id": "sensor_001",
-            "value": 22.5,
-            "unit": "celsius",
-        })
+
+        result = handle_ingest_reading(
+            {
+                "sensor_id": "sensor_001",
+                "value": 22.5,
+                "unit": "celsius",
+            }
+        )
         assert "reading" in result
         assert "quality" in result
         assert result["reading"]["sensor_id"] == "sensor_001"
 
     def test_ingest_null_json_string(self):
         from handlers.ingestion.ingestion_handlers import handle_ingest_reading
-        result = handle_ingest_reading({
-            "sensor_id": "s1",
-            "value": "10.0",
-            "unit": "celsius",
-            "last_reading": "null",
-        })
+
+        result = handle_ingest_reading(
+            {
+                "sensor_id": "s1",
+                "value": "10.0",
+                "unit": "celsius",
+                "last_reading": "null",
+            }
+        )
         assert result["quality"] == "initial"
 
     def test_validate_reading_default(self):
         from handlers.ingestion.ingestion_handlers import handle_validate_reading
-        result = handle_validate_reading({
-            "reading": {"value": 25.0, "sensor_id": "s1"},
-        })
+
+        result = handle_validate_reading(
+            {
+                "reading": {"value": 25.0, "sensor_id": "s1"},
+            }
+        )
         assert "valid" in result
         assert "calibrated_value" in result
 
     def test_validate_map_key_lookup(self):
         from handlers.ingestion.ingestion_handlers import handle_validate_reading
-        config = json.dumps({"calibration_offset": 0.5, "calibration_scale": 1.0, "min": -100, "max": 100})
-        result = handle_validate_reading({
-            "reading": json.dumps({"value": 20.0, "sensor_id": "s1"}),
-            "sensor_config": config,
-        })
+
+        config = json.dumps(
+            {"calibration_offset": 0.5, "calibration_scale": 1.0, "min": -100, "max": 100}
+        )
+        result = handle_validate_reading(
+            {
+                "reading": json.dumps({"value": 20.0, "sensor_id": "s1"}),
+                "sensor_config": config,
+            }
+        )
         assert result["valid"] is True
         assert result["calibrated_value"] == 20.5
 
@@ -125,44 +151,56 @@ class TestIngestionHandlers:
 class TestAnalysisHandlers:
     def test_detect_anomaly_default(self):
         from handlers.analysis.analysis_handlers import handle_detect_anomaly
-        result = handle_detect_anomaly({
-            "reading": {"value": 25.0},
-            "threshold_low": -10.0,
-            "threshold_high": 50.0,
-            "critical_low": -40.0,
-            "critical_high": 80.0,
-        })
+
+        result = handle_detect_anomaly(
+            {
+                "reading": {"value": 25.0},
+                "threshold_low": -10.0,
+                "threshold_high": 50.0,
+                "critical_low": -40.0,
+                "critical_high": 80.0,
+            }
+        )
         assert "result" in result
         assert result["result"]["severity"] == "normal"
 
     def test_detect_negative_baseline(self):
         from handlers.analysis.analysis_handlers import handle_detect_anomaly
-        result = handle_detect_anomaly({
-            "reading": json.dumps({"value": -50.0}),
-            "threshold_low": "-10.0",
-            "threshold_high": "50.0",
-            "critical_low": "-40.0",
-            "critical_high": "80.0",
-        })
+
+        result = handle_detect_anomaly(
+            {
+                "reading": json.dumps({"value": -50.0}),
+                "threshold_low": "-10.0",
+                "threshold_high": "50.0",
+                "critical_low": "-40.0",
+                "critical_high": "80.0",
+            }
+        )
         assert result["result"]["severity"] == "critical"
         assert result["result"]["threshold_breached"] == "critical_low"
 
     def test_classify_alert_default(self):
         from handlers.analysis.analysis_handlers import handle_classify_alert
-        result = handle_classify_alert({
-            "anomaly": {"severity": "warning"},
-            "sensor_id": "s1",
-        })
+
+        result = handle_classify_alert(
+            {
+                "anomaly": {"severity": "warning"},
+                "sensor_id": "s1",
+            }
+        )
         assert "alert" in result
         assert result["alert"]["priority"] == 2
 
     def test_classify_null_override(self):
         from handlers.analysis.analysis_handlers import handle_classify_alert
-        result = handle_classify_alert({
-            "anomaly": json.dumps({"severity": "critical"}),
-            "sensor_id": "s2",
-            "override_config": "null",
-        })
+
+        result = handle_classify_alert(
+            {
+                "anomaly": json.dumps({"severity": "critical"}),
+                "sensor_id": "s2",
+                "override_config": "null",
+            }
+        )
         assert result["alert"]["priority"] == 1
         assert result["alert"]["channel"] == "default"
 
@@ -173,41 +211,53 @@ class TestAnalysisHandlers:
 class TestReportingHandlers:
     def test_run_diagnostics_default(self):
         from handlers.reporting.reporting_handlers import handle_run_diagnostics
-        result = handle_run_diagnostics({
-            "sensor_id": "s1",
-            "anomaly_result": {"is_anomaly": False, "severity": "normal"},
-            "reading": {"value": 25.0},
-        })
+
+        result = handle_run_diagnostics(
+            {
+                "sensor_id": "s1",
+                "anomaly_result": {"is_anomaly": False, "severity": "normal"},
+                "reading": {"value": 25.0},
+            }
+        )
         assert "report" in result
         assert result["report"]["sensor_id"] == "s1"
         assert "health_status" in result["report"]
 
     def test_run_diagnostics_json_string(self):
         from handlers.reporting.reporting_handlers import handle_run_diagnostics
-        result = handle_run_diagnostics({
-            "sensor_id": "s2",
-            "anomaly_result": json.dumps({"is_anomaly": True, "severity": "critical"}),
-            "reading": json.dumps({"value": -50.0}),
-        })
+
+        result = handle_run_diagnostics(
+            {
+                "sensor_id": "s2",
+                "anomaly_result": json.dumps({"is_anomaly": True, "severity": "critical"}),
+                "reading": json.dumps({"value": -50.0}),
+            }
+        )
         assert result["report"]["anomalies_found"] >= 1
 
     def test_generate_summary_default(self):
         from handlers.reporting.reporting_handlers import handle_generate_summary
-        result = handle_generate_summary({
-            "sensor_id": "s1",
-            "diagnostic": {"anomalies_found": 2, "health_status": "degraded"},
-            "alert": {"priority": 1},
-        })
+
+        result = handle_generate_summary(
+            {
+                "sensor_id": "s1",
+                "diagnostic": {"anomalies_found": 2, "health_status": "degraded"},
+                "alert": {"priority": 1},
+            }
+        )
         assert "summary" in result
         assert result["summary"]["critical_count"] == 1
 
     def test_generate_summary_json_string(self):
         from handlers.reporting.reporting_handlers import handle_generate_summary
-        result = handle_generate_summary({
-            "sensor_id": "s1",
-            "diagnostic": json.dumps({"anomalies_found": 0, "health_status": "healthy"}),
-            "alert": json.dumps({"priority": 3}),
-        })
+
+        result = handle_generate_summary(
+            {
+                "sensor_id": "s1",
+                "diagnostic": json.dumps({"anomalies_found": 0, "health_status": "healthy"}),
+                "alert": json.dumps({"priority": 3}),
+            }
+        )
         assert result["summary"]["critical_count"] == 0
 
 
@@ -217,38 +267,66 @@ class TestReportingHandlers:
 class TestDispatch:
     def test_ingestion_dispatch(self):
         from handlers.ingestion.ingestion_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "monitor.Ingestion.IngestReading" in _DISPATCH
         assert "monitor.Ingestion.ValidateReading" in _DISPATCH
 
     def test_analysis_dispatch(self):
         from handlers.analysis.analysis_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "monitor.Analysis.DetectAnomaly" in _DISPATCH
         assert "monitor.Analysis.ClassifyAlert" in _DISPATCH
 
     def test_reporting_dispatch(self):
         from handlers.reporting.reporting_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "monitor.Reporting.RunDiagnostics" in _DISPATCH
         assert "monitor.Reporting.GenerateSummary" in _DISPATCH
 
     def test_total_handler_count(self):
-        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.analysis.analysis_handlers import _DISPATCH as d2
+        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.reporting.reporting_handlers import _DISPATCH as d3
+
         assert len(d1) + len(d2) + len(d3) == 6
 
     def test_registry_handle_routes(self):
-        from handlers.ingestion.ingestion_handlers import handle as h1
         from handlers.analysis.analysis_handlers import handle as h2
+        from handlers.ingestion.ingestion_handlers import handle as h1
         from handlers.reporting.reporting_handlers import handle as h3
+
         # Verify the handle() entrypoints dispatch correctly
-        r1 = h1({"_facet_name": "monitor.Ingestion.IngestReading", "sensor_id": "s1", "value": 1.0, "unit": "c"})
+        r1 = h1(
+            {
+                "_facet_name": "monitor.Ingestion.IngestReading",
+                "sensor_id": "s1",
+                "value": 1.0,
+                "unit": "c",
+            }
+        )
         assert "reading" in r1
-        r2 = h2({"_facet_name": "monitor.Analysis.DetectAnomaly", "reading": {"value": 0.0}, "threshold_low": -10, "threshold_high": 50, "critical_low": -40, "critical_high": 80})
+        r2 = h2(
+            {
+                "_facet_name": "monitor.Analysis.DetectAnomaly",
+                "reading": {"value": 0.0},
+                "threshold_low": -10,
+                "threshold_high": 50,
+                "critical_low": -40,
+                "critical_high": 80,
+            }
+        )
         assert "result" in r2
-        r3 = h3({"_facet_name": "monitor.Reporting.RunDiagnostics", "sensor_id": "s1", "anomaly_result": {}, "reading": {}})
+        r3 = h3(
+            {
+                "_facet_name": "monitor.Reporting.RunDiagnostics",
+                "sensor_id": "s1",
+                "anomaly_result": {},
+                "reading": {},
+            }
+        )
         assert "report" in r3
 
 
@@ -259,6 +337,7 @@ class TestCompilation:
     @pytest.fixture()
     def parsed_ast(self):
         from afl.parser import AFLParser
+
         afl_path = os.path.join(os.path.dirname(__file__), "..", "afl", "monitor.afl")
         with open(afl_path) as f:
             source = f.read()
@@ -298,6 +377,7 @@ class TestCompilation:
     def test_null_literal_in_call(self, parsed_ast):
         """Verify null literal appears in IngestReading and ClassifyAlert defaults."""
         from afl.ast import Literal
+
         null_count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -308,7 +388,8 @@ class TestCompilation:
 
     def test_mixin_alias_present(self, parsed_ast):
         """Verify mixin alias ('as retry', 'as alertcfg') in workflow steps."""
-        from afl.ast import MixinCall, AndThenBlock
+        from afl.ast import AndThenBlock, MixinCall
+
         aliases = []
         for ns in parsed_ast.namespaces:
             for w in ns.workflows:
@@ -325,7 +406,8 @@ class TestCompilation:
 
     def test_unary_negation_in_schema_inst(self, parsed_ast):
         """Verify unary negation appears in ThresholdConfig instantiation."""
-        from afl.ast import UnaryExpr, AndThenBlock
+        from afl.ast import AndThenBlock, UnaryExpr
+
         unary_count = 0
         for ns in parsed_ast.namespaces:
             for w in ns.workflows:
@@ -347,10 +429,11 @@ class TestCompilation:
 class TestAgentIntegration:
     def test_registry_runner_poll_once(self):
         """RegistryRunner dispatches all handlers via ToolRegistry."""
-        from afl.runtime.agent import ToolRegistry
-        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.analysis.analysis_handlers import _DISPATCH as d2
+        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.reporting.reporting_handlers import _DISPATCH as d3
+
+        from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
         for dispatch in [d1, d2, d3]:
@@ -359,17 +442,20 @@ class TestAgentIntegration:
                 registry.register(tool_name, handler)
 
         tool_names = [
-            "IngestReading", "ValidateReading",
-            "DetectAnomaly", "ClassifyAlert",
-            "RunDiagnostics", "GenerateSummary",
+            "IngestReading",
+            "ValidateReading",
+            "DetectAnomaly",
+            "ClassifyAlert",
+            "RunDiagnostics",
+            "GenerateSummary",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
 
     def test_registry_runner_handler_names(self):
         """Verify all dispatch tables have correct namespace prefixes."""
-        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.analysis.analysis_handlers import _DISPATCH as d2
+        from handlers.ingestion.ingestion_handlers import _DISPATCH as d1
         from handlers.reporting.reporting_handlers import _DISPATCH as d3
 
         all_names = list(d1.keys()) + list(d2.keys()) + list(d3.keys())
@@ -377,9 +463,10 @@ class TestAgentIntegration:
         assert all(n.startswith("monitor.") for n in all_names)
 
     def test_claude_agent_runner_with_sensor_handler(self):
+        from handlers.ingestion.ingestion_handlers import handle_ingest_reading
+
         from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
         from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
-        from handlers.ingestion.ingestion_handlers import handle_ingest_reading
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
@@ -409,7 +496,10 @@ class TestAgentIntegration:
                             "type": "CallExpr",
                             "target": "IngestReading",
                             "args": [
-                                {"name": "sensor_id", "value": {"type": "InputRef", "path": ["sensor_id"]}},
+                                {
+                                    "name": "sensor_id",
+                                    "value": {"type": "InputRef", "path": ["sensor_id"]},
+                                },
                                 {"name": "value", "value": {"type": "Double", "value": 22.5}},
                                 {"name": "unit", "value": {"type": "String", "value": "celsius"}},
                             ],
@@ -505,7 +595,10 @@ class TestAgentIntegration:
                                     "type": "MixinCall",
                                     "target": "RetryPolicy",
                                     "args": [
-                                        {"name": "max_retries", "value": {"type": "Int", "value": 7}},
+                                        {
+                                            "name": "max_retries",
+                                            "value": {"type": "Int", "value": 7},
+                                        },
                                     ],
                                     "alias": "retry",
                                 },
@@ -520,7 +613,10 @@ class TestAgentIntegration:
                         "type": "CallExpr",
                         "target": "W",
                         "args": [
-                            {"name": "out", "value": {"type": "StepRef", "path": ["ing", "quality"]}},
+                            {
+                                "name": "out",
+                                "value": {"type": "StepRef", "path": ["ing", "quality"]},
+                            },
                         ],
                     },
                 },

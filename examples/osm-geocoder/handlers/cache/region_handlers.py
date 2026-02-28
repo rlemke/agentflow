@@ -55,7 +55,9 @@ def handle_resolve_region(params: dict[str, Any]) -> dict[str, Any]:
     cache = download(best.geofabrik_path)
     source = cache.get("source", "unknown")
     if step_log:
-        step_log(f"ResolveRegion: '{name}' -> {best.facet_name} ({best.geofabrik_path}, source={source})")
+        step_log(
+            f"ResolveRegion: '{name}' -> {best.facet_name} ({best.geofabrik_path}, source={source})"
+        )
 
     return {
         "cache": cache,
@@ -92,14 +94,18 @@ def handle_resolve_regions(params: dict[str, Any]) -> dict[str, Any]:
         cache = download(match.geofabrik_path)
         source = cache.get("source", "unknown")
         if step_log:
-            step_log(f"ResolveRegions: '{match.facet_name}' ({match.geofabrik_path}, source={source})")
+            step_log(
+                f"ResolveRegions: '{match.facet_name}' ({match.geofabrik_path}, source={source})"
+            )
         caches.append(cache)
-        regions.append({
-            "name": match.facet_name,
-            "namespace": match.namespace,
-            "continent": match.continent,
-            "geofabrik_path": match.geofabrik_path,
-        })
+        regions.append(
+            {
+                "name": match.facet_name,
+                "namespace": match.namespace,
+                "continent": match.continent,
+                "geofabrik_path": match.geofabrik_path,
+            }
+        )
 
     return {
         "caches": caches,
@@ -138,9 +144,7 @@ def handle_list_regions(params: dict[str, Any]) -> dict[str, Any]:
             "region_count": len(region_list),
             "regions": region_list,
             "feature_count": len(features),
-            "geographic_features": {
-                k: v for k, v in features.items()
-            },
+            "geographic_features": dict(features.items()),
         },
     }
 

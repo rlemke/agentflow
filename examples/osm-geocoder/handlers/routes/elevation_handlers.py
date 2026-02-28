@@ -17,8 +17,9 @@ METERS_TO_FEET = 3.28084
 FEET_TO_METERS = 0.3048
 
 
-def _get_elevation_batch(coordinates: list[tuple[float, float]],
-                          dem_source: str = "srtm") -> list[float]:
+def _get_elevation_batch(
+    coordinates: list[tuple[float, float]], dem_source: str = "srtm"
+) -> list[float]:
     """
     Get elevation for a batch of coordinates.
 
@@ -41,13 +42,8 @@ def _get_elevation_batch(coordinates: list[tuple[float, float]],
         batch_size = 100
 
         for i in range(0, len(coordinates), batch_size):
-            batch = coordinates[i:i + batch_size]
-            payload = {
-                "locations": [
-                    {"latitude": lat, "longitude": lon}
-                    for lat, lon in batch
-                ]
-            }
+            batch = coordinates[i : i + batch_size]
+            payload = {"locations": [{"latitude": lat, "longitude": lon} for lat, lon in batch]}
 
             try:
                 response = requests.post(url, json=payload, timeout=30)
@@ -61,7 +57,7 @@ def _get_elevation_batch(coordinates: list[tuple[float, float]],
                 if i + batch_size < len(coordinates):
                     time.sleep(0.5)
 
-            except requests.RequestException as e:
+            except requests.RequestException:
                 # On error, fill with zeros
                 elevations.extend([0] * len(batch))
 
@@ -220,15 +216,17 @@ def handle_enrich_with_elevation(params: dict[str, Any]) -> dict[str, Any]:
     # Create output GeoJSON with enriched properties
     output_features = []
     for route in enriched_routes:
-        output_features.append({
-            "type": "Feature",
-            "geometry": route["geometry"],
-            "properties": {
-                **route["properties"],
-                "elevation_stats": route["stats"],
-                "elevation_profile": route["elevation_profile"],
+        output_features.append(
+            {
+                "type": "Feature",
+                "geometry": route["geometry"],
+                "properties": {
+                    **route["properties"],
+                    "elevation_stats": route["stats"],
+                    "elevation_profile": route["elevation_profile"],
+                },
             }
-        })
+        )
 
     output_geojson = {
         "type": "FeatureCollection",
@@ -239,7 +237,10 @@ def handle_enrich_with_elevation(params: dict[str, Any]) -> dict[str, Any]:
         json.dump(output_geojson, f)
 
     if step_log:
-        step_log(f"EnrichWithElevation: enriched {len(enriched_routes)}/{len(features)} routes with elevation", level="success")
+        step_log(
+            f"EnrichWithElevation: enriched {len(enriched_routes)}/{len(features)} routes with elevation",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,
@@ -295,7 +296,10 @@ def handle_filter_by_max_elevation(params: dict[str, Any]) -> dict[str, Any]:
         json.dump(output_geojson, f)
 
     if step_log:
-        step_log(f"FilterByMaxElevation: {len(matched)}/{len(features)} routes above {threshold_ft} ft", level="success")
+        step_log(
+            f"FilterByMaxElevation: {len(matched)}/{len(features)} routes above {threshold_ft} ft",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,
@@ -333,7 +337,7 @@ def handle_filter_by_min_elevation(params: dict[str, Any]) -> dict[str, Any]:
     for feature in features:
         props = feature.get("properties", {})
         stats = props.get("elevation_stats", {})
-        min_elev = stats.get("min_elevation_ft", float('inf'))
+        min_elev = stats.get("min_elevation_ft", float("inf"))
 
         if min_elev <= threshold_ft:
             matched.append(feature)
@@ -350,7 +354,10 @@ def handle_filter_by_min_elevation(params: dict[str, Any]) -> dict[str, Any]:
         json.dump(output_geojson, f)
 
     if step_log:
-        step_log(f"FilterByMinElevation: {len(matched)}/{len(features)} routes below {threshold_ft} ft", level="success")
+        step_log(
+            f"FilterByMinElevation: {len(matched)}/{len(features)} routes below {threshold_ft} ft",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,
@@ -405,7 +412,10 @@ def handle_filter_by_elevation_gain(params: dict[str, Any]) -> dict[str, Any]:
         json.dump(output_geojson, f)
 
     if step_log:
-        step_log(f"FilterByElevationGain: {len(matched)}/{len(features)} routes with gain >= {min_gain_ft} ft", level="success")
+        step_log(
+            f"FilterByElevationGain: {len(matched)}/{len(features)} routes with gain >= {min_gain_ft} ft",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,
@@ -434,7 +444,9 @@ def handle_filter_by_elevation_range(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
 
     if step_log:
-        step_log(f"FilterByElevationRange: filtering {input_path} for range {min_elev}-{max_elev} ft")
+        step_log(
+            f"FilterByElevationRange: filtering {input_path} for range {min_elev}-{max_elev} ft"
+        )
 
     with open(input_path) as f:
         geojson = json.load(f)
@@ -445,7 +457,7 @@ def handle_filter_by_elevation_range(params: dict[str, Any]) -> dict[str, Any]:
     for feature in features:
         props = feature.get("properties", {})
         stats = props.get("elevation_stats", {})
-        route_min = stats.get("min_elevation_ft", float('inf'))
+        route_min = stats.get("min_elevation_ft", float("inf"))
         route_max = stats.get("max_elevation_ft", 0)
 
         # Route passes through range if it overlaps
@@ -453,13 +465,9 @@ def handle_filter_by_elevation_range(params: dict[str, Any]) -> dict[str, Any]:
             matched.append(feature)
 
     output_path = input_path.replace(
-        ".geojson",
-        f"_range_{int(min_elev)}-{int(max_elev)}ft.geojson"
+        ".geojson", f"_range_{int(min_elev)}-{int(max_elev)}ft.geojson"
     )
-    output_path = output_path.replace(
-        ".json",
-        f"_range_{int(min_elev)}-{int(max_elev)}ft.json"
-    )
+    output_path = output_path.replace(".json", f"_range_{int(min_elev)}-{int(max_elev)}ft.json")
 
     output_geojson = {
         "type": "FeatureCollection",
@@ -470,7 +478,10 @@ def handle_filter_by_elevation_range(params: dict[str, Any]) -> dict[str, Any]:
         json.dump(output_geojson, f)
 
     if step_log:
-        step_log(f"FilterByElevationRange: {len(matched)}/{len(features)} routes in range {min_elev}-{max_elev} ft", level="success")
+        step_log(
+            f"FilterByElevationRange: {len(matched)}/{len(features)} routes in range {min_elev}-{max_elev} ft",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,
@@ -493,9 +504,9 @@ def handle_high_elevation_hiking_trails(params: dict[str, Any]) -> dict[str, Any
     2. Enrich with elevation data
     3. Filter by max elevation threshold
     """
-    cache = params["cache"]
+    _cache = params["cache"]
     min_elevation_ft = params.get("min_elevation_ft", 2000.0)
-    network = params.get("network", "*")
+    _network = params.get("network", "*")
     dem_source = params.get("dem_source", "srtm")
     step_log = params.get("_step_log")
 
@@ -529,7 +540,9 @@ def handle_high_elevation_cycling_routes(params: dict[str, Any]) -> dict[str, An
     step_log = params.get("_step_log")
 
     if step_log:
-        step_log(f"HighElevationCyclingRoutes: filtering cycling routes above {min_elevation_ft} ft")
+        step_log(
+            f"HighElevationCyclingRoutes: filtering cycling routes above {min_elevation_ft} ft"
+        )
 
     return {
         "result": {

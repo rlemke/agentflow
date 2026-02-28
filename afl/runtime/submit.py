@@ -30,7 +30,6 @@ import json
 import logging
 import sys
 import time
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "input",
         nargs="?",
-        help="Input AFL file (legacy single-file mode). "
-        "Use --primary for multi-file input.",
+        help="Input AFL file (legacy single-file mode). Use --primary for multi-file input.",
     )
 
     # Multi-source input options
@@ -152,7 +150,7 @@ def main(args: list[str] | None = None) -> int:
     # -------------------------------------------------------------------------
     from ..config import load_config
     from ..loader import SourceLoader
-    from ..source import CompilerInput, FileOrigin, SourceEntry
+    from ..source import CompilerInput
 
     config = load_config(parsed.config)
 
@@ -235,7 +233,9 @@ def main(args: list[str] | None = None) -> int:
     # -------------------------------------------------------------------------
     workflow_ast = _find_workflow_in_program(program_dict, parsed.workflow)
     if workflow_ast is None:
-        print(f"Error: Workflow '{parsed.workflow}' not found in compiled program.", file=sys.stderr)
+        print(
+            f"Error: Workflow '{parsed.workflow}' not found in compiled program.", file=sys.stderr
+        )
         return 1
 
     inputs: dict = {}

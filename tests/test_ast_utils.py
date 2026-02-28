@@ -16,10 +16,7 @@
 
 import copy
 
-import pytest
-
 from afl.ast_utils import find_all_workflows, find_workflow, normalize_program_ast
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — sample program dicts
@@ -269,9 +266,7 @@ class TestCompileNormalizeFindRoundTrip:
     def test_simple_workflow(self):
         from afl import emit_dict, parse
 
-        ast = parse(
-            'workflow Hello() => (msg: String) andThen { yield Hello(msg = "hi") }'
-        )
+        ast = parse('workflow Hello() => (msg: String) andThen { yield Hello(msg = "hi") }')
         compiled = emit_dict(ast)
         normalized = normalize_program_ast(compiled)
 
@@ -378,10 +373,7 @@ namespace myns {
         assert "eventFacets" not in ns_after
 
         # Event facet should still be findable in declarations
-        event_facets = [
-            d for d in ns_after["declarations"]
-            if d.get("type") == "EventFacetDecl"
-        ]
+        event_facets = [d for d in ns_after["declarations"] if d.get("type") == "EventFacetDecl"]
         assert len(event_facets) == 1
         assert event_facets[0]["name"] == "DoWork"
 

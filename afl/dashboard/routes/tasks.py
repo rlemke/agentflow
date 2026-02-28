@@ -36,7 +36,9 @@ def task_list(request: Request, state: str | None = None, store=Depends(get_stor
         if task.step_id and task.step_id not in step_names:
             step = store.get_step(task.step_id)
             if step:
-                step_names[task.step_id] = step.statement_name or step.statement_id or step.facet_name or ""
+                step_names[task.step_id] = (
+                    step.statement_name or step.statement_id or step.facet_name or ""
+                )
 
     return request.app.state.templates.TemplateResponse(
         request,

@@ -2615,9 +2615,7 @@ class TestForeachExecution:
         assert len(block_steps) == 1  # Just the foreach block itself
 
         # No Value steps created
-        value_steps = [
-            s for s in all_steps if s.object_type == ObjectType.VARIABLE_ASSIGNMENT
-        ]
+        value_steps = [s for s in all_steps if s.object_type == ObjectType.VARIABLE_ASSIGNMENT]
         assert len(value_steps) == 0
 
 
@@ -2686,7 +2684,11 @@ class TestStepDeduplication:
 
         program_ast = {
             "declarations": [
-                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
                 workflow_ast,
             ]
         }
@@ -2751,7 +2753,11 @@ class TestStepDeduplication:
 
         program_ast = {
             "declarations": [
-                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
                 workflow_ast,
             ]
         }
@@ -2872,7 +2878,11 @@ class TestStepDeduplication:
 
         program_ast = {
             "declarations": [
-                {"type": "FacetDecl", "name": "Value", "params": [{"name": "input", "type": "Long"}]},
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                },
                 workflow_ast,
             ]
         }
@@ -3361,7 +3371,9 @@ class TestIterationTraces:
         progress = self._run_one_iteration(evaluator, context)
         assert progress is True
         steps = list(store.get_steps_by_workflow(wf_id))
-        assert len(steps) == 8  # AddWorkflow, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1
+        assert (
+            len(steps) == 8
+        )  # AddWorkflow, block_AW, addition, block_Adder, s1, s2, block_s1, subStep1
         assert self._count_complete(steps) == 2  # s2, subStep1
 
         # --- Iteration 1: yield_SF created and completes (lazy)
@@ -3441,9 +3453,6 @@ class TestIterationTraces:
         Spec: 11 steps, 2 evaluator runs, output result=15.
         subStep1 calls CountDocuments (event), blocks at EventTransmit.
         """
-        from afl.runtime.evaluator import ExecutionContext
-        from afl.runtime.persistence import IterationChanges
-        from afl.runtime.types import WorkflowId
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
@@ -3631,9 +3640,7 @@ class TestIterationTraces:
         }
 
         # ===== Evaluator Run 1: execute until PAUSED =====
-        result1 = evaluator.execute(
-            workflow_ast, inputs={"x": 1, "y": 2}, program_ast=program_ast
-        )
+        result1 = evaluator.execute(workflow_ast, inputs={"x": 1, "y": 2}, program_ast=program_ast)
         assert result1.status == ExecutionStatus.PAUSED
         assert result1.success is True
 
@@ -3705,9 +3712,7 @@ class TestIterationTraces:
                         "call": {
                             "type": "CallExpr",
                             "target": "CountDocuments",
-                            "args": [
-                                {"name": "input", "value": {"type": "Int", "value": 42}}
-                            ],
+                            "args": [{"name": "input", "value": {"type": "Int", "value": 42}}],
                         },
                     },
                 ],
@@ -3763,9 +3768,7 @@ class TestIterationTraces:
                         "call": {
                             "type": "CallExpr",
                             "target": "CountDocuments",
-                            "args": [
-                                {"name": "input", "value": {"type": "Int", "value": 5}}
-                            ],
+                            "args": [{"name": "input", "value": {"type": "Int", "value": 5}}],
                         },
                     },
                 ],
@@ -3795,9 +3798,7 @@ class TestIterationTraces:
         evaluator.continue_step(blocked.id)
 
         # Resume should complete
-        result2 = evaluator.resume(
-            result1.workflow_id, workflow_ast, program_ast=program_ast
-        )
+        result2 = evaluator.resume(result1.workflow_id, workflow_ast, program_ast=program_ast)
         assert result2.status == ExecutionStatus.COMPLETED
         assert result2.outputs["result"] == 5
 
@@ -3833,9 +3834,7 @@ class TestIterationTraces:
                         "call": {
                             "type": "CallExpr",
                             "target": "External",
-                            "args": [
-                                {"name": "x", "value": {"type": "Int", "value": 10}}
-                            ],
+                            "args": [{"name": "x", "value": {"type": "Int", "value": 10}}],
                         },
                     },
                 ],
@@ -3859,7 +3858,7 @@ class TestIterationTraces:
         # Run 1: pauses
         result1 = evaluator.execute(workflow_ast, program_ast=program_ast)
         assert result1.status == ExecutionStatus.PAUSED
-        iterations_run1 = result1.iterations
+        _iterations_run1 = result1.iterations
 
         # Continue
         blocked = [
@@ -3870,9 +3869,7 @@ class TestIterationTraces:
         evaluator.continue_step(blocked.id)
 
         # Run 2: completes
-        result2 = evaluator.resume(
-            result1.workflow_id, workflow_ast, program_ast=program_ast
-        )
+        result2 = evaluator.resume(result1.workflow_id, workflow_ast, program_ast=program_ast)
         assert result2.status == ExecutionStatus.COMPLETED
         assert result2.iterations > 0
 
@@ -4020,9 +4017,7 @@ class TestIterationTraces:
                         "call": {
                             "type": "CallExpr",
                             "target": "MyEvent",
-                            "args": [
-                                {"name": "input", "value": {"type": "Int", "value": 1}}
-                            ],
+                            "args": [{"name": "input", "value": {"type": "Int", "value": 1}}],
                         },
                     },
                 ],
@@ -4207,9 +4202,7 @@ class TestIterationTraces:
             },
         }
 
-        result = evaluator.execute(
-            workflow_ast, inputs={"x": 5}, program_ast=program_ast
-        )
+        result = evaluator.execute(workflow_ast, inputs={"x": 5}, program_ast=program_ast)
         assert result.success is True
         # Inline body: sub.input = $.input + 10 = 5 + 10 = 15
         assert result.outputs["result"] == 15
@@ -4367,9 +4360,7 @@ class TestIterationTraces:
             },
         }
 
-        result = evaluator.execute(
-            workflow_ast, inputs={"x": 5}, program_ast=program_ast
-        )
+        result = evaluator.execute(workflow_ast, inputs={"x": 5}, program_ast=program_ast)
         assert result.success is True
         assert result.outputs["result"] == 15
 
@@ -4499,9 +4490,7 @@ class TestWorkflowAsStep:
             },
         }
 
-        result = evaluator.execute(
-            outer_workflow_ast, inputs={"x": 5}, program_ast=program_ast
-        )
+        result = evaluator.execute(outer_workflow_ast, inputs={"x": 5}, program_ast=program_ast)
         assert result.success is True
         assert result.outputs["result"] == 15
 
@@ -4626,9 +4615,7 @@ class TestWorkflowAsStep:
             },
         }
 
-        result = evaluator.execute(
-            outer_workflow_ast, inputs={"x": 7}, program_ast=program_ast
-        )
+        result = evaluator.execute(outer_workflow_ast, inputs={"x": 7}, program_ast=program_ast)
         assert result.success is True
         assert result.outputs["result"] == 14
 
@@ -5110,7 +5097,7 @@ class TestDirtyBlockTracking:
         mock_changer.process.return_value = mock_result
 
         processed_ids = []
-        original_process = evaluator._process_step
+        _original_process = evaluator._process_step
 
         def tracking_process(step, ctx):
             processed_ids.append(step.id)
@@ -5119,9 +5106,7 @@ class TestDirtyBlockTracking:
         with patch.object(evaluator, "_process_step", side_effect=tracking_process):
             evaluator._run_iteration(context)
 
-        assert block_step.id in processed_ids, (
-            "Dirty Continue block should be processed"
-        )
+        assert block_step.id in processed_ids, "Dirty Continue block should be processed"
 
     def test_continue_block_removed_from_dirty_on_no_progress(self, store, evaluator):
         """Continue block is removed from dirty set when processed with no progress."""
@@ -5210,22 +5195,16 @@ class TestDirtyBlockTracking:
             progress = evaluator._process_step(step, context)
 
         assert progress is True
-        assert context.is_block_dirty("parent-block-1"), (
-            "block_id should be marked dirty"
-        )
-        assert context.is_block_dirty("parent-container-1"), (
-            "container_id should be marked dirty"
-        )
+        assert context.is_block_dirty("parent-block-1"), "block_id should be marked dirty"
+        assert context.is_block_dirty("parent-container-1"), "container_id should be marked dirty"
 
     def test_resume_first_iteration_processes_all_then_switches(self, store, evaluator):
         """resume() starts with _dirty_blocks=None, switches to set after first iter."""
         from unittest.mock import patch
 
-        from afl.runtime.evaluator import ExecutionContext
-
         captured_contexts = []
 
-        original_run = evaluator._run_iteration
+        _original_run = evaluator._run_iteration
 
         def capturing_run(context):
             captured_contexts.append(context._dirty_blocks)
@@ -5236,9 +5215,7 @@ class TestDirtyBlockTracking:
 
         # First iteration should have _dirty_blocks=None (process everything)
         assert len(captured_contexts) >= 1
-        assert captured_contexts[0] is None, (
-            "First iteration should have _dirty_blocks=None"
-        )
+        assert captured_contexts[0] is None, "First iteration should have _dirty_blocks=None"
 
     def test_resume_step_seeds_dirty_from_chain(self, store, evaluator):
         """resume_step() seeds dirty set from Continue blocks in the chain."""
@@ -5326,16 +5303,32 @@ class TestErrorPropagation:
         )
 
         stmts = [
-            StatementDefinition(id="s1", name="ok", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"),
-            StatementDefinition(id="s2", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"),
+            StatementDefinition(
+                id="s1", name="ok", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"
+            ),
+            StatementDefinition(
+                id="s2", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
+            ),
         ]
 
         # One complete, one errored
-        s1 = StepDefinition.create(workflow_id="wf-err", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1", statement_id="s1", block_id=block.id)
+        s1 = StepDefinition.create(
+            workflow_id="wf-err",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F1",
+            statement_id="s1",
+            block_id=block.id,
+        )
         s1.state = StepState.STATEMENT_COMPLETE
         s1.transition.current_state = StepState.STATEMENT_COMPLETE
 
-        s2 = StepDefinition.create(workflow_id="wf-err", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2", statement_id="s2", block_id=block.id)
+        s2 = StepDefinition.create(
+            workflow_id="wf-err",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F2",
+            statement_id="s2",
+            block_id=block.id,
+        )
         s2.mark_error(RuntimeError("handler failed"))
 
         analysis = StepAnalysis.load(block=block, statements=stmts, steps=[s1, s2])
@@ -5357,15 +5350,31 @@ class TestErrorPropagation:
         )
 
         stmts = [
-            StatementDefinition(id="s1", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"),
-            StatementDefinition(id="s2", name="pending", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"),
+            StatementDefinition(
+                id="s1", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"
+            ),
+            StatementDefinition(
+                id="s2", name="pending", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
+            ),
         ]
 
-        s1 = StepDefinition.create(workflow_id="wf-err2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1", statement_id="s1", block_id=block.id)
+        s1 = StepDefinition.create(
+            workflow_id="wf-err2",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F1",
+            statement_id="s1",
+            block_id=block.id,
+        )
         s1.mark_error(RuntimeError("failed"))
 
         # s2 is still in EventTransmit
-        s2 = StepDefinition.create(workflow_id="wf-err2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2", statement_id="s2", block_id=block.id)
+        s2 = StepDefinition.create(
+            workflow_id="wf-err2",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F2",
+            statement_id="s2",
+            block_id=block.id,
+        )
         s2.state = StepState.EVENT_TRANSMIT
         s2.transition.current_state = StepState.EVENT_TRANSMIT
         s2.transition.request_transition = False
@@ -5388,12 +5397,29 @@ class TestErrorPropagation:
         )
 
         stmts = [
-            StatementDefinition(id="s1", name="upstream", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"),
-            StatementDefinition(id="s2", name="downstream", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2", dependencies={"s1"}),
+            StatementDefinition(
+                id="s1",
+                name="upstream",
+                object_type=ObjectType.VARIABLE_ASSIGNMENT,
+                facet_name="F1",
+            ),
+            StatementDefinition(
+                id="s2",
+                name="downstream",
+                object_type=ObjectType.VARIABLE_ASSIGNMENT,
+                facet_name="F2",
+                dependencies={"s1"},
+            ),
         ]
 
         # s1 errored — s2 should still be createable
-        s1 = StepDefinition.create(workflow_id="wf-dep", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1", statement_id="s1", block_id=block.id)
+        s1 = StepDefinition.create(
+            workflow_id="wf-dep",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F1",
+            statement_id="s1",
+            block_id=block.id,
+        )
         s1.mark_error(RuntimeError("failed"))
 
         analysis = StepAnalysis.load(block=block, statements=stmts, steps=[s1])
@@ -5413,11 +5439,21 @@ class TestErrorPropagation:
             facet_name="Parent",
         )
 
-        b1 = StepDefinition.create(workflow_id="wf-ba", object_type=ObjectType.AND_THEN, facet_name="", container_id=container.id)
+        b1 = StepDefinition.create(
+            workflow_id="wf-ba",
+            object_type=ObjectType.AND_THEN,
+            facet_name="",
+            container_id=container.id,
+        )
         b1.state = StepState.STATEMENT_COMPLETE
         b1.transition.current_state = StepState.STATEMENT_COMPLETE
 
-        b2 = StepDefinition.create(workflow_id="wf-ba", object_type=ObjectType.AND_THEN, facet_name="", container_id=container.id)
+        b2 = StepDefinition.create(
+            workflow_id="wf-ba",
+            object_type=ObjectType.AND_THEN,
+            facet_name="",
+            container_id=container.id,
+        )
         b2.mark_error(RuntimeError("block failed"))
 
         analysis = BlockAnalysis.load(container, [b1, b2])
@@ -5461,7 +5497,12 @@ class TestErrorPropagation:
         store.save_step(child)
 
         # Build a dependency graph with one statement
-        stmt = StatementDefinition(id="stmt-1", name="fail", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="FailFacet")
+        stmt = StatementDefinition(
+            id="stmt-1",
+            name="fail",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="FailFacet",
+        )
 
         context = ExecutionContext(
             persistence=store,
@@ -5474,7 +5515,7 @@ class TestErrorPropagation:
         context.set_block_graph(block.id, graph)
 
         handler = BlockExecutionContinueHandler(step=block, context=context)
-        result = handler.process_state()
+        _result = handler.process_state()
 
         assert block.is_error, f"Block should be in error state, got {block.state}"
         assert "errored" in str(block.transition.error).lower()
@@ -5484,22 +5525,48 @@ class TestErrorPropagation:
         from afl.runtime.block import StatementDefinition, StepAnalysis
         from afl.runtime.step import StepDefinition
 
-        block = StepDefinition.create(workflow_id="wf-prog", object_type=ObjectType.AND_THEN, facet_name="")
+        block = StepDefinition.create(
+            workflow_id="wf-prog", object_type=ObjectType.AND_THEN, facet_name=""
+        )
 
         stmts = [
-            StatementDefinition(id="s1", name="ok", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"),
-            StatementDefinition(id="s2", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"),
-            StatementDefinition(id="s3", name="wait", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F3"),
+            StatementDefinition(
+                id="s1", name="ok", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1"
+            ),
+            StatementDefinition(
+                id="s2", name="bad", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
+            ),
+            StatementDefinition(
+                id="s3", name="wait", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F3"
+            ),
         ]
 
-        s1 = StepDefinition.create(workflow_id="wf-prog", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F1", statement_id="s1", block_id=block.id)
+        s1 = StepDefinition.create(
+            workflow_id="wf-prog",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F1",
+            statement_id="s1",
+            block_id=block.id,
+        )
         s1.state = StepState.STATEMENT_COMPLETE
         s1.transition.current_state = StepState.STATEMENT_COMPLETE
 
-        s2 = StepDefinition.create(workflow_id="wf-prog", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2", statement_id="s2", block_id=block.id)
+        s2 = StepDefinition.create(
+            workflow_id="wf-prog",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F2",
+            statement_id="s2",
+            block_id=block.id,
+        )
         s2.mark_error(RuntimeError("failed"))
 
-        s3 = StepDefinition.create(workflow_id="wf-prog", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F3", statement_id="s3", block_id=block.id)
+        s3 = StepDefinition.create(
+            workflow_id="wf-prog",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="F3",
+            statement_id="s3",
+            block_id=block.id,
+        )
         s3.state = StepState.EVENT_TRANSMIT
         s3.transition.current_state = StepState.EVENT_TRANSMIT
 

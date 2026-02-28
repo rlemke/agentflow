@@ -10,12 +10,11 @@ these stubs provide synthetic fallback for testing.
 from __future__ import annotations
 
 import hashlib
-import json
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
     """Deterministic integer from seed string."""
@@ -36,6 +35,7 @@ _TOOLS = ["search", "calculate", "execute"]
 # ---------------------------------------------------------------------------
 # Public API (one per event facet)
 # ---------------------------------------------------------------------------
+
 
 def plan_tool_use(
     query: str,
@@ -87,11 +87,13 @@ def web_search(
     for i in range(n_results):
         r_seed = f"{seed}:{i}"
         relevance = _hash_float(r_seed, 0.5, 1.0)
-        results.append({
-            "title": f"Result {i} for '{query}'",
-            "snippet": f"Information about {query} (source {i})",
-            "relevance": round(relevance, 4),
-        })
+        results.append(
+            {
+                "title": f"Result {i} for '{query}'",
+                "snippet": f"Information about {query} (source {i})",
+                "relevance": round(relevance, 4),
+            }
+        )
     return {
         "query": query,
         "results": results,
@@ -114,11 +116,13 @@ def deep_search(
     for i in range(n_results):
         r_seed = f"{seed}:{i}"
         relevance = _hash_float(r_seed, 0.7, 1.0)
-        results.append({
-            "title": f"Deep result {i} for '{query}'",
-            "snippet": f"Detailed information about {query} (depth {depth}, source {i})",
-            "relevance": round(relevance, 4),
-        })
+        results.append(
+            {
+                "title": f"Deep result {i} for '{query}'",
+                "snippet": f"Detailed information about {query} (depth {depth}, source {i})",
+                "relevance": round(relevance, 4),
+            }
+        )
     search_result = {
         "query": query,
         "results": results,

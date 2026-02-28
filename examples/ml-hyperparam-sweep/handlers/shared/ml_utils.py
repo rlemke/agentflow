@@ -133,10 +133,7 @@ def compare_results(
         }
 
     ranked = sorted(eval_results, key=lambda r: r.get(metric_name, 0), reverse=True)
-    ranking = [
-        {"model_id": r.get("model_id", ""), "score": r.get(metric_name, 0)}
-        for r in ranked
-    ]
+    ranking = [{"model_id": r.get("model_id", ""), "score": r.get(metric_name, 0)} for r in ranked]
     best = ranked[0]
     return {
         "best_model_id": best.get("model_id", ""),
@@ -171,6 +168,6 @@ def generate_report_text(
         "dataset_name": dataset_name,
         "total_configs": total_configs,
         "summary_text": summary_text,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "best_config": comparison.get("ranking", [{}])[0] if ranking else {},
     }

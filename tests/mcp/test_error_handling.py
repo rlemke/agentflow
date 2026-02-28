@@ -148,16 +148,12 @@ class TestToolDispatchErrors:
 
     def test_manage_runner_without_runner_id(self):
         # Action is validated first; "cancel" is valid but runner_id empty -> not found
-        result = _tool_manage_runner(
-            {"runner_id": "", "action": "cancel"}, lambda: None
-        )
+        result = _tool_manage_runner({"runner_id": "", "action": "cancel"}, lambda: None)
         data = json.loads(result[0].text)
         assert data["success"] is False
 
     def test_manage_runner_without_action(self):
-        result = _tool_manage_runner(
-            {"runner_id": "r-1", "action": ""}, lambda: None
-        )
+        result = _tool_manage_runner({"runner_id": "r-1", "action": ""}, lambda: None)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "Invalid action" in data["error"]
@@ -175,9 +171,7 @@ class TestToolDispatchErrors:
         assert "facet_name is required" in data["error"]
 
     def test_manage_handlers_register_without_facet_name(self):
-        result = _tool_manage_handlers(
-            {"action": "register", "module_uri": "m"}, lambda: None
-        )
+        result = _tool_manage_handlers({"action": "register", "module_uri": "m"}, lambda: None)
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "facet_name is required" in data["error"]
@@ -231,17 +225,13 @@ class TestToolInputValidation:
 
     def test_execute_workflow_empty_inputs(self):
         source = "workflow W()"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "W", "inputs": {}}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "W", "inputs": {}})
         data = json.loads(result[0].text)
         assert "success" in data
 
     def test_execute_workflow_with_none_inputs(self):
         source = "workflow W()"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "W", "inputs": None}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "W", "inputs": None})
         data = json.loads(result[0].text)
         assert "success" in data
 
@@ -323,9 +313,7 @@ class TestResourceBoundaryConditions:
         )
         store.save_handler_registration(reg)
         # The handler resource splits on "/" so "deep.ns.FacetName" is a single segment
-        data = json.loads(
-            _handle_resource("afl://handlers/deep.ns.FacetName", lambda: store)
-        )
+        data = json.loads(_handle_resource("afl://handlers/deep.ns.FacetName", lambda: store))
         assert data["facet_name"] == "deep.ns.FacetName"
         assert data["module_uri"] == "deep.module"
 
@@ -333,9 +321,7 @@ class TestResourceBoundaryConditions:
         runner = _make_runner()
         store.save_runner(runner)
         # "invalid" is not a valid sub-resource (not "steps" or "logs")
-        data = json.loads(
-            _handle_resource("afl://runners/r-1/invalid", lambda: store)
-        )
+        data = json.loads(_handle_resource("afl://runners/r-1/invalid", lambda: store))
         assert "error" in data
 
     def test_invalid_flow_sub_resource(self, store):
@@ -344,9 +330,7 @@ class TestResourceBoundaryConditions:
             name=FlowIdentity(name="MyFlow", path="/flows/my", uuid="f-1"),
         )
         store.save_flow(flow)
-        data = json.loads(
-            _handle_resource("afl://flows/f-1/invalid", lambda: store)
-        )
+        data = json.loads(_handle_resource("afl://flows/f-1/invalid", lambda: store))
         assert "error" in data
 
     def test_large_runners_dataset(self, store):
@@ -378,8 +362,6 @@ class TestResourceBoundaryConditions:
         assert "Unknown resource" in data["error"]
 
     def test_deeply_nested_unknown_path(self, store):
-        data = json.loads(
-            _handle_resource("afl://runners/r-1/steps/extra/deep", lambda: store)
-        )
+        data = json.loads(_handle_resource("afl://runners/r-1/steps/extra/deep", lambda: store))
         # Extra path segments fall through the handler
         assert "error" in data or isinstance(data, list)

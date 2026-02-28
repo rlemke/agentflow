@@ -1,11 +1,12 @@
 """Tests for AFL dependency resolver."""
 
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
 
 from afl.parser import AFLParser
 from afl.resolver import DependencyResolver, MongoDBNamespaceResolver, NamespaceIndex
-from afl.source import CompilerInput, FileOrigin, SourceEntry, SourceRegistry
+from afl.source import CompilerInput, FileOrigin, SourceEntry
 
 
 @pytest.fixture
@@ -29,8 +30,7 @@ class TestNamespaceIndex:
     def test_multiple_namespaces_per_file(self, tmp_path):
         """A single file may define multiple namespaces."""
         (tmp_path / "multi.afl").write_text(
-            "namespace ns.a { facet A() }\n"
-            "namespace ns.b { facet B() }\n"
+            "namespace ns.a { facet A() }\nnamespace ns.b { facet B() }\n"
         )
 
         index = NamespaceIndex([tmp_path])
@@ -123,8 +123,7 @@ class TestDependencyResolver:
     def test_no_missing_deps_is_noop(self):
         """If all namespaces are defined, resolver is a no-op."""
         program, registry, ci = self._make_input(
-            "namespace a { facet A() }\n"
-            "namespace b { use a\n facet B() }\n"
+            "namespace a { facet A() }\nnamespace b { use a\n facet B() }\n"
         )
         resolver = DependencyResolver()
         result_prog, _, _ = resolver.resolve(program, registry, ci)
@@ -147,16 +146,10 @@ class TestDependencyResolver:
 
     def test_transitive_deps(self, tmp_path):
         """Resolve transitive dependencies: A → B → C."""
-        (tmp_path / "b.afl").write_text(
-            "namespace ns.b { use ns.c\n facet B() }"
-        )
-        (tmp_path / "c.afl").write_text(
-            "namespace ns.c { facet C() }"
-        )
+        (tmp_path / "b.afl").write_text("namespace ns.b { use ns.c\n facet B() }")
+        (tmp_path / "c.afl").write_text("namespace ns.c { facet C() }")
 
-        program, registry, ci = self._make_input(
-            "namespace ns.a { use ns.b\n facet A() }\n"
-        )
+        program, registry, ci = self._make_input("namespace ns.a { use ns.b\n facet A() }\n")
         fs_index = NamespaceIndex([tmp_path])
         resolver = DependencyResolver(filesystem_index=fs_index)
         result_prog, _, _ = resolver.resolve(program, registry, ci)
@@ -166,9 +159,7 @@ class TestDependencyResolver:
 
     def test_circular_deps_terminate(self, tmp_path):
         """Circular dependencies (A → B → A) terminate naturally."""
-        (tmp_path / "b.afl").write_text(
-            "namespace circle.b { use circle.a\n facet B() }"
-        )
+        (tmp_path / "b.afl").write_text("namespace circle.b { use circle.a\n facet B() }")
 
         program, registry, ci = self._make_input(
             "namespace circle.a { use circle.b\n facet A() }\n"
@@ -183,8 +174,7 @@ class TestDependencyResolver:
     def test_already_loaded_source_not_reloaded(self, tmp_path):
         """A source file is loaded only once even if multiple namespaces reference it."""
         (tmp_path / "shared.afl").write_text(
-            "namespace shared.types { facet T() }\n"
-            "namespace shared.utils { facet U() }\n"
+            "namespace shared.types { facet T() }\nnamespace shared.utils { facet U() }\n"
         )
 
         program, registry, ci = self._make_input(
@@ -212,9 +202,7 @@ class TestDependencyResolver:
 
     def test_auto_resolve_false_is_noop(self):
         """When no filesystem or mongo resolver is given, it's a no-op."""
-        program, registry, ci = self._make_input(
-            "namespace app { use missing.ns\n facet App() }\n"
-        )
+        program, registry, ci = self._make_input("namespace app { use missing.ns\n facet App() }\n")
         resolver = DependencyResolver()
         result_prog, _, _ = resolver.resolve(program, registry, ci)
         assert {ns.name for ns in result_prog.namespaces} == {"app"}
@@ -237,9 +225,7 @@ class TestDependencyResolver:
 
     def test_mixed_filesystem_and_mongodb(self, tmp_path):
         """Filesystem takes precedence; MongoDB fills the gaps."""
-        (tmp_path / "local.afl").write_text(
-            "namespace local.types { facet LocalT() }"
-        )
+        (tmp_path / "local.afl").write_text("namespace local.types { facet LocalT() }")
 
         program, registry, ci = self._make_input(
             "namespace app { use local.types\n use remote.types\n facet App() }\n"
@@ -263,9 +249,7 @@ class TestDependencyResolver:
         """Registry should include entries for auto-resolved sources."""
         (tmp_path / "dep.afl").write_text("namespace dep.ns { facet D() }")
 
-        program, registry, ci = self._make_input(
-            "namespace app { use dep.ns\n facet App() }\n"
-        )
+        program, registry, ci = self._make_input("namespace app { use dep.ns\n facet App() }\n")
         fs_index = NamespaceIndex([tmp_path])
         resolver = DependencyResolver(filesystem_index=fs_index)
         _, result_reg, _ = resolver.resolve(program, registry, ci)
@@ -275,12 +259,8 @@ class TestDependencyResolver:
 
     def test_sibling_directory_auto_detected(self, tmp_path):
         """Primary file's directory is scanned automatically via parse_and_resolve."""
-        (tmp_path / "main.afl").write_text(
-            "namespace app { use lib.types\n facet App() }"
-        )
-        (tmp_path / "types.afl").write_text(
-            "namespace lib.types { facet T() }"
-        )
+        (tmp_path / "main.afl").write_text("namespace app { use lib.types\n facet App() }")
+        (tmp_path / "types.afl").write_text("namespace lib.types { facet T() }")
 
         from afl.config import AFLConfig, ResolverConfig
 
@@ -297,7 +277,6 @@ class TestDependencyResolver:
 
         ns_names = {ns.name for ns in program.namespaces}
         assert ns_names == {"app", "lib.types"}
-
 
     def test_qualified_call_resolution(self, tmp_path):
         """Resolve namespaces referenced by qualified call names (no use statement)."""
@@ -330,9 +309,7 @@ class TestDependencyResolver:
             "}\n"
         )
         (tmp_path / "types.afl").write_text(
-            "namespace osm.types {\n"
-            "    schema Coord { lat: Float, lon: Float }\n"
-            "}\n"
+            "namespace osm.types {\n    schema Coord { lat: Float, lon: Float }\n}\n"
         )
 
         program, registry, ci = self._make_input(
@@ -355,9 +332,7 @@ class TestParseAndResolve:
 
     def test_auto_resolve_disabled_by_default(self, tmp_path):
         """Without auto_resolve=True, parse_and_resolve just calls parse_sources."""
-        (tmp_path / "main.afl").write_text(
-            "namespace app { use missing.ns\n facet App() }"
-        )
+        (tmp_path / "main.afl").write_text("namespace app { use missing.ns\n facet App() }")
 
         parser = AFLParser()
         entry = SourceEntry(
@@ -384,12 +359,8 @@ class TestParseAndResolve:
         main_dir.mkdir()
         lib_dir.mkdir()
 
-        (main_dir / "main.afl").write_text(
-            "namespace app { use ext.lib\n facet App() }"
-        )
-        (lib_dir / "lib.afl").write_text(
-            "namespace ext.lib { facet Lib() }"
-        )
+        (main_dir / "main.afl").write_text("namespace app { use ext.lib\n facet App() }")
+        (lib_dir / "lib.afl").write_text("namespace ext.lib { facet Lib() }")
 
         from afl.config import AFLConfig, ResolverConfig
 

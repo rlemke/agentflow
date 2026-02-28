@@ -51,7 +51,12 @@ def handle_validate_reading(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Validated: valid={valid}, calibrated={calibrated_value}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Validated: valid={valid}, calibrated={calibrated_value}",
+                "level": "success",
+            }
+        )
 
     return {"valid": valid, "calibrated_value": calibrated_value}
 

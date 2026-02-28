@@ -163,9 +163,7 @@ class MavenArtifactRunner(RegistryRunner):
             ValueError: If module_uri does not use the ``mvn:`` scheme.
         """
         if not module_uri.startswith("mvn:"):
-            raise ValueError(
-                f"MavenArtifactRunner requires 'mvn:' URI scheme, got: {module_uri}"
-            )
+            raise ValueError(f"MavenArtifactRunner requires 'mvn:' URI scheme, got: {module_uri}")
         self._parse_maven_uri(module_uri)  # validate early
 
         super().register_handler(
@@ -208,17 +206,13 @@ class MavenArtifactRunner(RegistryRunner):
                 f"Invalid Maven URI (expected mvn:groupId:artifactId:version[:classifier]): {uri}"
             )
         if len(parts) > 4:
-            raise ValueError(
-                f"Invalid Maven URI (too many components): {uri}"
-            )
+            raise ValueError(f"Invalid Maven URI (too many components): {uri}")
 
         group_id, artifact_id, version = parts[0], parts[1], parts[2]
         classifier = parts[3] if len(parts) == 4 else ""
 
         if not group_id or not artifact_id or not version:
-            raise ValueError(
-                f"Invalid Maven URI (empty component): {uri}"
-            )
+            raise ValueError(f"Invalid Maven URI (empty component): {uri}")
 
         return group_id, artifact_id, version, classifier
 
@@ -279,15 +273,13 @@ class MavenArtifactRunner(RegistryRunner):
         # Build URL (group dots -> slashes for URL path)
         group_url_path = group_id.replace(".", "/")
         url = (
-            f"{self._config.repository_url}/{group_url_path}"
-            f"/{artifact_id}/{version}/{jar_name}.jar"
+            f"{self._config.repository_url}/{group_url_path}/{artifact_id}/{version}/{jar_name}.jar"
         )
 
         # Build local cache path (group dots -> OS path separators)
         group_fs_path = group_id.replace(".", os.sep)
         jar_path = (
-            Path(self._config.cache_dir) / group_fs_path
-            / artifact_id / version / f"{jar_name}.jar"
+            Path(self._config.cache_dir) / group_fs_path / artifact_id / version / f"{jar_name}.jar"
         )
 
         # Per-artifact lock for thread safety
@@ -313,13 +305,9 @@ class MavenArtifactRunner(RegistryRunner):
                 with urllib.request.urlopen(url, timeout=60) as response:
                     jar_bytes = response.read()
             except urllib.error.HTTPError as e:
-                raise ValueError(
-                    f"Failed to download artifact '{coords}': HTTP {e.code}"
-                ) from e
+                raise ValueError(f"Failed to download artifact '{coords}': HTTP {e.code}") from e
             except urllib.error.URLError as e:
-                raise ValueError(
-                    f"Failed to download artifact '{coords}': {e.reason}"
-                ) from e
+                raise ValueError(f"Failed to download artifact '{coords}': {e.reason}") from e
 
             jar_path.write_bytes(jar_bytes)
             logger.info(
@@ -380,9 +368,7 @@ class MavenArtifactRunner(RegistryRunner):
 
             # Parse URI and resolve artifact
             try:
-                group_id, artifact_id, version, classifier = self._parse_maven_uri(
-                    reg.module_uri
-                )
+                group_id, artifact_id, version, classifier = self._parse_maven_uri(reg.module_uri)
                 jar_path = self._resolve_artifact(group_id, artifact_id, version, classifier)
             except ValueError as exc:
                 error_msg = f"Failed to resolve artifact for '{task.name}': {exc}"
@@ -442,8 +428,7 @@ class MavenArtifactRunner(RegistryRunner):
             if result.returncode != 0:
                 stderr_text = result.stderr.decode("utf-8", errors="replace").strip()
                 error_msg = (
-                    f"Subprocess failed (exit {result.returncode}) for '{task.name}': "
-                    f"{stderr_text}"
+                    f"Subprocess failed (exit {result.returncode}) for '{task.name}': {stderr_text}"
                 )
                 self._evaluator.fail_step(task.step_id, error_msg)
                 task.state = TaskState.FAILED

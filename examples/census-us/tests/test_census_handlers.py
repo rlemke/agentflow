@@ -40,8 +40,7 @@ def _census_import(module_name: str):
         pkg = sys.modules["handlers"]
         pkg_file = getattr(pkg, "__file__", "")
         if pkg_file and "census-us" not in pkg_file:
-            stale = [k for k in sys.modules
-                     if k == "handlers" or k.startswith("handlers.")]
+            stale = [k for k in sys.modules if k == "handlers" or k.startswith("handlers.")]
             for k in stale:
                 del sys.modules[k]
 
@@ -66,10 +65,12 @@ class TestDownloadHandlers:
             "wasInCache": True,
         }
         with patch.object(mod, "download_acs", return_value=mock_file):
-            result = mod.handle({
-                "_facet_name": "census.Operations.DownloadACS",
-                "state_fips": "01",
-            })
+            result = mod.handle(
+                {
+                    "_facet_name": "census.Operations.DownloadACS",
+                    "state_fips": "01",
+                }
+            )
         assert isinstance(result, dict)
         assert "file" in result
         assert result["file"]["wasInCache"] is True
@@ -95,10 +96,12 @@ class TestDownloadHandlers:
             "wasInCache": False,
         }
         with patch.object(mod, "download_acs", return_value=mock_file):
-            result = mod.handle({
-                "_facet_name": "census.Operations.DownloadACSDetailed",
-                "state_fips": "01",
-            })
+            result = mod.handle(
+                {
+                    "_facet_name": "census.Operations.DownloadACSDetailed",
+                    "state_fips": "01",
+                }
+            )
         assert isinstance(result, dict)
         assert "file" in result
         assert result["file"]["wasInCache"] is False
@@ -106,14 +109,15 @@ class TestDownloadHandlers:
     def test_error_step_log_download_acs(self):
         mod = _census_import("downloads.download_handlers")
         step_log = MagicMock()
-        with patch.object(mod, "download_acs",
-                          side_effect=RuntimeError("connection timeout")):
+        with patch.object(mod, "download_acs", side_effect=RuntimeError("connection timeout")):
             with pytest.raises(RuntimeError, match="connection timeout"):
-                mod.handle({
-                    "_facet_name": "census.Operations.DownloadACS",
-                    "state_fips": "01",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.Operations.DownloadACS",
+                        "state_fips": "01",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         call_args = step_log.call_args
         assert "connection timeout" in call_args[0][0]
@@ -122,14 +126,15 @@ class TestDownloadHandlers:
     def test_error_step_log_download_tiger(self):
         mod = _census_import("downloads.download_handlers")
         step_log = MagicMock()
-        with patch.object(mod, "download_tiger",
-                          side_effect=ValueError("bad geo_level")):
+        with patch.object(mod, "download_tiger", side_effect=ValueError("bad geo_level")):
             with pytest.raises(ValueError, match="bad geo_level"):
-                mod.handle({
-                    "_facet_name": "census.Operations.DownloadTIGER",
-                    "state_fips": "01",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.Operations.DownloadTIGER",
+                        "state_fips": "01",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         assert "bad geo_level" in step_log.call_args[0][0]
         assert step_log.call_args[1]["level"] == "error"
@@ -144,11 +149,13 @@ class TestACSHandlers:
 
     def test_handle_dispatches(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractPopulation",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractPopulation",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert isinstance(result, dict)
         assert "result" in result
         assert result["result"]["table_id"] == "B01003"
@@ -166,112 +173,136 @@ class TestACSHandlers:
 
     def test_extract_population(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractPopulation",
-            "file": {"path": ""},
-            "state_fips": "01",
-            "geo_level": "county",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractPopulation",
+                "file": {"path": ""},
+                "state_fips": "01",
+                "geo_level": "county",
+            }
+        )
         assert result["result"]["table_id"] == "B01003"
         assert result["result"]["geography_level"] == "county"
 
     def test_extract_income(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractIncome",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractIncome",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B19013"
 
     def test_extract_housing(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractHousing",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractHousing",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B25001"
 
     def test_extract_education(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractEducation",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractEducation",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B15003"
 
     def test_extract_commuting(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractCommuting",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractCommuting",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B08301"
 
     def test_extract_tenure(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractTenure",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractTenure",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B25003"
 
     def test_extract_households(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractHouseholds",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractHouseholds",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B11001"
 
     def test_extract_age(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractAge",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractAge",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B01001"
 
     def test_extract_vehicles(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractVehicles",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractVehicles",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B25044"
 
     def test_extract_race(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractRace",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractRace",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B02001"
 
     def test_extract_poverty(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractPoverty",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractPoverty",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B17001"
 
     def test_extract_employment(self):
         mod = _census_import("acs.acs_handlers")
-        result = mod.handle({
-            "_facet_name": "census.ACS.ExtractEmployment",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.ACS.ExtractEmployment",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["table_id"] == "B23025"
 
     def test_extract_multi_column_csv(self, tmp_path):
@@ -292,6 +323,7 @@ class TestACSHandlers:
         assert result.table_id == "B25003"
         # Verify output has all 3 columns
         import csv
+
         with open(result.output_path, newline="") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
@@ -338,16 +370,19 @@ class TestACSHandlers:
         mod = _census_import("acs.acs_handlers")
         step_log = MagicMock()
         with patch.object(
-            mod, "extract_acs_table",
+            mod,
+            "extract_acs_table",
             side_effect=ValueError("Unknown ACS table: BOGUS"),
         ):
             with pytest.raises(ValueError, match="Unknown ACS table"):
-                mod.handle({
-                    "_facet_name": "census.ACS.ExtractPopulation",
-                    "file": {"path": "/tmp/test.csv"},
-                    "state_fips": "01",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.ACS.ExtractPopulation",
+                        "file": {"path": "/tmp/test.csv"},
+                        "state_fips": "01",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         assert "Unknown ACS table" in step_log.call_args[0][0]
         assert step_log.call_args[1]["level"] == "error"
@@ -362,11 +397,13 @@ class TestTIGERHandlers:
 
     def test_handle_dispatches(self):
         mod = _census_import("tiger.tiger_handlers")
-        result = mod.handle({
-            "_facet_name": "census.TIGER.ExtractCounties",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.TIGER.ExtractCounties",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert isinstance(result, dict)
         assert "result" in result
         assert result["result"]["format"] == "GeoJSON"
@@ -384,54 +421,65 @@ class TestTIGERHandlers:
 
     def test_extract_counties(self):
         mod = _census_import("tiger.tiger_handlers")
-        result = mod.handle({
-            "_facet_name": "census.TIGER.ExtractCounties",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.TIGER.ExtractCounties",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["geography_level"] == "COUNTY"
 
     def test_extract_tracts(self):
         mod = _census_import("tiger.tiger_handlers")
-        result = mod.handle({
-            "_facet_name": "census.TIGER.ExtractTracts",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.TIGER.ExtractTracts",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["geography_level"] == "TRACT"
 
     def test_extract_block_groups(self):
         mod = _census_import("tiger.tiger_handlers")
-        result = mod.handle({
-            "_facet_name": "census.TIGER.ExtractBlockGroups",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.TIGER.ExtractBlockGroups",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["geography_level"] == "BG"
 
     def test_extract_places(self):
         mod = _census_import("tiger.tiger_handlers")
-        result = mod.handle({
-            "_facet_name": "census.TIGER.ExtractPlaces",
-            "file": {"path": ""},
-            "state_fips": "01",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.TIGER.ExtractPlaces",
+                "file": {"path": ""},
+                "state_fips": "01",
+            }
+        )
         assert result["result"]["geography_level"] == "PLACE"
 
     def test_error_step_log_tiger_handler(self):
         mod = _census_import("tiger.tiger_handlers")
         step_log = MagicMock()
         with patch.object(
-            mod, "extract_tiger",
+            mod,
+            "extract_tiger",
             side_effect=OSError("Permission denied"),
         ):
             with pytest.raises(OSError, match="Permission denied"):
-                mod.handle({
-                    "_facet_name": "census.TIGER.ExtractCounties",
-                    "file": {"path": "/tmp/test.zip"},
-                    "state_fips": "01",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.TIGER.ExtractCounties",
+                        "file": {"path": "/tmp/test.zip"},
+                        "state_fips": "01",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         assert "Permission denied" in step_log.call_args[0][0]
         assert step_log.call_args[1]["level"] == "error"
@@ -454,8 +502,7 @@ class TestDownloaderURLs:
         mod = _census_import("shared.downloader")
         with patch.object(mod, "_download_file", return_value=1024):
             with patch("os.path.exists", return_value=False):
-                result = mod.download_tiger(
-                    year="2024", geo_level="COUNTY", state_fips="01")
+                result = mod.download_tiger(year="2024", geo_level="COUNTY", state_fips="01")
         assert "tl_2024_us_county.zip" in result["url"]
         assert "tl_2024_01_county.zip" not in result["url"]
 
@@ -464,8 +511,7 @@ class TestDownloaderURLs:
         mod = _census_import("shared.downloader")
         with patch.object(mod, "_download_file", return_value=512):
             with patch("os.path.exists", return_value=False):
-                result = mod.download_tiger(
-                    year="2024", geo_level="TRACT", state_fips="06")
+                result = mod.download_tiger(year="2024", geo_level="TRACT", state_fips="06")
         assert "tl_2024_06_tract.zip" in result["url"]
 
     def test_acs_uses_census_api(self):
@@ -485,14 +531,20 @@ class TestJoinGeoDensity:
         acs_csv.write_text("GEOID,B01003_001E,NAME\n0500000US01001,50000,Autauga\n")
         # TIGER GeoJSON with ALAND (100 km2 = 1e8 m2)
         tiger_geojson = tmp_path / "counties.geojson"
-        tiger_geojson.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {"GEOID": "0500000US01001", "ALAND": 100000000},
-                "geometry": {"type": "Point", "coordinates": [0, 0]},
-            }],
-        }))
+        tiger_geojson.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "0500000US01001", "ALAND": 100000000},
+                            "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        }
+                    ],
+                }
+            )
+        )
         result = mod.join_geo(str(acs_csv), str(tiger_geojson))
         assert result.feature_count == 1
         # Read output and check density
@@ -507,14 +559,20 @@ class TestJoinGeoDensity:
         acs_csv = tmp_path / "pop.csv"
         acs_csv.write_text("GEOID,B01003_001E,NAME\nGEO1,1000,Place\n")
         tiger_geojson = tmp_path / "geo.geojson"
-        tiger_geojson.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {"GEOID": "GEO1"},
-                "geometry": {"type": "Point", "coordinates": [0, 0]},
-            }],
-        }))
+        tiger_geojson.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "GEO1"},
+                            "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        }
+                    ],
+                }
+            )
+        )
         result = mod.join_geo(str(acs_csv), str(tiger_geojson))
         with open(result.output_path) as f:
             data = json.load(f)
@@ -526,14 +584,20 @@ class TestJoinGeoDensity:
         acs_csv = tmp_path / "pop.csv"
         acs_csv.write_text("GEOID,B01003_001E,NAME\nGEO1,500,Place\n")
         tiger_geojson = tmp_path / "geo.geojson"
-        tiger_geojson.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {"GEOID": "GEO1", "ALAND": 0},
-                "geometry": {"type": "Point", "coordinates": [0, 0]},
-            }],
-        }))
+        tiger_geojson.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "GEO1", "ALAND": 0},
+                            "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        }
+                    ],
+                }
+            )
+        )
         result = mod.join_geo(str(acs_csv), str(tiger_geojson))
         with open(result.output_path) as f:
             data = json.load(f)
@@ -557,96 +621,148 @@ class TestDerivedMetrics:
         if tiger_props:
             props.update(tiger_props)
         tiger = tmp_path / "tiger.geojson"
-        tiger.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": props,
-                "geometry": {"type": "Point", "coordinates": [0, 0]},
-            }],
-        }))
+        tiger.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": props,
+                            "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        }
+                    ],
+                }
+            )
+        )
         result = mod.join_geo(str(acs_csv), str(tiger))
         with open(result.output_path) as f:
             data = json.load(f)
         return data["features"][0]["properties"]
 
     def test_pct_owner_occupied(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B25003_001E": "500", "B25003_002E": "400", "B25003_003E": "100",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B25003_001E": "500",
+                "B25003_002E": "400",
+                "B25003_003E": "100",
+            },
+        )
         assert props["pct_owner_occupied"] == 80.0
 
     def test_pct_renter_occupied_complement(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B25003_001E": "500", "B25003_002E": "400", "B25003_003E": "100",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B25003_001E": "500",
+                "B25003_002E": "400",
+                "B25003_003E": "100",
+            },
+        )
         assert props["pct_renter_occupied"] == 20.0
 
     def test_pct_below_poverty(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "10000",
-            "B17001_001E": "1000", "B17001_002E": "150",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "10000",
+                "B17001_001E": "1000",
+                "B17001_002E": "150",
+            },
+        )
         assert props["pct_below_poverty"] == 15.0
 
     def test_unemployment_rate(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B23025_001E": "800", "B23025_002E": "700",
-            "B23025_003E": "600", "B23025_005E": "30",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B23025_001E": "800",
+                "B23025_002E": "700",
+                "B23025_003E": "600",
+                "B23025_005E": "30",
+            },
+        )
         assert props["unemployment_rate"] == 5.0
 
     def test_pct_white(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B02001_001E": "1000", "B02001_002E": "750",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B02001_001E": "1000",
+                "B02001_002E": "750",
+            },
+        )
         assert props["pct_white"] == 75.0
 
     def test_pct_bachelors_plus(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B15003_001E": "800",
-            "B15003_022E": "100", "B15003_023E": "50",
-            "B15003_024E": "30", "B15003_025E": "20",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B15003_001E": "800",
+                "B15003_022E": "100",
+                "B15003_023E": "50",
+                "B15003_024E": "30",
+                "B15003_025E": "20",
+            },
+        )
         # (100+50+30+20)/800*100 = 25.0
         assert props["pct_bachelors_plus"] == 25.0
 
     def test_pct_drove_alone(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B08301_001E": "500", "B08301_003E": "400",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B08301_001E": "500",
+                "B08301_003E": "400",
+            },
+        )
         assert props["pct_drove_alone"] == 80.0
 
     def test_vehicles_per_household(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B25044_001E": "100",
-            "B25044_003E": "30", "B25044_004E": "40",
-            "B25044_005E": "10", "B25044_006E": "5",
-            "B25044_010E": "5", "B25044_011E": "5",
-            "B25044_012E": "3", "B25044_013E": "2",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B25044_001E": "100",
+                "B25044_003E": "30",
+                "B25044_004E": "40",
+                "B25044_005E": "10",
+                "B25044_006E": "5",
+                "B25044_010E": "5",
+                "B25044_011E": "5",
+                "B25044_012E": "3",
+                "B25044_013E": "2",
+            },
+        )
         # weighted: 30*1+40*2+10*3+5*4+5*1+5*2+3*3+2*4 = 30+80+30+20+5+10+9+8 = 192
         # 192/100 = 1.92
         assert props["vehicles_per_household"] == 1.92
 
     def test_zero_denominator_returns_none(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-            "B25003_001E": "0", "B25003_002E": "0",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+                "B25003_001E": "0",
+                "B25003_002E": "0",
+            },
+        )
         assert "pct_owner_occupied" not in props
 
     def test_missing_columns_no_metric(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "1000",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "1000",
+            },
+        )
         assert "pct_owner_occupied" not in props
         assert "unemployment_rate" not in props
         assert "pct_bachelors_plus" not in props
@@ -661,14 +777,20 @@ class TestDerivedMetrics:
         extra.write_text("GEOID,NAME,B25003_001E,B25003_002E,B25003_003E\nGEO1,Test,200,160,40\n")
         # TIGER
         tiger = tmp_path / "tiger.geojson"
-        tiger.write_text(json.dumps({
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": {"GEOID": "GEO1", "ALAND": 100000000},
-                "geometry": {"type": "Point", "coordinates": [0, 0]},
-            }],
-        }))
+        tiger.write_text(
+            json.dumps(
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {"GEOID": "GEO1", "ALAND": 100000000},
+                            "geometry": {"type": "Point", "coordinates": [0, 0]},
+                        }
+                    ],
+                }
+            )
+        )
         result = mod.join_geo(str(primary), str(tiger), extra_acs_paths=[str(extra)])
         with open(result.output_path) as f:
             data = json.load(f)
@@ -677,11 +799,14 @@ class TestDerivedMetrics:
         assert props["population"] == 5000.0
 
     def test_friendly_aliases(self, tmp_path):
-        props = self._join_with_cols(tmp_path, {
-            "B01003_001E": "50000",
-            "B19013_001E": "65000",
-            "B25001_001E": "20000",
-        })
+        props = self._join_with_cols(
+            tmp_path,
+            {
+                "B01003_001E": "50000",
+                "B19013_001E": "65000",
+                "B25001_001E": "20000",
+            },
+        )
         assert props["population"] == 50000.0
         assert props["median_income"] == 65000.0
         assert props["housing_units"] == 20000.0
@@ -696,28 +821,36 @@ class TestSummaryHandlers:
 
     def test_handle_join_geo(self):
         mod = _census_import("summary.summary_handlers")
-        result = mod.handle({
-            "_facet_name": "census.Summary.JoinGeo",
-            "acs_path": "",
-            "tiger_path": "",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.Summary.JoinGeo",
+                "acs_path": "",
+                "tiger_path": "",
+            }
+        )
         assert isinstance(result, dict)
         assert "result" in result
 
     def test_handle_summarize_state(self):
         mod = _census_import("summary.summary_handlers")
         empty_acs = {
-            "table_id": "", "output_path": "", "record_count": 0,
-            "geography_level": "", "year": "", "extraction_date": "",
+            "table_id": "",
+            "output_path": "",
+            "record_count": 0,
+            "geography_level": "",
+            "year": "",
+            "extraction_date": "",
         }
-        result = mod.handle({
-            "_facet_name": "census.Summary.SummarizeState",
-            "population": empty_acs,
-            "income": empty_acs,
-            "housing": empty_acs,
-            "education": empty_acs,
-            "commuting": empty_acs,
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "census.Summary.SummarizeState",
+                "population": empty_acs,
+                "income": empty_acs,
+                "housing": empty_acs,
+                "education": empty_acs,
+                "commuting": empty_acs,
+            }
+        )
         assert isinstance(result, dict)
         assert result["result"]["tables_joined"] == 0
 
@@ -736,16 +869,19 @@ class TestSummaryHandlers:
         mod = _census_import("summary.summary_handlers")
         step_log = MagicMock()
         with patch.object(
-            mod, "join_geo",
+            mod,
+            "join_geo",
             side_effect=json.JSONDecodeError("bad json", "", 0),
         ):
             with pytest.raises(json.JSONDecodeError):
-                mod.handle({
-                    "_facet_name": "census.Summary.JoinGeo",
-                    "acs_path": "/tmp/a.csv",
-                    "tiger_path": "/tmp/b.geojson",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.Summary.JoinGeo",
+                        "acs_path": "/tmp/a.csv",
+                        "tiger_path": "/tmp/b.geojson",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         assert step_log.call_args[1]["level"] == "error"
 
@@ -753,14 +889,17 @@ class TestSummaryHandlers:
         mod = _census_import("summary.summary_handlers")
         step_log = MagicMock()
         with patch.object(
-            mod, "summarize_state",
+            mod,
+            "summarize_state",
             side_effect=OSError("disk full"),
         ):
             with pytest.raises(OSError, match="disk full"):
-                mod.handle({
-                    "_facet_name": "census.Summary.SummarizeState",
-                    "_step_log": step_log,
-                })
+                mod.handle(
+                    {
+                        "_facet_name": "census.Summary.SummarizeState",
+                        "_step_log": step_log,
+                    }
+                )
         step_log.assert_called_once()
         assert "disk full" in step_log.call_args[0][0]
         assert step_log.call_args[1]["level"] == "error"
@@ -813,12 +952,19 @@ class TestTIGERExtractor:
         monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
 
         zip_base = tmp_path / "counties"
-        _make_tiger_zip(zip_base, [
-            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Autauga"},
-             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
-            {"fields": {"STATEFP": "01", "GEOID": "01003", "NAME": "Baldwin"},
-             "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]]},
-        ])
+        _make_tiger_zip(
+            zip_base,
+            [
+                {
+                    "fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Autauga"},
+                    "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                },
+                {
+                    "fields": {"STATEFP": "01", "GEOID": "01003", "NAME": "Baldwin"},
+                    "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]],
+                },
+            ],
+        )
         zip_path = str(zip_base) + ".zip"
 
         result = mod.extract_tiger(zip_path, "COUNTY", "01")
@@ -837,12 +983,19 @@ class TestTIGERExtractor:
         monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
 
         zip_base = tmp_path / "mixed"
-        _make_tiger_zip(zip_base, [
-            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Alabama Co"},
-             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
-            {"fields": {"STATEFP": "02", "GEOID": "02013", "NAME": "Alaska Co"},
-             "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]]},
-        ])
+        _make_tiger_zip(
+            zip_base,
+            [
+                {
+                    "fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Alabama Co"},
+                    "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                },
+                {
+                    "fields": {"STATEFP": "02", "GEOID": "02013", "NAME": "Alaska Co"},
+                    "geometry": [[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]],
+                },
+            ],
+        )
         zip_path = str(zip_base) + ".zip"
 
         result = mod.extract_tiger(zip_path, "COUNTY", "01")
@@ -889,10 +1042,15 @@ class TestTIGERExtractor:
         monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
 
         zip_base = tmp_path / "noreader"
-        _make_tiger_zip(zip_base, [
-            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Test"},
-             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
-        ])
+        _make_tiger_zip(
+            zip_base,
+            [
+                {
+                    "fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "Test"},
+                    "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                },
+            ],
+        )
         zip_path = str(zip_base) + ".zip"
 
         result = mod.extract_tiger(zip_path, "COUNTY", "01")
@@ -906,12 +1064,16 @@ class TestTIGERExtractor:
         monkeypatch.setitem(mod.__dict__, "_OUTPUT_DIR", str(tmp_path / "out"))
 
         zip_base = tmp_path / "nullgeo"
-        _make_tiger_zip(zip_base, [
-            {"fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "HasGeo"},
-             "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
-            {"fields": {"STATEFP": "01", "GEOID": "01002", "NAME": "NoGeo"},
-             "geometry": None},
-        ])
+        _make_tiger_zip(
+            zip_base,
+            [
+                {
+                    "fields": {"STATEFP": "01", "GEOID": "01001", "NAME": "HasGeo"},
+                    "geometry": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                },
+                {"fields": {"STATEFP": "01", "GEOID": "01002", "NAME": "NoGeo"}, "geometry": None},
+            ],
+        )
         zip_path = str(zip_base) + ".zip"
 
         result = mod.extract_tiger(zip_path, "COUNTY", "01")

@@ -19,63 +19,110 @@ import math
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Amenities", "declarations": [
-                    _ef("ExtractAmenities",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "category", "type": "String"}],
-                        [{"name": "result", "type": "AmenityResult"}]),
-                ]},
-                {"type": "Namespace", "name": "AirQuality", "declarations": [
-                    _ef("FetchAirQuality",
-                        [{"name": "bbox", "type": "String"},
-                         {"name": "parameter", "type": "String"},
-                         {"name": "radius_m", "type": "Long"}],
-                        [{"name": "result", "type": "AirQualityResult"}]),
-                    _ef("CorrelateSchoolAirQuality",
-                        [{"name": "schools_path", "type": "String"},
-                         {"name": "air_quality_path", "type": "String"},
-                         {"name": "max_distance_km", "type": "Double"}],
-                        [{"name": "result", "type": "ExposureCorrelationResult"}]),
-                    _ef("ExposureStatistics",
-                        [{"name": "input_path", "type": "String"}],
-                        [{"name": "stats", "type": "ExposureStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Amenities",
+                            "declarations": [
+                                _ef(
+                                    "ExtractAmenities",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "category", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "AmenityResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "AirQuality",
+                            "declarations": [
+                                _ef(
+                                    "FetchAirQuality",
+                                    [
+                                        {"name": "bbox", "type": "String"},
+                                        {"name": "parameter", "type": "String"},
+                                        {"name": "radius_m", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "AirQualityResult"}],
+                                ),
+                                _ef(
+                                    "CorrelateSchoolAirQuality",
+                                    [
+                                        {"name": "schools_path", "type": "String"},
+                                        {"name": "air_quality_path", "type": "String"},
+                                        {"name": "max_distance_km", "type": "Double"},
+                                    ],
+                                    [{"name": "result", "type": "ExposureCorrelationResult"}],
+                                ),
+                                _ef(
+                                    "ExposureStatistics",
+                                    [{"name": "input_path", "type": "String"}],
+                                    [{"name": "stats", "type": "ExposureStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -164,23 +211,23 @@ def compile_workflow() -> dict:
 # ---------------------------------------------------------------------------
 
 LONDON_SCHOOLS = [
-    {"name": "Westminster Academy",         "lat": 51.5194, "lon": -0.1810},
-    {"name": "City of London School",       "lat": 51.5095, "lon": -0.0987},
-    {"name": "Hackney Free School",         "lat": 51.5462, "lon": -0.0550},
-    {"name": "Greenwich Free School",       "lat": 51.4769, "lon": -0.0005},
+    {"name": "Westminster Academy", "lat": 51.5194, "lon": -0.1810},
+    {"name": "City of London School", "lat": 51.5095, "lon": -0.0987},
+    {"name": "Hackney Free School", "lat": 51.5462, "lon": -0.0550},
+    {"name": "Greenwich Free School", "lat": 51.4769, "lon": -0.0005},
     {"name": "Kensington Aldridge Academy", "lat": 51.5133, "lon": -0.2056},
-    {"name": "Mossbourne Academy",          "lat": 51.5500, "lon": -0.0596},
-    {"name": "Southbank Intl School",       "lat": 51.5022, "lon": -0.1140},
-    {"name": "Pimlico Academy",             "lat": 51.4890, "lon": -0.1350},
+    {"name": "Mossbourne Academy", "lat": 51.5500, "lon": -0.0596},
+    {"name": "Southbank Intl School", "lat": 51.5022, "lon": -0.1140},
+    {"name": "Pimlico Academy", "lat": 51.4890, "lon": -0.1350},
 ]
 
 AIR_QUALITY_STATIONS = [
-    {"name": "Marylebone Road",        "lat": 51.5225, "lon": -0.1546, "pm25": 38.2},
-    {"name": "Bloomsbury",             "lat": 51.5222, "lon": -0.1259, "pm25": 22.5},
+    {"name": "Marylebone Road", "lat": 51.5225, "lon": -0.1546, "pm25": 38.2},
+    {"name": "Bloomsbury", "lat": 51.5222, "lon": -0.1259, "pm25": 22.5},
     {"name": "Tower Hamlets Roadside", "lat": 51.5225, "lon": -0.0422, "pm25": 28.1},
-    {"name": "Greenwich Eltham",       "lat": 51.4527, "lon": 0.0705,  "pm25": 12.3},
-    {"name": "Kensington",             "lat": 51.4954, "lon": -0.1984, "pm25": 31.7},
-    {"name": "Lambeth Brixton",        "lat": 51.4649, "lon": -0.1147, "pm25": 19.4},
+    {"name": "Greenwich Eltham", "lat": 51.4527, "lon": 0.0705, "pm25": 12.3},
+    {"name": "Kensington", "lat": 51.4954, "lon": -0.1984, "pm25": 31.7},
+    {"name": "Lambeth Brixton", "lat": 51.4649, "lon": -0.1147, "pm25": 19.4},
 ]
 
 
@@ -201,20 +248,21 @@ def _correlate_mock(schools: list[dict], stations: list[dict]) -> list[dict]:
         best_distance = float("inf")
         best_pm25 = None
         for station in stations:
-            dist = _haversine_km(school["lat"], school["lon"],
-                                 station["lat"], station["lon"])
+            dist = _haversine_km(school["lat"], school["lon"], station["lat"], station["lon"])
             if dist < best_distance:
                 best_distance = dist
                 best_station = station["name"]
                 best_pm25 = station["pm25"]
         exposure = "high" if best_pm25 >= 35 else ("medium" if best_pm25 >= 15 else "low")
-        results.append({
-            "school": school["name"],
-            "nearest_station": best_station,
-            "distance_km": round(best_distance, 2),
-            "pm25": best_pm25,
-            "exposure": exposure,
-        })
+        results.append(
+            {
+                "school": school["name"],
+                "nearest_station": best_station,
+                "distance_km": round(best_distance, 2),
+                "pm25": best_pm25,
+                "exposure": exposure,
+            }
+        )
     return results
 
 
@@ -266,7 +314,9 @@ MOCK_HANDLERS = {
             "output_path": "/tmp/london_airquality.geojson",
             "station_count": len(AIR_QUALITY_STATIONS),
             "parameter": p.get("parameter", "pm25"),
-            "avg_value": round(sum(s["pm25"] for s in AIR_QUALITY_STATIONS) / len(AIR_QUALITY_STATIONS), 2),
+            "avg_value": round(
+                sum(s["pm25"] for s in AIR_QUALITY_STATIONS) / len(AIR_QUALITY_STATIONS), 2
+            ),
             "unit": "µg/m³",
             "format": "GeoJSON",
         },
@@ -318,7 +368,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -326,6 +378,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the London school air quality workflow end-to-end with mock handlers."""
@@ -338,8 +391,10 @@ def main() -> None:
 
     # 1. Execute workflow — pauses at the first event step (ResolveRegion)
     print('Executing: SchoolAirQualityMap(region="London")')
-    print("  Pipeline: ResolveRegion -> [ExtractAmenities, FetchAirQuality] "
-          "-> CorrelateSchoolAirQuality -> ExposureStatistics -> RenderMap\n")
+    print(
+        "  Pipeline: ResolveRegion -> [ExtractAmenities, FetchAirQuality] "
+        "-> CorrelateSchoolAirQuality -> ExposureStatistics -> RenderMap\n"
+    )
 
     result = evaluator.execute(
         workflow_ast,
@@ -392,21 +447,22 @@ def main() -> None:
     med = outputs.get("medium_exposure", 0)
     low = outputs.get("low_exposure", 0)
     total = high + med + low
-    print(f"\n  Exposure breakdown (WHO PM2.5 thresholds):")
-    print(f"    HIGH   (>= 35 µg/m³):   {high:>2} schools  "
-          f"({high/total*100:.0f}%)  {'!' * high}")
-    print(f"    MEDIUM (15-35 µg/m³):    {med:>2} schools  "
-          f"({med/total*100:.0f}%)  {'~' * med}")
-    print(f"    LOW    (< 15 µg/m³):     {low:>2} schools  "
-          f"({low/total*100:.0f}%)  {'.' * low}")
+    print("\n  Exposure breakdown (WHO PM2.5 thresholds):")
+    print(
+        f"    HIGH   (>= 35 µg/m³):   {high:>2} schools  ({high / total * 100:.0f}%)  {'!' * high}"
+    )
+    print(f"    MEDIUM (15-35 µg/m³):    {med:>2} schools  ({med / total * 100:.0f}%)  {'~' * med}")
+    print(f"    LOW    (< 15 µg/m³):     {low:>2} schools  ({low / total * 100:.0f}%)  {'.' * low}")
 
     # Per-school detail table
     print(f"\n  {'School':<30} {'Station':<25} {'Dist':>5} {'PM2.5':>6} {'Level':<7}")
-    print(f"  {'-'*30} {'-'*25} {'-'*5} {'-'*6} {'-'*7}")
+    print(f"  {'-' * 30} {'-' * 25} {'-' * 5} {'-' * 6} {'-' * 7}")
     for c in CORRELATIONS:
         level_marker = {"high": "!!!", "medium": " ~ ", "low": " . "}[c["exposure"]]
-        print(f"  {c['school']:<30} {c['nearest_station']:<25} "
-              f"{c['distance_km']:>4.1f}k {c['pm25']:>5.1f}  {level_marker} {c['exposure']}")
+        print(
+            f"  {c['school']:<30} {c['nearest_station']:<25} "
+            f"{c['distance_km']:>4.1f}k {c['pm25']:>5.1f}  {level_marker} {c['exposure']}"
+        )
 
     # 4. Assertions
     assert result.success

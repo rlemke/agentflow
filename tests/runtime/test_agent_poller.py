@@ -669,9 +669,7 @@ class TestAgentPollerStepLogs:
         assert len(error_logs) >= 1
         assert any("Handler error" in entry.message for entry in error_logs)
 
-    def test_step_log_callback_injection(
-        self, store, evaluator, workflow_ast, program_ast
-    ):
+    def test_step_log_callback_injection(self, store, evaluator, workflow_ast, program_ast):
         """Handler receives _step_log callback and can emit handler-level logs."""
         result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
@@ -721,8 +719,13 @@ class TestAgentPollerASTSnapshot:
         )
 
         wf = WorkflowDefinition(
-            uuid="wf-snap", name="SnapWF", namespace_id="ns",
-            facet_id="f-1", flow_id="fl-1", starting_step="s-1", version="1.0",
+            uuid="wf-snap",
+            name="SnapWF",
+            namespace_id="ns",
+            facet_id="f-1",
+            flow_id="fl-1",
+            starting_step="s-1",
+            version="1.0",
         )
         program_dict = {"declarations": [{"type": "WorkflowDecl", "name": "SnapWF"}]}
         wf_ast = {"type": "WorkflowDecl", "name": "SnapWF"}
@@ -749,8 +752,13 @@ class TestAgentPollerASTSnapshot:
         )
 
         wf = WorkflowDefinition(
-            uuid="wf-noast", name="NoAstWF", namespace_id="ns",
-            facet_id="f-1", flow_id="fl-1", starting_step="s-1", version="1.0",
+            uuid="wf-noast",
+            name="NoAstWF",
+            namespace_id="ns",
+            facet_id="f-1",
+            flow_id="fl-1",
+            starting_step="s-1",
+            version="1.0",
         )
         runner = RunnerDefinition(
             uuid="r-noast",

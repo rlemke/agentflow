@@ -20,8 +20,8 @@ import pytest
 
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, StepState, Telemetry
-from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
 from afl.runtime.entities import HandlerRegistration
+from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
 
 try:
     from mcp.types import TextContent  # noqa: F401
@@ -200,7 +200,9 @@ class TestFullLifecycleRegistryRunner:
         wf_ast = _find_workflow(compiled, "SayHello")
 
         _register_handler(
-            store, tmp_path, "hello.Greet",
+            store,
+            tmp_path,
+            "hello.Greet",
             "def handle(payload):\n    return {'greeting': 'Hi, ' + payload['name']}\n",
         )
 
@@ -232,7 +234,7 @@ class TestCompileAndExecuteEdgeCases:
         assert wf_ast["name"] == "SayHello"
 
     def test_invalid_source_raises(self):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             _compile("this is not valid afl {{{{")
 
     def test_validation_catches_duplicate(self):
@@ -267,6 +269,7 @@ namespace afl.test.dependency {
     }
 }
 """
+
 
 class TestAddLongsDependencyChain:
     """10-step dependency chain with arithmetic — all non-event facets complete immediately.
@@ -525,11 +528,13 @@ class TestMcpToolIntegration:
         assert compile_data["success"] is True
 
         # Execute — top-level workflow should be found and pause
-        exec_result = _tool_execute_workflow({
-            "source": AFL_TOP_LEVEL_WORKFLOW,
-            "workflow_name": "TestAddOne",
-            "inputs": {"x": 5},
-        })
+        exec_result = _tool_execute_workflow(
+            {
+                "source": AFL_TOP_LEVEL_WORKFLOW,
+                "workflow_name": "TestAddOne",
+                "inputs": {"x": 5},
+            }
+        )
         exec_data = json.loads(exec_result[0].text)
         assert exec_data["success"] is True
         assert "workflow_id" in exec_data
@@ -538,11 +543,13 @@ class TestMcpToolIntegration:
         from afl.mcp.server import _tool_execute_workflow
 
         source = "workflow Direct(x: Long) => (y: Long)"
-        result = _tool_execute_workflow({
-            "source": source,
-            "workflow_name": "Direct",
-            "inputs": {"x": 42},
-        })
+        result = _tool_execute_workflow(
+            {
+                "source": source,
+                "workflow_name": "Direct",
+                "inputs": {"x": 42},
+            }
+        )
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["status"] == "COMPLETED"
@@ -550,10 +557,12 @@ class TestMcpToolIntegration:
     def test_execute_nonexistent_workflow(self):
         from afl.mcp.server import _tool_execute_workflow
 
-        result = _tool_execute_workflow({
-            "source": "facet NotWorkflow()",
-            "workflow_name": "Missing",
-        })
+        result = _tool_execute_workflow(
+            {
+                "source": "facet NotWorkflow()",
+                "workflow_name": "Missing",
+            }
+        )
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "not found" in data["error"]
@@ -768,27 +777,56 @@ class TestCensusWithAndThenScripts:
                 if "DownloadACS" in facet:
                     evaluator.continue_step(
                         step.id,
-                        result={"file": {"path": f"/data/acs_{step.attributes.get_param('state_fips')}.csv", "size": 50000}},
+                        result={
+                            "file": {
+                                "path": f"/data/acs_{step.attributes.get_param('state_fips')}.csv",
+                                "size": 50000,
+                            }
+                        },
                     )
                 elif "DownloadTIGER" in facet:
                     evaluator.continue_step(
                         step.id,
-                        result={"file": {"path": f"/data/tiger_{step.attributes.get_param('state_fips')}.shp", "size": 120000}},
+                        result={
+                            "file": {
+                                "path": f"/data/tiger_{step.attributes.get_param('state_fips')}.shp",
+                                "size": 120000,
+                            }
+                        },
                     )
                 elif "ExtractPopulation" in facet:
                     evaluator.continue_step(
                         step.id,
-                        result={"result": {"output_path": "/data/pop.csv", "row_count": 67, "state_fips": "01"}},
+                        result={
+                            "result": {
+                                "output_path": "/data/pop.csv",
+                                "row_count": 67,
+                                "state_fips": "01",
+                            }
+                        },
                     )
                 elif "ExtractIncome" in facet:
                     evaluator.continue_step(
                         step.id,
-                        result={"result": {"output_path": "/data/income.csv", "row_count": 67, "state_fips": "01"}},
+                        result={
+                            "result": {
+                                "output_path": "/data/income.csv",
+                                "row_count": 67,
+                                "state_fips": "01",
+                            }
+                        },
                     )
                 elif "JoinGeo" in facet:
                     evaluator.continue_step(
                         step.id,
-                        result={"result": {"total_population": 5024279, "median_income": 52035, "county_count": 67, "state_name": "Alabama"}},
+                        result={
+                            "result": {
+                                "total_population": 5024279,
+                                "median_income": 52035,
+                                "county_count": 67,
+                                "state_name": "Alabama",
+                            }
+                        },
                     )
                 else:
                     evaluator.continue_step(step.id, result={})
@@ -838,11 +876,32 @@ class TestCensusWithAndThenScripts:
             for step in blocked:
                 facet = step.facet_name
                 if "Download" in facet:
-                    evaluator.continue_step(step.id, result={"file": {"path": "/data/ca.csv", "size": 100000}})
+                    evaluator.continue_step(
+                        step.id, result={"file": {"path": "/data/ca.csv", "size": 100000}}
+                    )
                 elif "Extract" in facet:
-                    evaluator.continue_step(step.id, result={"result": {"output_path": "/data/ca_extract.csv", "row_count": 58, "state_fips": "06"}})
+                    evaluator.continue_step(
+                        step.id,
+                        result={
+                            "result": {
+                                "output_path": "/data/ca_extract.csv",
+                                "row_count": 58,
+                                "state_fips": "06",
+                            }
+                        },
+                    )
                 elif "JoinGeo" in facet:
-                    evaluator.continue_step(step.id, result={"result": {"total_population": 39538223, "median_income": 78672, "county_count": 58, "state_name": "California"}})
+                    evaluator.continue_step(
+                        step.id,
+                        result={
+                            "result": {
+                                "total_population": 39538223,
+                                "median_income": 78672,
+                                "county_count": 58,
+                                "state_name": "California",
+                            }
+                        },
+                    )
                 else:
                     evaluator.continue_step(step.id, result={})
             r = evaluator.resume(result.workflow_id, wf, compiled)

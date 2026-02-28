@@ -80,6 +80,7 @@ _MODULE_MAP = {
     "handlers.tiger_handlers": "handlers.voting.tiger_handlers",
 }
 
+
 class _AliasImporter:
     """Lazy sys.modules aliasing — imports on first access only.
 

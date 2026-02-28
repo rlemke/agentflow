@@ -26,7 +26,7 @@ import io
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .source import (
     FileOrigin,
@@ -94,14 +94,13 @@ class SourceLoader:
             from pymongo import MongoClient
         except ImportError:
             raise ImportError(
-                "pymongo is required for MongoDB source loading. "
-                "Install with: pip install pymongo"
-            )
+                "pymongo is required for MongoDB source loading. Install with: pip install pymongo"
+            ) from None
 
         from .config import load_config
 
         cfg = config if config is not None else load_config()
-        client = MongoClient(cfg.mongodb.url)
+        client: Any = MongoClient(cfg.mongodb.url)
         db = client[cfg.mongodb.database]
 
         # Query flows collection by UUID
@@ -111,16 +110,10 @@ class SourceLoader:
 
         # Assemble source text from sources array
         sources = flow.get("sources", [])
-        afl_sources = [
-            s.get("content", "")
-            for s in sources
-            if s.get("language") == "afl"
-        ]
+        afl_sources = [s.get("content", "") for s in sources if s.get("language") == "afl"]
 
         if not afl_sources:
-            raise ValueError(
-                f"Flow '{collection_id}' contains no AFL sources"
-            )
+            raise ValueError(f"Flow '{collection_id}' contains no AFL sources")
 
         text = "\n".join(afl_sources)
         client.close()
@@ -175,9 +168,7 @@ class SourceLoader:
             coords = f"{group_id}:{artifact_id}:{version}"
             if classifier:
                 coords += f":{classifier}"
-            raise ValueError(
-                f"Failed to download artifact '{coords}': HTTP {e.code}"
-            ) from e
+            raise ValueError(f"Failed to download artifact '{coords}': HTTP {e.code}") from e
 
         # Extract AFL sources from JAR
         afl_sources: list[str] = []
@@ -194,9 +185,7 @@ class SourceLoader:
             coords = f"{group_id}:{artifact_id}:{version}"
             if classifier:
                 coords += f":{classifier}"
-            raise ValueError(
-                f"No .afl files found in artifact '{coords}'"
-            )
+            raise ValueError(f"No .afl files found in artifact '{coords}'")
 
         text = "\n".join(afl_sources)
 

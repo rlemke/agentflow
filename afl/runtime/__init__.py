@@ -43,7 +43,6 @@ from .dispatcher import (
     ToolRegistryDispatcher,
 )
 
-
 # Entity definitions
 from .entities import (
     BlockDefinition,

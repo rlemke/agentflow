@@ -118,9 +118,7 @@ class TestMongoDBLoader:
             from afl.config import AFLConfig
 
             config = AFLConfig()
-            entry = SourceLoader.load_mongodb(
-                "test", "Test", is_library=True, config=config
-            )
+            entry = SourceLoader.load_mongodb("test", "Test", is_library=True, config=config)
 
         assert entry.is_library is True
 
@@ -138,11 +136,13 @@ class TestMavenLoader:
 
     def test_load_maven_success(self, monkeypatch):
         """Successfully load AFL sources from Maven."""
-        jar_content = self._create_mock_jar({
-            "facet-a.afl": "facet A()",
-            "facet-b.afl": "facet B()",
-            "README.md": "Not AFL",
-        })
+        jar_content = self._create_mock_jar(
+            {
+                "facet-a.afl": "facet A()",
+                "facet-b.afl": "facet B()",
+                "README.md": "Not AFL",
+            }
+        )
 
         def mock_urlopen(url, **kwargs):
             response = MagicMock()
@@ -168,9 +168,7 @@ class TestMavenLoader:
         import urllib.error
 
         def mock_urlopen(url, **kwargs):
-            raise urllib.error.HTTPError(
-                url=url, code=404, msg="Not Found", hdrs={}, fp=None
-            )
+            raise urllib.error.HTTPError(url=url, code=404, msg="Not Found", hdrs={}, fp=None)
 
         monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
@@ -179,9 +177,11 @@ class TestMavenLoader:
 
     def test_load_maven_no_afl_files(self, monkeypatch):
         """Raise ValueError when JAR has no .afl files."""
-        jar_content = self._create_mock_jar({
-            "Main.java": "class Main {}",
-        })
+        jar_content = self._create_mock_jar(
+            {
+                "Main.java": "class Main {}",
+            }
+        )
 
         def mock_urlopen(url, **kwargs):
             response = MagicMock()
@@ -211,9 +211,7 @@ class TestMavenLoader:
 
         monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
-        entry = SourceLoader.load_maven(
-            "com.example", "mylib", "1.0.0", classifier="afl"
-        )
+        entry = SourceLoader.load_maven("com.example", "mylib", "1.0.0", classifier="afl")
 
         assert "mylib-1.0.0-afl.jar" in captured_url[0]
         assert entry.origin.classifier == "afl"
@@ -256,9 +254,7 @@ class TestMavenLoader:
 
         monkeypatch.setattr("urllib.request.urlopen", mock_urlopen)
 
-        entry = SourceLoader.load_maven(
-            "com.example", "mylib", "1.0.0", is_library=True
-        )
+        entry = SourceLoader.load_maven("com.example", "mylib", "1.0.0", is_library=True)
 
         assert entry.is_library is True
 
@@ -286,11 +282,13 @@ class TestMavenLoader:
 
     def test_load_maven_sorted_files(self, monkeypatch):
         """AFL files should be loaded in sorted order for determinism."""
-        jar_content = self._create_mock_jar({
-            "z_last.afl": "facet Z()",
-            "a_first.afl": "facet A()",
-            "m_middle.afl": "facet M()",
-        })
+        jar_content = self._create_mock_jar(
+            {
+                "z_last.afl": "facet Z()",
+                "a_first.afl": "facet A()",
+                "m_middle.afl": "facet M()",
+            }
+        )
 
         def mock_urlopen(url, **kwargs):
             response = MagicMock()

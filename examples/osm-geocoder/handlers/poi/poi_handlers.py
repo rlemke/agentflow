@@ -36,7 +36,9 @@ def _make_poi_handler(facet_name: str, return_param: str):
         log.info("%s extracting from: %s", facet_name, cache.get("url", "unknown"))
 
         if step_log:
-            step_log(f"{facet_name}: resolved cache (path={cache.get('path', '')})", level="success")
+            step_log(
+                f"{facet_name}: resolved cache (path={cache.get('path', '')})", level="success"
+            )
         return {
             return_param: {
                 "url": cache.get("url", ""),

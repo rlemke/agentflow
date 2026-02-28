@@ -15,56 +15,97 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Operations", "declarations": [
-                    {"type": "Namespace", "name": "GraphHopper", "declarations": [
-                        _ef("BuildGraph",
-                            [{"name": "cache", "type": "OSMCache"},
-                             {"name": "profile", "type": "String"},
-                             {"name": "recreate", "type": "Boolean"}],
-                            [{"name": "graph", "type": "GraphHopperCache"}]),
-                        _ef("ValidateGraph",
-                            [{"name": "graph", "type": "GraphHopperCache"}],
-                            [{"name": "valid", "type": "Boolean"},
-                             {"name": "nodeCount", "type": "Long"},
-                             {"name": "edgeCount", "type": "Long"}]),
-                    ]},
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Operations",
+                            "declarations": [
+                                {
+                                    "type": "Namespace",
+                                    "name": "GraphHopper",
+                                    "declarations": [
+                                        _ef(
+                                            "BuildGraph",
+                                            [
+                                                {"name": "cache", "type": "OSMCache"},
+                                                {"name": "profile", "type": "String"},
+                                                {"name": "recreate", "type": "Boolean"},
+                                            ],
+                                            [{"name": "graph", "type": "GraphHopperCache"}],
+                                        ),
+                                        _ef(
+                                            "ValidateGraph",
+                                            [{"name": "graph", "type": "GraphHopperCache"}],
+                                            [
+                                                {"name": "valid", "type": "Boolean"},
+                                                {"name": "nodeCount", "type": "Long"},
+                                                {"name": "edgeCount", "type": "Long"},
+                                            ],
+                                        ),
+                                    ],
+                                },
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -204,7 +245,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -212,6 +255,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Germany routing graph workflow end-to-end with mock handlers."""
@@ -263,13 +307,17 @@ def main() -> None:
             evaluator.continue_step(step_id, handler_result)
             result = evaluator.resume(result.workflow_id, workflow_ast, PROGRAM_AST)
 
-        assert result.status == ExecutionStatus.COMPLETED, f"Expected COMPLETED, got {result.status}"
+        assert result.status == ExecutionStatus.COMPLETED, (
+            f"Expected COMPLETED, got {result.status}"
+        )
 
         outputs = result.outputs
-        print(f"\n  Result: profile={outputs.get('profile')}, "
-              f"valid={outputs.get('valid')}, "
-              f"nodes={outputs.get('node_count'):,}, "
-              f"edges={outputs.get('edge_count'):,}")
+        print(
+            f"\n  Result: profile={outputs.get('profile')}, "
+            f"valid={outputs.get('valid')}, "
+            f"nodes={outputs.get('node_count'):,}, "
+            f"edges={outputs.get('edge_count'):,}"
+        )
         print(f"  Map: {outputs.get('map_path')}")
 
         assert result.success
@@ -282,20 +330,24 @@ def main() -> None:
     print(f"{'=' * 60}")
     print("RESULTS: Germany GraphHopper Routing Graphs")
     print(f"{'=' * 60}")
-    print(f"\n  {'Profile':<10} {'Nodes':>14} {'Edges':>14} {'Graph Size':>12} {'Build Time':>12} Description")
-    print(f"  {'-'*10} {'-'*14} {'-'*14} {'-'*12} {'-'*12} {'-'*50}")
+    print(
+        f"\n  {'Profile':<10} {'Nodes':>14} {'Edges':>14} {'Graph Size':>12} {'Build Time':>12} Description"
+    )
+    print(f"  {'-' * 10} {'-' * 14} {'-' * 14} {'-' * 12} {'-' * 12} {'-' * 50}")
     for name, stats in PROFILES.items():
-        print(f"  {name:<10} {stats['node_count']:>12,}   {stats['edge_count']:>12,}   "
-              f"{stats['graph_size_mb']:>8,} MB  {stats['build_time_s']:>8} s   {stats['description']}")
+        print(
+            f"  {name:<10} {stats['node_count']:>12,}   {stats['edge_count']:>12,}   "
+            f"{stats['graph_size_mb']:>8,} MB  {stats['build_time_s']:>8} s   {stats['description']}"
+        )
 
     total_nodes = sum(p["node_count"] for p in PROFILES.values())
     total_edges = sum(p["edge_count"] for p in PROFILES.values())
     total_size = sum(p["graph_size_mb"] for p in PROFILES.values())
-    print(f"  {'-'*10} {'-'*14} {'-'*14} {'-'*12} {'-'*12}")
+    print(f"  {'-' * 10} {'-' * 14} {'-' * 14} {'-' * 12} {'-' * 12}")
     print(f"  {'Total':<10} {total_nodes:>12,}   {total_edges:>12,}   {total_size:>8,} MB")
 
-    print(f"\n  Supported profiles: car, bike, foot, motorcycle, truck, hike, mtb, racingbike")
-    print(f"\nAll assertions passed. (3 profiles x 4 steps = 12 event steps processed)")
+    print("\n  Supported profiles: car, bike, foot, motorcycle, truck, hike, mtb, racingbike")
+    print("\nAll assertions passed. (3 profiles x 4 steps = 12 event steps processed)")
 
 
 if __name__ == "__main__":

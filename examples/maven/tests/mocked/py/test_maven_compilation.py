@@ -5,7 +5,6 @@ Verifies that the runner AFL files parse, validate, and compile correctly.
 
 from pathlib import Path
 
-from afl.cli import main
 from afl.emitter import emit_dict
 from afl.parser import AFLParser
 from afl.source import CompilerInput, FileOrigin, SourceEntry

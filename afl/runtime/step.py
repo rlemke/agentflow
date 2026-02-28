@@ -23,10 +23,8 @@ from .types import (
     BlockId,
     FacetAttributes,
     ObjectType,
-    StatementId,
     StepId,
     VersionInfo,
-    WorkflowId,
     step_id,
 )
 
@@ -120,12 +118,12 @@ class StepDefinition:
     object_type: str  # ObjectType constant
 
     # Hierarchy
-    workflow_id: WorkflowId
-    statement_id: StatementId | None = None
+    workflow_id: str  # WorkflowId (str-based NewType)
+    statement_id: str | None = None  # StatementId
     statement_name: str = ""  # Human-readable name (e.g. "s1" from "s1 = Facet()")
     container_type: str | None = None  # ObjectType of container
     container_id: StepId | None = None  # Step ID of containing step
-    block_id: BlockId | None = None  # Block containing this step
+    block_id: StepId | BlockId | None = None  # Block containing this step
     root_id: StepId | None = None  # Root step in the flow
 
     # State machine
@@ -145,20 +143,20 @@ class StepDefinition:
 
     # Metadata
     timestamp: str | None = None  # Last update timestamp
-    start_time: int = 0       # Creation timestamp (ms epoch)
-    last_modified: int = 0    # Last update timestamp (ms epoch)
+    start_time: int = 0  # Creation timestamp (ms epoch)
+    last_modified: int = 0  # Last update timestamp (ms epoch)
 
     @classmethod
     def create(
         cls,
-        workflow_id: WorkflowId,
+        workflow_id: str,
         object_type: str,
         facet_name: str = "",
-        statement_id: StatementId | None = None,
+        statement_id: str | None = None,
         statement_name: str = "",
         container_id: StepId | None = None,
         container_type: str | None = None,
-        block_id: BlockId | None = None,
+        block_id: StepId | BlockId | None = None,
         root_id: StepId | None = None,
     ) -> "StepDefinition":
         """Create a new step in CREATED state.

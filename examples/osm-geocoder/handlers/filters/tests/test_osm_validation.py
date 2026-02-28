@@ -162,11 +162,15 @@ class TestOsmValidationCompilation:
 
     def test_cli_check_osmvalidation(self, tmp_path):
         """The CLI --check flag succeeds for osmvalidation.afl."""
-        result = main([
-            "--primary", str(_AFL_BY_NAME["osmvalidation.afl"]),
-            "--library", str(_AFL_BY_NAME["osmtypes.afl"]),
-            "--check",
-        ])
+        result = main(
+            [
+                "--primary",
+                str(_AFL_BY_NAME["osmvalidation.afl"]),
+                "--library",
+                str(_AFL_BY_NAME["osmtypes.afl"]),
+                "--check",
+            ]
+        )
         assert result == 0
 
 

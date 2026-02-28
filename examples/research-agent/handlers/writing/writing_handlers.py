@@ -27,7 +27,12 @@ def handle_draft_report(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Drafted report: {draft['title']} ({draft['word_count']} words)", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Drafted report: {draft['title']} ({draft['word_count']} words)",
+                "level": "success",
+            }
+        )
 
     return {"draft": draft}
 
@@ -49,7 +54,12 @@ def handle_review_draft(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         status = "approved" if review["approved"] else "needs revision"
-        step_log.append({"message": f"Reviewed draft: score {review['score']}/100 ({status})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Reviewed draft: score {review['score']}/100 ({status})",
+                "level": "success",
+            }
+        )
 
     return {"review": review}
 

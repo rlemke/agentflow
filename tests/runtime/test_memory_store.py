@@ -226,20 +226,24 @@ class TestStepLogOperations:
     def test_get_by_workflow(self, store):
         """Retrieve step logs by workflow_id."""
         for i, step_id in enumerate(["step-1", "step-2"]):
-            store.save_step_log(StepLogEntry(
+            store.save_step_log(
+                StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=step_id,
+                    workflow_id="wf-1",
+                    message=f"Log {i}",
+                    time=1000 + i,
+                )
+            )
+        store.save_step_log(
+            StepLogEntry(
                 uuid=generate_id(),
-                step_id=step_id,
-                workflow_id="wf-1",
-                message=f"Log {i}",
-                time=1000 + i,
-            ))
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(),
-            step_id="step-3",
-            workflow_id="wf-other",
-            message="Other workflow",
-            time=2000,
-        ))
+                step_id="step-3",
+                workflow_id="wf-other",
+                message="Other workflow",
+                time=2000,
+            )
+        )
 
         logs = store.get_step_logs_by_workflow("wf-1")
         assert len(logs) == 2
@@ -247,21 +251,36 @@ class TestStepLogOperations:
 
     def test_ordering_by_time(self, store):
         """Logs are returned ordered by time ascending."""
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(), step_id="s1", workflow_id="w1",
-            message="Third", time=3000,
-        ))
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(), step_id="s1", workflow_id="w1",
-            message="First", time=1000,
-        ))
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(), step_id="s1", workflow_id="w1",
-            message="Second", time=2000,
-        ))
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="s1",
+                workflow_id="w1",
+                message="Third",
+                time=3000,
+            )
+        )
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="s1",
+                workflow_id="w1",
+                message="First",
+                time=1000,
+            )
+        )
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="s1",
+                workflow_id="w1",
+                message="Second",
+                time=2000,
+            )
+        )
 
         logs = store.get_step_logs_by_step("s1")
-        assert [l.message for l in logs] == ["First", "Second", "Third"]
+        assert [log_entry.message for log_entry in logs] == ["First", "Second", "Third"]
 
     def test_empty_results(self, store):
         """Querying for non-existent step/workflow returns empty list."""
@@ -270,10 +289,15 @@ class TestStepLogOperations:
 
     def test_clear_removes_step_logs(self, store):
         """clear() removes step logs too."""
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(), step_id="s1", workflow_id="w1",
-            message="Test", time=1000,
-        ))
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="s1",
+                workflow_id="w1",
+                message="Test",
+                time=1000,
+            )
+        )
         assert len(store.get_step_logs_by_step("s1")) == 1
 
         store.clear()
@@ -282,14 +306,26 @@ class TestStepLogOperations:
     def test_get_step_logs_by_facet(self, store):
         """Retrieve step logs by facet_name, ordered by time descending."""
         for i in range(5):
-            store.save_step_log(StepLogEntry(
-                uuid=generate_id(), step_id=f"s{i}", workflow_id="w1",
-                facet_name="ns.Facet", message=f"Log {i}", time=1000 + i,
-            ))
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(), step_id="s99", workflow_id="w1",
-            facet_name="other.Facet", message="Other", time=2000,
-        ))
+            store.save_step_log(
+                StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=f"s{i}",
+                    workflow_id="w1",
+                    facet_name="ns.Facet",
+                    message=f"Log {i}",
+                    time=1000 + i,
+                )
+            )
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="s99",
+                workflow_id="w1",
+                facet_name="other.Facet",
+                message="Other",
+                time=2000,
+            )
+        )
 
         logs = store.get_step_logs_by_facet("ns.Facet", limit=3)
         assert len(logs) == 3

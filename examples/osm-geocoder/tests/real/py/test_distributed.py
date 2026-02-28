@@ -19,10 +19,7 @@ Run:
     pytest examples/osm-geocoder/tests/real/py/test_distributed.py -v --mongodb
 """
 
-from pathlib import Path
-
 import pytest
-
 from helpers import (
     EXAMPLE_AFL_FILES,
     store_flow,
@@ -99,10 +96,12 @@ def _has_running_server(db, service_pattern: str) -> bool:
     now_ms = int(time.time() * 1000)
     # Consider servers with a heartbeat within the last 30 seconds
     cutoff = now_ms - 30_000
-    server = db.servers.find_one({
-        "service_name": {"$regex": service_pattern},
-        "ping_time": {"$gt": cutoff},
-    })
+    server = db.servers.find_one(
+        {
+            "service_name": {"$regex": service_pattern},
+            "ping_time": {"$gt": cutoff},
+        }
+    )
     return server is not None
 
 
@@ -155,9 +154,7 @@ class TestDistributed:
         )
 
         task_doc = wait_for_task(docker_db, task_id, timeout_s=30)
-        assert task_doc["state"] == "completed", (
-            f"Task failed: {task_doc.get('error')}"
-        )
+        assert task_doc["state"] == "completed", f"Task failed: {task_doc.get('error')}"
 
     def test_chain_distributed(self, docker_db):
         """3-step chain: start + 3 via Docker runner + agent resume cycle."""
@@ -176,14 +173,10 @@ class TestDistributed:
         )
 
         task_doc = wait_for_task(docker_db, task_id, timeout_s=60)
-        assert task_doc["state"] == "completed", (
-            f"Task failed: {task_doc.get('error')}"
-        )
+        assert task_doc["state"] == "completed", f"Task failed: {task_doc.get('error')}"
 
         # Verify the runner completed with correct output
-        runner = _wait_for_runner_state(
-            docker_db, task_doc, {"completed"}, timeout_s=10
-        )
+        runner = _wait_for_runner_state(docker_db, task_doc, {"completed"}, timeout_s=10)
         if runner:
             assert runner["state"] == "completed"
 
@@ -230,6 +223,4 @@ class TestDistributed:
 
         # City routing involves network downloads — allow generous timeout
         task_doc = wait_for_task(docker_db, task_id, timeout_s=300)
-        assert task_doc["state"] == "completed", (
-            f"Task failed: {task_doc.get('error')}"
-        )
+        assert task_doc["state"] == "completed", f"Task failed: {task_doc.get('error')}"

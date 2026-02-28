@@ -206,18 +206,14 @@ class TestExecuteWorkflowVariants:
         # Workflows are now included in namespace declarations,
         # so _find_workflow can resolve them.
         source = "namespace ns { workflow W() }"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "W"}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "W"})
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert "workflow_id" in data
 
     def test_execute_top_level_workflow_found(self):
         source = "workflow TopLevel()"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "TopLevel"}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "TopLevel"})
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert "workflow_id" in data
@@ -249,25 +245,19 @@ class TestExecuteWorkflowVariants:
 
     def test_execute_facet_not_workflow_fails(self):
         source = "facet NotWorkflow(x: String)"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "NotWorkflow"}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "NotWorkflow"})
         data = json.loads(result[0].text)
         assert data["success"] is False
         assert "not found" in data["error"]
 
     def test_execute_with_invalid_source(self):
-        result = _tool_execute_workflow(
-            {"source": "@@@invalid", "workflow_name": "W"}
-        )
+        result = _tool_execute_workflow({"source": "@@@invalid", "workflow_name": "W"})
         data = json.loads(result[0].text)
         assert data["success"] is False
 
     def test_execute_workflow_no_params(self):
         source = "workflow NoParams()"
-        result = _tool_execute_workflow(
-            {"source": source, "workflow_name": "NoParams"}
-        )
+        result = _tool_execute_workflow({"source": source, "workflow_name": "NoParams"})
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["status"] == "COMPLETED"

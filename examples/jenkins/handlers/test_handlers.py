@@ -60,7 +60,7 @@ def _security_scan_handler(payload: dict) -> dict[str, Any]:
     scanner = payload.get("scanner", "trivy")
     if step_log:
         step_log(f"SecurityScan: {scanner}")
-    threshold = payload.get("severity_threshold", "HIGH")
+    _threshold = payload.get("severity_threshold", "HIGH")
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     return {
         "report": {

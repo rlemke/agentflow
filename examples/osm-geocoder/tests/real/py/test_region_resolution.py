@@ -13,8 +13,6 @@ Run:
 import sys
 from pathlib import Path
 
-from afl.runtime import ExecutionStatus
-
 from helpers import (
     EXAMPLE_AFL_FILES,
     INTEGRATION_AFL_DIR,
@@ -22,6 +20,8 @@ from helpers import (
     extract_workflow,
     run_to_completion,
 )
+
+from afl.runtime import ExecutionStatus
 
 # Add the osm-geocoder example to the path so we can import handlers
 _EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
@@ -111,7 +111,10 @@ class TestRegionResolutionIntegration:
         poller.register("osm.geo.Region.ResolveRegion", _resolve_region_handler)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"name": "Germany"},
         )
 
@@ -129,7 +132,10 @@ class TestRegionResolutionIntegration:
         poller.register("osm.geo.Region.ResolveRegion", _resolve_region_handler)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"name": "Alps"},
         )
 
@@ -148,7 +154,10 @@ class TestRegionResolutionIntegration:
         # Georgia (US state) with UnitedStates preference
         # (the resolver uses "UnitedStates" as the continent for US states)
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"name": "Georgia", "prefer_continent": "UnitedStates"},
         )
 
@@ -166,7 +175,10 @@ class TestRegionResolutionIntegration:
         poller.register("osm.geo.Region.ResolveRegion", _resolve_region_handler)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"name": "Atlantis"},
         )
 

@@ -86,8 +86,13 @@ class TestJenkinsTypes:
         program = _compile("jenkins_types.afl")
         schema_names = _collect_names(program, "schemas")
         expected = [
-            "ScmInfo", "BuildResult", "TestReport", "QualityReport",
-            "Artifact", "DeployResult", "PipelineStatus",
+            "ScmInfo",
+            "BuildResult",
+            "TestReport",
+            "QualityReport",
+            "Artifact",
+            "DeployResult",
+            "PipelineStatus",
         ]
         for name in expected:
             assert name in schema_names, f"Missing schema: {name}"
@@ -109,8 +114,7 @@ class TestJenkinsMixins:
         """All 6 mixin facets are emitted."""
         program = _compile("jenkins_mixins.afl")
         facet_names = _collect_names(program, "facets")
-        expected = ["Retry", "Timeout", "Credentials", "Notification",
-                     "AgentLabel", "Stash"]
+        expected = ["Retry", "Timeout", "Credentials", "Notification", "AgentLabel", "Stash"]
         for name in expected:
             assert name in facet_names, f"Missing mixin facet: {name}"
 
@@ -207,8 +211,7 @@ class TestJenkinsPipelines:
         """All 4 workflow names are emitted."""
         program = self._compile_pipelines()
         wf_names = _collect_names(program, "workflows")
-        expected = ["JavaMavenCI", "DockerK8sDeploy",
-                     "MultiModuleBuild", "FullCIPipeline"]
+        expected = ["JavaMavenCI", "DockerK8sDeploy", "MultiModuleBuild", "FullCIPipeline"]
         for name in expected:
             assert name in wf_names, f"Missing workflow: {name}"
 
@@ -251,7 +254,8 @@ class TestJenkinsPipelines:
     def test_cli_check_pipelines(self):
         """The CLI --check flag succeeds for jenkins_pipelines.afl."""
         args = [
-            "--primary", str(_AFL_DIR / "jenkins_pipelines.afl"),
+            "--primary",
+            str(_AFL_DIR / "jenkins_pipelines.afl"),
         ]
         for dep in self._DEPS:
             args.extend(["--library", str(_AFL_DIR / dep)])

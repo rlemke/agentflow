@@ -7,14 +7,18 @@ Run from the repo root:
 
 import json
 import math
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
+from handlers.filters.osm_type_filter import (
+    HAS_OSMIUM,
+    OSMElement,
+    OSMType,
+    _describe_osm_filter,
+    filter_geojson_by_osm_type,
+)
 from handlers.filters.radius_filter import (
-    FilterResult,
     HAS_SHAPELY,
     Operator,
     RadiusCriteria,
@@ -26,22 +30,10 @@ from handlers.filters.radius_filter import (
     matches_criteria,
     parse_criteria,
 )
-from handlers.filters.osm_type_filter import (
-    HAS_OSMIUM,
-    OSMElement,
-    OSMFilterResult,
-    OSMType,
-    _describe_osm_filter,
-    filter_geojson_by_osm_type,
-)
 
 # Skip markers for optional dependencies
-requires_shapely = pytest.mark.skipif(
-    not HAS_SHAPELY, reason="shapely not installed"
-)
-requires_osmium = pytest.mark.skipif(
-    not HAS_OSMIUM, reason="pyosmium not installed"
-)
+requires_shapely = pytest.mark.skipif(not HAS_SHAPELY, reason="shapely not installed")
+requires_osmium = pytest.mark.skipif(not HAS_OSMIUM, reason="pyosmium not installed")
 
 
 class TestUnitConversion:
@@ -183,9 +175,7 @@ class TestMatchesCriteria:
         assert matches_criteria(20001, criteria) is False  # Above range
 
     def test_between_requires_max_threshold(self):
-        criteria = RadiusCriteria(
-            threshold=5, unit=Unit.KILOMETERS, operator=Operator.BETWEEN
-        )
+        criteria = RadiusCriteria(threshold=5, unit=Unit.KILOMETERS, operator=Operator.BETWEEN)
         with pytest.raises(ValueError, match="BETWEEN operator requires max_threshold"):
             matches_criteria(10000, criteria)
 
@@ -378,12 +368,14 @@ class TestFilterHandlers:
 
         # Patch HAS_SHAPELY to False
         with patch("handlers.filter_handlers.HAS_SHAPELY", False):
-            result = handler({
-                "input_path": "/some/file.geojson",
-                "radius": 10,
-                "unit": "km",
-                "operator": "gte",
-            })
+            result = handler(
+                {
+                    "input_path": "/some/file.geojson",
+                    "radius": 10,
+                    "unit": "km",
+                    "operator": "gte",
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert result["result"]["original_count"] == 0
@@ -396,12 +388,14 @@ class TestFilterHandlers:
         handler = _make_radius_range_handler("FilterByRadiusRange")
 
         with patch("handlers.filter_handlers.HAS_SHAPELY", False):
-            result = handler({
-                "input_path": "/some/file.geojson",
-                "min_radius": 5,
-                "max_radius": 20,
-                "unit": "km",
-            })
+            result = handler(
+                {
+                    "input_path": "/some/file.geojson",
+                    "min_radius": 5,
+                    "max_radius": 20,
+                    "unit": "km",
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert "5-20 km" in result["result"]["filter_applied"]
@@ -413,13 +407,15 @@ class TestFilterHandlers:
         handler = _make_type_and_radius_handler("FilterByTypeAndRadius")
 
         with patch("handlers.filter_handlers.HAS_SHAPELY", False):
-            result = handler({
-                "input_path": "/some/file.geojson",
-                "boundary_type": "water",
-                "radius": 10,
-                "unit": "km",
-                "operator": "gte",
-            })
+            result = handler(
+                {
+                    "input_path": "/some/file.geojson",
+                    "boundary_type": "water",
+                    "radius": 10,
+                    "unit": "km",
+                    "operator": "gte",
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert result["result"]["boundary_type"] == "water"
@@ -711,11 +707,13 @@ class TestOSMTypeFilterHandlers:
         handler = _make_osm_type_filter_handler("FilterByOSMType")
 
         with patch("handlers.filter_handlers.HAS_OSMIUM_TYPE", False):
-            result = handler({
-                "input_path": "/some/file.pbf",
-                "osm_type": "way",
-                "include_dependencies": True,
-            })
+            result = handler(
+                {
+                    "input_path": "/some/file.pbf",
+                    "osm_type": "way",
+                    "include_dependencies": True,
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert result["result"]["osm_type"] == "way"
@@ -728,13 +726,15 @@ class TestOSMTypeFilterHandlers:
         handler = _make_osm_tag_filter_handler("FilterByOSMTag")
 
         with patch("handlers.filter_handlers.HAS_OSMIUM_TYPE", False):
-            result = handler({
-                "input_path": "/some/file.pbf",
-                "tag_key": "amenity",
-                "tag_value": "restaurant",
-                "osm_type": "node",
-                "include_dependencies": False,
-            })
+            result = handler(
+                {
+                    "input_path": "/some/file.pbf",
+                    "tag_key": "amenity",
+                    "tag_value": "restaurant",
+                    "osm_type": "node",
+                    "include_dependencies": False,
+                }
+            )
 
         assert result["result"]["feature_count"] == 0
         assert "amenity=restaurant" in result["result"]["filter_applied"]
@@ -745,10 +745,12 @@ class TestOSMTypeFilterHandlers:
 
         handler = _make_geojson_osm_type_filter_handler("FilterGeoJSONByOSMType")
 
-        result = handler({
-            "input_path": "",
-            "osm_type": "node",
-        })
+        result = handler(
+            {
+                "input_path": "",
+                "osm_type": "node",
+            }
+        )
 
         assert result["result"]["feature_count"] == 0
         assert result["result"]["osm_type"] == "node"

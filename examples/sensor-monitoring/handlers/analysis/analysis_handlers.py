@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.sensor_utils import detect_anomaly, classify_alert
+from handlers.shared.sensor_utils import classify_alert, detect_anomaly
 
 NAMESPACE = "monitor.Analysis"
 
@@ -25,10 +25,12 @@ def handle_detect_anomaly(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({
-            "message": f"Anomaly check: severity={result['severity']}, breached={result['threshold_breached']}",
-            "level": "success",
-        })
+        step_log.append(
+            {
+                "message": f"Anomaly check: severity={result['severity']}, breached={result['threshold_breached']}",
+                "level": "success",
+            }
+        )
 
     return {"result": result}
 
@@ -52,10 +54,12 @@ def handle_classify_alert(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({
-            "message": f"Alert classified: priority={alert['priority']}, channel={alert['channel']}",
-            "level": "success",
-        })
+        step_log.append(
+            {
+                "message": f"Alert classified: priority={alert['priority']}, channel={alert['channel']}",
+                "level": "success",
+            }
+        )
 
     return {"alert": alert}
 

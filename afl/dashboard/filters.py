@@ -35,9 +35,7 @@ def timestamp_fmt(value: int | float | None, fmt: str = "%Y-%m-%d %H:%M:%S") -> 
     dt = datetime.datetime.fromtimestamp(value / 1000, tz=datetime.UTC)
     iso = dt.isoformat()
     utc_text = dt.strftime(fmt)
-    return Markup(
-        f'<time datetime="{iso}" data-ts="{int(value)}">{utc_text}</time>'
-    )
+    return Markup(f'<time datetime="{iso}" data-ts="{int(value)}">{utc_text}</time>')
 
 
 def duration_fmt(ms: int | float | None) -> str:
@@ -112,7 +110,7 @@ def doc_description(doc: dict | str | None) -> str:
     if not text:
         return ""
     try:
-        import markdown as md
+        import markdown as md  # type: ignore[import-untyped]
         from markupsafe import Markup
 
         return Markup(md.markdown(text))

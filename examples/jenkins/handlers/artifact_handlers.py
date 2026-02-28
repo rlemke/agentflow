@@ -20,7 +20,7 @@ def _archive_artifacts_handler(payload: dict) -> dict[str, Any]:
     workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     if step_log:
         step_log(f"ArchiveArtifacts: {workspace}")
-    includes = payload.get("includes", "**/*.jar")
+    _includes = payload.get("includes", "**/*.jar")
     return {
         "artifact": {
             "name": "app-1.0.0.jar",

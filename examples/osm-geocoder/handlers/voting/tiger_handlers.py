@@ -7,8 +7,7 @@ import json
 import logging
 import os
 import subprocess
-import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .tiger_downloader import (
@@ -17,7 +16,6 @@ from .tiger_downloader import (
     DISTRICT_STATE_SENATE,
     DISTRICT_VOTING_PRECINCT,
     FIPS_TO_STATE,
-    STATE_FIPS,
     download_congressional_districts,
     download_state_house_districts,
     download_state_senate_districts,
@@ -47,6 +45,7 @@ except (FileNotFoundError, subprocess.TimeoutExpired):
 # Check for geopandas availability (fallback for shapefile conversion)
 try:
     import geopandas as gpd
+
     HAS_GEOPANDAS = True
 except ImportError:
     HAS_GEOPANDAS = False
@@ -73,13 +72,14 @@ def _make_congressional_handler(facet_name: str):
 
         if step_log:
             step_log(f"{facet_name}: downloading CD for {congress_number}th Congress (year {year})")
-        log.info("%s downloading CD for %dth Congress (year %d)",
-                 facet_name, congress_number, year)
+        log.info("%s downloading CD for %dth Congress (year %d)", facet_name, congress_number, year)
 
         try:
             cache = download_congressional_districts(year, congress_number)
             if step_log:
-                step_log(f"{facet_name}: downloaded CD (size={cache.get('size', 0)})", level="success")
+                step_log(
+                    f"{facet_name}: downloaded CD (size={cache.get('size', 0)})", level="success"
+                )
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download Congressional Districts: %s", e)
@@ -87,7 +87,7 @@ def _make_congressional_handler(facet_name: str):
                 "cache": {
                     "url": "",
                     "path": "",
-                    "date": datetime.now(timezone.utc).isoformat(),
+                    "date": datetime.now(UTC).isoformat(),
                     "size": 0,
                     "wasInCache": False,
                     "year": year,
@@ -109,13 +109,14 @@ def _make_state_senate_handler(facet_name: str):
 
         if step_log:
             step_log(f"{facet_name}: downloading SLDU for state {state_fips} (year {year})")
-        log.info("%s downloading SLDU for state %s (year %d)",
-                 facet_name, state_fips, year)
+        log.info("%s downloading SLDU for state %s (year %d)", facet_name, state_fips, year)
 
         try:
             cache = download_state_senate_districts(state_fips, year)
             if step_log:
-                step_log(f"{facet_name}: downloaded SLDU (size={cache.get('size', 0)})", level="success")
+                step_log(
+                    f"{facet_name}: downloaded SLDU (size={cache.get('size', 0)})", level="success"
+                )
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download State Senate Districts: %s", e)
@@ -123,7 +124,7 @@ def _make_state_senate_handler(facet_name: str):
                 "cache": {
                     "url": "",
                     "path": "",
-                    "date": datetime.now(timezone.utc).isoformat(),
+                    "date": datetime.now(UTC).isoformat(),
                     "size": 0,
                     "wasInCache": False,
                     "year": year,
@@ -145,13 +146,14 @@ def _make_state_house_handler(facet_name: str):
 
         if step_log:
             step_log(f"{facet_name}: downloading SLDL for state {state_fips} (year {year})")
-        log.info("%s downloading SLDL for state %s (year %d)",
-                 facet_name, state_fips, year)
+        log.info("%s downloading SLDL for state %s (year %d)", facet_name, state_fips, year)
 
         try:
             cache = download_state_house_districts(state_fips, year)
             if step_log:
-                step_log(f"{facet_name}: downloaded SLDL (size={cache.get('size', 0)})", level="success")
+                step_log(
+                    f"{facet_name}: downloaded SLDL (size={cache.get('size', 0)})", level="success"
+                )
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download State House Districts: %s", e)
@@ -159,7 +161,7 @@ def _make_state_house_handler(facet_name: str):
                 "cache": {
                     "url": "",
                     "path": "",
-                    "date": datetime.now(timezone.utc).isoformat(),
+                    "date": datetime.now(UTC).isoformat(),
                     "size": 0,
                     "wasInCache": False,
                     "year": year,
@@ -181,13 +183,14 @@ def _make_voting_precincts_handler(facet_name: str):
 
         if step_log:
             step_log(f"{facet_name}: downloading VTD for state {state_fips} (year {year})")
-        log.info("%s downloading VTD for state %s (year %d)",
-                 facet_name, state_fips, year)
+        log.info("%s downloading VTD for state %s (year %d)", facet_name, state_fips, year)
 
         try:
             cache = download_voting_precincts(state_fips, year)
             if step_log:
-                step_log(f"{facet_name}: downloaded VTD (size={cache.get('size', 0)})", level="success")
+                step_log(
+                    f"{facet_name}: downloaded VTD (size={cache.get('size', 0)})", level="success"
+                )
             return {"cache": cache}
         except Exception as e:
             log.error("Failed to download Voting Precincts: %s", e)
@@ -195,7 +198,7 @@ def _make_voting_precincts_handler(facet_name: str):
                 "cache": {
                     "url": "",
                     "path": "",
-                    "date": datetime.now(timezone.utc).isoformat(),
+                    "date": datetime.now(UTC).isoformat(),
                     "size": 0,
                     "wasInCache": False,
                     "year": year,
@@ -231,7 +234,7 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
                     "state": FIPS_TO_STATE.get(state_fips, state_fips),
                     "year": year,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -248,7 +251,10 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
             feature_count = _convert_shapefile_to_geojson(shp_path, output_path)
 
             if step_log:
-                step_log(f"{facet_name}: converted to GeoJSON ({feature_count} features)", level="success")
+                step_log(
+                    f"{facet_name}: converted to GeoJSON ({feature_count} features)",
+                    level="success",
+                )
             return {
                 "result": {
                     "output_path": output_path,
@@ -257,7 +263,7 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
                     "state": FIPS_TO_STATE.get(state_fips, state_fips),
                     "year": year,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
         except Exception as e:
@@ -270,7 +276,7 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
                     "state": FIPS_TO_STATE.get(state_fips, state_fips),
                     "year": year,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -291,8 +297,7 @@ def _convert_shapefile_to_geojson(shp_path: str, output_path: str) -> int:
         return _convert_with_geopandas(shp_path, output_path)
     else:
         raise RuntimeError(
-            "No shapefile conversion tool available. "
-            "Install GDAL (ogr2ogr) or geopandas."
+            "No shapefile conversion tool available. Install GDAL (ogr2ogr) or geopandas."
         )
 
 
@@ -300,8 +305,10 @@ def _convert_with_ogr2ogr(shp_path: str, output_path: str) -> int:
     """Convert shapefile to GeoJSON using ogr2ogr."""
     cmd = [
         "ogr2ogr",
-        "-f", "GeoJSON",
-        "-t_srs", "EPSG:4326",  # Ensure WGS84
+        "-f",
+        "GeoJSON",
+        "-t_srs",
+        "EPSG:4326",  # Ensure WGS84
         output_path,
         shp_path,
     ]
@@ -311,7 +318,7 @@ def _convert_with_ogr2ogr(shp_path: str, output_path: str) -> int:
         raise RuntimeError(f"ogr2ogr failed: {result.stderr}")
 
     # Count features
-    with open(output_path, "r") as f:
+    with open(output_path) as f:
         geojson = json.load(f)
     return len(geojson.get("features", []))
 
@@ -357,8 +364,7 @@ def _make_filter_districts_handler(facet_name: str):
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} where {attribute}={value}")
-        log.info("%s filtering %s where %s=%s",
-                 facet_name, input_path, attribute, value)
+        log.info("%s filtering %s where %s=%s", facet_name, input_path, attribute, value)
 
         if not input_path or not os.path.exists(input_path):
             return {
@@ -369,22 +375,22 @@ def _make_filter_districts_handler(facet_name: str):
                     "state": "",
                     "year": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
         try:
-            with open(input_path, "r") as f:
+            with open(input_path) as f:
                 geojson = json.load(f)
 
             features = geojson.get("features", [])
-            filtered = [
-                f for f in features
-                if f.get("properties", {}).get(attribute) == value
-            ]
+            filtered = [f for f in features if f.get("properties", {}).get(attribute) == value]
 
             if step_log:
-                step_log(f"{facet_name}: {len(filtered)}/{len(features)} districts matched ({attribute}={value})", level="success")
+                step_log(
+                    f"{facet_name}: {len(filtered)}/{len(features)} districts matched ({attribute}={value})",
+                    level="success",
+                )
             # Generate output path
             input_p = Path(input_path)
             output_path = str(input_p.with_stem(f"{input_p.stem}_{attribute}_{value}"))
@@ -405,7 +411,7 @@ def _make_filter_districts_handler(facet_name: str):
                     "state": "",
                     "year": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
         except Exception as e:
@@ -418,7 +424,7 @@ def _make_filter_districts_handler(facet_name: str):
                     "state": "",
                     "year": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 

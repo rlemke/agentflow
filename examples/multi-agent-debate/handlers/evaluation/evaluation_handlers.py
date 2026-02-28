@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import score_arguments, judge_debate
+from handlers.shared.debate_utils import judge_debate, score_arguments
 
 NAMESPACE = "debate.Evaluation"
 
@@ -24,7 +24,12 @@ def handle_score_arguments(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Scored {len(arguments)} arguments with {len(rebuttals)} rebuttals", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Scored {len(arguments)} arguments with {len(rebuttals)} rebuttals",
+                "level": "success",
+            }
+        )
 
     return {"scores": scores}
 
@@ -44,7 +49,12 @@ def handle_judge_debate(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Judged debate on '{topic}': winner is '{verdict['winner']}'", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Judged debate on '{topic}': winner is '{verdict['winner']}'",
+                "level": "success",
+            }
+        )
 
     return {"verdict": verdict}
 

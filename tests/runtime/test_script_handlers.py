@@ -98,7 +98,7 @@ class TestFacetScriptsBeginHandler:
             "name": "Fail",
             "body": {
                 "type": "ScriptBlock",
-                "code": '1 / 0',
+                "code": "1 / 0",
                 "language": "python",
             },
         }
@@ -118,7 +118,7 @@ class TestFacetScriptsBeginHandler:
             "name": "BadSyntax",
             "body": {
                 "type": "ScriptBlock",
-                "code": 'def (broken',
+                "code": "def (broken",
                 "language": "python",
             },
         }

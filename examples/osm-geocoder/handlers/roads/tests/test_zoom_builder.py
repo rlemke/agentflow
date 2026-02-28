@@ -1,30 +1,15 @@
 """Tests for zoom builder handler and logic modules."""
 
 import json
-import math
 import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from handlers.roads.zoom_graph import (
-    FC_SCORES,
-    HAS_OSMIUM,
-    HIGHWAY_TO_FC,
-    LogicalEdge,
-    RoadGraph,
-    _classify_fc,
-    _compute_fc_score,
-    _haversine_m,
-    _polyline_length_m,
-)
-from handlers.roads.zoom_sbs import (
-    SegmentIndex,
-    accumulate_votes,
-    build_anchors,
-    normalize_sbs,
-    sample_od_pairs,
+from handlers.roads.zoom_builder import (
+    _empty_metrics,
+    _empty_result,
+    _export_zoom_geojson,
 )
 from handlers.roads.zoom_detection import (
     _classify_settlement,
@@ -32,17 +17,14 @@ from handlers.roads.zoom_detection import (
     _load_settlements,
     _sample_radial_pairs,
 )
-from handlers.roads.zoom_selection import (
-    BASE_KM,
-    HAS_H3,
-    _flat_budgets,
-    compute_scores,
-    enforce_monotonic_reveal,
-)
-from handlers.roads.zoom_builder import (
-    _empty_metrics,
-    _empty_result,
-    _export_zoom_geojson,
+from handlers.roads.zoom_graph import (
+    FC_SCORES,
+    LogicalEdge,
+    RoadGraph,
+    _classify_fc,
+    _compute_fc_score,
+    _haversine_m,
+    _polyline_length_m,
 )
 from handlers.roads.zoom_handlers import (
     NAMESPACE,
@@ -58,14 +40,39 @@ from handlers.roads.zoom_handlers import (
     _make_select_edges_handler,
     register_zoom_handlers,
 )
+from handlers.roads.zoom_sbs import (
+    SegmentIndex,
+    accumulate_votes,
+    build_anchors,
+    normalize_sbs,
+    sample_od_pairs,
+)
+from handlers.roads.zoom_selection import (
+    BASE_KM,
+    HAS_H3,
+    _flat_budgets,
+    compute_scores,
+    enforce_monotonic_reveal,
+)
 
 requires_h3 = pytest.mark.skipif(not HAS_H3, reason="h3 not installed")
 
 
-def _make_edge(edge_id, from_node, to_node, coords, fc="primary",
-               fc_score=0.75, length_m=None, ref="", name="",
-               bridge=False, tunnel=False, oneway=False,
-               surface_unpaved=False) -> LogicalEdge:
+def _make_edge(
+    edge_id,
+    from_node,
+    to_node,
+    coords,
+    fc="primary",
+    fc_score=0.75,
+    length_m=None,
+    ref="",
+    name="",
+    bridge=False,
+    tunnel=False,
+    oneway=False,
+    surface_unpaved=False,
+) -> LogicalEdge:
     """Create a LogicalEdge with sensible defaults."""
     if length_m is None:
         length_m = _polyline_length_m(coords)
@@ -171,8 +178,18 @@ class TestFCScoring:
 
     def test_fc_scores_all_keys(self):
         """All expected functional classes present."""
-        expected = {"motorway", "trunk", "primary", "secondary", "tertiary",
-                    "unclassified", "residential", "service", "track", "path"}
+        expected = {
+            "motorway",
+            "trunk",
+            "primary",
+            "secondary",
+            "tertiary",
+            "unclassified",
+            "residential",
+            "service",
+            "track",
+            "path",
+        }
         assert set(FC_SCORES.keys()) == expected
 
     def test_compute_fc_score_base(self):
@@ -266,9 +283,16 @@ class TestLogicalEdge:
 
     def test_field_types(self):
         """All fields have correct types."""
-        edge = _make_edge(0, 1, 2, [(0.0, 0.0), (1.0, 1.0)],
-                          bridge=True, tunnel=False, oneway=True,
-                          surface_unpaved=True)
+        edge = _make_edge(
+            0,
+            1,
+            2,
+            [(0.0, 0.0), (1.0, 1.0)],
+            bridge=True,
+            tunnel=False,
+            oneway=True,
+            surface_unpaved=True,
+        )
         assert isinstance(edge.bridge, bool)
         assert isinstance(edge.tunnel, bool)
         assert isinstance(edge.oneway, bool)
@@ -389,10 +413,15 @@ class TestSegmentIndex:
         graph = _make_test_graph()
         idx = SegmentIndex(graph)
         # Along edge 0 then edge 1: (0,0)→(0.01,0)→(0.02,0)
-        matched = idx.snap_route([
-            [0.0, 0.0], [0.005, 0.0], [0.01, 0.0],
-            [0.015, 0.0], [0.02, 0.0],
-        ])
+        matched = idx.snap_route(
+            [
+                [0.0, 0.0],
+                [0.005, 0.0],
+                [0.01, 0.0],
+                [0.015, 0.0],
+                [0.02, 0.0],
+            ]
+        )
         assert 0 in matched
         assert 1 in matched
 

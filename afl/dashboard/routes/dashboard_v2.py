@@ -16,8 +16,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
+if TYPE_CHECKING:
+    from afl.runtime.persistence import PersistenceAPI
 
 from ..dependencies import get_store
 from ..helpers import (
@@ -29,7 +34,6 @@ from ..helpers import (
     group_runners_by_namespace,
     group_servers_by_group,
     search_all,
-    short_workflow_name,
 )
 from ..tree import build_step_tree
 
@@ -195,7 +199,8 @@ def step_rows_partial(
         tree = build_step_tree(all_steps)
         templates = request.app.state.templates
         html = templates.get_template("partials/step_tree.html").render(
-            tree=tree, request=request,
+            tree=tree,
+            request=request,
         )
         return HTMLResponse(html)
 
@@ -520,13 +525,11 @@ def global_search(
         items = grouped.get(rtype, [])
         if not items:
             continue
-        html_parts.append(
-            f'<div class="cmd-palette-category">{type_labels[rtype]}</div>'
-        )
+        html_parts.append(f'<div class="cmd-palette-category">{type_labels[rtype]}</div>')
         for item in items:
             html_parts.append(
                 f'<div class="cmd-palette-item" data-href="{item["href"]}" '
-                f'onclick="window.location.href=\'{item["href"]}\'">'
+                f"onclick=\"window.location.href='{item['href']}'\">"
                 f'<span class="cmd-palette-item-icon">{item["icon"]}</span>'
                 f'<span class="cmd-palette-item-name">{item["name"]}</span>'
                 f'<span class="cmd-palette-item-type">{item["type"]}</span>'
@@ -542,7 +545,8 @@ def global_search(
 
 
 def _enrich_runners_with_progress(
-    runners: list, store: object,
+    runners: list,
+    store: PersistenceAPI,
 ) -> dict[str, dict]:
     """Compute step progress for a list of runners.
 

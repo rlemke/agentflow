@@ -48,9 +48,9 @@ def lock_detail(lock_key: str, request: Request, store=Depends(get_store)):
     # get_all_locks returns all (including expired); find by key
     locks = store.get_all_locks()
     lock = None
-    for l in locks:
-        if l.key == lock_key:
-            lock = l
+    for lock_entry in locks:
+        if lock_entry.key == lock_key:
+            lock = lock_entry
             break
     now = _current_time_ms()
     return request.app.state.templates.TemplateResponse(

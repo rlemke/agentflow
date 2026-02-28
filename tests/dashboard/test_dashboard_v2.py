@@ -376,16 +376,18 @@ class TestV2HandlerDetail:
 
         tc, store = client
         store.save_handler_registration(self._make_handler())
-        store.save_task(TaskDefinition(
-            uuid="task-1",
-            name="osm.geo.Cache",
-            runner_id="r-1",
-            workflow_id="wf-1",
-            flow_id="flow-1",
-            step_id="step-1",
-            state="running",
-            created=1000,
-        ))
+        store.save_task(
+            TaskDefinition(
+                uuid="task-1",
+                name="osm.geo.Cache",
+                runner_id="r-1",
+                workflow_id="wf-1",
+                flow_id="flow-1",
+                step_id="step-1",
+                state="running",
+                created=1000,
+            )
+        )
         resp = tc.get("/v2/handlers/osm.geo.Cache")
         assert resp.status_code == 200
         assert "step-1" in resp.text
@@ -396,15 +398,17 @@ class TestV2HandlerDetail:
 
         tc, store = client
         store.save_handler_registration(self._make_handler())
-        store.save_step_log(StepLogEntry(
-            uuid="log-1",
-            step_id="step-1",
-            workflow_id="wf-1",
-            runner_id="r-1",
-            facet_name="osm.geo.Cache",
-            message="Task completed",
-            time=1000,
-        ))
+        store.save_step_log(
+            StepLogEntry(
+                uuid="log-1",
+                step_id="step-1",
+                workflow_id="wf-1",
+                runner_id="r-1",
+                facet_name="osm.geo.Cache",
+                message="Task completed",
+                time=1000,
+            )
+        )
         resp = tc.get("/v2/handlers/osm.geo.Cache")
         assert resp.status_code == 200
         assert "Task completed" in resp.text
@@ -494,12 +498,14 @@ class TestGlobalSearch:
         from afl.runtime.entities import HandlerRegistration
 
         tc, store = client
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="osm.geo.Cache",
-            module_uri="examples.handlers.cache",
-            entrypoint="handle",
-            version="1.0",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="osm.geo.Cache",
+                module_uri="examples.handlers.cache",
+                entrypoint="handle",
+                version="1.0",
+            )
+        )
         resp = tc.get("/v2/search?q=Cache")
         assert resp.status_code == 200
         assert "osm.geo.Cache" in resp.text
@@ -590,7 +596,7 @@ class TestWorkflowListRedesign:
         tc, store = client
         resp = tc.get("/v2/workflows")
         assert resp.status_code == 200
-        assert 'data-list-filter=' in resp.text
+        assert "data-list-filter=" in resp.text
 
     def test_list_has_auto_refresh_on_running(self, client):
         tc, store = client
@@ -661,12 +667,14 @@ class TestStepTreeControls:
         tc, store = client
         runner = _make_runner("r-1", state="running")
         store.save_runner(runner)
-        store.save_step(StepDefinition(
-            id="step-1",
-            object_type="step",
-            workflow_id=runner.workflow_id,
-            state="state.statement.Complete",
-        ))
+        store.save_step(
+            StepDefinition(
+                id="step-1",
+                object_type="step",
+                workflow_id=runner.workflow_id,
+                state="state.statement.Complete",
+            )
+        )
         resp = tc.get("/v2/workflows/r-1")
         assert resp.status_code == 200
         assert "step-summary-legend" in resp.text

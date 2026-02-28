@@ -100,8 +100,7 @@ class OutputStore:
         if ops:
             self._output.bulk_write(ops, ordered=False)
 
-        self._update_meta(dataset_key, facet_name, len(features),
-                          data_type, path, now)
+        self._update_meta(dataset_key, facet_name, len(features), data_type, path, now)
         return len(features)
 
     # ------------------------------------------------------------------

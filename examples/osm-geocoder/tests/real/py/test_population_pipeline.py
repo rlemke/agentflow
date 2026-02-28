@@ -16,9 +16,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from afl.runtime import ExecutionStatus
-
 from helpers import (
     EXAMPLE_AFL_FILES,
     INTEGRATION_AFL_DIR,
@@ -26,6 +23,8 @@ from helpers import (
     extract_workflow,
     run_to_completion,
 )
+
+from afl.runtime import ExecutionStatus
 
 # Add the osm-geocoder example to the path so we can import handlers
 _EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
@@ -36,6 +35,7 @@ if str(_EXAMPLE_ROOT) not in sys.path:
 # Skip if osmium not available
 try:
     import osmium  # noqa: F401
+
     HAS_OSMIUM = True
 except ImportError:
     HAS_OSMIUM = False
@@ -43,6 +43,7 @@ except ImportError:
 # Skip if requests not available
 try:
     import requests  # noqa: F401
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -60,8 +61,8 @@ def _compile_population_pipeline():
 
 def _register_handlers(poller):
     """Register real handlers for the population pipeline."""
-    from handlers.population.population_handlers import register_population_handlers
     from handlers.cache.region_handlers import register_region_handlers
+    from handlers.population.population_handlers import register_population_handlers
 
     register_region_handlers(poller)
     register_population_handlers(poller)
@@ -95,7 +96,10 @@ class TestPopulationPipelineIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={
                 "region": "Monaco",
                 "min_population": 0,

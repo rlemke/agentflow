@@ -305,7 +305,6 @@ class ExpressionEvaluator:
                 ctx.step_id,
             ) from e
 
-
     def _eval_unary(self, expr: dict, ctx: EvaluationContext) -> Any:
         """Evaluate a unary expression (negation).
 

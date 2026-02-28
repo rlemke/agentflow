@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-import time
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,10 +10,8 @@ from afl.dashboard.filters import file_timestamp, filesizeformat
 from afl.dashboard.routes.output import (
     _build_breadcrumbs,
     _build_tree,
-    _output_base,
     _safe_path,
 )
-
 
 # ---- Helper unit tests ----
 

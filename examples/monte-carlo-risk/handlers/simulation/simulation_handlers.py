@@ -29,17 +29,17 @@ def handle_simulate_batch(params: dict[str, Any]) -> dict[str, Any]:
     if isinstance(cholesky, str):
         cholesky = json.loads(cholesky)
 
-    pnl = generate_correlated_gbm_paths(
-        positions, cholesky, num_paths, horizon_days, seed
-    )
+    pnl = generate_correlated_gbm_paths(positions, cholesky, num_paths, horizon_days, seed)
 
     mean_pnl = sum(pnl) / len(pnl) if pnl else 0
     worst_pnl = min(pnl) if pnl else 0
 
     if step_log:
-        step_log(f"SimulateBatch: batch={batch_id} paths={num_paths} "
-                 f"mean_pnl={mean_pnl:,.0f} worst={worst_pnl:,.0f}",
-                 level="success")
+        step_log(
+            f"SimulateBatch: batch={batch_id} paths={num_paths} "
+            f"mean_pnl={mean_pnl:,.0f} worst={worst_pnl:,.0f}",
+            level="success",
+        )
 
     return {
         "result": {
@@ -81,9 +81,10 @@ def handle_simulate_stress(params: dict[str, Any]) -> dict[str, Any]:
             best_pos = {"name": asset_id, "pnl": pos_pnl}
 
     if step_log:
-        step_log(f"SimulateStress: scenario={scenario_name} "
-                 f"portfolio_pnl={total_pnl:,.0f}",
-                 level="success")
+        step_log(
+            f"SimulateStress: scenario={scenario_name} portfolio_pnl={total_pnl:,.0f}",
+            level="success",
+        )
 
     return {
         "result": {

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import search_market_trends, gather_regulations, analyze_competitors
+from handlers.shared.debate_utils import (
+    analyze_competitors,
+    gather_regulations,
+    search_market_trends,
+)
 
 NAMESPACE = "ssd.Research"
 
@@ -20,7 +23,12 @@ def handle_search_market_trends(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Searched market trends for '{candidate_id}': growth={result['growth_rate']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Searched market trends for '{candidate_id}': growth={result['growth_rate']}",
+                "level": "success",
+            }
+        )
 
     return {"research": result}
 
@@ -34,7 +42,12 @@ def handle_gather_regulations(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Gathered regulations for '{candidate_id}': permit_difficulty={result['permit_difficulty']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Gathered regulations for '{candidate_id}': permit_difficulty={result['permit_difficulty']}",
+                "level": "success",
+            }
+        )
 
     return {"regulations": result}
 
@@ -48,7 +61,12 @@ def handle_analyze_competitors(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Analyzed competitors for '{candidate_id}': {len(competitors)} found, threat={threat_level}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Analyzed competitors for '{candidate_id}': {len(competitors)} found, threat={threat_level}",
+                "level": "success",
+            }
+        )
 
     return {"competitors": competitors, "threat_level": threat_level}
 

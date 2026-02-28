@@ -9,34 +9,34 @@ import json
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-from .zoom_graph import RoadGraph, build_logical_graph, HAS_OSMIUM
-from .zoom_sbs import (
-    SegmentIndex,
-    build_anchors,
-    sample_od_pairs,
-    route_batch_parallel,
-    accumulate_votes,
-    normalize_sbs,
-    save_sbs,
-    save_anchors,
-    HAS_REQUESTS,
-)
 from .zoom_detection import (
     detect_bypasses,
     detect_rings,
     save_bypass_flags,
     save_ring_flags,
 )
+from .zoom_graph import HAS_OSMIUM, RoadGraph, build_logical_graph
+from .zoom_sbs import (
+    HAS_REQUESTS,
+    SegmentIndex,
+    accumulate_votes,
+    build_anchors,
+    normalize_sbs,
+    route_batch_parallel,
+    sample_od_pairs,
+    save_anchors,
+    save_sbs,
+)
 from .zoom_selection import (
-    compute_scores,
     build_cell_budgets,
-    select_edges,
+    compute_scores,
     enforce_monotonic_reveal,
+    select_edges,
 )
 
 
@@ -105,7 +105,11 @@ def build_zoom_layers(
 
         if HAS_REQUESTS and graph_dir:
             routes = route_batch_parallel(
-                pairs, road_graph.node_coords, graph_dir, profile, max_concurrent,
+                pairs,
+                road_graph.node_coords,
+                graph_dir,
+                profile,
+                max_concurrent,
             )
             total_route_count += len(routes)
             bc = accumulate_votes(routes, segment_index)
@@ -142,7 +146,12 @@ def build_zoom_layers(
     # 7. Budgeted selection + backbone repair
     log.info("Step 7: Selecting edges")
     selected_by_zoom = select_edges(
-        road_graph, scores, budgets, anchors_by_zoom, bypass_flags, ring_flags,
+        road_graph,
+        scores,
+        budgets,
+        anchors_by_zoom,
+        bypass_flags,
+        ring_flags,
     )
 
     # 8. Enforce monotonic reveal → assign minZoom
@@ -152,9 +161,16 @@ def build_zoom_layers(
     # 9. Export
     log.info("Step 9: Exporting results")
     result, metrics = _export_results(
-        road_graph, assignments, scores, sbs_by_zoom,
-        bypass_flags, ring_flags, anchors_by_zoom,
-        total_route_count, output_dir, time.time() - t0,
+        road_graph,
+        assignments,
+        scores,
+        sbs_by_zoom,
+        bypass_flags,
+        ring_flags,
+        anchors_by_zoom,
+        total_route_count,
+        output_dir,
+        time.time() - t0,
     )
 
     return result, metrics
@@ -189,13 +205,11 @@ def _export_results(
 
     # CSV export: segment_scores.csv
     csv_path = str(out / "segment_scores.csv")
-    _export_csv(graph, assignments, scores, sbs_by_zoom,
-                bypass_flags, ring_flags, csv_path)
+    _export_csv(graph, assignments, scores, sbs_by_zoom, bypass_flags, ring_flags, csv_path)
 
     # JSONL export: edge_importance.jsonl
     jsonl_path = str(out / "edge_importance.jsonl")
-    _export_jsonl(graph, assignments, scores, sbs_by_zoom,
-                  bypass_flags, ring_flags, jsonl_path)
+    _export_jsonl(graph, assignments, scores, sbs_by_zoom, bypass_flags, ring_flags, jsonl_path)
 
     # Per-zoom GeoJSON (cumulative)
     for z in range(2, 8):
@@ -257,7 +271,7 @@ def _export_results(
         "csv_path": csv_path,
         "metrics_path": metrics_path,
         "format": "CSV+GeoJSON+JSONL",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
     return result, metrics
@@ -274,15 +288,27 @@ def _export_csv(
 ) -> None:
     """Export per-edge data to CSV."""
     fieldnames = [
-        "edgeId", "fromNode", "toNode", "osmWayIds", "lengthM", "fc", "minZoom",
+        "edgeId",
+        "fromNode",
+        "toNode",
+        "osmWayIds",
+        "lengthM",
+        "fc",
+        "minZoom",
     ]
     for z in range(2, 8):
         fieldnames.append(f"score_z{z}")
     for z in range(2, 8):
         fieldnames.append(f"sb_z{z}")
-    fieldnames.extend([
-        "backbone", "isBypass", "isRing", "isLegacyThruTown", "isBridgeOrTunnel",
-    ])
+    fieldnames.extend(
+        [
+            "backbone",
+            "isBypass",
+            "isRing",
+            "isLegacyThruTown",
+            "isBridgeOrTunnel",
+        ]
+    )
 
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -341,10 +367,8 @@ def _export_jsonl(
                 "lengthM": round(edge.length_m, 1),
                 "fc": edge.fc,
                 "minZoom": assignments[eid],
-                "scores": {z: round(scores.get(z, {}).get(eid, 0.0), 4)
-                           for z in range(2, 8)},
-                "sbs": {z: round(sbs_by_zoom.get(z, {}).get(eid, 0.0), 4)
-                        for z in range(2, 8)},
+                "scores": {z: round(scores.get(z, {}).get(eid, 0.0), 4) for z in range(2, 8)},
+                "sbs": {z: round(sbs_by_zoom.get(z, {}).get(eid, 0.0), 4) for z in range(2, 8)},
                 "flags": {
                     "backbone": False,
                     "isBypass": bypass_flags.get(eid) == "bypass",
@@ -372,21 +396,23 @@ def _export_zoom_geojson(
         if min_z is None or min_z > zoom:
             continue
 
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "edge_id": eid,
-                "fc": edge.fc,
-                "min_zoom": min_z,
-                "ref": edge.ref,
-                "name": edge.name,
-                "length_m": round(edge.length_m, 1),
-            },
-            "geometry": {
-                "type": "LineString",
-                "coordinates": list(edge.coords),
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "edge_id": eid,
+                    "fc": edge.fc,
+                    "min_zoom": min_z,
+                    "ref": edge.ref,
+                    "name": edge.name,
+                    "length_m": round(edge.length_m, 1),
+                },
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": list(edge.coords),
+                },
+            }
+        )
 
     geojson = {"type": "FeatureCollection", "features": features}
     with open(path, "w", encoding="utf-8") as f:
@@ -408,7 +434,7 @@ def _empty_result(output_dir: str) -> dict:
         "csv_path": "",
         "metrics_path": "",
         "format": "CSV+GeoJSON+JSONL",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

@@ -145,7 +145,11 @@ pytestmark_routes = pytest.mark.skipif(
 
 
 def _make_server_entity(
-    uuid="srv-1", group="test-group", name="test-node", state="running", ping_time=None,
+    uuid="srv-1",
+    group="test-group",
+    name="test-node",
+    state="running",
+    ping_time=None,
 ):
     from afl.runtime.entities import ServerDefinition
 
@@ -293,7 +297,7 @@ class TestV2ServerNav:
     def test_nav_servers_highlighted(self, client):
         tc, store = client
         resp = tc.get("/v2/servers")
-        assert 'sidebar-link active' in resp.text
+        assert "sidebar-link active" in resp.text
         # The Servers link should be active in sidebar
         assert '/v2/servers" class="sidebar-link active"' in resp.text
 
@@ -325,9 +329,7 @@ class TestV2ServerDownDetection:
         tc, store = client
         store.save_server(_make_server_entity("srv-ok", state="running"))
         stale_ping = int(time.time() * 1000) - SERVER_DOWN_TIMEOUT_MS - 1000
-        store.save_server(
-            _make_server_entity("srv-stale", state="running", ping_time=stale_ping)
-        )
+        store.save_server(_make_server_entity("srv-stale", state="running", ping_time=stale_ping))
         resp = tc.get("/v2/servers?tab=running")
         assert resp.status_code == 200
         assert "Down" in resp.text

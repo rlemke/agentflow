@@ -252,9 +252,7 @@ class AFLParser:
             filesystem_index=fs_index,
             mongodb_resolver=mongo_resolver,
         )
-        program, registry, compiler_input = resolver.resolve(
-            program, registry, compiler_input
-        )
+        program, registry, compiler_input = resolver.resolve(program, registry, compiler_input)
 
         return program, registry
 

@@ -22,7 +22,6 @@ Tests cover:
 - Foreach iteration with event facet handlers
 """
 
-import asyncio
 import threading
 
 import pytest
@@ -43,7 +42,6 @@ from afl.runtime.entities import (
 )
 from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
 from afl.runtime.types import ObjectType, generate_id
-
 
 # =========================================================================
 # Fixtures
@@ -174,10 +172,14 @@ class TestRegistryRunnerAddOne:
         _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": 1}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": 1}, program_ast=ADDONE_PROGRAM_AST
+        )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
         dispatched = runner.poll_once()
         assert dispatched == 1
 
@@ -191,10 +193,14 @@ class TestRegistryRunnerAddOne:
         _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": 41}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": 41}, program_ast=ADDONE_PROGRAM_AST
+        )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
         dispatched = runner.poll_once()
         assert dispatched == 1
 
@@ -207,10 +213,14 @@ class TestRegistryRunnerAddOne:
         _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": 0}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": 0}, program_ast=ADDONE_PROGRAM_AST
+        )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
         runner.poll_once()
 
         final = evaluator.resume(result.workflow_id, ADDONE_WORKFLOW_AST, ADDONE_PROGRAM_AST)
@@ -222,10 +232,14 @@ class TestRegistryRunnerAddOne:
         _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": -1}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": -1}, program_ast=ADDONE_PROGRAM_AST
+        )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
         runner.poll_once()
 
         final = evaluator.resume(result.workflow_id, ADDONE_WORKFLOW_AST, ADDONE_PROGRAM_AST)
@@ -237,7 +251,9 @@ class TestRegistryRunnerAddOne:
         _register_file_handler(store, tmp_path, "handlers.AddOne", ADDONE_HANDLER_CODE)
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": 5}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": 5}, program_ast=ADDONE_PROGRAM_AST
+        )
 
         blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
         assert len(blocked) == 1
@@ -246,7 +262,9 @@ class TestRegistryRunnerAddOne:
         step_before = store.get_step(step_id)
         assert step_before.attributes.get_param("input") == 5
 
-        runner.cache_workflow_ast(result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
+        )
         runner.poll_once()
 
         step_after = store.get_step(step_id)
@@ -256,12 +274,16 @@ class TestRegistryRunnerAddOne:
     def test_handler_failure_marks_step_error(self, store, evaluator, tmp_path):
         """If the handler raises, the step transitions to STATEMENT_ERROR."""
         _register_file_handler(
-            store, tmp_path, "handlers.AddOne",
+            store,
+            tmp_path,
+            "handlers.AddOne",
             "def handle(payload):\n    raise ValueError('cannot process')\n",
         )
         runner = _make_runner(store, evaluator)
 
-        result = evaluator.execute(ADDONE_WORKFLOW_AST, inputs={"x": 1}, program_ast=ADDONE_PROGRAM_AST)
+        result = evaluator.execute(
+            ADDONE_WORKFLOW_AST, inputs={"x": 1}, program_ast=ADDONE_PROGRAM_AST
+        )
         assert result.status == ExecutionStatus.PAUSED
 
         blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
@@ -399,11 +421,15 @@ class TestRegistryRunnerMultiStep:
     def test_double_then_square(self, store, evaluator, tmp_path):
         """DoubleAndSquare(x=3) => Double(3)=6 => Square(6)=36 => result=36."""
         _register_file_handler(
-            store, tmp_path, "compute.Double",
+            store,
+            tmp_path,
+            "compute.Double",
             "def handle(payload):\n    return {'output': payload['input'] * 2}\n",
         )
         _register_file_handler(
-            store, tmp_path, "compute.Square",
+            store,
+            tmp_path,
+            "compute.Square",
             "def handle(payload):\n    return {'output': payload['input'] ** 2}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -414,7 +440,9 @@ class TestRegistryRunnerMultiStep:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, MULTI_STEP_WORKFLOW_AST, program_ast=MULTI_STEP_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, MULTI_STEP_WORKFLOW_AST, program_ast=MULTI_STEP_PROGRAM_AST
+        )
 
         # poll_once handles full pipeline: Double claimed from queue,
         # Square dispatched inline during auto-resume (no task created)
@@ -422,7 +450,9 @@ class TestRegistryRunnerMultiStep:
         assert dispatched == 1
 
         # Workflow already completed by auto-resume inside poll_once
-        final = evaluator.resume(result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST)
+        final = evaluator.resume(
+            result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST
+        )
         assert final.success
         assert final.status == ExecutionStatus.COMPLETED
         assert final.outputs["result"] == 36  # (3*2)^2 = 36
@@ -430,11 +460,15 @@ class TestRegistryRunnerMultiStep:
     def test_multi_step_data_flow_values(self, store, evaluator, tmp_path):
         """Verify intermediate step attributes carry correct values."""
         _register_file_handler(
-            store, tmp_path, "compute.Double",
+            store,
+            tmp_path,
+            "compute.Double",
             "def handle(payload):\n    return {'output': payload['input'] * 2}\n",
         )
         _register_file_handler(
-            store, tmp_path, "compute.Square",
+            store,
+            tmp_path,
+            "compute.Square",
             "def handle(payload):\n    return {'output': payload['input'] ** 2}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -474,11 +508,15 @@ class TestRegistryRunnerMultiStep:
     def test_multi_step_first_handler_fails(self, store, evaluator, tmp_path):
         """If the first handler fails, the workflow does not proceed to step 2."""
         _register_file_handler(
-            store, tmp_path, "compute.Double",
+            store,
+            tmp_path,
+            "compute.Double",
             "def handle(payload):\n    raise RuntimeError('double failed')\n",
         )
         _register_file_handler(
-            store, tmp_path, "compute.Square",
+            store,
+            tmp_path,
+            "compute.Square",
             "def handle(payload):\n    return {'output': payload['input'] ** 2}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -492,12 +530,15 @@ class TestRegistryRunnerMultiStep:
 
         # Double step should be in error state
         all_steps = list(store.get_all_steps())
-        double_steps = [s for s in all_steps if s.facet_name == "Double" or s.facet_name == "compute.Double"]
+        double_steps = [
+            s for s in all_steps if s.facet_name == "Double" or s.facet_name == "compute.Double"
+        ]
         assert any(s.state == StepState.STATEMENT_ERROR for s in double_steps)
 
         # No Square tasks should have been created
         square_blocked = [
-            s for s in store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            s
+            for s in store.get_steps_by_state(StepState.EVENT_TRANSMIT)
             if "Square" in (s.facet_name or "")
         ]
         assert len(square_blocked) == 0
@@ -505,11 +546,15 @@ class TestRegistryRunnerMultiStep:
     def test_multi_step_different_inputs(self, store, evaluator, tmp_path):
         """DoubleAndSquare(x=7) => Double(7)=14 => Square(14)=196 => result=196."""
         _register_file_handler(
-            store, tmp_path, "compute.Double",
+            store,
+            tmp_path,
+            "compute.Double",
             "def handle(payload):\n    return {'output': payload['input'] * 2}\n",
         )
         _register_file_handler(
-            store, tmp_path, "compute.Square",
+            store,
+            tmp_path,
+            "compute.Square",
             "def handle(payload):\n    return {'output': payload['input'] ** 2}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -517,13 +562,17 @@ class TestRegistryRunnerMultiStep:
         result = evaluator.execute(
             MULTI_STEP_WORKFLOW_AST, inputs={"x": 7}, program_ast=MULTI_STEP_PROGRAM_AST
         )
-        runner.cache_workflow_ast(result.workflow_id, MULTI_STEP_WORKFLOW_AST, program_ast=MULTI_STEP_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, MULTI_STEP_WORKFLOW_AST, program_ast=MULTI_STEP_PROGRAM_AST
+        )
 
         runner.poll_once()
         evaluator.resume(result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST)
         runner.poll_once()
 
-        final = evaluator.resume(result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST)
+        final = evaluator.resume(
+            result.workflow_id, MULTI_STEP_WORKFLOW_AST, MULTI_STEP_PROGRAM_AST
+        )
         assert final.success
         assert final.outputs["result"] == 196  # (7*2)^2 = 196
 
@@ -599,7 +648,9 @@ class TestRegistryRunnerAsync:
     def test_async_handler_invoked(self, store, evaluator, tmp_path):
         """An async handler is properly invoked via asyncio.run()."""
         _register_file_handler(
-            store, tmp_path, "async_ns.AsyncProcess",
+            store,
+            tmp_path,
+            "async_ns.AsyncProcess",
             "import asyncio\n"
             "async def handle(payload):\n"
             "    await asyncio.sleep(0.01)\n"
@@ -612,7 +663,9 @@ class TestRegistryRunnerAsync:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ASYNC_WORKFLOW_AST, program_ast=ASYNC_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ASYNC_WORKFLOW_AST, program_ast=ASYNC_PROGRAM_AST
+        )
         dispatched = runner.poll_once()
         assert dispatched == 1
 
@@ -623,7 +676,9 @@ class TestRegistryRunnerAsync:
     def test_async_handler_exception(self, store, evaluator, tmp_path):
         """An exception in an async handler results in task failure."""
         _register_file_handler(
-            store, tmp_path, "async_ns.AsyncProcess",
+            store,
+            tmp_path,
+            "async_ns.AsyncProcess",
             "import asyncio\n"
             "async def handle(payload):\n"
             "    await asyncio.sleep(0.01)\n"
@@ -652,7 +707,9 @@ class TestRegistryRunnerAsync:
     def test_async_handler_with_multiple_awaits(self, store, evaluator, tmp_path):
         """Async handler with multiple await points completes correctly."""
         _register_file_handler(
-            store, tmp_path, "async_ns.AsyncProcess",
+            store,
+            tmp_path,
+            "async_ns.AsyncProcess",
             "import asyncio\n"
             "async def handle(payload):\n"
             "    result = payload['input']\n"
@@ -669,7 +726,9 @@ class TestRegistryRunnerAsync:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, ASYNC_WORKFLOW_AST, program_ast=ASYNC_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, ASYNC_WORKFLOW_AST, program_ast=ASYNC_PROGRAM_AST
+        )
         runner.poll_once()
 
         final = evaluator.resume(result.workflow_id, ASYNC_WORKFLOW_AST, ASYNC_PROGRAM_AST)
@@ -678,7 +737,7 @@ class TestRegistryRunnerAsync:
 
     def test_update_step_partial_results(self, store, evaluator):
         """update_step() adds return attributes to a step via RegistryRunner."""
-        from afl.runtime.step import StepDefinition, FacetAttributes
+        from afl.runtime.step import FacetAttributes, StepDefinition
         from afl.runtime.types import workflow_id as make_wf_id
 
         wf_id = make_wf_id()
@@ -697,7 +756,7 @@ class TestRegistryRunnerAsync:
         updated = store.get_step(step.id)
         assert updated.attributes.returns is not None
         assert "partial" in updated.attributes.returns
-        assert updated.attributes.returns["partial"]["value"] == "value1"
+        assert updated.attributes.returns["partial"].value == "value1"
 
     def test_update_step_type_hints(self, store, evaluator):
         """update_step() infers correct type hints for various Python types."""
@@ -729,13 +788,13 @@ class TestRegistryRunnerAsync:
 
         updated = store.get_step(step.id)
         returns = updated.attributes.returns
-        assert returns["str_field"]["type_hint"] == "String"
-        assert returns["int_field"]["type_hint"] == "Long"
-        assert returns["bool_field"]["type_hint"] == "Boolean"
-        assert returns["float_field"]["type_hint"] == "Double"
-        assert returns["list_field"]["type_hint"] == "List"
-        assert returns["dict_field"]["type_hint"] == "Map"
-        assert returns["none_field"]["type_hint"] == "Any"
+        assert returns["str_field"].type_hint == "String"
+        assert returns["int_field"].type_hint == "Long"
+        assert returns["bool_field"].type_hint == "Boolean"
+        assert returns["float_field"].type_hint == "Double"
+        assert returns["list_field"].type_hint == "List"
+        assert returns["dict_field"].type_hint == "Map"
+        assert returns["none_field"].type_hint == "Any"
 
     def test_update_step_not_found(self, store, evaluator):
         """update_step() raises for non-existent step."""
@@ -870,15 +929,21 @@ class TestRegistryRunnerComplexResume:
     def _setup_pipeline_handlers(self, store, tmp_path):
         """Register handlers: A adds 10, B multiplies by 3, C subtracts 1."""
         _register_file_handler(
-            store, tmp_path, "pipeline.StepA",
+            store,
+            tmp_path,
+            "pipeline.StepA",
             "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepB",
+            store,
+            tmp_path,
+            "pipeline.StepB",
             "def handle(payload):\n    return {'output': payload['input'] * 3}\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepC",
+            store,
+            tmp_path,
+            "pipeline.StepC",
             "def handle(payload):\n    return {'output': payload['input'] - 1}\n",
         )
 
@@ -891,7 +956,9 @@ class TestRegistryRunnerComplexResume:
             PIPELINE_WORKFLOW_AST, inputs={"x": 5}, program_ast=PIPELINE_PROGRAM_AST
         )
         assert result.status == ExecutionStatus.PAUSED
-        runner.cache_workflow_ast(result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST
+        )
 
         # poll_once claims StepA from queue; B and C dispatched inline during auto-resume
         dispatched = runner.poll_once()
@@ -948,15 +1015,21 @@ class TestRegistryRunnerComplexResume:
     def test_middle_step_failure_stops_pipeline(self, store, evaluator, tmp_path):
         """If StepB fails, StepC is never created."""
         _register_file_handler(
-            store, tmp_path, "pipeline.StepA",
+            store,
+            tmp_path,
+            "pipeline.StepA",
             "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepB",
+            store,
+            tmp_path,
+            "pipeline.StepB",
             "def handle(payload):\n    raise RuntimeError('StepB exploded')\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepC",
+            store,
+            tmp_path,
+            "pipeline.StepC",
             "def handle(payload):\n    return {'output': payload['input'] - 1}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -964,7 +1037,9 @@ class TestRegistryRunnerComplexResume:
         result = evaluator.execute(
             PIPELINE_WORKFLOW_AST, inputs={"x": 1}, program_ast=PIPELINE_PROGRAM_AST
         )
-        runner.cache_workflow_ast(result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, PIPELINE_WORKFLOW_AST, program_ast=PIPELINE_PROGRAM_AST
+        )
 
         # Cycle 1: StepA succeeds
         runner.poll_once()
@@ -980,7 +1055,8 @@ class TestRegistryRunnerComplexResume:
 
         # StepC should not be at EVENT_TRANSMIT
         step_c_blocked = [
-            s for s in store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+            s
+            for s in store.get_steps_by_state(StepState.EVENT_TRANSMIT)
             if "StepC" in (s.facet_name or "")
         ]
         assert len(step_c_blocked) == 0
@@ -1077,7 +1153,9 @@ class TestRegistryRunnerForeach:
     def test_foreach_single_item(self, store, evaluator, tmp_path):
         """Foreach with single item processes and completes."""
         _register_file_handler(
-            store, tmp_path, "batch.ProcessItem",
+            store,
+            tmp_path,
+            "batch.ProcessItem",
             "def handle(payload):\n    return {'output': payload['input'] * 10}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -1087,7 +1165,9 @@ class TestRegistryRunnerForeach:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST
+        )
 
         # poll_once handles the single foreach iteration with auto-resume
         total_dispatched = 0
@@ -1104,7 +1184,9 @@ class TestRegistryRunnerForeach:
     def test_foreach_multiple_items(self, store, evaluator, tmp_path):
         """Foreach with multiple items creates tasks for each iteration."""
         _register_file_handler(
-            store, tmp_path, "batch.ProcessItem",
+            store,
+            tmp_path,
+            "batch.ProcessItem",
             "def handle(payload):\n    return {'output': payload['input'] * 10}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -1114,7 +1196,9 @@ class TestRegistryRunnerForeach:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST
+        )
 
         # Process all tasks — foreach iterations may need multiple poll cycles
         # because auto-resume may create new tasks as sub-blocks progress
@@ -1133,10 +1217,12 @@ class TestRegistryRunnerForeach:
     def test_foreach_empty_list(self, store, evaluator, tmp_path):
         """Foreach with empty list completes immediately without invoking handlers."""
         _register_file_handler(
-            store, tmp_path, "batch.ProcessItem",
+            store,
+            tmp_path,
+            "batch.ProcessItem",
             "def handle(payload):\n    return {'output': payload['input'] * 10}\n",
         )
-        runner = _make_runner(store, evaluator)
+        _runner = _make_runner(store, evaluator)
 
         result = evaluator.execute(
             FOREACH_WORKFLOW_AST, inputs={"items": []}, program_ast=FOREACH_PROGRAM_AST
@@ -1147,7 +1233,9 @@ class TestRegistryRunnerForeach:
     def test_foreach_handler_failure_in_iteration(self, store, evaluator, tmp_path):
         """Handler failure in one foreach iteration is captured."""
         _register_file_handler(
-            store, tmp_path, "batch.ProcessItem",
+            store,
+            tmp_path,
+            "batch.ProcessItem",
             "def handle(payload):\n"
             "    if payload['input'] == 2:\n"
             "        raise ValueError('bad item')\n"
@@ -1160,7 +1248,9 @@ class TestRegistryRunnerForeach:
         )
         assert result.status == ExecutionStatus.PAUSED
 
-        runner.cache_workflow_ast(result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST)
+        runner.cache_workflow_ast(
+            result.workflow_id, FOREACH_WORKFLOW_AST, program_ast=FOREACH_PROGRAM_AST
+        )
 
         # Process all available tasks (auto-resume after each)
         for _ in range(10):
@@ -1219,7 +1309,7 @@ class TestRegistryRunnerStateCompletion:
         assert result.status == ExecutionStatus.PAUSED
 
         # Create a runner entity in RUNNING state
-        runner_entity = _create_runner_entity(store, result.workflow_id, "test-runner-1")
+        _runner_entity = _create_runner_entity(store, result.workflow_id, "test-runner-1")
 
         runner.cache_workflow_ast(
             result.workflow_id, ADDONE_WORKFLOW_AST, program_ast=ADDONE_PROGRAM_AST
@@ -1236,15 +1326,21 @@ class TestRegistryRunnerStateCompletion:
     def test_runner_completed_after_pipeline(self, store, evaluator, tmp_path):
         """Runner transitions to COMPLETED after multi-step pipeline finishes."""
         _register_file_handler(
-            store, tmp_path, "pipeline.StepA",
+            store,
+            tmp_path,
+            "pipeline.StepA",
             "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepB",
+            store,
+            tmp_path,
+            "pipeline.StepB",
             "def handle(payload):\n    return {'output': payload['input'] * 3}\n",
         )
         _register_file_handler(
-            store, tmp_path, "pipeline.StepC",
+            store,
+            tmp_path,
+            "pipeline.StepC",
             "def handle(payload):\n    return {'output': payload['input'] - 1}\n",
         )
         runner = _make_runner(store, evaluator)
@@ -1278,7 +1374,9 @@ class TestRegistryRunnerStateCompletion:
     def test_runner_stays_running_when_paused(self, store, evaluator, tmp_path):
         """Runner stays RUNNING when workflow pauses (not all events done)."""
         _register_file_handler(
-            store, tmp_path, "pipeline.StepA",
+            store,
+            tmp_path,
+            "pipeline.StepA",
             "def handle(payload):\n    return {'output': payload['input'] + 10}\n",
         )
         # Don't register StepB/StepC so we can control step-by-step

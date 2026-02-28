@@ -9,14 +9,15 @@ Usage:
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # Ensure handlers are importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from afl.runtime.registry_runner import RegistryRunner
 from handlers import register_all_registry_handlers
+
+from afl.runtime.registry_runner import RegistryRunner
 
 
 def main() -> None:

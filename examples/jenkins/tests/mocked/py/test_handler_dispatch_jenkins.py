@@ -53,7 +53,9 @@ class TestJenkinsScmHandlers:
 
     def test_handle_dispatches(self):
         mod = _jenkins_import("scm_handlers")
-        result = mod.handle({"_facet_name": "jenkins.scm.GitCheckout", "repo": "org/app", "branch": "main"})
+        result = mod.handle(
+            {"_facet_name": "jenkins.scm.GitCheckout", "repo": "org/app", "branch": "main"}
+        )
         assert isinstance(result, dict)
         assert "info" in result
 
@@ -132,7 +134,9 @@ class TestJenkinsArtifactHandlers:
 
     def test_handle_dispatches(self):
         mod = _jenkins_import("artifact_handlers")
-        result = mod.handle({"_facet_name": "jenkins.artifact.ArchiveArtifacts", "workspace_path": "/ws"})
+        result = mod.handle(
+            {"_facet_name": "jenkins.artifact.ArchiveArtifacts", "workspace_path": "/ws"}
+        )
         assert isinstance(result, dict)
         assert "artifact" in result
 
@@ -158,7 +162,9 @@ class TestJenkinsDeployHandlers:
 
     def test_handle_dispatches(self):
         mod = _jenkins_import("deploy_handlers")
-        result = mod.handle({"_facet_name": "jenkins.deploy.DeployToEnvironment", "environment": "staging"})
+        result = mod.handle(
+            {"_facet_name": "jenkins.deploy.DeployToEnvironment", "environment": "staging"}
+        )
         assert isinstance(result, dict)
         assert "result" in result
 

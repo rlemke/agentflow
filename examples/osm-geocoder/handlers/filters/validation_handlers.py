@@ -9,7 +9,7 @@ Delegates to the OSMOSE verifier for actual PBF analysis.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .osmose_verifier import VerifyResult, VerifySummaryData, compute_verify_summary, verify_pbf
 
@@ -22,13 +22,15 @@ def _stats_dict(summary: VerifySummaryData) -> dict:
     """Build a ValidationStats dict from verify summary data."""
     return {
         "total_entries": summary.total_issues,
-        "valid_entries": max(0, summary.total_issues - summary.geometry_issues - summary.tag_issues),
+        "valid_entries": max(
+            0, summary.total_issues - summary.geometry_issues - summary.tag_issues
+        ),
         "invalid_entries": summary.geometry_issues + summary.tag_issues,
         "missing_tags": summary.tag_issues,
         "invalid_geometry": summary.geometry_issues,
         "out_of_bounds": 0,
         "duplicate_entries": summary.reference_issues,
-        "validation_date": datetime.now(timezone.utc).isoformat(),
+        "validation_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -38,7 +40,7 @@ def _result_dict(result: VerifyResult) -> dict:
         "output_path": result.output_path,
         "feature_count": result.issue_count,
         "format": "GeoJSON",
-        "validation_date": datetime.now(timezone.utc).isoformat(),
+        "validation_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -51,7 +53,7 @@ def _empty_stats() -> dict:
         "invalid_geometry": 0,
         "out_of_bounds": 0,
         "duplicate_entries": 0,
-        "validation_date": datetime.now(timezone.utc).isoformat(),
+        "validation_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -60,7 +62,7 @@ def _empty_result() -> dict:
         "output_path": "",
         "feature_count": 0,
         "format": "GeoJSON",
-        "validation_date": datetime.now(timezone.utc).isoformat(),
+        "validation_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -80,7 +82,10 @@ def handle_validate_cache(payload: dict) -> dict:
     log.info("ValidateCache: validating %s", pbf_path)
     result, summary = verify_pbf(pbf_path, output_dir)
     if step_log:
-        step_log(f"ValidateCache: {summary.total_issues} issues (geometry={summary.geometry_issues}, tags={summary.tag_issues})", level="success")
+        step_log(
+            f"ValidateCache: {summary.total_issues} issues (geometry={summary.geometry_issues}, tags={summary.tag_issues})",
+            level="success",
+        )
     return {"stats": _stats_dict(summary), "result": _result_dict(result)}
 
 
@@ -97,8 +102,12 @@ def handle_validate_geometry(payload: dict) -> dict:
         return {"stats": _empty_stats(), "result": _empty_result()}
 
     result, summary = verify_pbf(
-        pbf_path, check_geometry=True, check_tags=False,
-        check_references=False, check_coordinates=False, check_duplicates=False,
+        pbf_path,
+        check_geometry=True,
+        check_tags=False,
+        check_references=False,
+        check_coordinates=False,
+        check_duplicates=False,
     )
     if step_log:
         step_log(f"ValidateGeometry: {summary.geometry_issues} geometry issues", level="success")
@@ -118,8 +127,12 @@ def handle_validate_tags(payload: dict) -> dict:
         return {"stats": _empty_stats(), "result": _empty_result()}
 
     result, summary = verify_pbf(
-        pbf_path, check_geometry=False, check_tags=True,
-        check_references=False, check_coordinates=False, check_duplicates=False,
+        pbf_path,
+        check_geometry=False,
+        check_tags=True,
+        check_references=False,
+        check_coordinates=False,
+        check_duplicates=False,
     )
     if step_log:
         step_log(f"ValidateTags: {summary.tag_issues} tag issues", level="success")
@@ -139,8 +152,12 @@ def handle_validate_bounds(payload: dict) -> dict:
         return {"stats": _empty_stats(), "result": _empty_result()}
 
     result, summary = verify_pbf(
-        pbf_path, check_geometry=False, check_tags=False,
-        check_references=False, check_coordinates=True, check_duplicates=False,
+        pbf_path,
+        check_geometry=False,
+        check_tags=False,
+        check_references=False,
+        check_coordinates=True,
+        check_duplicates=False,
     )
     if step_log:
         step_log(f"ValidateBounds: {summary.total_issues} coordinate issues", level="success")

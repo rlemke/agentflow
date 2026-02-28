@@ -6,7 +6,6 @@ and enforces monotonic zoom reveal.
 """
 
 import logging
-import math
 from collections import defaultdict
 
 log = logging.getLogger(__name__)
@@ -26,27 +25,42 @@ W_FC: dict[int, float] = {2: 0.25, 3: 0.30, 4: 0.35, 5: 0.40, 6: 0.45, 7: 0.50}
 W_BT = 0.05
 W_REF = 0.03
 W_SPECIAL: dict[int, float] = {
-    2: 0.03, 3: 0.03, 4: 0.08, 5: 0.08, 6: 0.08, 7: 0.04,
+    2: 0.03,
+    3: 0.03,
+    4: 0.08,
+    5: 0.08,
+    6: 0.08,
+    7: 0.04,
 }
 
 # Base budget per cell in km (spec §6)
 BASE_KM: dict[int, float] = {
-    2: 80.0, 3: 160.0, 4: 260.0, 5: 420.0, 6: 650.0, 7: 900.0,
+    2: 80.0,
+    3: 160.0,
+    4: 260.0,
+    5: 420.0,
+    6: 650.0,
+    7: 900.0,
 }
 
 # Sparse region floor km (spec §8.3)
 MIN_KM: dict[int, float] = {
-    2: 10.0, 3: 20.0, 4: 40.0, 5: 70.0, 6: 120.0, 7: 180.0,
+    2: 10.0,
+    3: 20.0,
+    4: 40.0,
+    5: 70.0,
+    6: 120.0,
+    7: 180.0,
 }
 
 # H3 resolution for cell budgets (~1.2km edge, ~5.2 km² area)
 H3_RESOLUTION = 7
 
 # Density factor thresholds
-DENSITY_SPARSE = 0.2    # km road per km² → factor 1.3
-DENSITY_NORMAL = 1.0    # → factor 1.0
-DENSITY_DENSE = 5.0     # → factor 0.6
-DENSITY_ULTRA = 15.0    # → factor 0.4
+DENSITY_SPARSE = 0.2  # km road per km² → factor 1.3
+DENSITY_NORMAL = 1.0  # → factor 1.0
+DENSITY_DENSE = 5.0  # → factor 0.6
+DENSITY_ULTRA = 15.0  # → factor 0.4
 
 
 def compute_scores(
@@ -144,9 +158,7 @@ def build_cell_budgets(
         cell_anchor_count[z] = dict(counts)
 
     # H3 cell area in km²
-    cell_area_km2 = h3.cell_area(
-        h3.latlng_to_cell(45.0, 0.0, H3_RESOLUTION), unit="km^2"
-    )
+    cell_area_km2 = h3.cell_area(h3.latlng_to_cell(45.0, 0.0, H3_RESOLUTION), unit="km^2")
 
     budgets: dict[int, dict[str, dict]] = {}
     all_cells = set(cell_road_km.keys())
@@ -207,7 +219,7 @@ def _edge_to_cells(edge) -> set[str]:
     cells: set[str] = set()
     # Sample every ~500m
     step_m = 500.0
-    total_m = 0.0
+    _total_m = 0.0
 
     for i in range(len(edge.coords)):
         lon, lat = edge.coords[i]
@@ -219,8 +231,10 @@ def _edge_to_cells(edge) -> set[str]:
 
         if i < len(edge.coords) - 1:
             seg_len = _haversine_m(
-                edge.coords[i][0], edge.coords[i][1],
-                edge.coords[i + 1][0], edge.coords[i + 1][1],
+                edge.coords[i][0],
+                edge.coords[i][1],
+                edge.coords[i + 1][0],
+                edge.coords[i + 1][1],
             )
             # Add intermediate sample points
             n_samples = int(seg_len / step_m)
@@ -281,7 +295,7 @@ def select_edges(
         selected: set[int] = set()
 
         # Greedy selection (spec §8.1)
-        for eid, score in candidates:
+        for eid, _score in candidates:
             edge = graph.edge_by_id.get(eid)
             if not edge:
                 continue
@@ -315,7 +329,7 @@ def select_edges(
             if budget_info.get("anchor_count", 0) > 0:
                 if cell_used_km.get(cell, 0) < min_km:
                     # Find highest-scoring unselected edges in this cell
-                    for eid, score in candidates:
+                    for eid, _score in candidates:
                         if eid in selected:
                             continue
                         cells = edge_cells.get(eid, set())
@@ -329,10 +343,12 @@ def select_edges(
                                     break
 
         selected_by_zoom[z] = selected
-        log.info("Zoom %d: selected %d edges (%.0f km)",
-                 z, len(selected),
-                 sum(graph.edge_by_id[e].length_m / 1000
-                     for e in selected if e in graph.edge_by_id))
+        log.info(
+            "Zoom %d: selected %d edges (%.0f km)",
+            z,
+            len(selected),
+            sum(graph.edge_by_id[e].length_m / 1000 for e in selected if e in graph.edge_by_id),
+        )
 
     return selected_by_zoom
 
@@ -365,6 +381,7 @@ def _backbone_repair(
     # Check connectivity for a sample of anchors
     sample_size = min(50, len(anchors))
     import random
+
     rng = random.Random(42)
     sampled_anchors = rng.sample(anchors, sample_size) if len(anchors) > sample_size else anchors
 
@@ -428,7 +445,6 @@ def enforce_monotonic_reveal(
     dist: dict[int, int] = defaultdict(int)
     for _eid, z in assignments.items():
         dist[z] += 1
-    log.info("Monotonic reveal: %s",
-             ", ".join(f"z{z}={dist.get(z, 0)}" for z in range(2, 8)))
+    log.info("Monotonic reveal: %s", ", ".join(f"z{z}={dist.get(z, 0)}" for z in range(2, 8)))
 
     return assignments

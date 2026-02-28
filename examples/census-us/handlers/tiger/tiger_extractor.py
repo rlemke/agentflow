@@ -17,12 +17,14 @@ logger = logging.getLogger(__name__)
 
 try:
     import fiona
+
     HAS_FIONA = True
 except ImportError:
     HAS_FIONA = False
 
 try:
     import shapefile  # pyshp
+
     HAS_PYSHP = True
 except ImportError:
     HAS_PYSHP = False
@@ -36,25 +38,24 @@ _GEO_CONFIG: dict[str, dict[str, str]] = {
 }
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "census-output"))
+_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "census-output"))
 
 
 @dataclass
 class TIGERExtractionResult:
     """Result of a TIGER shapefile extraction."""
+
     output_path: str
     feature_count: int
     geography_level: str
     year: str
     format: str = "GeoJSON"
-    extraction_date: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
-                  year: str = "2024") -> TIGERExtractionResult:
+def extract_tiger(
+    zip_path: str, geo_level: str, state_fips: str, year: str = "2024"
+) -> TIGERExtractionResult:
     """Extract features from a TIGER/Line shapefile ZIP.
 
     Args:
@@ -69,13 +70,13 @@ def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
     geo_upper = geo_level.upper()
     config = _GEO_CONFIG.get(geo_upper)
     if config is None:
-        raise ValueError(f"Unsupported geo_level: {geo_level}. "
-                         f"Supported: {list(_GEO_CONFIG.keys())}")
+        raise ValueError(
+            f"Unsupported geo_level: {geo_level}. Supported: {list(_GEO_CONFIG.keys())}"
+        )
 
     output_dir = os.path.join(_OUTPUT_DIR, "tiger", geo_upper.lower())
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = os.path.join(output_dir,
-                               f"{state_fips}_{geo_upper.lower()}.geojson")
+    output_path = os.path.join(output_dir, f"{state_fips}_{geo_upper.lower()}.geojson")
 
     features: list[dict[str, Any]] = []
 
@@ -85,11 +86,13 @@ def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
                 for feature in src:
                     props = feature.get("properties", {})
                     if props.get(config["fips_field"]) == state_fips:
-                        features.append({
-                            "type": "Feature",
-                            "properties": dict(props),
-                            "geometry": dict(feature["geometry"]),
-                        })
+                        features.append(
+                            {
+                                "type": "Feature",
+                                "properties": dict(props),
+                                "geometry": dict(feature["geometry"]),
+                            }
+                        )
         except Exception as exc:
             logger.warning("Failed to read TIGER ZIP %s: %s", zip_path, exc)
     elif HAS_PYSHP and os.path.exists(zip_path):
@@ -100,20 +103,20 @@ def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
                 if props.get(config["fips_field"]) == state_fips:
                     geo = sr.shape.__geo_interface__
                     if geo.get("type") != "Null":
-                        features.append({
-                            "type": "Feature",
-                            "properties": props,
-                            "geometry": geo,
-                        })
+                        features.append(
+                            {
+                                "type": "Feature",
+                                "properties": props,
+                                "geometry": geo,
+                            }
+                        )
         except Exception as exc:
-            logger.warning("Failed to read TIGER ZIP %s with pyshp: %s",
-                           zip_path, exc)
+            logger.warning("Failed to read TIGER ZIP %s with pyshp: %s", zip_path, exc)
     elif os.path.exists(zip_path):
         # Fallback: try to find .geojson inside ZIP
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
-                geojson_names = [n for n in zf.namelist()
-                                 if n.endswith(".geojson")]
+                geojson_names = [n for n in zf.namelist() if n.endswith(".geojson")]
                 for name in geojson_names:
                     with zf.open(name) as f:
                         data = json.load(f)
@@ -132,8 +135,13 @@ def extract_tiger(zip_path: str, geo_level: str, state_fips: str,
     with open(output_path, "w") as f:
         json.dump(geojson, f)
 
-    logger.info("Extracted %d features for %s (state=%s, level=%s)",
-                len(features), geo_upper, state_fips, geo_level)
+    logger.info(
+        "Extracted %d features for %s (state=%s, level=%s)",
+        len(features),
+        geo_upper,
+        state_fips,
+        geo_level,
+    )
 
     return TIGERExtractionResult(
         output_path=output_path,

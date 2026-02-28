@@ -5,13 +5,12 @@ Handles building extraction events defined in osmbuildings.afl.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .building_extractor import (
     HAS_OSMIUM,
     BuildingResult,
     BuildingStats,
-    BuildingType,
     calculate_building_stats,
     extract_buildings,
 )
@@ -40,7 +39,10 @@ def _make_extract_buildings_handler(facet_name: str):
         try:
             result = extract_buildings(pbf_path, building_type=building_type)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {building_type} buildings", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {building_type} buildings",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract buildings: %s", e)
@@ -67,7 +69,10 @@ def _make_typed_building_handler(facet_name: str, building_type: str):
         try:
             result = extract_buildings(pbf_path, building_type=building_type)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {building_type} buildings", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {building_type} buildings",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s buildings: %s", building_type, e)
@@ -94,7 +99,9 @@ def _make_buildings_3d_handler(facet_name: str):
         try:
             result = extract_buildings(pbf_path, building_type="all", require_height=True)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} 3D buildings", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} 3D buildings", level="success"
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract 3D buildings: %s", e)
@@ -122,7 +129,10 @@ def _make_large_buildings_handler(facet_name: str):
         try:
             result = extract_buildings(pbf_path, building_type="all", min_area_m2=min_area_m2)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} buildings >= {min_area_m2:.0f} m2", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} buildings >= {min_area_m2:.0f} m2",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract large buildings: %s", e)
@@ -203,21 +213,29 @@ def _make_filter_buildings_handler(facet_name: str):
                 json.dump(output_geojson, f, indent=2)
 
             total_area = sum(f["properties"].get("area_m2", 0) for f in filtered)
-            with_height = sum(1 for f in filtered
-                              if f["properties"].get("height") or f["properties"].get("levels"))
+            with_height = sum(
+                1
+                for f in filtered
+                if f["properties"].get("height") or f["properties"].get("levels")
+            )
 
             all_features = geojson.get("features", [])
             if step_log:
-                step_log(f"{facet_name}: {len(filtered)}/{len(all_features)} {building_type} buildings", level="success")
-            return {"result": {
-                "output_path": str(output_path),
-                "feature_count": len(filtered),
-                "building_type": building_type,
-                "total_area_km2": round(total_area / 1_000_000, 4),
-                "with_height_data": with_height,
-                "format": "GeoJSON",
-                "extraction_date": datetime.now(timezone.utc).isoformat(),
-            }}
+                step_log(
+                    f"{facet_name}: {len(filtered)}/{len(all_features)} {building_type} buildings",
+                    level="success",
+                )
+            return {
+                "result": {
+                    "output_path": str(output_path),
+                    "feature_count": len(filtered),
+                    "building_type": building_type,
+                    "total_area_km2": round(total_area / 1_000_000, 4),
+                    "with_height_data": with_height,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(UTC).isoformat(),
+                }
+            }
         except Exception as e:
             log.error("Failed to filter buildings: %s", e)
             return {"result": _empty_result(building_type)}
@@ -262,7 +280,7 @@ def _empty_result(building_type: str) -> dict:
         "total_area_km2": 0.0,
         "with_height_data": 0,
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

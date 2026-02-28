@@ -80,11 +80,11 @@ def _npm_build_handler(payload: dict) -> dict[str, Any]:
 def _docker_build_handler(payload: dict) -> dict[str, Any]:
     """Build a Docker image."""
     step_log = payload.get("_step_log")
-    workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
+    _workspace = payload.get("workspace_path", "/var/jenkins/workspace/app")
     image_tag = payload.get("image_tag", "app:latest")
     if step_log:
         step_log(f"DockerBuild: {image_tag}")
-    dockerfile = payload.get("dockerfile", "Dockerfile")
+    _dockerfile = payload.get("dockerfile", "Dockerfile")
     return {
         "result": {
             "artifact_path": f"docker://{image_tag}",

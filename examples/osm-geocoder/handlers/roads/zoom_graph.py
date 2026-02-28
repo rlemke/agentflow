@@ -9,8 +9,7 @@ import json
 import logging
 import math
 from collections import defaultdict
-from dataclasses import dataclass, field
-from pathlib import Path
+from dataclasses import dataclass
 
 from afl.runtime.storage import localize
 
@@ -64,16 +63,35 @@ HIGHWAY_TO_FC: dict[str, str] = {
 
 # Minimum functional classes to consider for zoom pipeline
 ROUTABLE_FCS = {
-    "motorway", "trunk", "primary", "secondary", "tertiary", "unclassified",
+    "motorway",
+    "trunk",
+    "primary",
+    "secondary",
+    "tertiary",
+    "unclassified",
 }
 
 PAVED_SURFACES = {
-    "asphalt", "concrete", "paved", "concrete:plates", "concrete:lanes",
-    "paving_stones", "sett", "cobblestone",
+    "asphalt",
+    "concrete",
+    "paved",
+    "concrete:plates",
+    "concrete:lanes",
+    "paving_stones",
+    "sett",
+    "cobblestone",
 }
 UNPAVED_SURFACES = {
-    "unpaved", "gravel", "dirt", "sand", "grass", "ground", "earth",
-    "mud", "compacted", "fine_gravel",
+    "unpaved",
+    "gravel",
+    "dirt",
+    "sand",
+    "grass",
+    "ground",
+    "earth",
+    "mud",
+    "compacted",
+    "fine_gravel",
 }
 
 RESTRICTED_ACCESS = {"private", "no", "customers", "delivery"}
@@ -168,37 +186,35 @@ class RoadGraph:
         """Serialize graph to a JSON-compatible dict."""
         features = []
         for e in self.edges:
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "edge_id": e.edge_id,
-                    "from_node": e.from_node,
-                    "to_node": e.to_node,
-                    "osm_way_ids": ",".join(str(w) for w in e.osm_way_ids),
-                    "length_m": round(e.length_m, 1),
-                    "fc": e.fc,
-                    "fc_score": round(e.fc_score, 4),
-                    "ref": e.ref,
-                    "name": e.name,
-                    "maxspeed": e.maxspeed,
-                    "lanes": e.lanes,
-                    "bridge": e.bridge,
-                    "tunnel": e.tunnel,
-                    "oneway": e.oneway,
-                    "surface_unpaved": e.surface_unpaved,
-                },
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": list(e.coords),
-                },
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "edge_id": e.edge_id,
+                        "from_node": e.from_node,
+                        "to_node": e.to_node,
+                        "osm_way_ids": ",".join(str(w) for w in e.osm_way_ids),
+                        "length_m": round(e.length_m, 1),
+                        "fc": e.fc,
+                        "fc_score": round(e.fc_score, 4),
+                        "ref": e.ref,
+                        "name": e.name,
+                        "maxspeed": e.maxspeed,
+                        "lanes": e.lanes,
+                        "bridge": e.bridge,
+                        "tunnel": e.tunnel,
+                        "oneway": e.oneway,
+                        "surface_unpaved": e.surface_unpaved,
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": list(e.coords),
+                    },
+                }
+            )
 
-        node_list = {
-            str(nid): list(coord) for nid, coord in self.node_coords.items()
-        }
-        adj_list = {
-            str(nid): eids for nid, eids in self.adj.items()
-        }
+        node_list = {str(nid): list(coord) for nid, coord in self.node_coords.items()}
+        adj_list = {str(nid): eids for nid, eids in self.adj.items()}
 
         return {
             "geojson": {"type": "FeatureCollection", "features": features},
@@ -211,8 +227,12 @@ class RoadGraph:
         ensure_dir(path)
         with open_output(path) as f:
             json.dump(self.to_dict(), f)
-        log.info("Saved road graph: %d edges, %d nodes → %s",
-                 len(self.edges), len(self.node_coords), path)
+        log.info(
+            "Saved road graph: %d edges, %d nodes → %s",
+            len(self.edges),
+            len(self.node_coords),
+            path,
+        )
 
     @classmethod
     def load(cls, path: str) -> "RoadGraph":
@@ -253,8 +273,12 @@ class RoadGraph:
             )
             graph.add_edge(edge)
 
-        log.info("Loaded road graph: %d edges, %d nodes from %s",
-                 len(graph.edges), len(graph.node_coords), path)
+        log.info(
+            "Loaded road graph: %d edges, %d nodes from %s",
+            len(graph.edges),
+            len(graph.node_coords),
+            path,
+        )
         return graph
 
 
@@ -272,8 +296,7 @@ def _polyline_length_m(coords: list[tuple[float, float]]) -> float:
     """Calculate polyline length in meters from (lon, lat) coordinate list."""
     total = 0.0
     for i in range(len(coords) - 1):
-        total += _haversine_m(coords[i][0], coords[i][1],
-                              coords[i + 1][0], coords[i + 1][1])
+        total += _haversine_m(coords[i][0], coords[i][1], coords[i + 1][0], coords[i + 1][1])
     return total
 
 
@@ -282,8 +305,9 @@ def _classify_fc(highway: str) -> str:
     return HIGHWAY_TO_FC.get(highway, "")
 
 
-def _compute_fc_score(fc: str, ref: str, bridge: bool, tunnel: bool,
-                      surface_unpaved: bool, access_restricted: bool) -> float:
+def _compute_fc_score(
+    fc: str, ref: str, bridge: bool, tunnel: bool, surface_unpaved: bool, access_restricted: bool
+) -> float:
     """Compute functional class score with modifiers (spec §4.2)."""
     base = FC_SCORES.get(fc, 0.0)
     score = base
@@ -499,8 +523,12 @@ class TopologyHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
             length_m = _polyline_length_m(coords)
 
             fc_score = _compute_fc_score(
-                wd.fc, wd.ref, wd.bridge, wd.tunnel,
-                wd.surface_unpaved, wd.access_restricted,
+                wd.fc,
+                wd.ref,
+                wd.bridge,
+                wd.tunnel,
+                wd.surface_unpaved,
+                wd.access_restricted,
             )
 
             edge = LogicalEdge(
@@ -538,8 +566,11 @@ class TopologyHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         self._node_fc_set.clear()
         self._node_ref_set.clear()
 
-        log.info("Built logical graph: %d edges, %d decision nodes",
-                 len(graph.edges), len(graph.node_coords))
+        log.info(
+            "Built logical graph: %d edges, %d decision nodes",
+            len(graph.edges),
+            len(graph.node_coords),
+        )
         return graph
 
 

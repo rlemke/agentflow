@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import present_analysis, challenge_position, score_arguments
+from handlers.shared.debate_utils import challenge_position, present_analysis, score_arguments
 
 NAMESPACE = "ssd.Debate"
 
@@ -27,7 +27,12 @@ def handle_present_analysis(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"{agent_role} presented analysis for '{candidate_id}' (round {round_num})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"{agent_role} presented analysis for '{candidate_id}' (round {round_num})",
+                "level": "success",
+            }
+        )
 
     return {"position": result}
 
@@ -45,7 +50,12 @@ def handle_challenge_position(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"{agent_role} challenged {target_role} ({len(weaknesses)} weaknesses)", "level": "success"})
+        step_log.append(
+            {
+                "message": f"{agent_role} challenged {target_role} ({len(weaknesses)} weaknesses)",
+                "level": "success",
+            }
+        )
 
     return {"rebuttal": rebuttal, "weaknesses": weaknesses}
 
@@ -69,7 +79,12 @@ def handle_score_arguments(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Scored arguments round {round_num}: consensus={result['consensus_level']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Scored arguments round {round_num}: consensus={result['consensus_level']}",
+                "level": "success",
+            }
+        )
 
     return {"rankings": result}
 

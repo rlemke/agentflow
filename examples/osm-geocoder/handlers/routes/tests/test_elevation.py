@@ -23,11 +23,7 @@ from handlers.routes.elevation_handlers import (
 
 def main():
     # Path to sample data
-    sample_path = os.path.join(
-        os.path.dirname(__file__), "..",
-        "data",
-        "sample_trails.geojson"
-    )
+    sample_path = os.path.join(os.path.dirname(__file__), "..", "data", "sample_trails.geojson")
 
     print("=" * 60)
     print("Elevation-Based Route Filtering Test")
@@ -49,10 +45,12 @@ def main():
     print("  (Calling Open-Elevation API - may take a moment)")
     print("-" * 60)
 
-    result = handle_enrich_with_elevation({
-        "input_path": sample_path,
-        "dem_source": "srtm",
-    })
+    result = handle_enrich_with_elevation(
+        {
+            "input_path": sample_path,
+            "dem_source": "srtm",
+        }
+    )
 
     enriched_result = result["result"]
     print(f"\nEnriched {enriched_result['matched_count']} trails")
@@ -74,10 +72,12 @@ def main():
     print("Step 2: Filtering trails with max elevation >= 2000 ft...")
     print("-" * 60)
 
-    filter_result = handle_filter_by_max_elevation({
-        "input_path": enriched_result["output_path"],
-        "min_max_elevation_ft": 2000,
-    })
+    filter_result = handle_filter_by_max_elevation(
+        {
+            "input_path": enriched_result["output_path"],
+            "min_max_elevation_ft": 2000,
+        }
+    )
 
     filtered = filter_result["result"]
     print(f"\nFound {filtered['matched_count']} trails above 2000 ft")

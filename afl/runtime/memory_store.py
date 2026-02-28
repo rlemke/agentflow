@@ -31,7 +31,7 @@ from .entities import (
 )
 from .persistence import IterationChanges, PersistenceAPI
 from .step import StepDefinition
-from .types import BlockId, StepId, WorkflowId
+from .types import BlockId, StepId
 
 if TYPE_CHECKING:
     from .persistence import LockMetaData
@@ -51,13 +51,13 @@ class MemoryStore(PersistenceAPI):
 
     def __init__(self):
         """Initialize empty stores."""
-        self._steps: dict[StepId, StepDefinition] = {}
+        self._steps: dict[str, StepDefinition] = {}
 
-        # Indexes for efficient queries
-        self._steps_by_block: dict[BlockId, list[StepId]] = defaultdict(list)
-        self._steps_by_workflow: dict[WorkflowId, list[StepId]] = defaultdict(list)
-        self._steps_by_container: dict[StepId, list[StepId]] = defaultdict(list)
-        self._blocks_by_step: dict[StepId, list[StepId]] = defaultdict(list)
+        # Indexes for efficient queries (keyed by str to accept all ID NewTypes)
+        self._steps_by_block: dict[str, list[StepId]] = defaultdict(list)
+        self._steps_by_workflow: dict[str, list[StepId]] = defaultdict(list)
+        self._steps_by_container: dict[str, list[StepId]] = defaultdict(list)
+        self._blocks_by_step: dict[str, list[StepId]] = defaultdict(list)
         self._steps_by_statement: dict[str, StepId] = {}  # statement_id+block_id -> step_id
 
         # New stores for extended entities
@@ -72,26 +72,24 @@ class MemoryStore(PersistenceAPI):
         # Lock for atomic task claiming
         self._claim_lock = threading.Lock()
 
-    def get_step(self, step_id: StepId) -> StepDefinition | None:
+    def get_step(self, step_id: str) -> StepDefinition | None:
         """Fetch a step by ID."""
         step = self._steps.get(step_id)
         if step:
             return step.clone()  # Return a copy for isolation
         return None
 
-    def get_steps_by_block(self, block_id: BlockId) -> Sequence[StepDefinition]:
+    def get_steps_by_block(self, block_id: StepId | BlockId) -> Sequence[StepDefinition]:
         """Fetch all steps in a block."""
         step_ids = self._steps_by_block.get(block_id, [])
         return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
 
-    def get_steps_by_workflow(self, workflow_id: WorkflowId) -> Sequence[StepDefinition]:
+    def get_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a workflow."""
         step_ids = self._steps_by_workflow.get(workflow_id, [])
         return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
 
-    def get_actionable_steps_by_workflow(
-        self, workflow_id: WorkflowId
-    ) -> Sequence[StepDefinition]:
+    def get_actionable_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch steps that need processing in an evaluator iteration."""
         from .states import StepState
 
@@ -103,10 +101,7 @@ class MemoryStore(PersistenceAPI):
                 continue
             if StepState.is_terminal(s.state):
                 continue
-            if (
-                s.state == StepState.EVENT_TRANSMIT
-                and not s.transition.is_requesting_state_change
-            ):
+            if s.state == StepState.EVENT_TRANSMIT and not s.transition.is_requesting_state_change:
                 continue
             result.append(s.clone())
         return result
@@ -115,7 +110,7 @@ class MemoryStore(PersistenceAPI):
         """Fetch all steps in a given state."""
         return [s.clone() for s in self._steps.values() if s.state == state]
 
-    def get_steps_by_container(self, container_id: StepId) -> Sequence[StepDefinition]:
+    def get_steps_by_container(self, container_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps with a given container."""
         step_ids = self._steps_by_container.get(container_id, [])
         return [self._steps[sid].clone() for sid in step_ids if sid in self._steps]
@@ -178,12 +173,12 @@ class MemoryStore(PersistenceAPI):
             if key in self._steps_by_statement:
                 del self._steps_by_statement[key]
 
-    def _statement_key(self, statement_id: str, block_id: BlockId | None) -> str:
+    def _statement_key(self, statement_id: str, block_id: StepId | BlockId | None) -> str:
         """Create a unique key for statement+block combination."""
         block_str = str(block_id) if block_id else "root"
         return f"{statement_id}:{block_str}"
 
-    def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
+    def get_blocks_by_step(self, step_id: str) -> Sequence[StepDefinition]:
         """Fetch all block steps for a containing step."""
         block_ids = self._blocks_by_step.get(step_id, [])
         return [self._steps[bid].clone() for bid in block_ids if bid in self._steps]
@@ -206,7 +201,7 @@ class MemoryStore(PersistenceAPI):
         for task in changes.created_tasks:
             self.save_task(task)
 
-    def get_workflow_root(self, workflow_id: WorkflowId) -> StepDefinition | None:
+    def get_workflow_root(self, workflow_id: str) -> StepDefinition | None:
         """Get the root step of a workflow."""
         step_ids = self._steps_by_workflow.get(workflow_id, [])
         for sid in step_ids:
@@ -215,7 +210,7 @@ class MemoryStore(PersistenceAPI):
                 return step.clone()
         return None
 
-    def step_exists(self, statement_id: str, block_id: BlockId | None) -> bool:
+    def step_exists(self, statement_id: str, block_id: StepId | BlockId | None) -> bool:
         """Check if a step already exists for a statement in a block."""
         key = self._statement_key(statement_id, block_id)
         return key in self._steps_by_statement
@@ -372,9 +367,7 @@ class MemoryStore(PersistenceAPI):
             result = [t for t in result if t.state in states_set]
         return sorted(result, key=lambda t: t.created, reverse=True)
 
-    def get_step_logs_by_facet(
-        self, facet_name: str, limit: int = 20
-    ) -> list[StepLogEntry]:
+    def get_step_logs_by_facet(self, facet_name: str, limit: int = 20) -> list[StepLogEntry]:
         """Get recent step logs for a facet, ordered by time descending."""
         matching = [e for e in self._step_logs if e.facet_name == facet_name]
         matching.sort(key=lambda e: e.time, reverse=True)

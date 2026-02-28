@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from afl.dashboard.tree import StepNode, build_step_tree
+from afl.dashboard.tree import build_step_tree
 from afl.runtime.step import StepDefinition
 from afl.runtime.types import step_id
 
@@ -194,15 +194,11 @@ class TestTreeIntegration:
             starting_step="s-1",
             version="1.0",
         )
-        runner = RunnerDefinition(
-            uuid="r-1", workflow_id=wf.uuid, workflow=wf, state="running"
-        )
+        runner = RunnerDefinition(uuid="r-1", workflow_id=wf.uuid, workflow=wf, state="running")
         store.save_runner(runner)
 
         root = _step(id="root-1", object_type="Workflow", facet_name="TestWF")
-        block = _step(
-            id="block-1", object_type="AndThen", container_id="root-1", root_id="root-1"
-        )
+        block = _step(id="block-1", object_type="AndThen", container_id="root-1", root_id="root-1")
         stmt = _step(
             id="stmt-1",
             statement_name="doWork",

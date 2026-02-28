@@ -7,10 +7,9 @@ Supports cities, towns, villages, states, countries, counties, etc.
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
@@ -251,7 +250,9 @@ def matches_place_type(tags: dict[str, str], place_type: PlaceType) -> bool:
     return False
 
 
-def matches_population(population: int, min_pop: int, max_pop: int | None, operator: Operator) -> bool:
+def matches_population(
+    population: int, min_pop: int, max_pop: int | None, operator: Operator
+) -> bool:
     """Check if population matches the filter criteria."""
     if operator == Operator.GT:
         return population > min_pop
@@ -272,7 +273,9 @@ def matches_population(population: int, min_pop: int, max_pop: int | None, opera
     return False
 
 
-def describe_filter(place_type: PlaceType, min_pop: int, max_pop: int | None, operator: Operator) -> str:
+def describe_filter(
+    place_type: PlaceType, min_pop: int, max_pop: int | None, operator: Operator
+) -> str:
     """Generate a human-readable description of the filter."""
     type_str = place_type.value if place_type != PlaceType.ALL else "all places"
 
@@ -374,7 +377,7 @@ def filter_geojson_by_population(
         min_population=min_population,
         max_population=max_population if max_population is not None else 0,
         filter_applied=describe_filter(place_type, min_population, max_population, operator),
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -396,8 +399,9 @@ class PopulationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         """Convert osmium tags to a dictionary."""
         return {t.k: t.v for t in tags}
 
-    def _process_element(self, osm_id: int, osm_type: str, tags: dict[str, str],
-                         geometry: dict | None):
+    def _process_element(
+        self, osm_id: int, osm_type: str, tags: dict[str, str], geometry: dict | None
+    ):
         """Process an OSM element for population data."""
         # Check if it has population
         population = parse_population(tags.get("population"))
@@ -421,18 +425,20 @@ class PopulationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
             level_map = {"2": "country", "4": "state", "6": "county", "8": "municipality"}
             detected_type = level_map.get(admin_level, f"admin_level_{admin_level}")
 
-        self.features.append({
-            "type": "Feature",
-            "properties": {
-                "osm_id": osm_id,
-                "osm_type": osm_type,
-                "place_type": detected_type,
-                "population": population,
-                "name": tags.get("name", ""),
-                **{k: v for k, v in tags.items() if k not in ("population", "name")},
-            },
-            "geometry": geometry,
-        })
+        self.features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "osm_id": osm_id,
+                    "osm_type": osm_type,
+                    "place_type": detected_type,
+                    "population": population,
+                    "name": tags.get("name", ""),
+                    **{k: v for k, v in tags.items() if k not in ("population", "name")},
+                },
+                "geometry": geometry,
+            }
+        )
 
     def node(self, n):
         """Process a node."""
@@ -511,7 +517,7 @@ def extract_places_with_population(
         min_population=min_population,
         max_population=0,
         filter_applied=f"{place_type.value} with population >= {min_population:,}",
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 

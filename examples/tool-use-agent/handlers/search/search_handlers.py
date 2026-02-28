@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.tool_utils import web_search, deep_search
+from handlers.shared.tool_utils import deep_search, web_search
 
 NAMESPACE = "tools.Search"
 
@@ -20,7 +20,12 @@ def handle_web_search(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Web search for '{query}': {result['source_count']} results", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Web search for '{query}': {result['source_count']} results",
+                "level": "success",
+            }
+        )
 
     return {"search_result": result}
 
@@ -37,7 +42,9 @@ def handle_deep_search(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Deep search for '{query}' at depth {depth}", "level": "success"})
+        step_log.append(
+            {"message": f"Deep search for '{query}' at depth {depth}", "level": "success"}
+        )
 
     return {
         "search_result": search_result,

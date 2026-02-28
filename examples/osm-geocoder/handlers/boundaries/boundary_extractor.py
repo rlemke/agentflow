@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -78,9 +77,7 @@ class ExtractionResult:
     boundary_type: str
     admin_levels: str
     format: str = "GeoJSON"
-    extraction_date: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class BoundaryHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
@@ -215,7 +212,7 @@ def extract_boundaries(
     # Build descriptive filename
     parts = [pbf_path.stem]
     if admin_levels:
-        parts.append(f"admin{'-'.join(str(l) for l in sorted(admin_levels))}")
+        parts.append(f"admin{'-'.join(str(lvl) for lvl in sorted(admin_levels))}")
     if natural_types:
         parts.append("-".join(natural_types))
     output_name = "_".join(parts) + ".geojson"
@@ -243,7 +240,7 @@ def extract_boundaries(
         output_path=output_path,
         feature_count=len(handler.features),
         boundary_type=_describe_boundary_type(admin_levels, natural_types),
-        admin_levels=",".join(str(l) for l in (admin_levels or [])),
+        admin_levels=",".join(str(lvl) for lvl in (admin_levels or [])),
     )
 
 
@@ -275,9 +272,7 @@ def _features_to_geojson(features: list[BoundaryFeature]) -> dict[str, Any]:
     }
 
 
-def _describe_boundary_type(
-    admin_levels: list[int] | None, natural_types: list[str] | None
-) -> str:
+def _describe_boundary_type(admin_levels: list[int] | None, natural_types: list[str] | None) -> str:
     """Generate a human-readable description of the boundary type."""
     parts = []
     if admin_levels:
@@ -287,7 +282,7 @@ def _describe_boundary_type(
             6: "county",
             8: "city",
         }
-        parts.extend(level_names.get(l, f"admin{l}") for l in admin_levels)
+        parts.extend(level_names.get(lvl, f"admin{lvl}") for lvl in admin_levels)
     if natural_types:
         parts.extend(natural_types)
     return ", ".join(parts) if parts else "all"

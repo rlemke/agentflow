@@ -10,12 +10,11 @@ available; these stubs provide synthetic fallback for testing.
 from __future__ import annotations
 
 import hashlib
-import json
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
     """Deterministic integer from seed string."""
@@ -33,6 +32,7 @@ def _hash_float(seed: str, low: float = 0.0, high: float = 1.0) -> float:
 # ---------------------------------------------------------------------------
 # Public API (one per event facet)
 # ---------------------------------------------------------------------------
+
 
 def ingest_reading(
     sensor_id: str,
@@ -131,7 +131,9 @@ def classify_alert(
         priority_map = {"critical": 1, "warning": 2, "normal": 3}
         channel = "default"
     else:
-        priority_map = override_config.get("priority_map", {"critical": 1, "warning": 2, "normal": 3})
+        priority_map = override_config.get(
+            "priority_map", {"critical": 1, "warning": 2, "normal": 3}
+        )
         channel = override_config.get("channel", "default")
     priority = priority_map.get(severity, 3)
     return {

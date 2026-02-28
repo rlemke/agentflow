@@ -11,7 +11,7 @@ of available regions.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..cache.cache_handlers import REGION_REGISTRY
 
@@ -156,55 +156,129 @@ ALIASES: dict[str, str] = {
 # Geographic features: normalized feature name -> list of normalized region names
 GEOGRAPHIC_FEATURES: dict[str, list[str]] = {
     # Mountain ranges
-    "alps": ["austria", "switzerland", "france", "italy", "germany",
-             "slovenia", "liechtenstein"],
-    "rockies": ["colorado", "montana", "wyoming", "idaho", "utah",
-                "newmexico", "alberta", "britishcolumbia"],
+    "alps": ["austria", "switzerland", "france", "italy", "germany", "slovenia", "liechtenstein"],
+    "rockies": [
+        "colorado",
+        "montana",
+        "wyoming",
+        "idaho",
+        "utah",
+        "newmexico",
+        "alberta",
+        "britishcolumbia",
+    ],
     "andes": ["argentina", "chile", "peru", "bolivia", "ecuador", "colombia"],
     "himalayas": ["nepal", "india", "bhutan", "china", "pakistan"],
     "pyrenees": ["france", "spain", "andorra"],
-    "carpathians": ["romania", "ukraine", "poland", "slovakia",
-                    "czechrepublic", "hungary", "serbia"],
-    "appalachians": ["virginia", "westvirginia", "northcarolina",
-                     "tennessee", "kentucky", "georgia", "pennsylvania",
-                     "newyork", "vermont", "newhampshire", "maine",
-                     "maryland"],
+    "carpathians": [
+        "romania",
+        "ukraine",
+        "poland",
+        "slovakia",
+        "czechrepublic",
+        "hungary",
+        "serbia",
+    ],
+    "appalachians": [
+        "virginia",
+        "westvirginia",
+        "northcarolina",
+        "tennessee",
+        "kentucky",
+        "georgia",
+        "pennsylvania",
+        "newyork",
+        "vermont",
+        "newhampshire",
+        "maine",
+        "maryland",
+    ],
     "cascades": ["washington", "oregon"],
     "sierranevada": ["california", "nevada"],
     # Named regions
     "scandinavia": ["norway", "sweden", "denmark", "finland", "iceland"],
     "baltics": ["estonia", "latvia", "lithuania"],
-    "balkans": ["albania", "bosniaandherzegovina", "bulgaria", "croatia",
-                "kosovo", "macedonia", "montenegro", "serbia", "slovenia",
-                "greece", "romania"],
+    "balkans": [
+        "albania",
+        "bosniaandherzegovina",
+        "bulgaria",
+        "croatia",
+        "kosovo",
+        "macedonia",
+        "montenegro",
+        "serbia",
+        "slovenia",
+        "greece",
+        "romania",
+    ],
     "benelux": ["belgium", "netherlands", "luxembourg"],
     "iberia": ["spain", "portugal"],
     "dach": ["germany", "austria", "switzerland"],
-    "middleeast": ["iran", "iraq", "jordan", "lebanon", "syria", "yemen",
-                   "israelandpalestine", "saudiarabia"],
-    "southeastasia": ["cambodia", "indonesia", "laos", "malaysia",
-                      "myanmar", "philippines", "thailand", "vietnam",
-                      "brunei", "easttimor", "singapore"],
-    "newengland": ["connecticut", "maine", "massachusetts", "newhampshire",
-                   "rhodeisland", "vermont"],
+    "middleeast": [
+        "iran",
+        "iraq",
+        "jordan",
+        "lebanon",
+        "syria",
+        "yemen",
+        "israelandpalestine",
+        "saudiarabia",
+    ],
+    "southeastasia": [
+        "cambodia",
+        "indonesia",
+        "laos",
+        "malaysia",
+        "myanmar",
+        "philippines",
+        "thailand",
+        "vietnam",
+        "brunei",
+        "easttimor",
+        "singapore",
+    ],
+    "newengland": [
+        "connecticut",
+        "maine",
+        "massachusetts",
+        "newhampshire",
+        "rhodeisland",
+        "vermont",
+    ],
     "pacificnorthwest": ["washington", "oregon", "britishcolumbia"],
-    "greatlakes": ["michigan", "wisconsin", "minnesota", "illinois",
-                   "indiana", "ohio", "ontario"],
-    "deepsouth": ["alabama", "mississippi", "louisiana", "georgia",
-                  "southcarolina"],
-    "greatplains": ["kansas", "nebraska", "southdakota", "northdakota",
-                    "oklahoma"],
+    "greatlakes": ["michigan", "wisconsin", "minnesota", "illinois", "indiana", "ohio", "ontario"],
+    "deepsouth": ["alabama", "mississippi", "louisiana", "georgia", "southcarolina"],
+    "greatplains": ["kansas", "nebraska", "southdakota", "northdakota", "oklahoma"],
     "tristate": ["newyork", "newjersey", "connecticut"],
-    "eastafrica": ["kenya", "tanzania", "uganda", "rwanda", "burundi",
-                   "ethiopia"],
-    "westafrica": ["nigeria", "ghana", "senegal", "mali", "guineabissau",
-                   "guinea", "sierraleone", "liberia",
-                   "burkinafaso", "togo", "benin", "niger", "gambia",
-                   "capeverde"],
+    "eastafrica": ["kenya", "tanzania", "uganda", "rwanda", "burundi", "ethiopia"],
+    "westafrica": [
+        "nigeria",
+        "ghana",
+        "senegal",
+        "mali",
+        "guineabissau",
+        "guinea",
+        "sierraleone",
+        "liberia",
+        "burkinafaso",
+        "togo",
+        "benin",
+        "niger",
+        "gambia",
+        "capeverde",
+    ],
     "northafrica": ["morocco", "algeria", "tunisia", "libya", "egypt"],
-    "southernafrica": ["southafrica", "namibia", "botswana", "zimbabwe",
-                       "mozambique", "zambia", "malawi", "lesotho",
-                       "eswatini"],
+    "southernafrica": [
+        "southafrica",
+        "namibia",
+        "botswana",
+        "zimbabwe",
+        "mozambique",
+        "zambia",
+        "malawi",
+        "lesotho",
+        "eswatini",
+    ],
     "hornofafrica": ["ethiopia", "eritrea", "somalia", "djibouti"],
     "patagonia": ["argentina", "chile"],
 }
@@ -285,8 +359,7 @@ def resolve(name: str, prefer_continent: str | None = None) -> ResolutionResult:
         all_matches = _deduplicate(all_matches)
         if prefer_continent:
             norm_continent = _normalize(prefer_continent)
-            filtered = [m for m in all_matches
-                        if _normalize(m.continent) == norm_continent]
+            filtered = [m for m in all_matches if _normalize(m.continent) == norm_continent]
             if filtered:
                 all_matches = filtered
         return ResolutionResult(
@@ -308,16 +381,14 @@ def resolve(name: str, prefer_continent: str | None = None) -> ResolutionResult:
     disambiguation = ""
     if len(matches) > 1 and prefer_continent:
         norm_continent = _normalize(prefer_continent)
-        filtered = [m for m in matches
-                    if _normalize(m.continent) == norm_continent]
+        filtered = [m for m in matches if _normalize(m.continent) == norm_continent]
         if filtered:
             matches = filtered
     elif len(matches) > 1:
         # Check if matches span multiple continents (true ambiguity)
-        continents = {m.continent for m in matches}
+        _continents = {m.continent for m in matches}
         # Filter out "Continents" namespace entries for ambiguity check
-        non_continent_matches = [m for m in matches
-                                 if m.namespace != "osm.geo.cache.Continents"]
+        non_continent_matches = [m for m in matches if m.namespace != "osm.geo.cache.Continents"]
         non_continent_continents = {m.continent for m in non_continent_matches}
         if len(non_continent_continents) > 1:
             is_ambiguous = True
@@ -353,8 +424,7 @@ def list_regions(continent: str | None = None) -> list[RegionMatch]:
 
     if continent:
         norm_continent = _normalize(continent)
-        all_matches = [m for m in all_matches
-                       if _normalize(m.continent) == norm_continent]
+        all_matches = [m for m in all_matches if _normalize(m.continent) == norm_continent]
 
     return sorted(all_matches, key=lambda m: (m.continent, m.facet_name))
 

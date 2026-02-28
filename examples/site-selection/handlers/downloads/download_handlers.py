@@ -7,7 +7,7 @@ by delegating to the shared downloader module.
 import os
 from typing import Any
 
-from ..shared.downloader import download_acs, download_tiger, download_pbf
+from ..shared.downloader import download_acs, download_pbf, download_tiger
 
 NAMESPACE = "sitesel.Downloads"
 
@@ -25,13 +25,14 @@ def handle_download_acs(params: dict[str, Any]) -> dict[str, Any]:
         result = download_acs(state_fips=state_fips)
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadACS: state={state_fips} ({source})",
-                     level="success")
-        return {"file": {
-            "path": result["path"],
-            "state_fips": result["state_fips"],
-            "wasInCache": result["wasInCache"],
-        }}
+            step_log(f"DownloadACS: state={state_fips} ({source})", level="success")
+        return {
+            "file": {
+                "path": result["path"],
+                "state_fips": result["state_fips"],
+                "wasInCache": result["wasInCache"],
+            }
+        }
     except Exception as exc:
         if step_log:
             step_log(f"DownloadACS: {exc}", level="error")
@@ -53,14 +54,17 @@ def handle_download_tiger(params: dict[str, Any]) -> dict[str, Any]:
         result = download_tiger(state_fips=state_fips, geo_level=geo_level)
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadTIGER: state={state_fips} level={geo_level} ({source})",
-                     level="success")
-        return {"file": {
-            "path": result["path"],
-            "state_fips": result["state_fips"],
-            "geo_level": result["geo_level"],
-            "wasInCache": result["wasInCache"],
-        }}
+            step_log(
+                f"DownloadTIGER: state={state_fips} level={geo_level} ({source})", level="success"
+            )
+        return {
+            "file": {
+                "path": result["path"],
+                "state_fips": result["state_fips"],
+                "geo_level": result["geo_level"],
+                "wasInCache": result["wasInCache"],
+            }
+        }
     except Exception as exc:
         if step_log:
             step_log(f"DownloadTIGER: {exc}", level="error")
@@ -80,13 +84,14 @@ def handle_download_pbf(params: dict[str, Any]) -> dict[str, Any]:
         result = download_pbf(region=region)
         source = "cache" if result["wasInCache"] else "download"
         if step_log:
-            step_log(f"DownloadPBF: region={region} ({source})",
-                     level="success")
-        return {"file": {
-            "path": result["path"],
-            "region": result["region"],
-            "wasInCache": result["wasInCache"],
-        }}
+            step_log(f"DownloadPBF: region={region} ({source})", level="success")
+        return {
+            "file": {
+                "path": result["path"],
+                "region": result["region"],
+                "wasInCache": result["wasInCache"],
+            }
+        }
     except Exception as exc:
         if step_log:
             step_log(f"DownloadPBF: {exc}", level="error")

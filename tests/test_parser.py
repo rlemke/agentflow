@@ -148,9 +148,9 @@ script
         """Parse script block inside namespace."""
         from afl.ast import ScriptBlock
 
-        source = '''namespace utils {
+        source = """namespace utils {
     facet Helper() script "pass"
-}'''
+}"""
         ast = parser.parse(source)
         ns = ast.namespaces[0]
         f = ns.facets[0]
@@ -160,7 +160,7 @@ script
         """Parse facet with brace-delimited script block."""
         from afl.ast import ScriptBlock
 
-        source = 'facet F() script {\n    x = 1\n    y = 2\n}'
+        source = "facet F() script {\n    x = 1\n    y = 2\n}"
         ast = parser.parse(source)
         f = ast.facets[0]
         assert isinstance(f.pre_script, ScriptBlock)
@@ -181,7 +181,7 @@ script
 
     def test_andthen_script(self, parser):
         """Parse andThen script variant."""
-        from afl.ast import AndThenBlock, ScriptBlock
+        from afl.ast import AndThenBlock
 
         source = 'facet F() andThen script "y = 2"'
         ast = parser.parse(source)
@@ -194,7 +194,6 @@ script
 
     def test_multiple_andthen_mixed(self, parser):
         """Parse mixed regular andThen and andThen script blocks."""
-        from afl.ast import AndThenBlock
 
         source = 'facet F() andThen { s = G() } andThen script "y = 2"'
         ast = parser.parse(source)
@@ -250,12 +249,12 @@ class TestPromptBlocks:
         """Parse prompt block with all directives."""
         from afl.ast import PromptBlock
 
-        source = '''event facet Summarize(doc: String) => (summary: String)
+        source = """event facet Summarize(doc: String) => (summary: String)
 prompt {
     system "You are a summarizer."
     template "Summarize: {doc}"
     model "claude-3-opus"
-}'''
+}"""
         ast = parser.parse(source)
         ef = ast.event_facets[0]
         assert isinstance(ef.body, PromptBlock)
@@ -287,12 +286,12 @@ prompt {
         """Parse prompt block inside namespace."""
         from afl.ast import PromptBlock
 
-        source = '''namespace llm {
+        source = """namespace llm {
     event facet Query(q: String) => (answer: String)
     prompt {
         template "{q}"
     }
-}'''
+}"""
         ast = parser.parse(source)
         assert len(ast.namespaces) == 1
         ns = ast.namespaces[0]
@@ -1194,6 +1193,7 @@ class TestStepBody:
         assert step.name == "s"
         assert step.body is not None
         from afl.ast import AndThenBlock
+
         assert isinstance(step.body, AndThenBlock)
         assert len(step.body.block.steps) == 1
         assert step.body.block.steps[0].name == "inner"
@@ -1251,6 +1251,7 @@ class TestMultipleAndThenBlocks:
         assert isinstance(body, list)
         assert len(body) == 2
         from afl.ast import AndThenBlock
+
         assert all(isinstance(b, AndThenBlock) for b in body)
         assert body[0].block.steps[0].name == "s1"
         assert body[1].block.steps[0].name == "s2"
@@ -1284,6 +1285,7 @@ class TestMultipleAndThenBlocks:
         }
         """)
         from afl.ast import AndThenBlock
+
         assert isinstance(ast.workflows[0].body, AndThenBlock)
 
     def test_multi_block_with_foreach(self, parser):
@@ -1320,6 +1322,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import ArrayLiteral
+
         step = ast.workflows[0].body.block.steps[0]
         arg = step.call.args[0]
         assert isinstance(arg.value, ArrayLiteral)
@@ -1334,6 +1337,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import ArrayLiteral
+
         step = ast.workflows[0].body.block.steps[0]
         arr = step.call.args[0].value
         assert isinstance(arr, ArrayLiteral)
@@ -1349,6 +1353,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import ArrayLiteral
+
         arr = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(arr, ArrayLiteral)
         assert len(arr.elements) == 2
@@ -1363,6 +1368,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import ArrayLiteral
+
         arr = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(arr, ArrayLiteral)
         assert len(arr.elements) == 2
@@ -1377,6 +1383,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import MapLiteral
+
         m = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(m, MapLiteral)
         assert len(m.entries) == 2
@@ -1392,6 +1399,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import MapLiteral
+
         m = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(m, MapLiteral)
         assert m.entries == []
@@ -1405,6 +1413,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import MapLiteral
+
         m = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(m, MapLiteral)
         assert len(m.entries) == 2
@@ -1419,6 +1428,7 @@ class TestCollectionLiterals:
         }
         """)
         from afl.ast import IndexExpr
+
         expr = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(expr, IndexExpr)
         assert isinstance(expr.target, Reference)
@@ -1433,7 +1443,8 @@ class TestCollectionLiterals:
             s = V(item = [1, 2, 3][1])
         }
         """)
-        from afl.ast import IndexExpr, ArrayLiteral
+        from afl.ast import ArrayLiteral, IndexExpr
+
         expr = ast.workflows[0].body.block.steps[0].call.args[0].value
         assert isinstance(expr, IndexExpr)
         assert isinstance(expr.target, ArrayLiteral)
@@ -1666,7 +1677,9 @@ class TestDocComments:
             facet F(x: String)
         }
         """)
-        assert ast.namespaces[0].facets[0].doc.description == "Multi-line documentation.\nSecond line."
+        assert (
+            ast.namespaces[0].facets[0].doc.description == "Multi-line documentation.\nSecond line."
+        )
 
     def test_doc_comment_with_tags(self, parser):
         """Doc comment with @param and @return tags parsed into structured form."""

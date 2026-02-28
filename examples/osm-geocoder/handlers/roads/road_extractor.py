@@ -10,7 +10,7 @@ import json
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
@@ -24,13 +24,15 @@ log = logging.getLogger(__name__)
 
 try:
     import osmium
+
     HAS_OSMIUM = True
 except ImportError:
     HAS_OSMIUM = False
 
 try:
-    from shapely import wkb
-    from shapely.geometry import mapping
+    from shapely import wkb  # noqa: F401
+    from shapely.geometry import mapping  # noqa: F401
+
     HAS_SHAPELY = True
 except ImportError:
     HAS_SHAPELY = False
@@ -99,8 +101,28 @@ ROAD_CLASS_MAP = {
 
 MAJOR_ROAD_CLASSES = {RoadClass.MOTORWAY, RoadClass.TRUNK, RoadClass.PRIMARY, RoadClass.SECONDARY}
 
-PAVED_SURFACES = {"asphalt", "concrete", "paved", "concrete:plates", "concrete:lanes", "paving_stones", "sett", "cobblestone"}
-UNPAVED_SURFACES = {"unpaved", "gravel", "dirt", "sand", "grass", "ground", "earth", "mud", "compacted", "fine_gravel"}
+PAVED_SURFACES = {
+    "asphalt",
+    "concrete",
+    "paved",
+    "concrete:plates",
+    "concrete:lanes",
+    "paving_stones",
+    "sett",
+    "cobblestone",
+}
+UNPAVED_SURFACES = {
+    "unpaved",
+    "gravel",
+    "dirt",
+    "sand",
+    "grass",
+    "ground",
+    "earth",
+    "mud",
+    "compacted",
+    "fine_gravel",
+}
 
 
 @dataclass
@@ -267,15 +289,17 @@ class RoadHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
 
         # Store way for later geometry construction
         node_refs = [n.ref for n in w.nodes]
-        self._pending_ways.append((
-            {
-                "osm_id": w.id,
-                "tags": tags,
-                "classification": classification,
-                "speed_limit": speed_limit,
-            },
-            node_refs
-        ))
+        self._pending_ways.append(
+            (
+                {
+                    "osm_id": w.id,
+                    "tags": tags,
+                    "classification": classification,
+                    "speed_limit": speed_limit,
+                },
+                node_refs,
+            )
+        )
 
     def finalize(self):
         """Build geometries from cached nodes."""
@@ -292,25 +316,27 @@ class RoadHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
             length_km = calculate_line_length(geometry)
 
             tags = way_data["tags"]
-            self.features.append({
-                "type": "Feature",
-                "properties": {
-                    "osm_id": way_data["osm_id"],
-                    "osm_type": "way",
-                    "road_class": way_data["classification"],
-                    "highway": tags.get("highway", ""),
-                    "name": tags.get("name", ""),
-                    "ref": tags.get("ref", ""),
-                    "maxspeed": way_data["speed_limit"],
-                    "lanes": parse_lanes(tags.get("lanes")),
-                    "surface": tags.get("surface", ""),
-                    "oneway": tags.get("oneway", "") == "yes",
-                    "bridge": "bridge" in tags,
-                    "tunnel": "tunnel" in tags,
-                    "length_km": round(length_km, 3),
-                },
-                "geometry": geometry,
-            })
+            self.features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "osm_id": way_data["osm_id"],
+                        "osm_type": "way",
+                        "road_class": way_data["classification"],
+                        "highway": tags.get("highway", ""),
+                        "name": tags.get("name", ""),
+                        "ref": tags.get("ref", ""),
+                        "maxspeed": way_data["speed_limit"],
+                        "lanes": parse_lanes(tags.get("lanes")),
+                        "surface": tags.get("surface", ""),
+                        "oneway": tags.get("oneway", "") == "yes",
+                        "bridge": "bridge" in tags,
+                        "tunnel": "tunnel" in tags,
+                        "length_km": round(length_km, 3),
+                    },
+                    "geometry": geometry,
+                }
+            )
 
         # Clear caches
         self._node_cache.clear()
@@ -365,7 +391,7 @@ def extract_roads(
         road_class=road_class.value,
         total_length_km=round(total_length, 2),
         with_speed_limit=with_speed,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -437,12 +463,14 @@ def filter_roads_by_class(
         geojson = json.load(f)
 
     filtered = [
-        f for f in geojson.get("features", [])
+        f
+        for f in geojson.get("features", [])
         if f.get("properties", {}).get("road_class") == road_class
     ]
 
     if output_path is None:
         import posixpath
+
         _dir = posixpath.dirname(input_path)
         output_path_str = f"{_dir}/{uri_stem(input_path)}_{road_class}.geojson"
     else:
@@ -461,7 +489,7 @@ def filter_roads_by_class(
         road_class=road_class,
         total_length_km=round(total_length, 2),
         with_speed_limit=with_speed,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -485,6 +513,7 @@ def filter_by_speed_limit(
 
     if output_path is None:
         import posixpath
+
         _dir = posixpath.dirname(input_path)
         output_path_str = f"{_dir}/{uri_stem(input_path)}_speed_{min_speed}_{max_speed}.geojson"
     else:
@@ -502,5 +531,5 @@ def filter_by_speed_limit(
         road_class="filtered",
         total_length_km=round(total_length, 2),
         with_speed_limit=len(filtered),
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )

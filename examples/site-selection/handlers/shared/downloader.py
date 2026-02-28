@@ -16,6 +16,7 @@ from typing import Any
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -23,8 +24,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_CACHE_DIR = os.environ.get("AFL_SITESEL_CACHE_DIR",
-                            os.path.join(_LOCAL_OUTPUT, "sitesel-cache"))
+_CACHE_DIR = os.environ.get("AFL_SITESEL_CACHE_DIR", os.path.join(_LOCAL_OUTPUT, "sitesel-cache"))
 
 # Per-path locks to prevent duplicate concurrent downloads
 _locks: dict[str, threading.Lock] = {}
@@ -88,8 +88,9 @@ def _download_file(url: str, dest: str) -> int:
     return size
 
 
-def download_acs(year: str = "2023", state_fips: str = "01",
-                 columns: str = DEFAULT_ACS_COLUMNS) -> dict[str, Any]:
+def download_acs(
+    year: str = "2023", state_fips: str = "01", columns: str = DEFAULT_ACS_COLUMNS
+) -> dict[str, Any]:
     """Download ACS data for a state via the Census Bureau REST API.
 
     The API returns JSON: [[header...], [row1...], ...].
@@ -99,8 +100,7 @@ def download_acs(year: str = "2023", state_fips: str = "01",
     """
     filename = f"acs_{year}_{state_fips}_sitesel.csv"
     dest = os.path.join(_CACHE_DIR, "acs", year, filename)
-    url = (f"{CENSUS_API_BASE}/{year}/acs/acs5"
-           f"?get=NAME,{columns}&for=county:*&in=state:{state_fips}")
+    url = f"{CENSUS_API_BASE}/{year}/acs/acs5?get=NAME,{columns}&for=county:*&in=state:{state_fips}"
 
     requested_cols = {c.strip() for c in columns.split(",")}
 
@@ -171,13 +171,13 @@ def _download_acs_api(url: str, dest: str, state_fips: str) -> int:
 
     size = os.path.getsize(dest)
     elapsed = time.monotonic() - start
-    logger.info("Fetched ACS API -> %s (%d rows, %d bytes, %.1fs)",
-                dest, len(rows), size, elapsed)
+    logger.info("Fetched ACS API -> %s (%d rows, %d bytes, %.1fs)", dest, len(rows), size, elapsed)
     return size
 
 
-def download_tiger(year: str = "2024", geo_level: str = "COUNTY",
-                   state_fips: str = "01") -> dict[str, Any]:
+def download_tiger(
+    year: str = "2024", geo_level: str = "COUNTY", state_fips: str = "01"
+) -> dict[str, Any]:
     """Download TIGER/Line shapefile for a state and geography level.
 
     For COUNTY, downloads the national file (tl_{year}_us_county.zip).
@@ -187,8 +187,9 @@ def download_tiger(year: str = "2024", geo_level: str = "COUNTY",
     """
     geo_upper = geo_level.upper()
     if geo_upper not in _TIGER_GEO:
-        raise ValueError(f"Unsupported geo_level: {geo_level}. "
-                         f"Supported: {list(_TIGER_GEO.keys())}")
+        raise ValueError(
+            f"Unsupported geo_level: {geo_level}. Supported: {list(_TIGER_GEO.keys())}"
+        )
 
     tiger_dir, tiger_suffix = _TIGER_GEO[geo_upper]
 

@@ -173,5 +173,3 @@ def select_transitions(object_type: str) -> dict[str, str]:
         return BLOCK_TRANSITIONS
     else:
         return STEP_TRANSITIONS
-
-

@@ -124,7 +124,12 @@ pytestmark_routes = pytest.mark.skipif(
 )
 
 
-def _make_handler_entity(facet_name="osm.geo.Cache", module_uri="osm.handlers.cache", entrypoint="handle", version="1.0.0"):
+def _make_handler_entity(
+    facet_name="osm.geo.Cache",
+    module_uri="osm.handlers.cache",
+    entrypoint="handle",
+    version="1.0.0",
+):
     from afl.runtime.entities import HandlerRegistration
 
     return HandlerRegistration(
@@ -177,7 +182,9 @@ class TestV2HandlerList:
     def test_handler_list_tab_filter(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler_entity("osm.geo.Cache"))
-        store.save_handler_registration(_make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy"))
+        store.save_handler_registration(
+            _make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy")
+        )
         # osm tab should only show osm handlers
         resp = tc.get("/v2/handlers?tab=osm")
         assert resp.status_code == 200
@@ -194,7 +201,9 @@ class TestV2HandlerList:
     def test_handler_list_all_tab_shows_everything(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler_entity("osm.geo.Cache"))
-        store.save_handler_registration(_make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy"))
+        store.save_handler_registration(
+            _make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy")
+        )
         resp = tc.get("/v2/handlers?tab=all")
         assert resp.status_code == 200
         assert "Cache" in resp.text
@@ -203,8 +212,12 @@ class TestV2HandlerList:
     def test_handler_list_tab_counts(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler_entity("osm.geo.Cache"))
-        store.save_handler_registration(_make_handler_entity("osm.boundaries.Extract", module_uri="osm.handlers.extract"))
-        store.save_handler_registration(_make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy"))
+        store.save_handler_registration(
+            _make_handler_entity("osm.boundaries.Extract", module_uri="osm.handlers.extract")
+        )
+        store.save_handler_registration(
+            _make_handler_entity("aws.lambda.Deploy", module_uri="aws.handlers.deploy")
+        )
         resp = tc.get("/v2/handlers?tab=all")
         assert resp.status_code == 200
         # All tab should show count 3

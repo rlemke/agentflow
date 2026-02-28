@@ -986,7 +986,9 @@ class TestHandlerRoutes:
         assert "Handlers" in resp.text
 
 
-def _make_event_task(uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"):
+def _make_event_task(
+    uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"
+):
     from afl.runtime.entities import TaskDefinition
 
     return TaskDefinition(
@@ -1494,14 +1496,18 @@ class TestListFiltering:
         tc, store = client
         from afl.runtime.entities import FlowDefinition, FlowIdentity
 
-        store.save_flow(FlowDefinition(
-            uuid="flow-1",
-            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
-        ))
-        store.save_flow(FlowDefinition(
-            uuid="flow-2",
-            name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
-        ))
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-1",
+                name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
+            )
+        )
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-2",
+                name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
+            )
+        )
 
         resp = tc.get("/flows?q=Test")
         assert resp.status_code == 200
@@ -1520,12 +1526,12 @@ class TestListFiltering:
 
     def test_source_list_search(self, client):
         tc, store = client
-        store.save_published_source(_make_published_source(
-            uuid="src-1", namespace_name="geo.cache"
-        ))
-        store.save_published_source(_make_published_source(
-            uuid="src-2", namespace_name="auth.login"
-        ))
+        store.save_published_source(
+            _make_published_source(uuid="src-1", namespace_name="geo.cache")
+        )
+        store.save_published_source(
+            _make_published_source(uuid="src-2", namespace_name="auth.login")
+        )
 
         resp = tc.get("/sources?q=geo")
         assert resp.status_code == 200
@@ -1613,20 +1619,24 @@ class TestApiExpansion:
         tc, store = client
         from afl.runtime.entities import ServerDefinition, ServerState
 
-        store.save_server(ServerDefinition(
-            uuid="s-1",
-            server_group="workers",
-            service_name="afl",
-            server_name="worker-01",
-            state=ServerState.RUNNING,
-        ))
-        store.save_server(ServerDefinition(
-            uuid="s-2",
-            server_group="workers",
-            service_name="afl",
-            server_name="worker-02",
-            state=ServerState.ERROR,
-        ))
+        store.save_server(
+            ServerDefinition(
+                uuid="s-1",
+                server_group="workers",
+                service_name="afl",
+                server_name="worker-01",
+                state=ServerState.RUNNING,
+            )
+        )
+        store.save_server(
+            ServerDefinition(
+                uuid="s-2",
+                server_group="workers",
+                service_name="afl",
+                server_name="worker-02",
+                state=ServerState.ERROR,
+            )
+        )
 
         resp = tc.get("/api/servers?state=running")
         assert resp.status_code == 200
@@ -1638,14 +1648,18 @@ class TestApiExpansion:
         tc, store = client
         from afl.runtime.entities import FlowDefinition, FlowIdentity
 
-        store.save_flow(FlowDefinition(
-            uuid="flow-1",
-            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
-        ))
-        store.save_flow(FlowDefinition(
-            uuid="flow-2",
-            name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
-        ))
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-1",
+                name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
+            )
+        )
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-2",
+                name=FlowIdentity(name="OtherFlow", path="/other", uuid="flow-2"),
+            )
+        )
 
         resp = tc.get("/api/flows?q=Test")
         assert resp.status_code == 200
@@ -1672,7 +1686,11 @@ def _make_flow_with_docs(flow_id="flow-doc"):
     )
 
     ns_doc = {"description": "Core handlers namespace.", "params": [], "returns": []}
-    facet_doc = {"description": "Increments a value.", "params": [{"name": "value", "description": "The input value."}], "returns": []}
+    facet_doc = {
+        "description": "Increments a value.",
+        "params": [{"name": "value", "description": "The input value."}],
+        "returns": [],
+    }
     wf_doc = {
         "description": "Adds one twice.",
         "params": [{"name": "input", "description": "The starting value."}],
@@ -1811,7 +1829,7 @@ class TestSeedWorkflowDocumentation:
         from afl.emitter import JSONEmitter
         from afl.parser import AFLParser
 
-        source = '''
+        source = """
 namespace test_ns {
     /** Adds one to a value.
      * @param v The value.
@@ -1821,7 +1839,7 @@ namespace test_ns {
         yield AddOne(r = $.v)
     }
 }
-'''
+"""
         parser = AFLParser()
         ast = parser.parse(source)
         emitter = JSONEmitter(include_locations=False)
@@ -1829,6 +1847,7 @@ namespace test_ns {
 
         # Import _collect_workflows from seed
         import sys
+
         sys.path.insert(0, "/Users/ralph_lemke/agentflow")
         from docker.seed.seed import _collect_workflows
 
@@ -1869,26 +1888,30 @@ class TestStepLogs:
         from afl.runtime.entities import StepLogEntry
         from afl.runtime.types import generate_id
 
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(),
-            step_id="step-log-1",
-            workflow_id="wf-log-1",
-            runner_id="runner-1",
-            facet_name="ns.Test",
-            source="framework",
-            level="info",
-            message="Task claimed: ns.Test",
-            time=1000,
-        ))
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(),
-            step_id="step-log-1",
-            workflow_id="wf-log-1",
-            source="handler",
-            level="success",
-            message="Download complete",
-            time=2000,
-        ))
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="step-log-1",
+                workflow_id="wf-log-1",
+                runner_id="runner-1",
+                facet_name="ns.Test",
+                source="framework",
+                level="info",
+                message="Task claimed: ns.Test",
+                time=1000,
+            )
+        )
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id="step-log-1",
+                workflow_id="wf-log-1",
+                source="handler",
+                level="success",
+                message="Download complete",
+                time=2000,
+            )
+        )
 
         resp = tc.get("/api/steps/step-log-1/logs")
         assert resp.status_code == 200
@@ -1923,15 +1946,17 @@ class TestStepLogs:
         )
         store.save_step(step)
 
-        store.save_step_log(StepLogEntry(
-            uuid=generate_id(),
-            step_id=sid,
-            workflow_id=wid,
-            source="framework",
-            level="info",
-            message="Task claimed: ns.Test",
-            time=1000,
-        ))
+        store.save_step_log(
+            StepLogEntry(
+                uuid=generate_id(),
+                step_id=sid,
+                workflow_id=wid,
+                source="framework",
+                level="info",
+                message="Task claimed: ns.Test",
+                time=1000,
+            )
+        )
 
         resp = tc.get(f"/steps/{sid}")
         assert resp.status_code == 200

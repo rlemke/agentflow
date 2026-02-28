@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import tempfile
-from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any
 
@@ -18,9 +17,7 @@ log = logging.getLogger(__name__)
 NAMESPACE = "osm.geo.Routing"
 
 # GraphHopper API endpoint (local instance)
-GRAPHHOPPER_API_URL = os.environ.get(
-    "GRAPHHOPPER_API_URL", "http://localhost:8989"
-)
+GRAPHHOPPER_API_URL = os.environ.get("GRAPHHOPPER_API_URL", "http://localhost:8989")
 
 
 def _load_cities_geojson(cities_path: str) -> list[dict[str, Any]]:
@@ -45,12 +42,14 @@ def _load_cities_geojson(cities_path: str) -> list[dict[str, Any]]:
             except ValueError:
                 population = 0
 
-        cities.append({
-            "name": name,
-            "population": population,
-            "lon": coords[0],
-            "lat": coords[1],
-        })
+        cities.append(
+            {
+                "name": name,
+                "population": population,
+                "lon": coords[0],
+                "lat": coords[1],
+            }
+        )
 
     return cities
 
@@ -98,9 +97,7 @@ def _query_graphhopper_route(
     return _estimate_route(from_city, to_city)
 
 
-def _estimate_route(
-    from_city: dict, to_city: dict
-) -> dict[str, Any]:
+def _estimate_route(from_city: dict, to_city: dict) -> dict[str, Any]:
     """Estimate route distance and duration using great-circle distance."""
     import math
 
@@ -169,20 +166,22 @@ def compute_pairwise_routes(payload: dict) -> dict:
         total_distance += route["distance_km"]
         total_duration += route["duration_min"]
 
-        features.append({
-            "type": "Feature",
-            "geometry": {
-                "type": "LineString",
-                "coordinates": route["coordinates"],
-            },
-            "properties": {
-                "from": city_a["name"],
-                "to": city_b["name"],
-                "distance_km": route["distance_km"],
-                "duration_min": route["duration_min"],
-                "profile": profile,
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": route["coordinates"],
+                },
+                "properties": {
+                    "from": city_a["name"],
+                    "to": city_b["name"],
+                    "distance_km": route["distance_km"],
+                    "duration_min": route["duration_min"],
+                    "profile": profile,
+                },
+            }
+        )
 
     # Write output GeoJSON
     output_dir = os.path.join(tempfile.gettempdir(), "osm-routing")
@@ -202,7 +201,10 @@ def compute_pairwise_routes(payload: dict) -> dict:
 
     route_count = len(features)
     if step_log:
-        step_log(f"ComputePairwiseRoutes: {route_count} routes between {len(cities)} cities ({round(total_distance)} km total)", level="success")
+        step_log(
+            f"ComputePairwiseRoutes: {route_count} routes between {len(cities)} cities ({round(total_distance)} km total)",
+            level="success",
+        )
     return {
         "result": {
             "output_path": output_path,

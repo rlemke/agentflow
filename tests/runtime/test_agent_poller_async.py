@@ -35,13 +35,11 @@ from afl.runtime import (
 )
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 from afl.runtime.entities import (
-    TaskDefinition,
     TaskState,
 )
-from afl.runtime.step import StepDefinition, FacetAttributes
-from afl.runtime.types import generate_id, ObjectType
+from afl.runtime.step import FacetAttributes, StepDefinition
+from afl.runtime.types import AttributeValue, ObjectType
 from afl.runtime.types import workflow_id as make_wf_id
-
 
 # =========================================================================
 # Fixtures
@@ -205,9 +203,7 @@ class TestAsyncInvocation:
 
     def test_async_handler_invoked(self, store, evaluator, workflow_ast, program_ast):
         """An async handler is properly invoked with asyncio.run()."""
-        result = _execute_until_paused(
-            evaluator, workflow_ast, {"x": "test_input"}, program_ast
-        )
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": "test_input"}, program_ast)
         assert result.status == ExecutionStatus.PAUSED
 
         # Find the event-blocked step
@@ -323,8 +319,8 @@ class TestUpdateStep:
         updated = store.get_step(step.id)
         assert updated.attributes.returns is not None
         assert "partial" in updated.attributes.returns
-        assert updated.attributes.returns["partial"]["value"] == "value1"
-        assert updated.attributes.returns["partial"]["type_hint"] == "String"
+        assert updated.attributes.returns["partial"].value == "value1"
+        assert updated.attributes.returns["partial"].type_hint == "String"
 
     def test_update_step_merges_returns(self, store, evaluator):
         """update_step() merges with existing returns."""
@@ -336,7 +332,7 @@ class TestUpdateStep:
         )
         step.state = StepState.EVENT_TRANSMIT
         step.attributes = FacetAttributes(
-            returns={"existing": {"name": "existing", "value": "old", "type_hint": "String"}}
+            returns={"existing": AttributeValue(name="existing", value="old", type_hint="String")}
         )
         store.save_step(step)
 
@@ -351,10 +347,10 @@ class TestUpdateStep:
 
         updated = store.get_step(step.id)
         assert "existing" in updated.attributes.returns
-        assert updated.attributes.returns["existing"]["value"] == "old"
+        assert updated.attributes.returns["existing"].value == "old"
         assert "new_field" in updated.attributes.returns
-        assert updated.attributes.returns["new_field"]["value"] == 42
-        assert updated.attributes.returns["new_field"]["type_hint"] == "Long"
+        assert updated.attributes.returns["new_field"].value == 42
+        assert updated.attributes.returns["new_field"].type_hint == "Long"
 
     def test_update_step_not_found(self, store, evaluator):
         """update_step() raises for non-existent step."""
@@ -400,13 +396,13 @@ class TestUpdateStep:
 
         updated = store.get_step(step.id)
         returns = updated.attributes.returns
-        assert returns["str_field"]["type_hint"] == "String"
-        assert returns["int_field"]["type_hint"] == "Long"
-        assert returns["bool_field"]["type_hint"] == "Boolean"
-        assert returns["float_field"]["type_hint"] == "Double"
-        assert returns["list_field"]["type_hint"] == "List"
-        assert returns["dict_field"]["type_hint"] == "Map"
-        assert returns["none_field"]["type_hint"] == "Any"
+        assert returns["str_field"].type_hint == "String"
+        assert returns["int_field"].type_hint == "Long"
+        assert returns["bool_field"].type_hint == "Boolean"
+        assert returns["float_field"].type_hint == "Double"
+        assert returns["list_field"].type_hint == "List"
+        assert returns["dict_field"].type_hint == "Map"
+        assert returns["none_field"].type_hint == "Any"
 
     def test_update_step_from_async_handler(self, store, evaluator, workflow_ast, program_ast):
         """update_step() can be called from within an async handler."""

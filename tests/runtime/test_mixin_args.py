@@ -13,17 +13,15 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 from afl.runtime.block import StatementDefinition
 from afl.runtime.dependency import DependencyGraph
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_evaluator():
     store = MemoryStore()
@@ -44,6 +42,7 @@ def _make_poller(store, evaluator, handlers: dict):
 # ---------------------------------------------------------------------------
 # TestCallSiteMixinArgs
 # ---------------------------------------------------------------------------
+
 
 class TestCallSiteMixinArgs:
     """Unit + integration tests for call-site mixin args and aliases."""
@@ -80,7 +79,10 @@ class TestCallSiteMixinArgs:
                                     "type": "MixinCall",
                                     "target": "RetryPolicy",
                                     "args": [
-                                        {"name": "max_retries", "value": {"type": "Int", "value": 5}},
+                                        {
+                                            "name": "max_retries",
+                                            "value": {"type": "Int", "value": 5},
+                                        },
                                     ],
                                 },
                             ],
@@ -94,7 +96,10 @@ class TestCallSiteMixinArgs:
                         "type": "CallExpr",
                         "target": "W",
                         "args": [
-                            {"name": "result", "value": {"type": "StepRef", "path": ["d", "got_x"]}},
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["d", "got_x"]},
+                            },
                         ],
                     },
                 },
@@ -164,7 +169,10 @@ class TestCallSiteMixinArgs:
                                     "type": "MixinCall",
                                     "target": "RetryPolicy",
                                     "args": [
-                                        {"name": "max_retries", "value": {"type": "Int", "value": 3}},
+                                        {
+                                            "name": "max_retries",
+                                            "value": {"type": "Int", "value": 3},
+                                        },
                                     ],
                                     "alias": "retry",
                                 },
@@ -319,7 +327,10 @@ class TestCallSiteMixinArgs:
                                     "type": "MixinCall",
                                     "target": "RetryPolicy",
                                     "args": [
-                                        {"name": "max_retries", "value": {"type": "Int", "value": 5}},
+                                        {
+                                            "name": "max_retries",
+                                            "value": {"type": "Int", "value": 5},
+                                        },
                                     ],
                                     "alias": "retry",
                                 },
@@ -327,7 +338,10 @@ class TestCallSiteMixinArgs:
                                     "type": "MixinCall",
                                     "target": "AlertConfig",
                                     "args": [
-                                        {"name": "channel", "value": {"type": "String", "value": "alerts"}},
+                                        {
+                                            "name": "channel",
+                                            "value": {"type": "String", "value": "alerts"},
+                                        },
                                     ],
                                 },
                             ],
@@ -407,7 +421,10 @@ class TestCallSiteMixinArgs:
                                 "type": "MixinCall",
                                 "target": "Mixin",
                                 "args": [
-                                    {"name": "val", "value": {"type": "StepRef", "path": ["a", "out"]}},
+                                    {
+                                        "name": "val",
+                                        "value": {"type": "StepRef", "path": ["a", "out"]},
+                                    },
                                 ],
                             },
                         ],
@@ -505,7 +522,10 @@ class TestCallSiteMixinArgs:
                         "type": "CallExpr",
                         "target": "W",
                         "args": [
-                            {"name": "result", "value": {"type": "StepRef", "path": ["d", "level"]}},
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["d", "level"]},
+                            },
                         ],
                     },
                 },

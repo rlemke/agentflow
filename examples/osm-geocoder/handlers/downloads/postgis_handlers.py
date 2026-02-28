@@ -7,7 +7,7 @@ under the osm.geo.Operations namespace.
 import logging
 import os
 
-from .postgis_importer import HAS_OSMIUM, HAS_PSYCOPG2, sanitize_url
+from .postgis_importer import HAS_OSMIUM, HAS_PSYCOPG2
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,10 @@ def _postgis_import_handler(payload: dict) -> dict:
 
         result = import_to_postgis(pbf_path, source_url=source_url)
         if step_log:
-            step_log(f"PostGisImport: imported {result.node_count + result.way_count} elements (nodes={result.node_count}, ways={result.way_count})", level="success")
+            step_log(
+                f"PostGisImport: imported {result.node_count + result.way_count} elements (nodes={result.node_count}, ways={result.way_count})",
+                level="success",
+            )
         return {
             "stats": {
                 "url": source_url,

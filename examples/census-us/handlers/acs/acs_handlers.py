@@ -30,6 +30,7 @@ _FACET_TABLE_MAP = {
 
 def _make_acs_handler(facet_name: str, table_id: str):
     """Create a handler for an ACS extraction event facet."""
+
     def handler(params: dict[str, Any]) -> dict[str, Any]:
         file_info = params.get("file", {})
         csv_path = file_info.get("path", "") if isinstance(file_info, dict) else ""
@@ -68,19 +69,18 @@ def _make_acs_handler(facet_name: str, table_id: str):
             if step_log:
                 step_log(f"{facet_name}: {exc}", level="error")
             raise
+
     return handler
 
 
 # Build handlers for each facet
 _HANDLERS = {
-    facet: _make_acs_handler(facet, table_id)
-    for facet, table_id in _FACET_TABLE_MAP.items()
+    facet: _make_acs_handler(facet, table_id) for facet, table_id in _FACET_TABLE_MAP.items()
 }
 
 # RegistryRunner dispatch adapter
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.{facet}": handler
-    for facet, handler in _HANDLERS.items()
+    f"{NAMESPACE}.{facet}": handler for facet, handler in _HANDLERS.items()
 }
 
 

@@ -14,9 +14,8 @@ Severity levels:
 
 import json
 import logging
-import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from afl.runtime.storage import localize
@@ -37,6 +36,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class VerifyResult:
@@ -73,16 +73,36 @@ class VerifySummaryData:
 # Helpers
 # ---------------------------------------------------------------------------
 
-_NAMED_FEATURE_KEYS = frozenset({
-    "amenity", "shop", "tourism", "leisure", "office",
-    "building", "highway", "railway", "aeroway", "waterway",
-    "place", "historic", "natural",
-})
+_NAMED_FEATURE_KEYS = frozenset(
+    {
+        "amenity",
+        "shop",
+        "tourism",
+        "leisure",
+        "office",
+        "building",
+        "highway",
+        "railway",
+        "aeroway",
+        "waterway",
+        "place",
+        "historic",
+        "natural",
+    }
+)
 
-_POLYGON_TAG_KEYS = frozenset({
-    "building", "landuse", "natural", "leisure", "amenity",
-    "area", "boundary", "place",
-})
+_POLYGON_TAG_KEYS = frozenset(
+    {
+        "building",
+        "landuse",
+        "natural",
+        "leisure",
+        "amenity",
+        "area",
+        "boundary",
+        "place",
+    }
+)
 
 
 def _should_have_name(tags: dict[str, str]) -> bool:
@@ -122,6 +142,7 @@ def _make_issue(
 # ---------------------------------------------------------------------------
 # VerificationHandler — single-pass pyosmium handler
 # ---------------------------------------------------------------------------
+
 
 class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # type: ignore[misc]
     """Single-pass PBF handler that collects data quality issues."""
@@ -166,8 +187,12 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
         return {t.k: t.v for t in tags}
 
     def _check_tags_common(
-        self, tags: dict[str, str], element_type: str, element_id: int,
-        lon: float | None, lat: float | None,
+        self,
+        tags: dict[str, str],
+        element_type: str,
+        element_id: int,
+        lon: float | None,
+        lat: float | None,
     ) -> None:
         """Tag checks shared across node/way/relation."""
         tag_count = len(tags)
@@ -178,28 +203,46 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
         # Level 3: empty tag values
         for k, v in tags.items():
             if v == "":
-                self.issues.append(_make_issue(
-                    "tag", 3,
-                    f"Empty value for tag '{k}'",
-                    element_type, element_id, lon, lat,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "tag",
+                        3,
+                        f"Empty value for tag '{k}'",
+                        element_type,
+                        element_id,
+                        lon,
+                        lat,
+                    )
+                )
 
         # Level 2: missing name on named features
         if _should_have_name(tags) and "name" not in tags:
-            self.issues.append(_make_issue(
-                "tag", 2,
-                "Missing 'name' tag on named feature",
-                element_type, element_id, lon, lat,
-            ))
+            self.issues.append(
+                _make_issue(
+                    "tag",
+                    2,
+                    "Missing 'name' tag on named feature",
+                    element_type,
+                    element_id,
+                    lon,
+                    lat,
+                )
+            )
 
         # Required tags
         for rt in self.required_tags:
             if rt not in tags:
-                self.issues.append(_make_issue(
-                    "tag", 2,
-                    f"Missing required tag '{rt}'",
-                    element_type, element_id, lon, lat,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "tag",
+                        2,
+                        f"Missing required tag '{rt}'",
+                        element_type,
+                        element_id,
+                        lon,
+                        lat,
+                    )
+                )
 
     # -- pyosmium callbacks --
 
@@ -210,11 +253,15 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
         # Duplicate check
         if self.check_duplicates:
             if nid in self._node_ids:
-                self.issues.append(_make_issue(
-                    "duplicate", 1,
-                    f"Duplicate node ID {nid}",
-                    "node", nid,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "duplicate",
+                        1,
+                        f"Duplicate node ID {nid}",
+                        "node",
+                        nid,
+                    )
+                )
         self._node_ids.add(nid)
 
         # Coordinate checks
@@ -223,26 +270,42 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
             lat = n.location.lat
         except osmium.InvalidLocationError:
             if self.check_coordinates:
-                self.issues.append(_make_issue(
-                    "coordinate", 1,
-                    "Invalid/missing location",
-                    "node", nid,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "coordinate",
+                        1,
+                        "Invalid/missing location",
+                        "node",
+                        nid,
+                    )
+                )
             return
 
         if self.check_coordinates:
             if not (-180.0 <= lon <= 180.0) or not (-90.0 <= lat <= 90.0):
-                self.issues.append(_make_issue(
-                    "coordinate", 1,
-                    f"Out-of-bounds coordinates ({lon}, {lat})",
-                    "node", nid, lon, lat,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "coordinate",
+                        1,
+                        f"Out-of-bounds coordinates ({lon}, {lat})",
+                        "node",
+                        nid,
+                        lon,
+                        lat,
+                    )
+                )
             if lon == 0.0 and lat == 0.0:
-                self.issues.append(_make_issue(
-                    "coordinate", 1,
-                    "Null Island (0, 0) coordinates",
-                    "node", nid, lon, lat,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "coordinate",
+                        1,
+                        "Null Island (0, 0) coordinates",
+                        "node",
+                        nid,
+                        lon,
+                        lat,
+                    )
+                )
 
         # Tag checks
         if self.check_tags:
@@ -256,11 +319,15 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
         # Duplicate check
         if self.check_duplicates:
             if wid in self._way_ids:
-                self.issues.append(_make_issue(
-                    "duplicate", 1,
-                    f"Duplicate way ID {wid}",
-                    "way", wid,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "duplicate",
+                        1,
+                        f"Duplicate way ID {wid}",
+                        "way",
+                        wid,
+                    )
+                )
         self._way_ids.add(wid)
 
         node_refs = [nd.ref for nd in w.nodes]
@@ -268,30 +335,42 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
         # Geometry checks
         if self.check_geometry:
             if len(node_refs) < 2:
-                self.issues.append(_make_issue(
-                    "geometry", 1,
-                    f"Degenerate way with {len(node_refs)} node(s)",
-                    "way", wid,
-                ))
+                self.issues.append(
+                    _make_issue(
+                        "geometry",
+                        1,
+                        f"Degenerate way with {len(node_refs)} node(s)",
+                        "way",
+                        wid,
+                    )
+                )
 
             tags = self._tags_to_dict(w.tags)
             if _is_polygon_tagged(tags) and len(node_refs) >= 2:
                 if node_refs[0] != node_refs[-1]:
-                    self.issues.append(_make_issue(
-                        "geometry", 2,
-                        "Unclosed polygon-tagged way",
-                        "way", wid,
-                    ))
+                    self.issues.append(
+                        _make_issue(
+                            "geometry",
+                            2,
+                            "Unclosed polygon-tagged way",
+                            "way",
+                            wid,
+                        )
+                    )
 
         # Reference integrity
         if self.check_references:
             for ref in node_refs:
                 if ref not in self._node_ids:
-                    self.issues.append(_make_issue(
-                        "reference", 1,
-                        f"Way references unknown node {ref}",
-                        "way", wid,
-                    ))
+                    self.issues.append(
+                        _make_issue(
+                            "reference",
+                            1,
+                            f"Way references unknown node {ref}",
+                            "way",
+                            wid,
+                        )
+                    )
                     break  # one issue per way is enough
 
         # Tag checks
@@ -309,18 +388,26 @@ class VerificationHandler(osmium.SimpleHandler if HAS_OSMIUM else object):  # ty
                 mtype = m.type
                 mref = m.ref
                 if mtype == "n" and mref not in self._node_ids:
-                    self.issues.append(_make_issue(
-                        "reference", 1,
-                        f"Relation references unknown node {mref}",
-                        "relation", rid,
-                    ))
+                    self.issues.append(
+                        _make_issue(
+                            "reference",
+                            1,
+                            f"Relation references unknown node {mref}",
+                            "relation",
+                            rid,
+                        )
+                    )
                     break
                 if mtype == "w" and mref not in self._way_ids:
-                    self.issues.append(_make_issue(
-                        "reference", 1,
-                        f"Relation references unknown way {mref}",
-                        "relation", rid,
-                    ))
+                    self.issues.append(
+                        _make_issue(
+                            "reference",
+                            1,
+                            f"Relation references unknown way {mref}",
+                            "relation",
+                            rid,
+                        )
+                    )
                     break
 
         # Tag checks
@@ -367,9 +454,7 @@ def _build_summary(handler: VerificationHandler) -> VerifySummaryData:
     tag_coverage = (
         (handler.elements_with_tags / total_elements * 100.0) if total_elements > 0 else 0.0
     )
-    avg_tags = (
-        (handler.total_tag_count / total_elements) if total_elements > 0 else 0.0
-    )
+    avg_tags = (handler.total_tag_count / total_elements) if total_elements > 0 else 0.0
 
     return VerifySummaryData(
         total_issues=len(handler.issues),
@@ -383,13 +468,14 @@ def _build_summary(handler: VerificationHandler) -> VerifySummaryData:
         level_3=lv3,
         tag_coverage_pct=round(tag_coverage, 2),
         avg_tags_per_element=round(avg_tags, 4),
-        verify_date=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        verify_date=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def verify_pbf(
     pbf_path: str,
@@ -440,7 +526,7 @@ def verify_pbf(
     with open_output(output_path) as f:
         json.dump(geojson, f)
 
-    verify_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    verify_date = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     summary = _build_summary(handler)
 
     result = VerifyResult(
@@ -479,11 +565,15 @@ def verify_geojson(
 
     # Structure checks
     if not isinstance(data, dict) or data.get("type") != "FeatureCollection":
-        issues.append(_make_issue(
-            "geometry", 1,
-            "GeoJSON root is not a FeatureCollection",
-            "file", 0,
-        ))
+        issues.append(
+            _make_issue(
+                "geometry",
+                1,
+                "GeoJSON root is not a FeatureCollection",
+                "file",
+                0,
+            )
+        )
 
     features = data.get("features", [])
     node_count = 0
@@ -521,11 +611,17 @@ def verify_geojson(
         if geom_type == "Point" and isinstance(coords, list) and len(coords) >= 2:
             lon, lat = coords[0], coords[1]
             if not (-180.0 <= lon <= 180.0) or not (-90.0 <= lat <= 90.0):
-                issues.append(_make_issue(
-                    "coordinate", 1,
-                    f"Out-of-bounds coordinates ({lon}, {lat})",
-                    "feature", fid, lon, lat,
-                ))
+                issues.append(
+                    _make_issue(
+                        "coordinate",
+                        1,
+                        f"Out-of-bounds coordinates ({lon}, {lat})",
+                        "feature",
+                        fid,
+                        lon,
+                        lat,
+                    )
+                )
                 coordinate_issues += 1
                 lv1 += 1
 
@@ -538,11 +634,15 @@ def verify_geojson(
 
         for k, v in props.items():
             if v == "" or v is None:
-                issues.append(_make_issue(
-                    "tag", 3,
-                    f"Empty property '{k}'",
-                    "feature", fid,
-                ))
+                issues.append(
+                    _make_issue(
+                        "tag",
+                        3,
+                        f"Empty property '{k}'",
+                        "feature",
+                        fid,
+                    )
+                )
                 tag_issues += 1
                 lv3 += 1
 
@@ -555,7 +655,7 @@ def verify_geojson(
     with open_output(output_path) as f:
         json.dump(geojson_out, f)
 
-    verify_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    verify_date = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     tag_coverage = (elements_with_props / node_count * 100.0) if node_count > 0 else 0.0
     avg_tags = (total_props / node_count) if node_count > 0 else 0.0
 
@@ -646,7 +746,7 @@ def compute_verify_summary(input_path: str) -> VerifySummaryData:
         level_1=lv1,
         level_2=lv2,
         level_3=lv3,
-        verify_date=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        verify_date=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
 
 

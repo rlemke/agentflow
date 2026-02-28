@@ -220,21 +220,15 @@ class TestHandlerRegistrationCRUD:
 
     def test_list(self, store):
         """List returns all registrations."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.A", module_uri="a")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.B", module_uri="b")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.A", module_uri="a"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.B", module_uri="b"))
         regs = store.list_handler_registrations()
         names = {r.facet_name for r in regs}
         assert names == {"ns.A", "ns.B"}
 
     def test_delete(self, store):
         """Delete removes a registration."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.X", module_uri="x")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.X", module_uri="x"))
         assert store.delete_handler_registration("ns.X") is True
         assert store.get_handler_registration("ns.X") is None
 
@@ -244,12 +238,8 @@ class TestHandlerRegistrationCRUD:
 
     def test_overwrite(self, store):
         """Saving with same facet_name overwrites."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.A", module_uri="old")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.A", module_uri="new")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.A", module_uri="old"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.A", module_uri="new"))
         loaded = store.get_handler_registration("ns.A")
         assert loaded.module_uri == "new"
 
@@ -387,8 +377,8 @@ class TestModuleCaching:
             checksum="v2",
         )
 
-        handler_v1 = runner._dispatcher._load_handler(reg_v1)
-        handler_v2 = runner._dispatcher._load_handler(reg_v2)
+        _handler_v1 = runner._dispatcher._load_handler(reg_v1)
+        _handler_v2 = runner._dispatcher._load_handler(reg_v2)
         # Different checksum -> different cache entry -> different import
         # (they're functionally equal but are separate function objects)
         assert (reg_v1.module_uri, reg_v1.checksum) in runner._module_cache
@@ -461,9 +451,7 @@ class TestRegistryRunnerPollOnce:
         """poll_once returns 0 when no handlers are registered."""
         assert runner.poll_once() == 0
 
-    def test_poll_handler_exception(
-        self, store, evaluator, workflow_ast, program_ast, tmp_path
-    ):
+    def test_poll_handler_exception(self, store, evaluator, workflow_ast, program_ast, tmp_path):
         """Exception in handler -> step error, task failed."""
         _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
@@ -543,9 +531,7 @@ class TestRegistryRunnerPollOnce:
         assert updated_task.state == TaskState.FAILED
         assert "No handler registration" in updated_task.error["message"]
 
-    def test_poll_handler_load_failure(
-        self, store, evaluator, workflow_ast, program_ast
-    ):
+    def test_poll_handler_load_failure(self, store, evaluator, workflow_ast, program_ast):
         """Handler with bad module_uri -> step error, task failed."""
         _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
@@ -673,9 +659,7 @@ class TestRegistryRunnerPollOnce:
             assert "_facet_name" not in original_data
             assert set(original_data.keys()) == original_keys
 
-    def test_handler_metadata_injected(
-        self, store, evaluator, tmp_path
-    ):
+    def test_handler_metadata_injected(self, store, evaluator, tmp_path):
         """_handler_metadata is injected when registration has metadata."""
         from afl.runtime.step import StepDefinition
         from afl.runtime.types import ObjectType
@@ -741,9 +725,7 @@ class TestRegistryRunnerPollOnce:
         assert "_handler_metadata" in captured
         assert captured["_handler_metadata"] == {"region": "europe", "priority": "high"}
 
-    def test_no_handler_metadata_when_empty(
-        self, store, evaluator, tmp_path
-    ):
+    def test_no_handler_metadata_when_empty(self, store, evaluator, tmp_path):
         """_handler_metadata is NOT injected when registration has no metadata."""
         from afl.runtime.step import StepDefinition
         from afl.runtime.types import ObjectType
@@ -1030,15 +1012,9 @@ class TestRegistryRunnerTopics:
 
     def test_topics_filter_exact(self, store, evaluator):
         """Only exact-matching facet names appear when topics are set."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.A", module_uri="a")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.B", module_uri="b")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.C", module_uri="c")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.A", module_uri="a"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.B", module_uri="b"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.C", module_uri="c"))
 
         runner = RegistryRunner(
             persistence=store,
@@ -1051,12 +1027,8 @@ class TestRegistryRunnerTopics:
 
     def test_topics_filter_glob(self, store, evaluator):
         """Glob patterns filter registered names."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.X.Foo", module_uri="x")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.Y.Bar", module_uri="y")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.X.Foo", module_uri="x"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.Y.Bar", module_uri="y"))
 
         runner = RegistryRunner(
             persistence=store,
@@ -1069,12 +1041,8 @@ class TestRegistryRunnerTopics:
 
     def test_topics_empty_means_all(self, store, evaluator):
         """No topics configured -> all registered names appear (default)."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.A", module_uri="a")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.B", module_uri="b")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.A", module_uri="a"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.B", module_uri="b"))
 
         runner = RegistryRunner(
             persistence=store,
@@ -1176,15 +1144,9 @@ class TestRegistryRunnerTopics:
 
     def test_server_topics_reflect_filter(self, store, evaluator):
         """Server definition topics match the filtered registered names."""
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.X.Foo", module_uri="x")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.X.Bar", module_uri="x")
-        )
-        store.save_handler_registration(
-            HandlerRegistration(facet_name="ns.Y.Baz", module_uri="y")
-        )
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.X.Foo", module_uri="x"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.X.Bar", module_uri="x"))
+        store.save_handler_registration(HandlerRegistration(facet_name="ns.Y.Baz", module_uri="y"))
 
         runner = RegistryRunner(
             persistence=store,
@@ -1208,9 +1170,7 @@ class TestRegistryRunnerTopics:
 class TestStepLogEmission:
     """Tests for step log emission during event processing."""
 
-    def test_step_logs_on_success(
-        self, store, evaluator, workflow_ast, program_ast, handler_file
-    ):
+    def test_step_logs_on_success(self, store, evaluator, workflow_ast, program_ast, handler_file):
         """Successful dispatch emits claimed, dispatching, and completed logs."""
         result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
         assert result.status == ExecutionStatus.PAUSED
@@ -1235,7 +1195,7 @@ class TestStepLogEmission:
         runner.poll_once()
 
         logs = store.get_step_logs_by_step(step.id)
-        messages = [l.message for l in logs]
+        messages = [log_entry.message for log_entry in logs]
 
         # Should have at least: claimed, dispatching, completed
         assert any("Task claimed" in m for m in messages)
@@ -1243,13 +1203,11 @@ class TestStepLogEmission:
         assert any("Handler completed" in m for m in messages)
 
         # Check levels
-        levels = {l.message: l.level for l in logs}
+        levels = {log_entry.message: log_entry.level for log_entry in logs}
         completed_key = [k for k in levels if "Handler completed" in k][0]
         assert levels[completed_key] == "success"
 
-    def test_step_logs_on_failure(
-        self, store, evaluator, workflow_ast, program_ast, tmp_path
-    ):
+    def test_step_logs_on_failure(self, store, evaluator, workflow_ast, program_ast, tmp_path):
         """Handler exception emits an error step log."""
         _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
@@ -1281,9 +1239,9 @@ class TestStepLogEmission:
         runner.poll_once()
 
         logs = store.get_step_logs_by_step(step.id)
-        error_logs = [l for l in logs if l.level == "error"]
+        error_logs = [log_entry for log_entry in logs if log_entry.level == "error"]
         assert len(error_logs) >= 1
-        assert any("Handler error" in l.message for l in error_logs)
+        assert any("Handler error" in log_entry.message for log_entry in error_logs)
 
     def test_step_log_callback_injection(
         self, store, evaluator, workflow_ast, program_ast, tmp_path
@@ -1322,7 +1280,7 @@ class TestStepLogEmission:
         runner.poll_once()
 
         logs = store.get_step_logs_by_step(step.id)
-        handler_logs = [l for l in logs if l.source == "handler"]
+        handler_logs = [log_entry for log_entry in logs if log_entry.source == "handler"]
         assert len(handler_logs) == 2
         assert handler_logs[0].message == "Fetching data from API"
         assert handler_logs[0].level == "info"

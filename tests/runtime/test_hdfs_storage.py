@@ -16,7 +16,7 @@ exercise the cluster through WebHDFS instead.
 
 import pytest
 
-from tests.hdfs_helpers import WebHDFSClient, hdfs, workdir  # noqa: F401
+from tests.hdfs_helpers import WebHDFSClient, hdfs, workdir  # noqa: F401, F811
 
 # Skip entire module unless --hdfs is passed
 pytestmark = pytest.mark.skipif("not config.getoption('--hdfs')")

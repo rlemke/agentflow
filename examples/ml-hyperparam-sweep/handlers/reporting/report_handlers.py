@@ -31,7 +31,9 @@ def handle_generate_sweep_report(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Generated sweep report for '{dataset_name}'", "level": "success"})
+        step_log.append(
+            {"message": f"Generated sweep report for '{dataset_name}'", "level": "success"}
+        )
 
     return {"report": report}
 

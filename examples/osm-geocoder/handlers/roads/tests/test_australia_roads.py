@@ -15,51 +15,86 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Roads", "declarations": [
-                    _ef("ExtractRoads",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "road_class", "type": "String"}],
-                        [{"name": "result", "type": "RoadResult"}]),
-                    _ef("RoadStatistics",
-                        [{"name": "input_path", "type": "String"}],
-                        [{"name": "stats", "type": "RoadStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Roads",
+                            "declarations": [
+                                _ef(
+                                    "ExtractRoads",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "road_class", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "RoadResult"}],
+                                ),
+                                _ef(
+                                    "RoadStatistics",
+                                    [{"name": "input_path", "type": "String"}],
+                                    [{"name": "stats", "type": "RoadStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -134,26 +169,76 @@ AUSTRALIA_STATS = {
 }
 
 NOTABLE_ROADS = [
-    {"name": "Pacific Highway (M1)", "class": "motorway", "length_km": 868,
-     "from": "Sydney", "to": "Brisbane"},
-    {"name": "Hume Highway (M31)", "class": "motorway", "length_km": 840,
-     "from": "Sydney", "to": "Melbourne"},
-    {"name": "Stuart Highway", "class": "primary", "length_km": 2834,
-     "from": "Adelaide", "to": "Darwin"},
-    {"name": "Great Ocean Road (B100)", "class": "secondary", "length_km": 243,
-     "from": "Torquay", "to": "Allansford"},
-    {"name": "Great Northern Highway", "class": "primary", "length_km": 3198,
-     "from": "Perth", "to": "Wyndham"},
-    {"name": "Eyre Highway", "class": "primary", "length_km": 1660,
-     "from": "Norseman", "to": "Port Augusta"},
-    {"name": "Bruce Highway (M1)", "class": "motorway", "length_km": 1677,
-     "from": "Brisbane", "to": "Cairns"},
-    {"name": "Calder Highway", "class": "primary", "length_km": 266,
-     "from": "Melbourne", "to": "Mildura"},
-    {"name": "Great Western Highway", "class": "primary", "length_km": 201,
-     "from": "Sydney", "to": "Bathurst"},
-    {"name": "Gibb River Road", "class": "tertiary", "length_km": 660,
-     "from": "Derby", "to": "Wyndham"},
+    {
+        "name": "Pacific Highway (M1)",
+        "class": "motorway",
+        "length_km": 868,
+        "from": "Sydney",
+        "to": "Brisbane",
+    },
+    {
+        "name": "Hume Highway (M31)",
+        "class": "motorway",
+        "length_km": 840,
+        "from": "Sydney",
+        "to": "Melbourne",
+    },
+    {
+        "name": "Stuart Highway",
+        "class": "primary",
+        "length_km": 2834,
+        "from": "Adelaide",
+        "to": "Darwin",
+    },
+    {
+        "name": "Great Ocean Road (B100)",
+        "class": "secondary",
+        "length_km": 243,
+        "from": "Torquay",
+        "to": "Allansford",
+    },
+    {
+        "name": "Great Northern Highway",
+        "class": "primary",
+        "length_km": 3198,
+        "from": "Perth",
+        "to": "Wyndham",
+    },
+    {
+        "name": "Eyre Highway",
+        "class": "primary",
+        "length_km": 1660,
+        "from": "Norseman",
+        "to": "Port Augusta",
+    },
+    {
+        "name": "Bruce Highway (M1)",
+        "class": "motorway",
+        "length_km": 1677,
+        "from": "Brisbane",
+        "to": "Cairns",
+    },
+    {
+        "name": "Calder Highway",
+        "class": "primary",
+        "length_km": 266,
+        "from": "Melbourne",
+        "to": "Mildura",
+    },
+    {
+        "name": "Great Western Highway",
+        "class": "primary",
+        "length_km": 201,
+        "from": "Sydney",
+        "to": "Bathurst",
+    },
+    {
+        "name": "Gibb River Road",
+        "class": "tertiary",
+        "length_km": 660,
+        "from": "Derby",
+        "to": "Wyndham",
+    },
 ]
 
 MOCK_HANDLERS = {
@@ -209,7 +294,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -217,6 +304,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Australia road network workflow end-to-end with mock handlers."""
@@ -285,7 +373,7 @@ def main() -> None:
         ("Secondary", outputs.get("secondary_km", 0)),
         ("Residential", outputs.get("residential_km", 0)),
     ]
-    print(f"\n  Road network by classification:")
+    print("\n  Road network by classification:")
     for label, km in sorted(classifications, key=lambda x: x[1], reverse=True):
         bar = "#" * int(km / 5000)
         print(f"    {label:.<20} {km:>10,.1f} km  {bar}")
@@ -293,14 +381,22 @@ def main() -> None:
     # Show data quality
     stats = AUSTRALIA_STATS
     total = stats["total_roads"]
-    print(f"\n  Data quality:")
-    print(f"    With speed limit:     {stats['with_speed_limit']:>8,}  ({100*stats['with_speed_limit']/total:.0f}%)")
-    print(f"    With surface type:    {stats['with_surface']:>8,}  ({100*stats['with_surface']/total:.0f}%)")
-    print(f"    With lane count:      {stats['with_lanes']:>8,}  ({100*stats['with_lanes']/total:.0f}%)")
-    print(f"    One-way roads:        {stats['one_way_count']:>8,}  ({100*stats['one_way_count']/total:.0f}%)")
+    print("\n  Data quality:")
+    print(
+        f"    With speed limit:     {stats['with_speed_limit']:>8,}  ({100 * stats['with_speed_limit'] / total:.0f}%)"
+    )
+    print(
+        f"    With surface type:    {stats['with_surface']:>8,}  ({100 * stats['with_surface'] / total:.0f}%)"
+    )
+    print(
+        f"    With lane count:      {stats['with_lanes']:>8,}  ({100 * stats['with_lanes'] / total:.0f}%)"
+    )
+    print(
+        f"    One-way roads:        {stats['one_way_count']:>8,}  ({100 * stats['one_way_count'] / total:.0f}%)"
+    )
 
     # Show notable roads
-    print(f"\n  Notable roads:")
+    print("\n  Notable roads:")
     for road in sorted(NOTABLE_ROADS, key=lambda r: r["length_km"], reverse=True):
         route = f"{road['from']} to {road['to']}"
         print(f"    {road['name']:.<36} {road['length_km']:>5,} km  {route}")

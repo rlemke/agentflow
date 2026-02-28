@@ -28,9 +28,10 @@ def handle_join_demographics(params: dict[str, Any]) -> dict[str, Any]:
     try:
         result = join_demographics(acs_path, tiger_path, state_fips)
         if step_log:
-            step_log(f"JoinDemographics: state={state_fips} "
-                     f"features={result['feature_count']}",
-                     level="success")
+            step_log(
+                f"JoinDemographics: state={state_fips} features={result['feature_count']}",
+                level="success",
+            )
         return {"result": result}
     except Exception as exc:
         if step_log:
@@ -52,9 +53,10 @@ def handle_extract_restaurants(params: dict[str, Any]) -> dict[str, Any]:
     try:
         result = extract_restaurants(pbf_path, region)
         if step_log:
-            step_log(f"ExtractRestaurants: region={region} "
-                     f"count={result['restaurant_count']}",
-                     level="success")
+            step_log(
+                f"ExtractRestaurants: region={region} count={result['restaurant_count']}",
+                level="success",
+            )
         return {"result": result}
     except Exception as exc:
         if step_log:

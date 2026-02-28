@@ -171,11 +171,15 @@ class TestZoomBuilderCompilation:
 
     def test_cli_check_osmzoombuilder(self, tmp_path):
         """The CLI --check flag succeeds for osmzoombuilder.afl."""
-        result = main([
-            "--primary", str(_AFL_BY_NAME["osmzoombuilder.afl"]),
-            "--library", str(_AFL_BY_NAME["osmtypes.afl"]),
-            "--check",
-        ])
+        result = main(
+            [
+                "--primary",
+                str(_AFL_BY_NAME["osmzoombuilder.afl"]),
+                "--library",
+                str(_AFL_BY_NAME["osmtypes.afl"]),
+                "--check",
+            ]
+        )
         assert result == 0
 
 

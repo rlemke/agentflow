@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from .profiling.profiling_handlers import register_profiling_handlers
-from .validation.validation_handlers import register_validation_handlers
-from .scoring.scoring_handlers import register_scoring_handlers
 from .remediation.remediation_handlers import register_remediation_handlers
+from .scoring.scoring_handlers import register_scoring_handlers
+from .validation.validation_handlers import register_validation_handlers
 
 
 def register_all_handlers(poller) -> None:
@@ -19,9 +19,9 @@ def register_all_handlers(poller) -> None:
 def register_all_registry_handlers(runner) -> None:
     """Register all handlers with a RegistryRunner."""
     from .profiling.profiling_handlers import register_handlers as reg_profiling
-    from .validation.validation_handlers import register_handlers as reg_validation
-    from .scoring.scoring_handlers import register_handlers as reg_scoring
     from .remediation.remediation_handlers import register_handlers as reg_remediation
+    from .scoring.scoring_handlers import register_handlers as reg_scoring
+    from .validation.validation_handlers import register_handlers as reg_validation
 
     reg_profiling(runner)
     reg_validation(runner)

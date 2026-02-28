@@ -17,65 +17,106 @@ No external dependencies. Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST — declares event facets the runtime needs to recognise.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "genomics", "declarations": [
-            {"type": "Namespace", "name": "Facets", "declarations": [
-                _ef("IngestReference",
-                    [{"name": "reference_build", "type": "String"}],
-                    [{"name": "result", "type": "ReferenceBundle"}]),
-                _ef("QcReads",
-                    [{"name": "sample_id", "type": "String"},
-                     {"name": "r1_uri", "type": "String"},
-                     {"name": "r2_uri", "type": "String"}],
-                    [{"name": "result", "type": "QcReport"}]),
-                _ef("AlignReads",
-                    [{"name": "sample_id", "type": "String"},
-                     {"name": "clean_fastq_path", "type": "String"},
-                     {"name": "reference_build", "type": "String"}],
-                    [{"name": "result", "type": "AlignmentResult"}]),
-                _ef("CallVariants",
-                    [{"name": "sample_id", "type": "String"},
-                     {"name": "bam_path", "type": "String"},
-                     {"name": "reference_build", "type": "String"}],
-                    [{"name": "result", "type": "VariantResult"}]),
-                _ef("JointGenotype",
-                    [{"name": "gvcf_dir", "type": "String"},
-                     {"name": "reference_build", "type": "String"},
-                     {"name": "sample_count", "type": "Long"}],
-                    [{"name": "result", "type": "CohortVariantResult"}]),
-                _ef("NormalizeFilter",
-                    [{"name": "vcf_path", "type": "String"},
-                     {"name": "reference_build", "type": "String"}],
-                    [{"name": "result", "type": "CohortVariantResult"}]),
-                _ef("Annotate",
-                    [{"name": "vcf_path", "type": "String"},
-                     {"name": "annotation_path", "type": "String"}],
-                    [{"name": "result", "type": "AnnotationResult"}]),
-                _ef("CohortAnalytics",
-                    [{"name": "variant_table_path", "type": "String"},
-                     {"name": "dataset_id", "type": "String"}],
-                    [{"name": "result", "type": "CohortStatsResult"}]),
-                _ef("Publish",
-                    [{"name": "variant_table_path", "type": "String"},
-                     {"name": "qc_report_path", "type": "String"},
-                     {"name": "stats_path", "type": "String"},
-                     {"name": "dataset_id", "type": "String"}],
-                    [{"name": "result", "type": "AnalysisPackage"}]),
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "genomics",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "Facets",
+                    "declarations": [
+                        _ef(
+                            "IngestReference",
+                            [{"name": "reference_build", "type": "String"}],
+                            [{"name": "result", "type": "ReferenceBundle"}],
+                        ),
+                        _ef(
+                            "QcReads",
+                            [
+                                {"name": "sample_id", "type": "String"},
+                                {"name": "r1_uri", "type": "String"},
+                                {"name": "r2_uri", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "QcReport"}],
+                        ),
+                        _ef(
+                            "AlignReads",
+                            [
+                                {"name": "sample_id", "type": "String"},
+                                {"name": "clean_fastq_path", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "AlignmentResult"}],
+                        ),
+                        _ef(
+                            "CallVariants",
+                            [
+                                {"name": "sample_id", "type": "String"},
+                                {"name": "bam_path", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "VariantResult"}],
+                        ),
+                        _ef(
+                            "JointGenotype",
+                            [
+                                {"name": "gvcf_dir", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                                {"name": "sample_count", "type": "Long"},
+                            ],
+                            [{"name": "result", "type": "CohortVariantResult"}],
+                        ),
+                        _ef(
+                            "NormalizeFilter",
+                            [
+                                {"name": "vcf_path", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "CohortVariantResult"}],
+                        ),
+                        _ef(
+                            "Annotate",
+                            [
+                                {"name": "vcf_path", "type": "String"},
+                                {"name": "annotation_path", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "AnnotationResult"}],
+                        ),
+                        _ef(
+                            "CohortAnalytics",
+                            [
+                                {"name": "variant_table_path", "type": "String"},
+                                {"name": "dataset_id", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "CohortStatsResult"}],
+                        ),
+                        _ef(
+                            "Publish",
+                            [
+                                {"name": "variant_table_path", "type": "String"},
+                                {"name": "qc_report_path", "type": "String"},
+                                {"name": "stats_path", "type": "String"},
+                                {"name": "dataset_id", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "AnalysisPackage"}],
+                        ),
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -233,6 +274,7 @@ SAMPLE_MOCK_DATA = {s["sample_id"]: s for s in SAMPLES}
 # Mock handlers
 # ---------------------------------------------------------------------------
 
+
 def _mock_qc_reads(params: dict) -> dict:
     sid = params.get("sample_id", "unknown")
     data = SAMPLE_MOCK_DATA.get(sid, SAMPLES[0])
@@ -346,6 +388,7 @@ MOCK_HANDLERS = {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def find_event_blocked_steps(store: MemoryStore, workflow_id: str) -> list[tuple[str, str]]:
     """Find all steps blocked waiting for an event handler.
 
@@ -354,7 +397,9 @@ def find_event_blocked_steps(store: MemoryStore, workflow_id: str) -> list[tuple
     results = []
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             results.append((step.id, short))
     return results
 
@@ -362,6 +407,7 @@ def find_event_blocked_steps(store: MemoryStore, workflow_id: str) -> list[tuple
 # ---------------------------------------------------------------------------
 # Phase 1: SamplePipeline (foreach fan-out)
 # ---------------------------------------------------------------------------
+
 
 def run_sample_pipeline() -> dict:
     """Run per-sample processing for 4 samples, return summary."""
@@ -377,8 +423,7 @@ def run_sample_pipeline() -> dict:
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
 
     sample_inputs = [
-        {"sample_id": s["sample_id"], "r1_uri": s["r1_uri"], "r2_uri": s["r2_uri"]}
-        for s in SAMPLES
+        {"sample_id": s["sample_id"], "r1_uri": s["r1_uri"], "r2_uri": s["r2_uri"]} for s in SAMPLES
     ]
 
     print(f"Executing: SamplePipeline with {len(SAMPLES)} samples")
@@ -421,12 +466,16 @@ def run_sample_pipeline() -> dict:
     assert result.success
 
     # Summary table
-    print(f"\n  {'Sample':<10} {'Reads':>12} {'Pass%':>6} {'Map%':>6} {'Cov':>5} {'Variants':>12} {'SNPs':>10} {'Indels':>10}")
-    print(f"  {'-'*10} {'-'*12} {'-'*6} {'-'*6} {'-'*5} {'-'*12} {'-'*10} {'-'*10}")
+    print(
+        f"\n  {'Sample':<10} {'Reads':>12} {'Pass%':>6} {'Map%':>6} {'Cov':>5} {'Variants':>12} {'SNPs':>10} {'Indels':>10}"
+    )
+    print(f"  {'-' * 10} {'-' * 12} {'-' * 6} {'-' * 6} {'-' * 5} {'-' * 12} {'-' * 10} {'-' * 10}")
     for s in SAMPLES:
-        print(f"  {s['sample_id']:<10} {s['total_reads']:>12,} {s['pass_rate']:>5}% "
-              f"{s['mapping_rate']:>5}% {s['coverage']:>4}x {s['variant_count']:>12,} "
-              f"{s['snp_count']:>10,} {s['indel_count']:>10,}")
+        print(
+            f"  {s['sample_id']:<10} {s['total_reads']:>12,} {s['pass_rate']:>5}% "
+            f"{s['mapping_rate']:>5}% {s['coverage']:>4}x {s['variant_count']:>12,} "
+            f"{s['snp_count']:>10,} {s['indel_count']:>10,}"
+        )
 
     assert len(samples_seen) == 4, f"Expected 4 samples, saw {len(samples_seen)}"
     print(f"\nPhase 1 complete: {step_num} event steps across {len(samples_seen)} samples")
@@ -441,6 +490,7 @@ def run_sample_pipeline() -> dict:
 # ---------------------------------------------------------------------------
 # Phase 2: CohortAnalysis (linear fan-in)
 # ---------------------------------------------------------------------------
+
 
 def run_cohort_analysis(gvcf_dir: str) -> None:
     """Run cohort-level joint analysis pipeline."""
@@ -457,9 +507,11 @@ def run_cohort_analysis(gvcf_dir: str) -> None:
 
     dataset_id = "1000G_CEU_GBR_2026Q1"
 
-    print(f"Executing: CohortAnalysis(dataset_id=\"{dataset_id}\")")
-    print("  Pipeline: IngestReference -> JointGenotype -> NormalizeFilter "
-          "-> Annotate -> CohortAnalytics -> Publish\n")
+    print(f'Executing: CohortAnalysis(dataset_id="{dataset_id}")')
+    print(
+        "  Pipeline: IngestReference -> JointGenotype -> NormalizeFilter "
+        "-> Annotate -> CohortAnalytics -> Publish\n"
+    )
 
     result = evaluator.execute(
         workflow_ast,
@@ -502,7 +554,7 @@ def run_cohort_analysis(gvcf_dir: str) -> None:
     print("COHORT RESULTS")
     print(f"{'-' * 70}")
     print(f"  Dataset:            {dataset_id}")
-    print(f"  Reference build:    GRCh38")
+    print("  Reference build:    GRCh38")
     print(f"  Samples:            {outputs.get('sample_count')}")
     print(f"  Cohort VCF:         {outputs.get('cohort_vcf_path')}")
     print(f"  Variant table:      {outputs.get('variant_table_path')}")
@@ -522,6 +574,7 @@ def run_cohort_analysis(gvcf_dir: str) -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run both pipeline phases end-to-end."""

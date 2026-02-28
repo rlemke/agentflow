@@ -15,51 +15,86 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Amenities", "declarations": [
-                    _ef("ExtractAmenities",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "category", "type": "String"}],
-                        [{"name": "result", "type": "AmenityResult"}]),
-                    _ef("AmenityStatistics",
-                        [{"name": "input_path", "type": "String"}],
-                        [{"name": "stats", "type": "AmenityStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Amenities",
+                            "declarations": [
+                                _ef(
+                                    "ExtractAmenities",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "category", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "AmenityResult"}],
+                                ),
+                                _ef(
+                                    "AmenityStatistics",
+                                    [{"name": "input_path", "type": "String"}],
+                                    [{"name": "stats", "type": "AmenityStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -223,7 +258,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -231,6 +268,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Paris amenity workflow end-to-end with mock handlers."""
@@ -300,13 +338,13 @@ def main() -> None:
         ("Education", outputs.get("education", 0)),
         ("Entertainment", outputs.get("entertainment", 0)),
     ]
-    print(f"\n  Amenities by category:")
+    print("\n  Amenities by category:")
     for label, count in sorted(categories, key=lambda x: x[1], reverse=True):
         bar = "#" * (count // 500)
         print(f"    {label:.<20} {count:>6,}  {bar}")
 
     # Show highlighted places
-    print(f"\n  Notable places:")
+    print("\n  Notable places:")
     for category, places in PARIS_HIGHLIGHTS.items():
         print(f"    {category}:")
         for place in places:

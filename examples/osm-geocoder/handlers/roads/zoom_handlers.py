@@ -7,13 +7,21 @@ under osm.geo.Roads.ZoomBuilder.
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .zoom_builder import (
-    build_zoom_layers,
-    _empty_result,
     _empty_metrics,
+    _empty_result,
+    build_zoom_layers,
+)
+from .zoom_detection import (
+    detect_bypasses,
+    detect_rings,
+    load_bypass_flags,
+    load_ring_flags,
+    save_bypass_flags,
+    save_ring_flags,
 )
 from .zoom_graph import (
     HAS_OSMIUM,
@@ -23,24 +31,19 @@ from .zoom_graph import (
 from .zoom_sbs import (
     build_anchors,
     compute_sbs_for_zoom,
-    save_sbs,
     load_sbs,
     save_anchors,
-    HAS_REQUESTS,
+    save_sbs,
 )
-from .zoom_detection import (
-    detect_bypasses,
-    detect_rings,
-    save_bypass_flags,
-    load_bypass_flags,
-    save_ring_flags,
-    load_ring_flags,
+from .zoom_selection import (
+    build_cell_budgets,
+    enforce_monotonic_reveal,
 )
 from .zoom_selection import (
     compute_scores as _compute_scores,
-    build_cell_budgets,
+)
+from .zoom_selection import (
     select_edges as _select_edges,
-    enforce_monotonic_reveal,
 )
 
 log = logging.getLogger(__name__)
@@ -70,7 +73,10 @@ def _make_build_logical_graph_handler(facet_name: str):
 
             graph = build_logical_graph(pbf_path, output_path=graph_path)
             if step_log:
-                step_log(f"{facet_name}: built graph with {len(graph.edges)} edges, {len(graph.node_coords)} nodes", level="success")
+                step_log(
+                    f"{facet_name}: built graph with {len(graph.edges)} edges, {len(graph.node_coords)} nodes",
+                    level="success",
+                )
             return {
                 "edge_count": len(graph.edges),
                 "node_count": len(graph.node_coords),
@@ -108,7 +114,10 @@ def _make_build_anchors_handler(facet_name: str):
             save_anchors(anchors, anchors_path)
 
             if step_log:
-                step_log(f"{facet_name}: built {len(anchors)} anchors for zoom {zoom_level}", level="success")
+                step_log(
+                    f"{facet_name}: built {len(anchors)} anchors for zoom {zoom_level}",
+                    level="success",
+                )
             return {"anchors_path": anchors_path, "anchor_count": len(anchors)}
         except Exception as e:
             log.error("Failed to build anchors: %s", e)
@@ -122,7 +131,7 @@ def _make_compute_sbs_handler(facet_name: str):
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
-        anchors_path = payload.get("anchors_path", "")
+        _anchors_path = payload.get("anchors_path", "")
         gh_config = payload.get("graph", {})
         zoom_level = payload.get("zoom_level", 4)
         k_pairs = payload.get("k_pairs", 5000)
@@ -143,8 +152,12 @@ def _make_compute_sbs_handler(facet_name: str):
             cities_path = str(Path(graph_path).parent / "cities.geojson")
 
             sbs, anchor_count, route_count = compute_sbs_for_zoom(
-                graph, cities_path, graph_dir, profile,
-                zoom_level, k_pairs=k_pairs,
+                graph,
+                cities_path,
+                graph_dir,
+                profile,
+                zoom_level,
+                k_pairs=k_pairs,
             )
 
             out_dir = Path(graph_path).parent
@@ -152,7 +165,10 @@ def _make_compute_sbs_handler(facet_name: str):
             save_sbs(sbs, sbs_path)
 
             if step_log:
-                step_log(f"{facet_name}: {route_count} routes computed for zoom {zoom_level}", level="success")
+                step_log(
+                    f"{facet_name}: {route_count} routes computed for zoom {zoom_level}",
+                    level="success",
+                )
             return {"sbs_path": sbs_path, "route_count": route_count}
         except Exception as e:
             log.error("Failed to compute SBS: %s", e)
@@ -204,7 +220,9 @@ def _make_compute_scores_handler(facet_name: str):
                 json.dump(serializable, f)
 
             if step_log:
-                step_log(f"{facet_name}: computed scores for {len(scores)} zoom levels", level="success")
+                step_log(
+                    f"{facet_name}: computed scores for {len(scores)} zoom levels", level="success"
+                )
             return {"scores_path": scores_path}
         except Exception as e:
             log.error("Failed to compute scores: %s", e)
@@ -313,8 +331,7 @@ def _make_select_edges_handler(facet_name: str):
             with open(scores_path, encoding="utf-8") as f:
                 raw = json.load(f)
             scores = {
-                int(z): {int(eid): s for eid, s in z_scores.items()}
-                for z, z_scores in raw.items()
+                int(z): {int(eid): s for eid, s in z_scores.items()} for z, z_scores in raw.items()
             }
 
             bypass_flags = load_bypass_flags(bypasses_path)
@@ -327,7 +344,12 @@ def _make_select_edges_handler(facet_name: str):
 
             budgets = build_cell_budgets(graph, anchors_by_zoom)
             selected_by_zoom = _select_edges(
-                graph, scores, budgets, anchors_by_zoom, bypass_flags, ring_flags,
+                graph,
+                scores,
+                budgets,
+                anchors_by_zoom,
+                bypass_flags,
+                ring_flags,
             )
             assignments = enforce_monotonic_reveal(selected_by_zoom)
 
@@ -381,20 +403,25 @@ def _make_export_zoom_layers_handler(facet_name: str):
                 _export_zoom_geojson(graph, assignments, z, geojson_path)
 
             if step_log:
-                step_log(f"{facet_name}: exported {len(assignments)} edges across 6 zoom levels to {output_dir}", level="success")
-            return {"result": {
-                "output_dir": output_dir,
-                "total_logical_edges": len(graph.edges),
-                "selected_edges": len(assignments),
-                "zoom_distribution": "",
-                "city_count": 0,
-                "pair_count": 0,
-                "route_count": 0,
-                "csv_path": "",
-                "metrics_path": "",
-                "format": "GeoJSON",
-                "extraction_date": datetime.now(timezone.utc).isoformat(),
-            }}
+                step_log(
+                    f"{facet_name}: exported {len(assignments)} edges across 6 zoom levels to {output_dir}",
+                    level="success",
+                )
+            return {
+                "result": {
+                    "output_dir": output_dir,
+                    "total_logical_edges": len(graph.edges),
+                    "selected_edges": len(assignments),
+                    "zoom_distribution": "",
+                    "city_count": 0,
+                    "pair_count": 0,
+                    "route_count": 0,
+                    "csv_path": "",
+                    "metrics_path": "",
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(UTC).isoformat(),
+                }
+            }
         except Exception as e:
             log.error("Failed to export zoom layers: %s", e)
             return {"result": _empty_result(output_dir)}
@@ -426,7 +453,10 @@ def _make_build_zoom_layers_handler(facet_name: str):
                 max_concurrent=max_concurrent,
             )
             if step_log:
-                step_log(f"{facet_name}: built zoom layers ({result.get('selected_edges', 0)} edges selected)", level="success")
+                step_log(
+                    f"{facet_name}: built zoom layers ({result.get('selected_edges', 0)} edges selected)",
+                    level="success",
+                )
             return {"result": result, "metrics": metrics}
         except Exception as e:
             log.error("Failed to build zoom layers: %s", e)

@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import synthesize_positions, build_consensus
+from handlers.shared.debate_utils import build_consensus, synthesize_positions
 
 NAMESPACE = "debate.Synthesis"
 
@@ -27,7 +27,12 @@ def handle_synthesize_positions(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Synthesized {len(arguments)} arguments into {len(themes)} themes", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Synthesized {len(arguments)} arguments into {len(themes)} themes",
+                "level": "success",
+            }
+        )
 
     return {"synthesis": synthesis, "themes": themes}
 
@@ -46,7 +51,12 @@ def handle_build_consensus(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Built consensus: agreement level {consensus['agreement_level']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Built consensus: agreement level {consensus['agreement_level']}",
+                "level": "success",
+            }
+        )
 
     return {"consensus": consensus}
 

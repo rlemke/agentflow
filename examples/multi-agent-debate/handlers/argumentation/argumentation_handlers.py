@@ -24,7 +24,9 @@ def handle_generate_argument(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         persona = role.get("persona", "unknown") if isinstance(role, dict) else "unknown"
-        step_log.append({"message": f"Generated argument by '{persona}' on '{topic}'", "level": "success"})
+        step_log.append(
+            {"message": f"Generated argument by '{persona}' on '{topic}'", "level": "success"}
+        )
 
     return {"argument": argument}
 
@@ -43,7 +45,12 @@ def handle_generate_rebuttal(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         persona = role.get("persona", "unknown") if isinstance(role, dict) else "unknown"
-        step_log.append({"message": f"Generated rebuttal by '{persona}' against {len(arguments)} arguments", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Generated rebuttal by '{persona}' against {len(arguments)} arguments",
+                "level": "success",
+            }
+        )
 
     return {"rebuttal": rebuttal}
 

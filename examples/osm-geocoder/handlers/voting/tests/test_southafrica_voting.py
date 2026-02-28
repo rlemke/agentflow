@@ -16,58 +16,103 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Amenities", "declarations": [
-                    _ef("ExtractAmenities",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "category", "type": "String"}],
-                        [{"name": "result", "type": "AmenityResult"}]),
-                    _ef("SearchAmenities",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "name_pattern", "type": "String"}],
-                        [{"name": "result", "type": "AmenityResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Boundaries", "declarations": [
-                    _ef("AdminBoundary",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "admin_level", "type": "Long"}],
-                        [{"name": "result", "type": "BoundaryResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Amenities",
+                            "declarations": [
+                                _ef(
+                                    "ExtractAmenities",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "category", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "AmenityResult"}],
+                                ),
+                                _ef(
+                                    "SearchAmenities",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "name_pattern", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "AmenityResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Boundaries",
+                            "declarations": [
+                                _ef(
+                                    "AdminBoundary",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "admin_level", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "BoundaryResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -145,26 +190,76 @@ TOTAL_STATIONS = sum(p["stations"] for p in PROVINCES)
 TOTAL_REGISTERED = sum(p["registered"] for p in PROVINCES)
 
 SAMPLE_STATIONS = [
-    {"name": "Soweto Community Hall", "type": "community_centre", "province": "Gauteng",
-     "ward": "Ward 42", "capacity": 2400},
-    {"name": "Orlando Stadium Precinct", "type": "polling_station", "province": "Gauteng",
-     "ward": "Ward 38", "capacity": 3100},
-    {"name": "Durban City Hall", "type": "government", "province": "KwaZulu-Natal",
-     "ward": "Ward 28", "capacity": 1800},
-    {"name": "Khayelitsha Community Hall", "type": "community_centre", "province": "Western Cape",
-     "ward": "Ward 94", "capacity": 2200},
-    {"name": "Nelson Mandela Bay Municipality", "type": "government", "province": "Eastern Cape",
-     "ward": "Ward 1", "capacity": 1500},
-    {"name": "Polokwane Civic Centre", "type": "government", "province": "Limpopo",
-     "ward": "Ward 15", "capacity": 1900},
-    {"name": "Mbombela Stadium Hall", "type": "community_centre", "province": "Mpumalanga",
-     "ward": "Ward 22", "capacity": 2600},
-    {"name": "Rustenburg Civic Centre", "type": "government", "province": "North West",
-     "ward": "Ward 7", "capacity": 1200},
-    {"name": "Bloemfontein City Hall", "type": "government", "province": "Free State",
-     "ward": "Ward 11", "capacity": 1600},
-    {"name": "Kimberley Town Hall", "type": "government", "province": "Northern Cape",
-     "ward": "Ward 3", "capacity": 800},
+    {
+        "name": "Soweto Community Hall",
+        "type": "community_centre",
+        "province": "Gauteng",
+        "ward": "Ward 42",
+        "capacity": 2400,
+    },
+    {
+        "name": "Orlando Stadium Precinct",
+        "type": "polling_station",
+        "province": "Gauteng",
+        "ward": "Ward 38",
+        "capacity": 3100,
+    },
+    {
+        "name": "Durban City Hall",
+        "type": "government",
+        "province": "KwaZulu-Natal",
+        "ward": "Ward 28",
+        "capacity": 1800,
+    },
+    {
+        "name": "Khayelitsha Community Hall",
+        "type": "community_centre",
+        "province": "Western Cape",
+        "ward": "Ward 94",
+        "capacity": 2200,
+    },
+    {
+        "name": "Nelson Mandela Bay Municipality",
+        "type": "government",
+        "province": "Eastern Cape",
+        "ward": "Ward 1",
+        "capacity": 1500,
+    },
+    {
+        "name": "Polokwane Civic Centre",
+        "type": "government",
+        "province": "Limpopo",
+        "ward": "Ward 15",
+        "capacity": 1900,
+    },
+    {
+        "name": "Mbombela Stadium Hall",
+        "type": "community_centre",
+        "province": "Mpumalanga",
+        "ward": "Ward 22",
+        "capacity": 2600,
+    },
+    {
+        "name": "Rustenburg Civic Centre",
+        "type": "government",
+        "province": "North West",
+        "ward": "Ward 7",
+        "capacity": 1200,
+    },
+    {
+        "name": "Bloemfontein City Hall",
+        "type": "government",
+        "province": "Free State",
+        "ward": "Ward 11",
+        "capacity": 1600,
+    },
+    {
+        "name": "Kimberley Town Hall",
+        "type": "government",
+        "province": "Northern Cape",
+        "ward": "Ward 3",
+        "capacity": 800,
+    },
 ]
 
 MOCK_HANDLERS = {
@@ -236,7 +331,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -244,6 +341,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the South Africa voting location workflow end-to-end with mock handlers."""
@@ -306,27 +404,35 @@ def main() -> None:
     print(f"  Map output:             {outputs.get('map_path')}")
 
     # Show provincial breakdown
-    print(f"\n  Electoral data by province:")
-    print(f"  {'Province':<22} {'Wards':>6} {'Stations':>10} {'Registered':>12} {'Voters/Station':>15}")
-    print(f"  {'-'*22} {'-'*6} {'-'*10} {'-'*12} {'-'*15}")
+    print("\n  Electoral data by province:")
+    print(
+        f"  {'Province':<22} {'Wards':>6} {'Stations':>10} {'Registered':>12} {'Voters/Station':>15}"
+    )
+    print(f"  {'-' * 22} {'-' * 6} {'-' * 10} {'-' * 12} {'-' * 15}")
     for prov in sorted(PROVINCES, key=lambda p: p["registered"], reverse=True):
         vps = prov["registered"] // prov["stations"]
-        print(f"  {prov['name']:<22} {prov['wards']:>6,} {prov['stations']:>10,} "
-              f"{prov['registered']:>12,} {vps:>15,}")
-    print(f"  {'-'*22} {'-'*6} {'-'*10} {'-'*12} {'-'*15}")
+        print(
+            f"  {prov['name']:<22} {prov['wards']:>6,} {prov['stations']:>10,} "
+            f"{prov['registered']:>12,} {vps:>15,}"
+        )
+    print(f"  {'-' * 22} {'-' * 6} {'-' * 10} {'-' * 12} {'-' * 15}")
     avg_vps = TOTAL_REGISTERED // TOTAL_STATIONS
-    print(f"  {'Total':<22} {TOTAL_WARDS:>6,} {TOTAL_STATIONS:>10,} "
-          f"{TOTAL_REGISTERED:>12,} {avg_vps:>15,}")
+    print(
+        f"  {'Total':<22} {TOTAL_WARDS:>6,} {TOTAL_STATIONS:>10,} "
+        f"{TOTAL_REGISTERED:>12,} {avg_vps:>15,}"
+    )
 
     # Show sample voting stations
-    print(f"\n  Sample voting stations:")
+    print("\n  Sample voting stations:")
     for station in SAMPLE_STATIONS:
-        print(f"    {station['name']:.<42} {station['type']:<20} "
-              f"{station['province']:<16} {station['ward']}")
+        print(
+            f"    {station['name']:.<42} {station['type']:<20} "
+            f"{station['province']:<16} {station['ward']}"
+        )
 
     # Show coverage ratio
     stations_per_ward = TOTAL_STATIONS / TOTAL_WARDS
-    print(f"\n  Coverage:")
+    print("\n  Coverage:")
     print(f"    Avg stations per ward:    {stations_per_ward:.1f}")
     print(f"    Avg registered per ward:  {TOTAL_REGISTERED // TOTAL_WARDS:,}")
     print(f"    Avg registered per station:{TOTAL_REGISTERED // TOTAL_STATIONS:,}")

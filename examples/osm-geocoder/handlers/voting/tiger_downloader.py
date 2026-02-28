@@ -27,17 +27,61 @@ DISTRICT_VOTING_PRECINCT = "vtd"
 
 # State FIPS codes
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
-    "WY": "56", "PR": "72", "VI": "78", "GU": "66", "AS": "60",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
+    "WY": "56",
+    "PR": "72",
+    "VI": "78",
+    "GU": "66",
+    "AS": "60",
     "MP": "69",
 }
 
@@ -46,21 +90,62 @@ FIPS_TO_STATE = {v: k for k, v in STATE_FIPS.items()}
 
 # Full state names to abbreviations
 STATE_NAMES = {
-    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
-    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
-    "district of columbia": "DC", "florida": "FL", "georgia": "GA", "hawaii": "HI",
-    "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
-    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME",
-    "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
-    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
-    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
-    "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH",
-    "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI",
-    "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX",
-    "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
-    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
-    "puerto rico": "PR", "virgin islands": "VI", "guam": "GU",
-    "american samoa": "AS", "northern mariana islands": "MP",
+    "alabama": "AL",
+    "alaska": "AK",
+    "arizona": "AZ",
+    "arkansas": "AR",
+    "california": "CA",
+    "colorado": "CO",
+    "connecticut": "CT",
+    "delaware": "DE",
+    "district of columbia": "DC",
+    "florida": "FL",
+    "georgia": "GA",
+    "hawaii": "HI",
+    "idaho": "ID",
+    "illinois": "IL",
+    "indiana": "IN",
+    "iowa": "IA",
+    "kansas": "KS",
+    "kentucky": "KY",
+    "louisiana": "LA",
+    "maine": "ME",
+    "maryland": "MD",
+    "massachusetts": "MA",
+    "michigan": "MI",
+    "minnesota": "MN",
+    "mississippi": "MS",
+    "missouri": "MO",
+    "montana": "MT",
+    "nebraska": "NE",
+    "nevada": "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    "ohio": "OH",
+    "oklahoma": "OK",
+    "oregon": "OR",
+    "pennsylvania": "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    "tennessee": "TN",
+    "texas": "TX",
+    "utah": "UT",
+    "vermont": "VT",
+    "virginia": "VA",
+    "washington": "WA",
+    "west virginia": "WV",
+    "wisconsin": "WI",
+    "wyoming": "WY",
+    "puerto rico": "PR",
+    "virgin islands": "VI",
+    "guam": "GU",
+    "american samoa": "AS",
+    "northern mariana islands": "MP",
 }
 
 
@@ -97,8 +182,9 @@ def resolve_state_fips(state: str) -> str:
     raise ValueError(f"Unknown state: {state}")
 
 
-def tiger_url(district_type: str, year: int, state_fips: str | None = None,
-              congress_number: int | None = None) -> str:
+def tiger_url(
+    district_type: str, year: int, state_fips: str | None = None, congress_number: int | None = None
+) -> str:
     """Build the TIGER/Line download URL for a district type.
 
     Args:
@@ -139,8 +225,9 @@ def tiger_url(district_type: str, year: int, state_fips: str | None = None,
     raise ValueError(f"Unknown district type: {district_type}")
 
 
-def cache_path(district_type: str, year: int, state_fips: str | None = None,
-               congress_number: int | None = None) -> str:
+def cache_path(
+    district_type: str, year: int, state_fips: str | None = None, congress_number: int | None = None
+) -> str:
     """Build the local cache path for a district type."""
     year_str = str(year)
 
@@ -163,9 +250,12 @@ def cache_path(district_type: str, year: int, state_fips: str | None = None,
     return os.path.join(CACHE_DIR, year_str, subdir, filename)
 
 
-def download_tiger(district_type: str, year: int = 2023,
-                   state_fips: str | None = None,
-                   congress_number: int | None = None) -> dict:
+def download_tiger(
+    district_type: str,
+    year: int = 2023,
+    state_fips: str | None = None,
+    congress_number: int | None = None,
+) -> dict:
     """Download a TIGER/Line shapefile, using local cache if available.
 
     Args:
@@ -202,11 +292,7 @@ def download_tiger(district_type: str, year: int = 2023,
     log.info("Downloading: %s", url)
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
-    response = requests.get(
-        url, stream=True,
-        headers={"User-Agent": USER_AGENT},
-        timeout=300
-    )
+    response = requests.get(url, stream=True, headers={"User-Agent": USER_AGENT}, timeout=300)
     response.raise_for_status()
 
     with open(local_path, "wb") as f:
@@ -254,11 +340,9 @@ def extract_shapefile(zip_path: str, output_dir: str | None = None) -> str:
     return str(shp_files[0])
 
 
-def download_congressional_districts(year: int = 2023,
-                                     congress_number: int = 118) -> dict:
+def download_congressional_districts(year: int = 2023, congress_number: int = 118) -> dict:
     """Download Congressional District boundaries."""
-    return download_tiger(DISTRICT_CONGRESSIONAL, year,
-                          congress_number=congress_number)
+    return download_tiger(DISTRICT_CONGRESSIONAL, year, congress_number=congress_number)
 
 
 def download_state_senate_districts(state_fips: str, year: int = 2023) -> dict:

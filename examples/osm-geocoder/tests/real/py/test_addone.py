@@ -9,14 +9,14 @@ Run:
     pytest examples/osm-geocoder/tests/real/py/test_addone.py -v --mongodb
 """
 
-from afl.runtime import ExecutionStatus
-
 from helpers import (
     INTEGRATION_AFL_DIR,
     compile_afl_files,
     extract_workflow,
     run_to_completion,
 )
+
+from afl.runtime import ExecutionStatus
 
 
 def addone_handler(payload: dict) -> dict:
@@ -43,9 +43,7 @@ class TestAddOneIntegration:
 
         poller.register("handlers.AddOne", addone_handler)
 
-        result = run_to_completion(
-            evaluator, poller, workflow, program, inputs={"x": 1}
-        )
+        result = run_to_completion(evaluator, poller, workflow, program, inputs={"x": 1})
 
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
@@ -58,9 +56,7 @@ class TestAddOneIntegration:
 
         poller.register("handlers.AddOne", addone_handler)
 
-        result = run_to_completion(
-            evaluator, poller, workflow, program, inputs={"x": 41}
-        )
+        result = run_to_completion(evaluator, poller, workflow, program, inputs={"x": 41})
 
         assert result.success
         assert result.outputs["result"] == 42
@@ -72,9 +68,7 @@ class TestAddOneIntegration:
 
         poller.register("handlers.AddOne", addone_handler)
 
-        result = run_to_completion(
-            evaluator, poller, workflow, program, inputs={"x": 5}
-        )
+        result = run_to_completion(evaluator, poller, workflow, program, inputs={"x": 5})
 
         assert result.success
         assert result.outputs["result"] == 6

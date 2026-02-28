@@ -5,18 +5,17 @@ Handles road extraction events defined in osmroads.afl.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .road_extractor import (
     HAS_OSMIUM,
-    RoadClass,
+    MAJOR_ROAD_CLASSES,
     RoadResult,
     RoadStats,
-    MAJOR_ROAD_CLASSES,
     calculate_road_stats,
     extract_roads,
-    filter_roads_by_class,
     filter_by_speed_limit,
+    filter_roads_by_class,
 )
 
 log = logging.getLogger(__name__)
@@ -43,7 +42,10 @@ def _make_extract_roads_handler(facet_name: str):
         try:
             result = extract_roads(pbf_path, road_class=road_class)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {road_class} roads", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {road_class} roads",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract roads: %s", e)
@@ -70,7 +72,10 @@ def _make_typed_road_handler(facet_name: str, road_class: str):
         try:
             result = extract_roads(pbf_path, road_class=road_class)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {road_class} roads", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {road_class} roads",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s roads: %s", road_class, e)
@@ -111,7 +116,8 @@ def _make_major_roads_handler(facet_name: str):
 
             major_classes = {rc.value for rc in MAJOR_ROAD_CLASSES}
             filtered = [
-                f for f in geojson.get("features", [])
+                f
+                for f in geojson.get("features", [])
                 if f.get("properties", {}).get("road_class") in major_classes
             ]
 
@@ -127,16 +133,21 @@ def _make_major_roads_handler(facet_name: str):
             with_speed = sum(1 for f in filtered if f["properties"].get("maxspeed"))
 
             if step_log:
-                step_log(f"{facet_name}: {len(filtered)}/{result.feature_count} major roads", level="success")
-            return {"result": {
-                "output_path": str(output_path),
-                "feature_count": len(filtered),
-                "road_class": "major",
-                "total_length_km": round(total_length, 2),
-                "with_speed_limit": with_speed,
-                "format": "GeoJSON",
-                "extraction_date": datetime.now(timezone.utc).isoformat(),
-            }}
+                step_log(
+                    f"{facet_name}: {len(filtered)}/{result.feature_count} major roads",
+                    level="success",
+                )
+            return {
+                "result": {
+                    "output_path": str(output_path),
+                    "feature_count": len(filtered),
+                    "road_class": "major",
+                    "total_length_km": round(total_length, 2),
+                    "with_speed_limit": with_speed,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(UTC).isoformat(),
+                }
+            }
         except Exception as e:
             log.error("Failed to extract major roads: %s", e)
             return {"result": _empty_result("major")}
@@ -175,8 +186,7 @@ def _make_special_road_handler(facet_name: str, attribute: str):
                 geojson = json.load(f)
 
             filtered = [
-                f for f in geojson.get("features", [])
-                if f.get("properties", {}).get(attribute)
+                f for f in geojson.get("features", []) if f.get("properties", {}).get(attribute)
             ]
 
             _dir = posixpath.dirname(result.output_path)
@@ -191,16 +201,21 @@ def _make_special_road_handler(facet_name: str, attribute: str):
             with_speed = sum(1 for f in filtered if f["properties"].get("maxspeed"))
 
             if step_log:
-                step_log(f"{facet_name}: {len(filtered)}/{result.feature_count} {attribute}s", level="success")
-            return {"result": {
-                "output_path": str(output_path),
-                "feature_count": len(filtered),
-                "road_class": attribute,
-                "total_length_km": round(total_length, 2),
-                "with_speed_limit": with_speed,
-                "format": "GeoJSON",
-                "extraction_date": datetime.now(timezone.utc).isoformat(),
-            }}
+                step_log(
+                    f"{facet_name}: {len(filtered)}/{result.feature_count} {attribute}s",
+                    level="success",
+                )
+            return {
+                "result": {
+                    "output_path": str(output_path),
+                    "feature_count": len(filtered),
+                    "road_class": attribute,
+                    "total_length_km": round(total_length, 2),
+                    "with_speed_limit": with_speed,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(UTC).isoformat(),
+                }
+            }
         except Exception as e:
             log.error("Failed to extract %s: %s", attribute, e)
             return {"result": _empty_result(attribute)}
@@ -226,7 +241,10 @@ def _make_surface_handler(facet_name: str, surface_type: str):
         try:
             result = extract_roads(pbf_path, road_class="all", surface_filter=surface_type)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {surface_type} roads", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {surface_type} roads",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s roads: %s", surface_type, e)
@@ -253,7 +271,10 @@ def _make_speed_limit_handler(facet_name: str):
         try:
             result = extract_roads(pbf_path, road_class="all", require_speed_limit=True)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} roads with speed limits", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} roads with speed limits",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract roads with speed limits: %s", e)
@@ -279,7 +300,10 @@ def _make_road_stats_handler(facet_name: str):
         try:
             stats = calculate_road_stats(input_path)
             if step_log:
-                step_log(f"{facet_name}: {stats.total_roads} roads, {stats.total_length_km:.1f} km", level="success")
+                step_log(
+                    f"{facet_name}: {stats.total_roads} roads, {stats.total_length_km:.1f} km",
+                    level="success",
+                )
             return {"stats": _stats_to_dict(stats)}
         except Exception as e:
             log.error("Failed to calculate road stats: %s", e)
@@ -306,7 +330,10 @@ def _make_filter_by_class_handler(facet_name: str):
         try:
             result = filter_roads_by_class(input_path, road_class)
             if step_log:
-                step_log(f"{facet_name}: filtered to {result.feature_count} {road_class} roads", level="success")
+                step_log(
+                    f"{facet_name}: filtered to {result.feature_count} {road_class} roads",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter roads: %s", e)
@@ -334,7 +361,10 @@ def _make_filter_by_speed_handler(facet_name: str):
         try:
             result = filter_by_speed_limit(input_path, min_speed, max_speed)
             if step_log:
-                step_log(f"{facet_name}: filtered to {result.feature_count} roads (speed {min_speed}-{max_speed})", level="success")
+                step_log(
+                    f"{facet_name}: filtered to {result.feature_count} roads (speed {min_speed}-{max_speed})",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter by speed limit: %s", e)
@@ -383,7 +413,7 @@ def _empty_result(road_class: str) -> dict:
         "total_length_km": 0.0,
         "with_speed_limit": 0,
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -408,28 +438,22 @@ def _empty_stats() -> dict:
 ROAD_FACETS = [
     # General extraction
     ("ExtractRoads", _make_extract_roads_handler),
-
     # By classification
     ("Motorways", lambda n: _make_typed_road_handler(n, "motorway")),
     ("PrimaryRoads", lambda n: _make_typed_road_handler(n, "primary")),
     ("SecondaryRoads", lambda n: _make_typed_road_handler(n, "secondary")),
     ("TertiaryRoads", lambda n: _make_typed_road_handler(n, "tertiary")),
     ("ResidentialRoads", lambda n: _make_typed_road_handler(n, "residential")),
-
     # Major roads combined
     ("MajorRoads", _make_major_roads_handler),
-
     # Special types
     ("Bridges", lambda n: _make_special_road_handler(n, "bridge")),
     ("Tunnels", lambda n: _make_special_road_handler(n, "tunnel")),
-
     # By surface
     ("PavedRoads", lambda n: _make_surface_handler(n, "paved")),
     ("UnpavedRoads", lambda n: _make_surface_handler(n, "unpaved")),
-
     # With attributes
     ("RoadsWithSpeedLimit", _make_speed_limit_handler),
-
     # Statistics and filtering
     ("RoadStatistics", _make_road_stats_handler),
     ("FilterRoadsByClass", _make_filter_by_class_handler),

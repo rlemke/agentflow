@@ -4,10 +4,8 @@ Handles the ExportScored event facet, copying scored GeoJSON
 into the output store for dashboard consumption.
 """
 
-import json
 import logging
 import os
-from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -15,14 +13,15 @@ logger = logging.getLogger(__name__)
 NAMESPACE = "sitesel.Output"
 
 
-def _try_output_store_ingest(scored_path: str, state_fips: str,
-                             facet_name: str) -> int:
+def _try_output_store_ingest(scored_path: str, state_fips: str, facet_name: str) -> int:
     """Attempt to ingest into MongoDB OutputStore. Returns record count or 0."""
     try:
         from afl.runtime.persistence.output_store import OutputStore
+
         db = None
         try:
             from afl.runtime.persistence.mongo_store import get_mongo_db
+
             db = get_mongo_db()
         except Exception:
             pass
@@ -63,22 +62,24 @@ def handle_export_scored(params: dict[str, Any]) -> dict[str, Any]:
         output_dir = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
         dest_dir = os.path.join(output_dir, "sitesel-export")
         os.makedirs(dest_dir, exist_ok=True)
-        dest_path = os.path.join(dest_dir,
-                                 f"{state_fips}_scored.geojson")
+        dest_path = os.path.join(dest_dir, f"{state_fips}_scored.geojson")
 
         if scored_path and os.path.exists(scored_path):
             with open(scored_path) as src, open(dest_path, "w") as dst:
                 dst.write(src.read())
 
         if step_log:
-            step_log(f"ExportScored: state={state_fips} "
-                     f"db_records={count} path={dest_path}",
-                     level="success")
+            step_log(
+                f"ExportScored: state={state_fips} db_records={count} path={dest_path}",
+                level="success",
+            )
 
-        return {"result": {
-            "output_path": dest_path,
-            "format": "geojson",
-        }}
+        return {
+            "result": {
+                "output_path": dest_path,
+                "format": "geojson",
+            }
+        }
     except Exception as exc:
         if step_log:
             step_log(f"ExportScored: {exc}", level="error")

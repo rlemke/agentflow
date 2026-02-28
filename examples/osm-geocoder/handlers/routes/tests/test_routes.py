@@ -3,11 +3,9 @@
 import json
 import os
 import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from handlers.routes.route_extractor import (
     HAS_OSMIUM,
     RouteResult,
@@ -246,9 +244,7 @@ class TestRouteStats:
             ],
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".geojson", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".geojson", delete=False) as f:
             json.dump(geojson, f)
             temp_path = f.name
 
@@ -266,9 +262,7 @@ class TestRouteStats:
         """Test calculating stats from empty GeoJSON."""
         geojson = {"type": "FeatureCollection", "features": []}
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".geojson", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".geojson", delete=False) as f:
             json.dump(geojson, f)
             temp_path = f.name
 

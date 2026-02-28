@@ -21,60 +21,105 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Population", "declarations": [
-                    _ef("ExtractPlacesWithPopulation",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "place_type", "type": "String"},
-                         {"name": "min_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                    _ef("FilterByPopulationRange",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "min_population", "type": "Long"},
-                         {"name": "max_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Routing", "declarations": [
-                    _ef("BuildRoutesBetweenCities",
-                        [{"name": "cities_path", "type": "String"},
-                         {"name": "profile", "type": "String"},
-                         {"name": "cache", "type": "OSMCache"}],
-                        [{"name": "result", "type": "RoutingResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Population",
+                            "declarations": [
+                                _ef(
+                                    "ExtractPlacesWithPopulation",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "place_type", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByPopulationRange",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                        {"name": "max_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Routing",
+                            "declarations": [
+                                _ef(
+                                    "BuildRoutesBetweenCities",
+                                    [
+                                        {"name": "cities_path", "type": "String"},
+                                        {"name": "profile", "type": "String"},
+                                        {"name": "cache", "type": "OSMCache"},
+                                    ],
+                                    [{"name": "result", "type": "RoutingResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -173,61 +218,188 @@ RANGE_CITIES = [c for c in US_CITIES if MIN_POP <= c["population"] <= MAX_POP]
 # Distances are approximate highway driving distances in km.
 ROUTES = [
     # Phoenix routes (6)
-    {"from": "Phoenix", "to": "Philadelphia", "distance_km": 3860, "duration_min": 2040,
-     "waypoints": 6112, "via": "I-10 - I-20 - I-85 - I-81 via El Paso"},
-    {"from": "Phoenix", "to": "San Antonio", "distance_km": 1575, "duration_min": 840,
-     "waypoints": 2494, "via": "I-10 via Tucson - Las Cruces - El Paso"},
-    {"from": "Phoenix", "to": "San Diego", "distance_km": 570, "duration_min": 315,
-     "waypoints": 902, "via": "I-8 via Gila Bend - Yuma"},
-    {"from": "Phoenix", "to": "Dallas", "distance_km": 1710, "duration_min": 915,
-     "waypoints": 2708, "via": "I-10 - I-20 via El Paso - Midland"},
-    {"from": "Phoenix", "to": "Austin", "distance_km": 1400, "duration_min": 750,
-     "waypoints": 2217, "via": "I-10 via Tucson - El Paso - San Antonio"},
-    {"from": "Phoenix", "to": "San Jose", "distance_km": 1060, "duration_min": 570,
-     "waypoints": 1678, "via": "I-10 - I-5 via Los Angeles - Bakersfield"},
+    {
+        "from": "Phoenix",
+        "to": "Philadelphia",
+        "distance_km": 3860,
+        "duration_min": 2040,
+        "waypoints": 6112,
+        "via": "I-10 - I-20 - I-85 - I-81 via El Paso",
+    },
+    {
+        "from": "Phoenix",
+        "to": "San Antonio",
+        "distance_km": 1575,
+        "duration_min": 840,
+        "waypoints": 2494,
+        "via": "I-10 via Tucson - Las Cruces - El Paso",
+    },
+    {
+        "from": "Phoenix",
+        "to": "San Diego",
+        "distance_km": 570,
+        "duration_min": 315,
+        "waypoints": 902,
+        "via": "I-8 via Gila Bend - Yuma",
+    },
+    {
+        "from": "Phoenix",
+        "to": "Dallas",
+        "distance_km": 1710,
+        "duration_min": 915,
+        "waypoints": 2708,
+        "via": "I-10 - I-20 via El Paso - Midland",
+    },
+    {
+        "from": "Phoenix",
+        "to": "Austin",
+        "distance_km": 1400,
+        "duration_min": 750,
+        "waypoints": 2217,
+        "via": "I-10 via Tucson - El Paso - San Antonio",
+    },
+    {
+        "from": "Phoenix",
+        "to": "San Jose",
+        "distance_km": 1060,
+        "duration_min": 570,
+        "waypoints": 1678,
+        "via": "I-10 - I-5 via Los Angeles - Bakersfield",
+    },
     # Philadelphia routes (5 remaining)
-    {"from": "Philadelphia", "to": "San Antonio", "distance_km": 2830, "duration_min": 1500,
-     "waypoints": 4481, "via": "I-81 - I-40 - I-30 - I-35 via Knoxville"},
-    {"from": "Philadelphia", "to": "San Diego", "distance_km": 4390, "duration_min": 2340,
-     "waypoints": 6951, "via": "I-76 - I-70 - I-15 via Denver - Las Vegas"},
-    {"from": "Philadelphia", "to": "Dallas", "distance_km": 2490, "duration_min": 1320,
-     "waypoints": 3943, "via": "I-81 - I-40 - I-30 via Knoxville - Memphis"},
-    {"from": "Philadelphia", "to": "Austin", "distance_km": 2700, "duration_min": 1440,
-     "waypoints": 4276, "via": "I-81 - I-40 - I-30 - I-35 via Memphis - Dallas"},
-    {"from": "Philadelphia", "to": "San Jose", "distance_km": 4670, "duration_min": 2460,
-     "waypoints": 7394, "via": "I-76 - I-80 via Chicago - Salt Lake City - Reno"},
+    {
+        "from": "Philadelphia",
+        "to": "San Antonio",
+        "distance_km": 2830,
+        "duration_min": 1500,
+        "waypoints": 4481,
+        "via": "I-81 - I-40 - I-30 - I-35 via Knoxville",
+    },
+    {
+        "from": "Philadelphia",
+        "to": "San Diego",
+        "distance_km": 4390,
+        "duration_min": 2340,
+        "waypoints": 6951,
+        "via": "I-76 - I-70 - I-15 via Denver - Las Vegas",
+    },
+    {
+        "from": "Philadelphia",
+        "to": "Dallas",
+        "distance_km": 2490,
+        "duration_min": 1320,
+        "waypoints": 3943,
+        "via": "I-81 - I-40 - I-30 via Knoxville - Memphis",
+    },
+    {
+        "from": "Philadelphia",
+        "to": "Austin",
+        "distance_km": 2700,
+        "duration_min": 1440,
+        "waypoints": 4276,
+        "via": "I-81 - I-40 - I-30 - I-35 via Memphis - Dallas",
+    },
+    {
+        "from": "Philadelphia",
+        "to": "San Jose",
+        "distance_km": 4670,
+        "duration_min": 2460,
+        "waypoints": 7394,
+        "via": "I-76 - I-80 via Chicago - Salt Lake City - Reno",
+    },
     # San Antonio routes (4 remaining)
-    {"from": "San Antonio", "to": "San Diego", "distance_km": 1940, "duration_min": 1035,
-     "waypoints": 3072, "via": "I-10 - I-8 via El Paso - Tucson"},
-    {"from": "San Antonio", "to": "Dallas", "distance_km": 440, "duration_min": 240,
-     "waypoints": 697, "via": "I-35 via Waco - Temple"},
-    {"from": "San Antonio", "to": "Austin", "distance_km": 130, "duration_min": 75,
-     "waypoints": 206, "via": "I-35 via San Marcos - New Braunfels"},
-    {"from": "San Antonio", "to": "San Jose", "distance_km": 2660, "duration_min": 1410,
-     "waypoints": 4212, "via": "I-10 - I-5 via El Paso - Phoenix - LA"},
+    {
+        "from": "San Antonio",
+        "to": "San Diego",
+        "distance_km": 1940,
+        "duration_min": 1035,
+        "waypoints": 3072,
+        "via": "I-10 - I-8 via El Paso - Tucson",
+    },
+    {
+        "from": "San Antonio",
+        "to": "Dallas",
+        "distance_km": 440,
+        "duration_min": 240,
+        "waypoints": 697,
+        "via": "I-35 via Waco - Temple",
+    },
+    {
+        "from": "San Antonio",
+        "to": "Austin",
+        "distance_km": 130,
+        "duration_min": 75,
+        "waypoints": 206,
+        "via": "I-35 via San Marcos - New Braunfels",
+    },
+    {
+        "from": "San Antonio",
+        "to": "San Jose",
+        "distance_km": 2660,
+        "duration_min": 1410,
+        "waypoints": 4212,
+        "via": "I-10 - I-5 via El Paso - Phoenix - LA",
+    },
     # San Diego routes (3 remaining)
-    {"from": "San Diego", "to": "Dallas", "distance_km": 2250, "duration_min": 1200,
-     "waypoints": 3563, "via": "I-8 - I-10 - I-20 via Tucson - El Paso"},
-    {"from": "San Diego", "to": "Austin", "distance_km": 2070, "duration_min": 1095,
-     "waypoints": 3278, "via": "I-8 - I-10 via Tucson - El Paso - San Antonio"},
-    {"from": "San Diego", "to": "San Jose", "distance_km": 740, "duration_min": 390,
-     "waypoints": 1172, "via": "I-5 via Los Angeles - Bakersfield"},
+    {
+        "from": "San Diego",
+        "to": "Dallas",
+        "distance_km": 2250,
+        "duration_min": 1200,
+        "waypoints": 3563,
+        "via": "I-8 - I-10 - I-20 via Tucson - El Paso",
+    },
+    {
+        "from": "San Diego",
+        "to": "Austin",
+        "distance_km": 2070,
+        "duration_min": 1095,
+        "waypoints": 3278,
+        "via": "I-8 - I-10 via Tucson - El Paso - San Antonio",
+    },
+    {
+        "from": "San Diego",
+        "to": "San Jose",
+        "distance_km": 740,
+        "duration_min": 390,
+        "waypoints": 1172,
+        "via": "I-5 via Los Angeles - Bakersfield",
+    },
     # Dallas routes (2 remaining)
-    {"from": "Dallas", "to": "Austin", "distance_km": 315, "duration_min": 180,
-     "waypoints": 499, "via": "I-35E - I-35 via Waco"},
-    {"from": "Dallas", "to": "San Jose", "distance_km": 2700, "duration_min": 1440,
-     "waypoints": 4276, "via": "I-20 - I-10 - I-5 via El Paso - Los Angeles"},
+    {
+        "from": "Dallas",
+        "to": "Austin",
+        "distance_km": 315,
+        "duration_min": 180,
+        "waypoints": 499,
+        "via": "I-35E - I-35 via Waco",
+    },
+    {
+        "from": "Dallas",
+        "to": "San Jose",
+        "distance_km": 2700,
+        "duration_min": 1440,
+        "waypoints": 4276,
+        "via": "I-20 - I-10 - I-5 via El Paso - Los Angeles",
+    },
     # Austin routes (1 remaining)
-    {"from": "Austin", "to": "San Jose", "distance_km": 2530, "duration_min": 1350,
-     "waypoints": 4007, "via": "I-10 - I-5 via San Antonio - El Paso - LA"},
+    {
+        "from": "Austin",
+        "to": "San Jose",
+        "distance_km": 2530,
+        "duration_min": 1350,
+        "waypoints": 4007,
+        "via": "I-10 - I-5 via San Antonio - El Paso - LA",
+    },
 ]
 
 TOTAL_DISTANCE = sum(r["distance_km"] for r in ROUTES)
 TOTAL_DURATION = sum(r["duration_min"] for r in ROUTES)
 AVG_DISTANCE = TOTAL_DISTANCE // len(ROUTES)
 NUM_ROUTES = len(ROUTES)
-assert NUM_ROUTES == len(RANGE_CITIES) * (len(RANGE_CITIES) - 1) // 2, \
-    f"Expected C({len(RANGE_CITIES)},2)={len(RANGE_CITIES)*(len(RANGE_CITIES)-1)//2}, got {NUM_ROUTES}"
+assert NUM_ROUTES == len(RANGE_CITIES) * (len(RANGE_CITIES) - 1) // 2, (
+    f"Expected C({len(RANGE_CITIES)},2)={len(RANGE_CITIES) * (len(RANGE_CITIES) - 1) // 2}, got {NUM_ROUTES}"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -256,8 +428,9 @@ MOCK_HANDLERS = {
     "ExtractPlacesWithPopulation": lambda p: {
         "result": {
             "output_path": "/tmp/us_cities.geojson",
-            "feature_count": len([c for c in US_CITIES
-                                  if c["population"] >= p.get("min_population", 0)]),
+            "feature_count": len(
+                [c for c in US_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "original_count": 19_502,
             "place_type": "city",
             "min_population": p.get("min_population", 0),
@@ -271,13 +444,15 @@ MOCK_HANDLERS = {
         "result": {
             "output_path": "/tmp/us_cities_1m_2m.geojson",
             "feature_count": len(RANGE_CITIES),
-            "original_count": len([c for c in US_CITIES
-                                   if c["population"] >= p.get("min_population", 0)]),
+            "original_count": len(
+                [c for c in US_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "place_type": "city",
             "min_population": p.get("min_population", 0),
             "max_population": p.get("max_population", 0),
-            "filter_applied": (f"{p.get('min_population', 0):,} <= population "
-                               f"<= {p.get('max_population', 0):,}"),
+            "filter_applied": (
+                f"{p.get('min_population', 0):,} <= population <= {p.get('max_population', 0):,}"
+            ),
             "format": "geojson",
             "extraction_date": "2026-02-06T12:00:02+00:00",
         },
@@ -316,7 +491,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -324,6 +501,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the US city route map workflow end-to-end with mock handlers."""
@@ -335,8 +513,10 @@ def main() -> None:
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
 
     # 1. Execute workflow
-    print('Executing: CityRouteMapByRegion(region="United States", '
-          f'min_population={MIN_POP:,}, max_population={MAX_POP:,}, profile="car")')
+    print(
+        'Executing: CityRouteMapByRegion(region="United States", '
+        f'min_population={MIN_POP:,}, max_population={MAX_POP:,}, profile="car")'
+    )
     print("  Pipeline: ResolveRegion -> ExtractPlacesWithPopulation")
     print("            -> FilterByPopulationRange -> BuildRoutesBetweenCities -> RenderMap\n")
 
@@ -380,11 +560,11 @@ def main() -> None:
     outputs = result.outputs
     n = outputs.get("city_count")
     print(f"\n{'=' * 75}")
-    print(f"RESULTS: US Cities 1-2M Population - All-Pairs Driving Routes")
+    print("RESULTS: US Cities 1-2M Population - All-Pairs Driving Routes")
     print(f"{'=' * 75}")
     print(f"  Region:                 {outputs.get('region_name')}")
     print(f"  Cities in range:        {n}")
-    print(f"  All-pairs routes:       {outputs.get('route_count')}  (C({n},2) = {n}*{n-1}/2)")
+    print(f"  All-pairs routes:       {outputs.get('route_count')}  (C({n},2) = {n}*{n - 1}/2)")
     print(f"  Total driving distance: {outputs.get('total_distance_km'):,} km")
     print(f"  Average route length:   {outputs.get('avg_distance_km'):,} km")
     print(f"  Map output:             {outputs.get('map_path')}")
@@ -398,20 +578,24 @@ def main() -> None:
         print(f"    {city['name']:.<18} {city['population']:>10,}  {city['state']:<4} {bar}")
 
     # Build symmetric route lookup
-    city_names = [c["name"] for c in sorted(RANGE_CITIES,
-                                            key=lambda c: c["population"], reverse=True)]
+    city_names = [
+        c["name"] for c in sorted(RANGE_CITIES, key=lambda c: c["population"], reverse=True)
+    ]
     route_map = {}
     for r in ROUTES:
         route_map[(r["from"], r["to"])] = r
         route_map[(r["to"], r["from"])] = {
-            "distance_km": r["distance_km"], "duration_min": r["duration_min"],
-            "via": r["via"], "waypoints": r["waypoints"],
-            "from": r["to"], "to": r["from"],
+            "distance_km": r["distance_km"],
+            "duration_min": r["duration_min"],
+            "via": r["via"],
+            "waypoints": r["waypoints"],
+            "from": r["to"],
+            "to": r["from"],
         }
 
     # Distance matrix
     col_w = 14
-    print(f"\n  Distance matrix (km):")
+    print("\n  Distance matrix (km):")
     header = "    " + "".ljust(18) + "".join(c[:col_w].rjust(col_w) for c in city_names)
     print(header)
     print("    " + "-" * (18 + col_w * len(city_names)))
@@ -426,7 +610,7 @@ def main() -> None:
         print(f"    {row_city:.<18}" + "".join(cells))
 
     # Duration matrix
-    print(f"\n  Duration matrix (hours):")
+    print("\n  Duration matrix (hours):")
     header = "    " + "".ljust(18) + "".join(c[:col_w].rjust(col_w) for c in city_names)
     print(header)
     print("    " + "-" * (18 + col_w * len(city_names)))
@@ -448,22 +632,26 @@ def main() -> None:
     # All routes sorted by distance
     print(f"\n  All {NUM_ROUTES} routes (sorted by distance):")
     print(f"    {'Route':<32} {'Distance':>10} {'Duration':>10}  {'Via'}")
-    print(f"    {'-'*32} {'-'*10} {'-'*10}  {'-'*40}")
+    print(f"    {'-' * 32} {'-' * 10} {'-' * 10}  {'-' * 40}")
     for route in sorted(ROUTES, key=lambda r: r["distance_km"], reverse=True):
         label = f"{route['from']} -> {route['to']}"
         hours = route["duration_min"] // 60
         mins = route["duration_min"] % 60
-        print(f"    {label:<32} {route['distance_km']:>7,} km  "
-              f"{hours:>2}h {mins:02d}m   {route['via']}")
-    print(f"    {'-'*32} {'-'*10} {'-'*10}")
+        print(
+            f"    {label:<32} {route['distance_km']:>7,} km  "
+            f"{hours:>2}h {mins:02d}m   {route['via']}"
+        )
+    print(f"    {'-' * 32} {'-' * 10} {'-' * 10}")
     total_h = TOTAL_DURATION // 60
     total_m = TOTAL_DURATION % 60
     print(f"    {'Total':<32} {TOTAL_DISTANCE:>7,} km  {total_h:>2}h {total_m:02d}m")
-    print(f"    {'Average':<32} {AVG_DISTANCE:>7,} km  "
-          f"{TOTAL_DURATION // NUM_ROUTES // 60:>2}h {TOTAL_DURATION // NUM_ROUTES % 60:02d}m")
+    print(
+        f"    {'Average':<32} {AVG_DISTANCE:>7,} km  "
+        f"{TOTAL_DURATION // NUM_ROUTES // 60:>2}h {TOTAL_DURATION // NUM_ROUTES % 60:02d}m"
+    )
 
     # Per-city connectivity summary
-    print(f"\n  Per-city connectivity:")
+    print("\n  Per-city connectivity:")
     for city_name in city_names:
         city_routes = [r for r in ROUTES if r["from"] == city_name or r["to"] == city_name]
         total_km = sum(r["distance_km"] for r in city_routes)
@@ -471,54 +659,80 @@ def main() -> None:
         farthest = max(city_routes, key=lambda r: r["distance_km"])
         nearest_city = nearest["to"] if nearest["from"] == city_name else nearest["from"]
         farthest_city = farthest["to"] if farthest["from"] == city_name else farthest["from"]
-        print(f"    {city_name:.<18} {len(city_routes)} routes, {total_km:>6,} km total  "
-              f"(nearest: {nearest_city} {nearest['distance_km']:,} km, "
-              f"farthest: {farthest_city} {farthest['distance_km']:,} km)")
+        print(
+            f"    {city_name:.<18} {len(city_routes)} routes, {total_km:>6,} km total  "
+            f"(nearest: {nearest_city} {nearest['distance_km']:,} km, "
+            f"farthest: {farthest_city} {farthest['distance_km']:,} km)"
+        )
 
     # Geographic clusters
     texas_cities = [c for c in RANGE_CITIES if c["state"] == "TX"]
     california_cities = [c for c in RANGE_CITIES if c["state"] == "CA"]
-    print(f"\n  Geographic clusters:")
+    print("\n  Geographic clusters:")
     if texas_cities:
         names = ", ".join(c["name"] for c in texas_cities)
         print(f"    Texas ({len(texas_cities)} cities): {names}")
-        tx_routes = [r for r in ROUTES
-                     if (r["from"] in [c["name"] for c in texas_cities]
-                         and r["to"] in [c["name"] for c in texas_cities])]
+        tx_routes = [
+            r
+            for r in ROUTES
+            if (
+                r["from"] in [c["name"] for c in texas_cities]
+                and r["to"] in [c["name"] for c in texas_cities]
+            )
+        ]
         if tx_routes:
             shortest = min(tx_routes, key=lambda r: r["distance_km"])
-            print(f"      Shortest intra-TX route: {shortest['from']} -> {shortest['to']} "
-                  f"({shortest['distance_km']} km, {shortest['duration_min']//60}h {shortest['duration_min']%60:02d}m)")
+            print(
+                f"      Shortest intra-TX route: {shortest['from']} -> {shortest['to']} "
+                f"({shortest['distance_km']} km, {shortest['duration_min'] // 60}h {shortest['duration_min'] % 60:02d}m)"
+            )
     if california_cities:
         names = ", ".join(c["name"] for c in california_cities)
         print(f"    California ({len(california_cities)} cities): {names}")
-        ca_routes = [r for r in ROUTES
-                     if (r["from"] in [c["name"] for c in california_cities]
-                         and r["to"] in [c["name"] for c in california_cities])]
+        ca_routes = [
+            r
+            for r in ROUTES
+            if (
+                r["from"] in [c["name"] for c in california_cities]
+                and r["to"] in [c["name"] for c in california_cities]
+            )
+        ]
         if ca_routes:
             shortest = min(ca_routes, key=lambda r: r["distance_km"])
-            print(f"      Shortest intra-CA route: {shortest['from']} -> {shortest['to']} "
-                  f"({shortest['distance_km']} km, {shortest['duration_min']//60}h {shortest['duration_min']%60:02d}m)")
+            print(
+                f"      Shortest intra-CA route: {shortest['from']} -> {shortest['to']} "
+                f"({shortest['distance_km']} km, {shortest['duration_min'] // 60}h {shortest['duration_min'] % 60:02d}m)"
+            )
 
     # Cross-country extremes
     longest = max(ROUTES, key=lambda r: r["distance_km"])
     shortest = min(ROUTES, key=lambda r: r["distance_km"])
-    print(f"\n  Extremes:")
-    print(f"    Longest route:  {longest['from']} -> {longest['to']} "
-          f"({longest['distance_km']:,} km, {longest['duration_min']//60}h {longest['duration_min']%60:02d}m)")
-    print(f"    Shortest route: {shortest['from']} -> {shortest['to']} "
-          f"({shortest['distance_km']:,} km, {shortest['duration_min']//60}h {shortest['duration_min']%60:02d}m)")
-    print(f"    Ratio:          {longest['distance_km'] / shortest['distance_km']:.1f}x distance, "
-          f"{longest['duration_min'] / shortest['duration_min']:.1f}x time")
+    print("\n  Extremes:")
+    print(
+        f"    Longest route:  {longest['from']} -> {longest['to']} "
+        f"({longest['distance_km']:,} km, {longest['duration_min'] // 60}h {longest['duration_min'] % 60:02d}m)"
+    )
+    print(
+        f"    Shortest route: {shortest['from']} -> {shortest['to']} "
+        f"({shortest['distance_km']:,} km, {shortest['duration_min'] // 60}h {shortest['duration_min'] % 60:02d}m)"
+    )
+    print(
+        f"    Ratio:          {longest['distance_km'] / shortest['distance_km']:.1f}x distance, "
+        f"{longest['duration_min'] / shortest['duration_min']:.1f}x time"
+    )
 
     # Show excluded cities
     too_big = [c for c in US_CITIES if c["population"] > MAX_POP]
     too_small = [c for c in US_CITIES if c["population"] < MIN_POP]
-    print(f"\n  Excluded cities:")
+    print("\n  Excluded cities:")
     for c in too_big:
-        print(f"    {c['name']:.<18} {c['population']:>10,}  {c['state']:<4} (above {MAX_POP / 1e6:.0f}M)")
+        print(
+            f"    {c['name']:.<18} {c['population']:>10,}  {c['state']:<4} (above {MAX_POP / 1e6:.0f}M)"
+        )
     for c in sorted(too_small, key=lambda x: x["population"], reverse=True):
-        print(f"    {c['name']:.<18} {c['population']:>10,}  {c['state']:<4} (below {MIN_POP / 1e6:.0f}M)")
+        print(
+            f"    {c['name']:.<18} {c['population']:>10,}  {c['state']:<4} (below {MIN_POP / 1e6:.0f}M)"
+        )
 
     assert result.success
     assert outputs["region_name"] == "United States"

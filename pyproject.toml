@@ -29,6 +29,8 @@ test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "mongomock>=4.0",
+    "requests>=2.28",
+    "pyshp>=2.3",
 ]
 dashboard = [
     "fastapi>=0.100",
@@ -99,7 +101,12 @@ ignore = [
     "E402",   # module level import not at top of file (logger setup pattern)
     "B008",   # do not perform function calls in argument defaults
     "B905",   # zip without strict= (python 3.10+)
+    "UP038",  # isinstance with tuple is valid and readable (removed in ruff 0.12+)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/runtime/test_hdfs_storage.py" = ["F811"]
+"examples/osm-geocoder/tests/real/py/test_osm_handlers_hdfs.py" = ["F811"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["afl"]
@@ -118,6 +125,10 @@ ignore_missing_imports = true
 # disallow_incomplete_defs = true
 # warn_return_any = true
 # strict_optional = true
+
+[[tool.mypy.overrides]]
+module = "afl.runtime.mongo_store"
+warn_unused_ignores = false
 
 [[tool.mypy.overrides]]
 module = "tests.*"

@@ -33,7 +33,7 @@ def plan_topic(topic: str, depth: int = 3, max_subtopics: int = 5) -> dict[str, 
     Keywords are deterministically generated from the topic hash.
     """
     h = hashlib.md5(topic.encode()).hexdigest()
-    keywords = [f"kw_{h[i:i+4]}" for i in range(0, min(depth * 4, 16), 4)]
+    keywords = [f"kw_{h[i : i + 4]}" for i in range(0, min(depth * 4, 16), 4)]
     return {
         "name": topic,
         "depth": depth,
@@ -49,12 +49,14 @@ def decompose_topic(topic: dict[str, Any], max_subtopics: int = 5) -> list[dict[
     subtopics = []
     for i in range(max_subtopics):
         h = hashlib.md5(f"{name}_sub_{i}".encode()).hexdigest()
-        subtopics.append({
-            "name": f"{name}_subtopic_{i}",
-            "parent_topic": name,
-            "description": f"Investigation of aspect {i} of {name} (hash: {h[:6]})",
-            "priority": max_subtopics - i,
-        })
+        subtopics.append(
+            {
+                "name": f"{name}_subtopic_{i}",
+                "parent_topic": name,
+                "description": f"Investigation of aspect {i} of {name} (hash: {h[:6]})",
+                "priority": max_subtopics - i,
+            }
+        )
     return subtopics
 
 
@@ -65,28 +67,34 @@ def gather_sources(subtopic: dict[str, Any], max_sources: int = 5) -> list[dict[
     sources = []
     for i in range(count):
         seed = f"{name}_source_{i}"
-        sources.append({
-            "title": f"Source {i}: {name}",
-            "url": f"https://example.com/research/{hashlib.md5(seed.encode()).hexdigest()[:8]}",
-            "relevance_score": round(_hash_float(seed, 0.5, 1.0), 4),
-            "source_type": ["journal", "conference", "book", "report", "website"][i % 5],
-        })
+        sources.append(
+            {
+                "title": f"Source {i}: {name}",
+                "url": f"https://example.com/research/{hashlib.md5(seed.encode()).hexdigest()[:8]}",
+                "relevance_score": round(_hash_float(seed, 0.5, 1.0), 4),
+                "source_type": ["journal", "conference", "book", "report", "website"][i % 5],
+            }
+        )
     return sources
 
 
-def extract_findings(subtopic: dict[str, Any], sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def extract_findings(
+    subtopic: dict[str, Any], sources: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Extract findings from sources for a subtopic."""
     name = subtopic.get("name", "unknown") if isinstance(subtopic, dict) else str(subtopic)
     findings = []
     for i, source in enumerate(sources):
         seed = f"{name}_finding_{i}"
         title = source.get("title", f"source_{i}") if isinstance(source, dict) else str(source)
-        findings.append({
-            "claim": f"Finding {i} from {name}: evidence suggests correlation (seed: {seed[:20]})",
-            "evidence": f"Based on analysis of {title}",
-            "confidence": round(_hash_float(seed, 0.4, 0.95), 2),
-            "source_title": title,
-        })
+        findings.append(
+            {
+                "claim": f"Finding {i} from {name}: evidence suggests correlation (seed: {seed[:20]})",
+                "evidence": f"Based on analysis of {title}",
+                "confidence": round(_hash_float(seed, 0.4, 0.95), 2),
+                "source_title": title,
+            }
+        )
     return findings
 
 
@@ -143,28 +151,34 @@ def identify_gaps(
     gaps = []
     for i, g in enumerate(existing_gaps):
         seed = f"{name}_gap_{i}"
-        gaps.append({
-            "description": g if isinstance(g, str) else f"Gap {i} in {name}",
-            "severity": ["high", "medium", "low"][i % 3],
-            "area": f"area_{_hash_int(seed, 0, 5)}",
-        })
+        gaps.append(
+            {
+                "description": g if isinstance(g, str) else f"Gap {i} in {name}",
+                "severity": ["high", "medium", "low"][i % 3],
+                "area": f"area_{_hash_int(seed, 0, 5)}",
+            }
+        )
 
     # Add a gap if none exist
     if not gaps:
-        gaps.append({
-            "description": f"No gaps identified for {name} — recommend deeper analysis",
-            "severity": "low",
-            "area": "methodology",
-        })
+        gaps.append(
+            {
+                "description": f"No gaps identified for {name} — recommend deeper analysis",
+                "severity": "low",
+                "area": "methodology",
+            }
+        )
 
     recommendations = []
     for i in range(len(gaps)):
         seed = f"{name}_rec_{i}"
-        recommendations.append({
-            "action": f"Investigate {gaps[i]['description'][:50]}",
-            "priority": ["high", "medium", "low"][i % 3],
-            "estimated_effort": ["low", "medium", "high"][i % 3],
-        })
+        recommendations.append(
+            {
+                "action": f"Investigate {gaps[i]['description'][:50]}",
+                "priority": ["high", "medium", "low"][i % 3],
+                "estimated_effort": ["low", "medium", "high"][i % 3],
+            }
+        )
 
     return gaps, recommendations
 
@@ -181,12 +195,15 @@ def draft_report(
         {"title": "Introduction", "content": f"This report examines {name}."},
         {"title": "Methodology", "content": f"Analysis covered {len(themes)} themes."},
         {"title": "Findings", "content": summary},
-        {"title": "Discussion", "content": f"Key gaps: {len(gaps) if isinstance(gaps, list) else 0} identified."},
+        {
+            "title": "Discussion",
+            "content": f"Key gaps: {len(gaps) if isinstance(gaps, list) else 0} identified.",
+        },
         {"title": "Conclusion", "content": f"Research on {name} reveals significant insights."},
     ]
 
     word_count = sum(len(s["content"].split()) for s in sections)
-    citations = [f"[{i+1}] {t}" for i, t in enumerate(themes[:5])]
+    citations = [f"[{i + 1}] {t}" for i, t in enumerate(themes[:5])]
 
     return {
         "title": f"Research Report: {name}",

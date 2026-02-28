@@ -13,7 +13,6 @@ import logging
 import math
 import os
 import tempfile
-from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -123,17 +122,19 @@ def handle_fetch_air_quality(payload: dict) -> dict:
 
             if pm_value is not None:
                 values.append(pm_value)
-                features.append({
-                    "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [lon, lat]},
-                    "properties": {
-                        "name": loc.get("name", "Unknown"),
-                        "parameter": parameter,
-                        "value": pm_value,
-                        "unit": "µg/m³",
-                        "location_id": loc.get("id"),
-                    },
-                })
+                features.append(
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                        "properties": {
+                            "name": loc.get("name", "Unknown"),
+                            "parameter": parameter,
+                            "value": pm_value,
+                            "unit": "µg/m³",
+                            "location_id": loc.get("id"),
+                        },
+                    }
+                )
 
         # Write GeoJSON
         output_dir = os.path.join(tempfile.gettempdir(), "osm-airquality")
@@ -147,15 +148,20 @@ def handle_fetch_air_quality(payload: dict) -> dict:
         avg_value = sum(values) / len(values) if values else 0.0
 
         if step_log:
-            step_log(f"FetchAirQuality: fetched {len(features)} {parameter} stations (avg {avg_value:.1f} µg/m³)", level="success")
-        return {"result": {
-            "output_path": output_path,
-            "station_count": len(features),
-            "parameter": parameter,
-            "avg_value": round(avg_value, 2),
-            "unit": "µg/m³",
-            "format": "GeoJSON",
-        }}
+            step_log(
+                f"FetchAirQuality: fetched {len(features)} {parameter} stations (avg {avg_value:.1f} µg/m³)",
+                level="success",
+            )
+        return {
+            "result": {
+                "output_path": output_path,
+                "station_count": len(features),
+                "parameter": parameter,
+                "avg_value": round(avg_value, 2),
+                "unit": "µg/m³",
+                "format": "GeoJSON",
+            }
+        }
 
     except Exception as e:
         log.error("Failed to fetch air quality data: %s", e)
@@ -183,7 +189,9 @@ def handle_correlate(payload: dict) -> dict:
     step_log = payload.get("_step_log")
 
     if step_log:
-        step_log(f"CorrelateSchoolAirQuality: correlating schools with air quality (max {max_distance_km} km)")
+        step_log(
+            f"CorrelateSchoolAirQuality: correlating schools with air quality (max {max_distance_km} km)"
+        )
 
     if not schools_path or not air_quality_path:
         return {"result": _empty_correlation_result()}
@@ -237,17 +245,19 @@ def handle_correlate(payload: dict) -> dict:
                 low += 1
             pm25_values.append(best_value)
 
-            correlated_features.append({
-                "type": "Feature",
-                "geometry": school["geometry"],
-                "properties": {
-                    **school_props,
-                    "nearest_station": best_station,
-                    "distance_km": round(best_distance, 2),
-                    "pm25": best_value,
-                    "exposure": exposure,
-                },
-            })
+            correlated_features.append(
+                {
+                    "type": "Feature",
+                    "geometry": school["geometry"],
+                    "properties": {
+                        **school_props,
+                        "nearest_station": best_station,
+                        "distance_km": round(best_distance, 2),
+                        "pm25": best_value,
+                        "exposure": exposure,
+                    },
+                }
+            )
 
     # Write correlated GeoJSON
     output_dir = os.path.join(tempfile.gettempdir(), "osm-airquality")
@@ -262,17 +272,22 @@ def handle_correlate(payload: dict) -> dict:
     avg_pm25 = sum(pm25_values) / len(pm25_values) if pm25_values else 0.0
 
     if step_log:
-        step_log(f"CorrelateSchoolAirQuality: {matched}/{len(schools)} schools matched (high={high}, medium={medium}, low={low})", level="success")
-    return {"result": {
-        "output_path": output_path,
-        "school_count": len(schools),
-        "matched_count": matched,
-        "high_exposure": high,
-        "medium_exposure": medium,
-        "low_exposure": low,
-        "avg_pm25": round(avg_pm25, 2),
-        "format": "GeoJSON",
-    }}
+        step_log(
+            f"CorrelateSchoolAirQuality: {matched}/{len(schools)} schools matched (high={high}, medium={medium}, low={low})",
+            level="success",
+        )
+    return {
+        "result": {
+            "output_path": output_path,
+            "school_count": len(schools),
+            "matched_count": matched,
+            "high_exposure": high,
+            "medium_exposure": medium,
+            "low_exposure": low,
+            "avg_pm25": round(avg_pm25, 2),
+            "format": "GeoJSON",
+        }
+    }
 
 
 def handle_exposure_stats(payload: dict) -> dict:
@@ -327,20 +342,25 @@ def handle_exposure_stats(payload: dict) -> dict:
 
     if step_log:
         avg_pm = sum(pm25_values) / matched if matched else 0.0
-        step_log(f"ExposureStatistics: {total} schools (high={high}, medium={medium}, low={low}, avg PM2.5={avg_pm:.1f})", level="success")
-    return {"stats": {
-        "total_schools": total,
-        "matched_schools": matched,
-        "high_count": high,
-        "medium_count": medium,
-        "low_count": low,
-        "high_pct": round(high / total * 100, 1) if total else 0.0,
-        "medium_pct": round(medium / total * 100, 1) if total else 0.0,
-        "low_pct": round(low / total * 100, 1) if total else 0.0,
-        "avg_pm25": round(sum(pm25_values) / matched, 2) if matched else 0.0,
-        "max_pm25": max(pm25_values) if pm25_values else 0.0,
-        "min_pm25": min(pm25_values) if pm25_values else 0.0,
-    }}
+        step_log(
+            f"ExposureStatistics: {total} schools (high={high}, medium={medium}, low={low}, avg PM2.5={avg_pm:.1f})",
+            level="success",
+        )
+    return {
+        "stats": {
+            "total_schools": total,
+            "matched_schools": matched,
+            "high_count": high,
+            "medium_count": medium,
+            "low_count": low,
+            "high_pct": round(high / total * 100, 1) if total else 0.0,
+            "medium_pct": round(medium / total * 100, 1) if total else 0.0,
+            "low_pct": round(low / total * 100, 1) if total else 0.0,
+            "avg_pm25": round(sum(pm25_values) / matched, 2) if matched else 0.0,
+            "max_pm25": max(pm25_values) if pm25_values else 0.0,
+            "min_pm25": min(pm25_values) if pm25_values else 0.0,
+        }
+    }
 
 
 def _empty_air_quality_result(parameter: str) -> dict:

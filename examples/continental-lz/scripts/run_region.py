@@ -13,7 +13,6 @@ For North America: UnitedStates, Canada
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -22,12 +21,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 # Ensure handlers are importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from afl.parser import parse
-from afl.validator import validate
 from afl.emitter import emit_dict
+from afl.parser import parse
 from afl.runtime import Evaluator, MemoryStore, Telemetry
 from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
-
+from afl.validator import validate
 
 # Mapping of region names to (cache namespace, GH namespace) pairs
 REGION_MAP = {
@@ -131,7 +129,7 @@ def main() -> None:
         sys.exit(1)
     print("Validation passed")
 
-    compiled = emit_dict(ast)
+    _compiled = emit_dict(ast)
     wf_name = f"single.region.Build{args.region}LZ"
     print(f"Workflow: {wf_name}")
 
@@ -150,8 +148,8 @@ def main() -> None:
 
     # Register handlers
     from handlers.cache_handlers import register_handlers as reg_cache
-    from handlers.operations_handlers import register_handlers as reg_operations
     from handlers.graphhopper_handlers import register_handlers as reg_graphhopper
+    from handlers.operations_handlers import register_handlers as reg_operations
     from handlers.population_handlers import register_handlers as reg_population
     from handlers.zoom_handlers import register_handlers as reg_zoom
 

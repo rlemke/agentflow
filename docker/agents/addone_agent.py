@@ -17,10 +17,9 @@ import sys
 # Add parent to path for afl imports
 sys.path.insert(0, "/app")
 
-from afl.config import load_config
-from afl.runtime.mongo_store import MongoStore
-from afl.runtime.evaluator import Evaluator
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
+from afl.runtime.evaluator import Evaluator
+from afl.runtime.mongo_store import MongoStore
 
 logging.basicConfig(
     level=logging.INFO,

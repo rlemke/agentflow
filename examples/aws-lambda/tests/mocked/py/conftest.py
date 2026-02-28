@@ -1,4 +1,5 @@
 """Conftest for aws-lambda mocked tests."""
+
 import os
 import sys
 

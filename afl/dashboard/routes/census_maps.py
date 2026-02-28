@@ -31,19 +31,57 @@ router = APIRouter(prefix="/census")
 
 # FIPS code → state name for display purposes.
 _FIPS_TO_STATE: dict[str, str] = {
-    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
-    "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
-    "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
-    "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
-    "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
-    "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
-    "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
-    "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
-    "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
-    "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
-    "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
-    "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-    "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
+    "01": "Alabama",
+    "02": "Alaska",
+    "04": "Arizona",
+    "05": "Arkansas",
+    "06": "California",
+    "08": "Colorado",
+    "09": "Connecticut",
+    "10": "Delaware",
+    "11": "District of Columbia",
+    "12": "Florida",
+    "13": "Georgia",
+    "15": "Hawaii",
+    "16": "Idaho",
+    "17": "Illinois",
+    "18": "Indiana",
+    "19": "Iowa",
+    "20": "Kansas",
+    "21": "Kentucky",
+    "22": "Louisiana",
+    "23": "Maine",
+    "24": "Maryland",
+    "25": "Massachusetts",
+    "26": "Michigan",
+    "27": "Minnesota",
+    "28": "Mississippi",
+    "29": "Missouri",
+    "30": "Montana",
+    "31": "Nebraska",
+    "32": "Nevada",
+    "33": "New Hampshire",
+    "34": "New Jersey",
+    "35": "New Mexico",
+    "36": "New York",
+    "37": "North Carolina",
+    "38": "North Dakota",
+    "39": "Ohio",
+    "40": "Oklahoma",
+    "41": "Oregon",
+    "42": "Pennsylvania",
+    "44": "Rhode Island",
+    "45": "South Carolina",
+    "46": "South Dakota",
+    "47": "Tennessee",
+    "48": "Texas",
+    "49": "Utah",
+    "50": "Vermont",
+    "51": "Virginia",
+    "53": "Washington",
+    "54": "West Virginia",
+    "55": "Wisconsin",
+    "56": "Wyoming",
 }
 
 
@@ -59,13 +97,33 @@ def _region_label(dataset_key: str) -> str:
 
 # Preferred choropleth fields and skip lists (shared by single + combined views).
 _PREFERRED_FIELDS = [
-    "population", "population_density", "population_density_km2", "median_income",
-    "housing_units", "total_households", "family_households", "nonfamily_households",
-    "pct_owner_occupied", "pct_renter_occupied",
-    "pct_no_vehicle", "pct_drove_alone", "pct_public_transit", "pct_walk", "pct_work_from_home",
-    "pct_under_18", "pct_18_34", "pct_35_64", "pct_65_plus",
-    "pct_white", "pct_black", "pct_asian", "pct_below_poverty", "unemployment_rate",
-    "labor_force_participation", "pct_bachelors_plus", "vehicles_per_household",
+    "population",
+    "population_density",
+    "population_density_km2",
+    "median_income",
+    "housing_units",
+    "total_households",
+    "family_households",
+    "nonfamily_households",
+    "pct_owner_occupied",
+    "pct_renter_occupied",
+    "pct_no_vehicle",
+    "pct_drove_alone",
+    "pct_public_transit",
+    "pct_walk",
+    "pct_work_from_home",
+    "pct_under_18",
+    "pct_18_34",
+    "pct_35_64",
+    "pct_65_plus",
+    "pct_white",
+    "pct_black",
+    "pct_asian",
+    "pct_below_poverty",
+    "unemployment_rate",
+    "labor_force_participation",
+    "pct_bachelors_plus",
+    "vehicles_per_household",
 ]
 _FIELD_LABELS: dict[str, str] = {
     "population": "Population",
@@ -108,9 +166,14 @@ def _get_field_label(field: str) -> str:
 
 
 _POPUP_FIELDS = [
-    "population", "median_income", "population_density_km2",
-    "pct_below_poverty", "unemployment_rate", "pct_owner_occupied",
-    "pct_white", "pct_bachelors_plus",
+    "population",
+    "median_income",
+    "population_density_km2",
+    "pct_below_poverty",
+    "unemployment_rate",
+    "pct_owner_occupied",
+    "pct_white",
+    "pct_bachelors_plus",
 ]
 
 _SKIP_PREFIXES = ("B0", "B1", "B2", "B3")  # raw ACS variable codes
@@ -118,8 +181,19 @@ _SKIP_FIELDS = {"ALAND", "AWATER", "CBSAFP", "CSAFP", "METDIVFP", "STATEFP", "CO
 
 # Properties to strip from the combined national view for size reduction.
 _STRIP_PROPS = {
-    "AWATER", "CBSAFP", "CSAFP", "METDIVFP", "COUNTYNS", "GEOIDFQ",
-    "CLASSFP", "FUNCSTAT", "MTFCC", "LSAD", "INTPTLAT", "INTPTLON", "COUNTYFP",
+    "AWATER",
+    "CBSAFP",
+    "CSAFP",
+    "METDIVFP",
+    "COUNTYNS",
+    "GEOIDFQ",
+    "CLASSFP",
+    "FUNCSTAT",
+    "MTFCC",
+    "LSAD",
+    "INTPTLAT",
+    "INTPTLON",
+    "COUNTYFP",
 }
 _STRIP_RE = re.compile(r"^B[0-3]\d")
 
@@ -157,17 +231,21 @@ def _simplify_geometry(geom: dict[str, Any], max_points: int = 80) -> dict[str, 
     if gtype == "Polygon":
         return {"type": gtype, "coordinates": [_decimate_ring(r, max_points) for r in coords]}
     if gtype == "MultiPolygon":
-        return {"type": gtype, "coordinates": [[_decimate_ring(r, max_points) for r in poly] for poly in coords]}
+        return {
+            "type": gtype,
+            "coordinates": [[_decimate_ring(r, max_points) for r in poly] for poly in coords],
+        }
     return geom
 
 
 def _slim_properties(props: dict[str, Any]) -> dict[str, Any]:
     """Strip raw ACS codes and verbose TIGER fields for the combined view."""
-    return {k: v for k, v in props.items()
-            if k not in _STRIP_PROPS and not _STRIP_RE.match(k)}
+    return {k: v for k, v in props.items() if k not in _STRIP_PROPS and not _STRIP_RE.match(k)}
 
 
-def _compute_stats(features: list[dict[str, Any]], numeric_fields: list[str]) -> dict[str, dict[str, float]]:
+def _compute_stats(
+    features: list[dict[str, Any]], numeric_fields: list[str]
+) -> dict[str, dict[str, float]]:
     """Compute min/max/mean/median for numeric fields. No numpy — sorts for median."""
     stats: dict[str, dict[str, float]] = {}
     for field in numeric_fields:
@@ -252,21 +330,23 @@ def _aggregate_state_stats(features: list[dict[str, Any]]) -> list[dict[str, Any
     for fips in sorted(buckets):
         b = buckets[fips]
         total_area_km2 = b["total_aland"] / 1e6 if b["total_aland"] > 0 else 0
-        result.append({
-            "state_fips": b["state_fips"],
-            "state_name": b["state_name"],
-            "county_count": b["county_count"],
-            "total_population": round(b["total_population"]),
-            "total_housing_units": round(b["total_housing_units"]),
-            "weighted_median_income": (
-                round(b["income_weighted_sum"] / b["income_pop_sum"], 2)
-                if b["income_pop_sum"] > 0 else 0.0
-            ),
-            "population_density": (
-                round(b["total_population"] / total_area_km2, 2)
-                if total_area_km2 > 0 else 0.0
-            ),
-        })
+        result.append(
+            {
+                "state_fips": b["state_fips"],
+                "state_name": b["state_name"],
+                "county_count": b["county_count"],
+                "total_population": round(b["total_population"]),
+                "total_housing_units": round(b["total_housing_units"]),
+                "weighted_median_income": (
+                    round(b["income_weighted_sum"] / b["income_pop_sum"], 2)
+                    if b["income_pop_sum"] > 0
+                    else 0.0
+                ),
+                "population_density": (
+                    round(b["total_population"] / total_area_km2, 2) if total_area_km2 > 0 else 0.0
+                ),
+            }
+        )
     return result
 
 
@@ -282,12 +362,14 @@ def _build_comparison(
         r_data = right_stats.get(field, {})
         l_val = l_data.get("mean", 0.0)
         r_val = r_data.get("mean", 0.0)
-        rows.append({
-            "field": field,
-            "left": round(l_val, 2),
-            "right": round(r_val, 2),
-            "difference": round(r_val - l_val, 2),
-        })
+        rows.append(
+            {
+                "field": field,
+                "left": round(l_val, 2),
+                "right": round(r_val, 2),
+                "difference": round(r_val - l_val, 2),
+            }
+        )
     return rows
 
 
@@ -348,8 +430,7 @@ def census_map_all(
     """Render a combined national map of all joined county datasets."""
     db = store._db
     dataset_keys = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
+        k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix)
     )
     # Count features and detect numeric fields from first non-empty dataset.
     total_features = 0
@@ -358,7 +439,9 @@ def census_map_all(
         c = db.handler_output.count_documents({"dataset_key": dk, "geometry": {"$exists": True}})
         total_features += c
         if c > 0 and not numeric_fields:
-            sample_doc = db.handler_output.find_one({"dataset_key": dk, "geometry": {"$exists": True}})
+            sample_doc = db.handler_output.find_one(
+                {"dataset_key": dk, "geometry": {"$exists": True}}
+            )
             if sample_doc:
                 numeric_fields = _filter_numeric_fields(
                     _slim_properties(sample_doc.get("properties", {}))
@@ -386,8 +469,7 @@ def census_map_all_api(
     """Return simplified GeoJSON for all joined datasets combined."""
     db = store._db
     dataset_keys = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
+        k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix)
     )
 
     features: list[dict[str, Any]] = []
@@ -415,8 +497,7 @@ def census_map_all_download(
 
     db = store._db
     dataset_keys = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
+        k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix)
     )
 
     features: list[dict[str, Any]] = []
@@ -491,25 +572,30 @@ def census_map_states(
     db = store._db
     prefix = "census.joined."
     dataset_keys = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
+        k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix)
     )
 
     features: list[dict[str, Any]] = []
     for dk in dataset_keys:
         docs = db.handler_output.find({"dataset_key": dk, "geometry": {"$exists": True}})
         for doc in docs:
-            features.append({
-                "type": "Feature",
-                "geometry": doc["geometry"],
-                "properties": doc.get("properties", {}),
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": doc["geometry"],
+                    "properties": doc.get("properties", {}),
+                }
+            )
 
     state_stats = _aggregate_state_stats(features)
 
     # Detect numeric fields for the choropleth dropdown from state_stats
-    choropleth_fields = ["total_population", "total_housing_units",
-                         "weighted_median_income", "population_density"]
+    choropleth_fields = [
+        "total_population",
+        "total_housing_units",
+        "weighted_median_income",
+        "population_density",
+    ]
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -537,19 +623,20 @@ def census_map_states_api(
     db = store._db
     prefix = "census.joined."
     dataset_keys = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
+        k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix)
     )
 
     features: list[dict[str, Any]] = []
     for dk in dataset_keys:
         docs = db.handler_output.find({"dataset_key": dk, "geometry": {"$exists": True}})
         for doc in docs:
-            features.append({
-                "type": "Feature",
-                "geometry": doc["geometry"],
-                "properties": doc.get("properties", {}),
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": doc["geometry"],
+                    "properties": doc.get("properties", {}),
+                }
+            )
 
     # Compute state aggregates and build lookup
     state_stats = _aggregate_state_stats(features)
@@ -697,13 +784,12 @@ def census_compare(
     """Compare two state datasets side-by-side with maps and a diff table."""
     db = store._db
     prefix = "census.joined."
-    available = sorted(
-        k for k in db.handler_output.distinct("dataset_key")
-        if k.startswith(prefix)
-    )
+    available = sorted(k for k in db.handler_output.distinct("dataset_key") if k.startswith(prefix))
     # Enrich with region names
-    datasets = [{"key": k, "label": f"{_region_label(k)} ({k})" if _region_label(k) else k}
-                for k in available]
+    datasets = [
+        {"key": k, "label": f"{_region_label(k)} ({k})" if _region_label(k) else k}
+        for k in available
+    ]
 
     left_features: list[dict[str, Any]] = []
     right_features: list[dict[str, Any]] = []
@@ -715,18 +801,22 @@ def census_compare(
     if left and right:
         # Query left features
         for doc in db.handler_output.find({"dataset_key": left, "geometry": {"$exists": True}}):
-            left_features.append({
-                "type": "Feature",
-                "geometry": doc["geometry"],
-                "properties": doc.get("properties", {}),
-            })
+            left_features.append(
+                {
+                    "type": "Feature",
+                    "geometry": doc["geometry"],
+                    "properties": doc.get("properties", {}),
+                }
+            )
         # Query right features
         for doc in db.handler_output.find({"dataset_key": right, "geometry": {"$exists": True}}):
-            right_features.append({
-                "type": "Feature",
-                "geometry": doc["geometry"],
-                "properties": doc.get("properties", {}),
-            })
+            right_features.append(
+                {
+                    "type": "Feature",
+                    "geometry": doc["geometry"],
+                    "properties": doc.get("properties", {}),
+                }
+            )
         # Compute stats and comparison
         all_features = left_features + right_features
         if all_features:

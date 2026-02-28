@@ -10,10 +10,9 @@ Extracts routes and related infrastructure from OSM PBF files for:
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
@@ -76,7 +75,14 @@ ROUTE_TAGS = {
         },
         "ways": {
             "highway": ["cycleway"],
-            "cycleway": ["lane", "track", "opposite", "opposite_lane", "opposite_track", "shared_lane"],
+            "cycleway": [
+                "lane",
+                "track",
+                "opposite",
+                "opposite_lane",
+                "opposite_track",
+                "shared_lane",
+            ],
             "bicycle": ["designated", "yes"],
         },
         "infrastructure": {
@@ -93,8 +99,14 @@ ROUTE_TAGS = {
         "ways": {
             "highway": ["path", "footway", "pedestrian", "track"],
             "foot": ["designated", "yes"],
-            "sac_scale": ["hiking", "mountain_hiking", "demanding_mountain_hiking",
-                         "alpine_hiking", "demanding_alpine_hiking", "difficult_alpine_hiking"],
+            "sac_scale": [
+                "hiking",
+                "mountain_hiking",
+                "demanding_mountain_hiking",
+                "alpine_hiking",
+                "demanding_alpine_hiking",
+                "difficult_alpine_hiking",
+            ],
         },
         "infrastructure": {
             "amenity": ["shelter", "drinking_water"],
@@ -102,7 +114,12 @@ ROUTE_TAGS = {
             "information": ["guidepost", "map", "board"],
         },
         "network_key": "network",
-        "network_values": ["iwn", "nwn", "rwn", "lwn"],  # International/National/Regional/Local Walking
+        "network_values": [
+            "iwn",
+            "nwn",
+            "rwn",
+            "lwn",
+        ],  # International/National/Regional/Local Walking
     },
     RouteType.TRAIN: {
         "routes": {
@@ -136,7 +153,16 @@ ROUTE_TAGS = {
     },
     RouteType.PUBLIC_TRANSPORT: {
         "routes": {
-            "route": ["train", "railway", "light_rail", "subway", "tram", "bus", "trolleybus", "ferry"],
+            "route": [
+                "train",
+                "railway",
+                "light_rail",
+                "subway",
+                "tram",
+                "bus",
+                "trolleybus",
+                "ferry",
+            ],
         },
         "ways": {
             "railway": ["rail", "light_rail", "subway", "tram"],
@@ -233,20 +259,22 @@ class RouteHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         if self.include_infrastructure:
             tags = self._tags_to_dict(n.tags)
             if self._matches_tags(tags, self.config.get("infrastructure", {})):
-                self.features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "osm_id": n.id,
-                        "osm_type": "node",
-                        "feature_type": "infrastructure",
-                        "route_type": self.route_type.value,
-                        **tags,
-                    },
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [n.location.lon, n.location.lat],
-                    },
-                })
+                self.features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "osm_id": n.id,
+                            "osm_type": "node",
+                            "feature_type": "infrastructure",
+                            "route_type": self.route_type.value,
+                            **tags,
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [n.location.lon, n.location.lat],
+                        },
+                    }
+                )
                 self.infra_count += 1
 
     def way(self, w):
@@ -258,18 +286,20 @@ class RouteHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
             if self._matches_network(tags):
                 node_refs = [n.ref for n in w.nodes]
                 self.needed_node_ids.update(node_refs)
-                self.features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "osm_id": w.id,
-                        "osm_type": "way",
-                        "feature_type": "way",
-                        "route_type": self.route_type.value,
-                        "_node_refs": node_refs,  # Temporary, for geometry reconstruction
-                        **tags,
-                    },
-                    "geometry": None,  # Will be filled in second pass
-                })
+                self.features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "osm_id": w.id,
+                            "osm_type": "way",
+                            "feature_type": "way",
+                            "route_type": self.route_type.value,
+                            "_node_refs": node_refs,  # Temporary, for geometry reconstruction
+                            **tags,
+                        },
+                        "geometry": None,  # Will be filled in second pass
+                    }
+                )
                 self.way_count += 1
 
     def relation(self, r):
@@ -279,22 +309,21 @@ class RouteHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         # Check if this is a route relation
         if self._matches_tags(tags, self.config.get("routes", {})):
             if self._matches_network(tags):
-                members = [
-                    {"type": m.type, "ref": m.ref, "role": m.role}
-                    for m in r.members
-                ]
-                self.features.append({
-                    "type": "Feature",
-                    "properties": {
-                        "osm_id": r.id,
-                        "osm_type": "relation",
-                        "feature_type": "route",
-                        "route_type": self.route_type.value,
-                        "member_count": len(members),
-                        **tags,
-                    },
-                    "geometry": None,  # Relations need special handling
-                })
+                members = [{"type": m.type, "ref": m.ref, "role": m.role} for m in r.members]
+                self.features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "osm_id": r.id,
+                            "osm_type": "relation",
+                            "feature_type": "route",
+                            "route_type": self.route_type.value,
+                            "member_count": len(members),
+                            **tags,
+                        },
+                        "geometry": None,  # Relations need special handling
+                    }
+                )
                 self.route_count += 1
 
     def finalize_geometries(self):
@@ -358,6 +387,7 @@ def extract_routes(
 
     # Second pass: collect node coordinates for way geometries
     if handler.needed_node_ids:
+
         class NodeCollector(osmium.SimpleHandler):
             def __init__(self, needed_ids: set[int]):
                 super().__init__()
@@ -377,7 +407,8 @@ def extract_routes(
 
     # Filter out features without geometry (except relations)
     features = [
-        f for f in handler.features
+        f
+        for f in handler.features
         if f["geometry"] is not None or f["properties"].get("osm_type") == "relation"
     ]
 
@@ -397,7 +428,7 @@ def extract_routes(
         route_type=route_type.value,
         network_level=network,
         include_infrastructure=include_infrastructure,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -423,6 +454,7 @@ def filter_routes_by_type(
         suffix = f"_{route_type}" if isinstance(route_type, str) else f"_{route_type.value}"
         stem = uri_stem(input_path)
         import posixpath
+
         _dir = posixpath.dirname(input_path)
         output_path = f"{_dir}/{stem}{suffix}.geojson"
     output_path = str(output_path)
@@ -472,7 +504,7 @@ def filter_routes_by_type(
         route_type=route_type.value,
         network_level=network,
         include_infrastructure=False,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -513,8 +545,7 @@ def calculate_route_stats(input_path: str | Path) -> RouteStats:
                 coords = geometry.get("coordinates", [])
                 for i in range(len(coords) - 1):
                     total_length += _haversine_distance(
-                        coords[i][1], coords[i][0],
-                        coords[i + 1][1], coords[i + 1][0]
+                        coords[i][1], coords[i][0], coords[i + 1][1], coords[i + 1][0]
                     )
 
     return RouteStats(
@@ -536,8 +567,10 @@ def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
     delta_lat = math.radians(lat2 - lat1)
     delta_lon = math.radians(lon2 - lon1)
 
-    a = (math.sin(delta_lat / 2) ** 2 +
-         math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2)
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
+    )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     return R * c

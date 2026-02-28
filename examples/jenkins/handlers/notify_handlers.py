@@ -18,7 +18,7 @@ def _slack_notify_handler(payload: dict) -> dict[str, Any]:
     """Send a Slack notification."""
     step_log = payload.get("_step_log")
     channel = payload.get("channel", "#general")
-    message = payload.get("message", "")
+    _message = payload.get("message", "")
     if step_log:
         step_log(f"SlackNotify: {channel}")
     return {
@@ -30,7 +30,7 @@ def _slack_notify_handler(payload: dict) -> dict[str, Any]:
 def _email_notify_handler(payload: dict) -> dict[str, Any]:
     """Send an email notification."""
     step_log = payload.get("_step_log")
-    recipients = payload.get("recipients", "")
+    _recipients = payload.get("recipients", "")
     subject = payload.get("subject", "")
     if step_log:
         step_log(f"EmailNotify: {subject}")

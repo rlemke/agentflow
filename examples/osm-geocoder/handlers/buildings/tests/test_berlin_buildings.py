@@ -15,51 +15,86 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Buildings", "declarations": [
-                    _ef("ExtractBuildings",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "building_type", "type": "String"}],
-                        [{"name": "result", "type": "BuildingResult"}]),
-                    _ef("BuildingStatistics",
-                        [{"name": "input_path", "type": "String"}],
-                        [{"name": "stats", "type": "BuildingStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Buildings",
+                            "declarations": [
+                                _ef(
+                                    "ExtractBuildings",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "building_type", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "BuildingResult"}],
+                                ),
+                                _ef(
+                                    "BuildingStatistics",
+                                    [{"name": "input_path", "type": "String"}],
+                                    [{"name": "stats", "type": "BuildingStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -133,44 +168,38 @@ BERLIN_STATS = {
 
 NOTABLE_BUILDINGS = {
     "Landmarks": [
-        {"name": "Reichstag Building", "type": "government", "levels": 4,
-         "district": "Mitte"},
-        {"name": "Berliner Fernsehturm", "type": "tower", "levels": 1,
-         "district": "Mitte"},
-        {"name": "Brandenburger Tor", "type": "monument", "levels": 1,
-         "district": "Mitte"},
-        {"name": "Berliner Dom", "type": "church", "levels": 3,
-         "district": "Mitte"},
+        {"name": "Reichstag Building", "type": "government", "levels": 4, "district": "Mitte"},
+        {"name": "Berliner Fernsehturm", "type": "tower", "levels": 1, "district": "Mitte"},
+        {"name": "Brandenburger Tor", "type": "monument", "levels": 1, "district": "Mitte"},
+        {"name": "Berliner Dom", "type": "church", "levels": 3, "district": "Mitte"},
     ],
     "Commercial": [
-        {"name": "Sony Center", "type": "commercial", "levels": 8,
-         "district": "Tiergarten"},
-        {"name": "KaDeWe", "type": "retail", "levels": 8,
-         "district": "Schoeneberg"},
-        {"name": "Mall of Berlin", "type": "retail", "levels": 4,
-         "district": "Mitte"},
-        {"name": "Potsdamer Platz Arkaden", "type": "commercial", "levels": 3,
-         "district": "Tiergarten"},
+        {"name": "Sony Center", "type": "commercial", "levels": 8, "district": "Tiergarten"},
+        {"name": "KaDeWe", "type": "retail", "levels": 8, "district": "Schoeneberg"},
+        {"name": "Mall of Berlin", "type": "retail", "levels": 4, "district": "Mitte"},
+        {
+            "name": "Potsdamer Platz Arkaden",
+            "type": "commercial",
+            "levels": 3,
+            "district": "Tiergarten",
+        },
     ],
     "Cultural": [
-        {"name": "Philharmonie", "type": "concert_hall", "levels": 3,
-         "district": "Tiergarten"},
-        {"name": "Hamburger Bahnhof", "type": "museum", "levels": 2,
-         "district": "Moabit"},
-        {"name": "Berghain", "type": "nightclub", "levels": 3,
-         "district": "Friedrichshain"},
-        {"name": "Staatsoper Unter den Linden", "type": "theatre", "levels": 5,
-         "district": "Mitte"},
+        {"name": "Philharmonie", "type": "concert_hall", "levels": 3, "district": "Tiergarten"},
+        {"name": "Hamburger Bahnhof", "type": "museum", "levels": 2, "district": "Moabit"},
+        {"name": "Berghain", "type": "nightclub", "levels": 3, "district": "Friedrichshain"},
+        {
+            "name": "Staatsoper Unter den Linden",
+            "type": "theatre",
+            "levels": 5,
+            "district": "Mitte",
+        },
     ],
     "Residential Towers": [
-        {"name": "Park Inn Hotel", "type": "hotel", "levels": 37,
-         "district": "Mitte"},
-        {"name": "Steglitzer Kreisel", "type": "residential", "levels": 30,
-         "district": "Steglitz"},
-        {"name": "Treptowers", "type": "office", "levels": 17,
-         "district": "Treptow"},
-        {"name": "Upper West", "type": "mixed", "levels": 34,
-         "district": "Charlottenburg"},
+        {"name": "Park Inn Hotel", "type": "hotel", "levels": 37, "district": "Mitte"},
+        {"name": "Steglitzer Kreisel", "type": "residential", "levels": 30, "district": "Steglitz"},
+        {"name": "Treptowers", "type": "office", "levels": 17, "district": "Treptow"},
+        {"name": "Upper West", "type": "mixed", "levels": 34, "district": "Charlottenburg"},
     ],
 }
 
@@ -227,7 +256,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -235,6 +266,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Berlin building workflow end-to-end with mock handlers."""
@@ -305,7 +337,7 @@ def main() -> None:
         ("Industrial", outputs.get("industrial", 0)),
     ]
     total = outputs.get("total_buildings", 1)
-    print(f"\n  Buildings by type:")
+    print("\n  Buildings by type:")
     for label, count in sorted(types, key=lambda x: x[1], reverse=True):
         pct = 100 * count / total
         bar = "#" * int(pct / 2)
@@ -313,14 +345,16 @@ def main() -> None:
 
     # Show 3D data coverage
     with_height = BERLIN_STATS["with_height"]
-    print(f"\n  3D data coverage:       {with_height:,} buildings ({100*with_height/total:.0f}%) have height data")
+    print(
+        f"\n  3D data coverage:       {with_height:,} buildings ({100 * with_height / total:.0f}%) have height data"
+    )
 
     # Show notable buildings
-    print(f"\n  Notable buildings:")
+    print("\n  Notable buildings:")
     for category, buildings in NOTABLE_BUILDINGS.items():
         print(f"    {category}:")
         for bldg in buildings:
-            levels = f"{bldg['levels']} levels" if bldg['levels'] > 1 else "1 level"
+            levels = f"{bldg['levels']} levels" if bldg["levels"] > 1 else "1 level"
             print(f"      {bldg['name']:.<38} {levels:<10} {bldg['district']}")
 
     assert result.success

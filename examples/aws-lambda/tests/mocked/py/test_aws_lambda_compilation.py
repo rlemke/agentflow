@@ -86,8 +86,13 @@ class TestAwsLambdaTypes:
         program = _compile("lambda_types.afl")
         schema_names = _collect_names(program, "schemas")
         expected = [
-            "FunctionConfig", "InvokeResult", "FunctionInfo", "LayerInfo",
-            "StateMachineConfig", "ExecutionResult", "ExecutionInfo",
+            "FunctionConfig",
+            "InvokeResult",
+            "FunctionInfo",
+            "LayerInfo",
+            "StateMachineConfig",
+            "ExecutionResult",
+            "ExecutionInfo",
         ]
         for name in expected:
             assert name in schema_names, f"Missing schema: {name}"
@@ -133,8 +138,13 @@ class TestAwsLambdaEventFacets:
         program = _compile("lambda_functions.afl", "lambda_types.afl")
         facet_names = _collect_names(program, "eventFacets")
         expected = [
-            "CreateFunction", "InvokeFunction", "UpdateFunctionCode",
-            "DeleteFunction", "ListFunctions", "GetFunctionInfo", "PublishLayer",
+            "CreateFunction",
+            "InvokeFunction",
+            "UpdateFunctionCode",
+            "DeleteFunction",
+            "ListFunctions",
+            "GetFunctionInfo",
+            "PublishLayer",
         ]
         for name in expected:
             assert name in facet_names, f"Missing lambda facet: {name}"
@@ -145,8 +155,11 @@ class TestAwsLambdaEventFacets:
         program = _compile("lambda_stepfunctions.afl", "lambda_types.afl")
         facet_names = _collect_names(program, "eventFacets")
         expected = [
-            "CreateStateMachine", "StartExecution", "DescribeExecution",
-            "DeleteStateMachine", "ListExecutions",
+            "CreateStateMachine",
+            "StartExecution",
+            "DescribeExecution",
+            "DeleteStateMachine",
+            "ListExecutions",
         ]
         for name in expected:
             assert name in facet_names, f"Missing stepfunctions facet: {name}"
@@ -179,8 +192,10 @@ class TestAwsLambdaWorkflows:
         program = self._compile_workflows()
         wf_names = _collect_names(program, "workflows")
         expected = [
-            "DeployAndInvoke", "BlueGreenDeploy",
-            "StepFunctionPipeline", "BatchProcessor",
+            "DeployAndInvoke",
+            "BlueGreenDeploy",
+            "StepFunctionPipeline",
+            "BatchProcessor",
         ]
         for name in expected:
             assert name in wf_names, f"Missing workflow: {name}"
@@ -219,7 +234,8 @@ class TestAwsLambdaWorkflows:
     def test_cli_check_workflows(self):
         """The CLI --check flag succeeds for lambda_workflows.afl."""
         args = [
-            "--primary", str(_AFL_DIR / "lambda_workflows.afl"),
+            "--primary",
+            str(_AFL_DIR / "lambda_workflows.afl"),
         ]
         for dep in self._DEPS:
             args.extend(["--library", str(_AFL_DIR / dep)])

@@ -1,4 +1,5 @@
 """Conftest for jenkins mocked tests."""
+
 import os
 import sys
 

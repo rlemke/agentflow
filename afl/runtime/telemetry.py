@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from .types import BlockId, StepId, WorkflowId
+from .types import BlockId, StepId
 
 if TYPE_CHECKING:
     from .step import StepDefinition
@@ -35,15 +35,15 @@ class TelemetryEvent:
 
     timestamp: str
     event_type: str
-    workflow_id: WorkflowId | None = None
+    workflow_id: str | None = None
     step_id: StepId | None = None
-    block_id: BlockId | None = None
+    block_id: BlockId | StepId | None = None
     state: str | None = None
     details: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
-        result = {
+        result: dict[str, Any] = {
             "timestamp": self.timestamp,
             "eventType": self.event_type,
         }
@@ -86,9 +86,9 @@ class Telemetry:
     def _log(
         self,
         event_type: str,
-        workflow_id: WorkflowId | None = None,
+        workflow_id: str | None = None,
         step_id: StepId | None = None,
-        block_id: BlockId | None = None,
+        block_id: BlockId | StepId | None = None,
         state: str | None = None,
         **details: Any,
     ) -> None:
@@ -107,7 +107,7 @@ class Telemetry:
         )
         self.events.append(event)
 
-    def log_workflow_start(self, workflow_id: WorkflowId, workflow_name: str) -> None:
+    def log_workflow_start(self, workflow_id: str, workflow_name: str) -> None:
         """Log workflow execution start."""
         self._log(
             "workflow.start",
@@ -115,7 +115,7 @@ class Telemetry:
             workflowName=workflow_name,
         )
 
-    def log_workflow_complete(self, workflow_id: WorkflowId, result: dict) -> None:
+    def log_workflow_complete(self, workflow_id: str, result: dict) -> None:
         """Log workflow execution complete."""
         self._log(
             "workflow.complete",
@@ -123,7 +123,7 @@ class Telemetry:
             result=result,
         )
 
-    def log_workflow_error(self, workflow_id: WorkflowId, error: Exception) -> None:
+    def log_workflow_error(self, workflow_id: str, error: Exception) -> None:
         """Log workflow execution error."""
         self._log(
             "workflow.error",
@@ -132,7 +132,7 @@ class Telemetry:
             errorType=type(error).__name__,
         )
 
-    def log_iteration_start(self, workflow_id: WorkflowId, iteration: int) -> None:
+    def log_iteration_start(self, workflow_id: str, iteration: int) -> None:
         """Log iteration start."""
         self._log(
             "iteration.start",
@@ -142,7 +142,7 @@ class Telemetry:
 
     def log_iteration_end(
         self,
-        workflow_id: WorkflowId,
+        workflow_id: str,
         iteration: int,
         steps_created: int,
         steps_updated: int,

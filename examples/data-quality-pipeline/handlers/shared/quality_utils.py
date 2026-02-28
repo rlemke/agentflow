@@ -10,12 +10,11 @@ available; these stubs provide synthetic fallback for testing.
 from __future__ import annotations
 
 import hashlib
-import json
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
     """Deterministic integer from seed string."""
@@ -33,6 +32,7 @@ def _hash_float(seed: str, low: float = 0.0, high: float = 1.0) -> float:
 # ---------------------------------------------------------------------------
 # Public API (one per event facet)
 # ---------------------------------------------------------------------------
+
 
 def profile_dataset(
     dataset: str,
@@ -53,12 +53,14 @@ def profile_dataset(
         distinct = _hash_int(f"{col_seed}:distinct", 1, row_count)
         dtype_idx = _hash_int(f"{col_seed}:dtype", 0, 3)
         dtype = ["string", "integer", "float", "boolean"][dtype_idx]
-        profiles.append({
-            "column_name": col,
-            "missing_count": missing,
-            "distinct_count": distinct,
-            "dtype": dtype,
-        })
+        profiles.append(
+            {
+                "column_name": col,
+                "missing_count": missing,
+                "distinct_count": distinct,
+                "dtype": dtype,
+            }
+        )
     return profiles, row_count
 
 
@@ -75,11 +77,13 @@ def detect_anomalies(
     for p in profiles:
         missing_rate = p.get("missing_count", 0) / max(row_count, 1)
         if missing_rate > missing_threshold:
-            flagged.append({
-                "column": p["column_name"],
-                "missing_rate": round(missing_rate, 4),
-                "threshold": missing_threshold,
-            })
+            flagged.append(
+                {
+                    "column": p["column_name"],
+                    "missing_rate": round(missing_rate, 4),
+                    "threshold": missing_threshold,
+                }
+            )
     return len(flagged), flagged
 
 
@@ -99,15 +103,17 @@ def validate_completeness(
         passed = missing_rate <= missing_threshold
         score = 1.0 - missing_rate
         scores.append(score)
-        results.append({
-            "check_name": f"completeness:{p['column_name']}",
-            "passed": passed,
-            "score": round(score, 4),
-            "details": {
-                "missing_rate": round(missing_rate, 4),
-                "threshold": missing_threshold,
-            },
-        })
+        results.append(
+            {
+                "check_name": f"completeness:{p['column_name']}",
+                "passed": passed,
+                "score": round(score, 4),
+                "details": {
+                    "missing_rate": round(missing_rate, 4),
+                    "threshold": missing_threshold,
+                },
+            }
+        )
     completeness_score = round(sum(scores) / max(len(scores), 1), 4)
     return results, completeness_score
 
@@ -128,15 +134,17 @@ def validate_accuracy(
         passed = type_errors <= type_error_max
         score = max(0.0, 1.0 - (type_errors / max(type_error_max * 2, 1)))
         scores.append(score)
-        results.append({
-            "check_name": f"accuracy:{p['column_name']}",
-            "passed": passed,
-            "score": round(score, 4),
-            "details": {
-                "type_errors": type_errors,
-                "max_allowed": type_error_max,
-            },
-        })
+        results.append(
+            {
+                "check_name": f"accuracy:{p['column_name']}",
+                "passed": passed,
+                "score": round(score, 4),
+                "details": {
+                    "type_errors": type_errors,
+                    "max_allowed": type_error_max,
+                },
+            }
+        )
     accuracy_score = round(sum(scores) / max(len(scores), 1), 4)
     return results, accuracy_score
 
@@ -166,11 +174,13 @@ def compute_scores(
     for dim, raw, weight in dimensions:
         weighted = (raw * weight) / max(total_weight, 0.001)
         weighted_sum += weighted
-        scores.append({
-            "dimension": dim,
-            "raw_score": round(raw, 4),
-            "weighted_score": round(weighted, 4),
-        })
+        scores.append(
+            {
+                "dimension": dim,
+                "raw_score": round(raw, 4),
+                "weighted_score": round(weighted, 4),
+            }
+        )
 
     overall = round(weighted_sum, 4)
     return scores, overall
@@ -214,12 +224,14 @@ def plan_remediation(
     # Actions from flagged columns (anomalies)
     for fc in flagged_columns:
         col = fc.get("column", "unknown")
-        actions.append({
-            "priority": priority,
-            "action": "fill_missing",
-            "target_column": col,
-            "reason": f"Missing rate {fc.get('missing_rate', 0)} exceeds threshold",
-        })
+        actions.append(
+            {
+                "priority": priority,
+                "action": "fill_missing",
+                "target_column": col,
+                "reason": f"Missing rate {fc.get('missing_rate', 0)} exceeds threshold",
+            }
+        )
         priority += 1
 
     # Actions from failed validation results
@@ -228,12 +240,14 @@ def plan_remediation(
             check = r.get("check_name", "unknown")
             col = check.split(":")[-1] if ":" in check else "unknown"
             action = "fix_type_errors" if "accuracy" in check else "fill_missing"
-            actions.append({
-                "priority": priority,
-                "action": action,
-                "target_column": col,
-                "reason": f"Check '{check}' failed with score {r.get('score', 0)}",
-            })
+            actions.append(
+                {
+                    "priority": priority,
+                    "action": action,
+                    "target_column": col,
+                    "reason": f"Check '{check}' failed with score {r.get('score', 0)}",
+                }
+            )
             priority += 1
 
     return actions
@@ -256,5 +270,5 @@ def generate_report(
         "dimensions": {s["dimension"]: s["weighted_score"] for s in scores},
         "actions": actions,
         "summary": f"Dataset '{dataset}' received grade {grade} "
-                   f"(score: {overall:.2f}, {'PASSED' if passed else 'FAILED'})",
+        f"(score: {overall:.2f}, {'PASSED' if passed else 'FAILED'})",
     }

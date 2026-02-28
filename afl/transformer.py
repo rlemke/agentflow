@@ -14,6 +14,8 @@
 
 """Lark Transformer to convert parse tree to AFL AST."""
 
+import re
+
 from lark import Token, Transformer, v_args
 
 from .ast import (
@@ -55,9 +57,6 @@ from .ast import (
     WorkflowDecl,
     YieldStmt,
 )
-
-
-import re
 
 _TAG_RE = re.compile(r"^@(param|return)\s+(\w+)\s+(.*)")
 
@@ -435,7 +434,7 @@ class AFLTransformer(Transformer):
             elif isinstance(item, AndThenBlock):
                 blocks.append(item)
 
-        body = None
+        body: AndThenBlock | list[AndThenBlock] | None = None
         if len(blocks) == 1:
             body = blocks[0]
         elif blocks:
@@ -530,7 +529,9 @@ class AFLTransformer(Transformer):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
-        return FacetDecl(sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta))
+        return FacetDecl(
+            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+        )
 
     @v_args(meta=True)
     def event_facet_decl(self, meta, items: list) -> EventFacetDecl:
@@ -542,7 +543,9 @@ class AFLTransformer(Transformer):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
-        return EventFacetDecl(sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta))
+        return EventFacetDecl(
+            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+        )
 
     @v_args(meta=True)
     def workflow_decl(self, meta, items: list) -> WorkflowDecl:
@@ -554,7 +557,9 @@ class AFLTransformer(Transformer):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
-        return WorkflowDecl(sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta))
+        return WorkflowDecl(
+            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+        )
 
     @v_args(meta=True, inline=True)
     def implicit_decl(self, meta, name: str, call: CallExpr) -> ImplicitDecl:
@@ -582,7 +587,7 @@ class AFLTransformer(Transformer):
     # Namespace
     @v_args(meta=True)
     def namespace_body(self, meta, items: list) -> dict:
-        result = {
+        result: dict[str, list] = {
             "uses": [],
             "facets": [],
             "event_facets": [],

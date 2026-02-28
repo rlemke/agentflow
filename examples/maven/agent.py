@@ -32,16 +32,12 @@ def main() -> None:
         poll_interval_ms=2000,
         max_concurrent=5,
         topics=topics,
-        repository_url=os.environ.get(
-            "AFL_MAVEN_REPOSITORY", "https://repo1.maven.org/maven2"
-        ),
+        repository_url=os.environ.get("AFL_MAVEN_REPOSITORY", "https://repo1.maven.org/maven2"),
         cache_dir=os.environ.get("AFL_MAVEN_CACHE", ""),
         java_command=os.environ.get("AFL_JAVA_COMMAND", "java"),
     )
 
-    runner = MavenArtifactRunner(
-        persistence=store, evaluator=evaluator, config=config
-    )
+    runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
     def shutdown(signum, frame):
         print("\nShutting down...")

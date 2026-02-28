@@ -49,7 +49,7 @@ from afl.runtime.entities import (
 )
 from afl.runtime.persistence import IterationChanges
 from afl.runtime.step import StepDefinition
-from afl.runtime.types import StepId, WorkflowId, block_id, step_id, workflow_id
+from afl.runtime.types import StepId, block_id, step_id, workflow_id
 
 
 def _use_real_mongodb(request) -> bool:
@@ -483,7 +483,6 @@ class TestRunnerOperations:
         assert len(running) == 1
         assert running[0].uuid == "r-1"
 
-
     def test_runner_compiled_ast_round_trip(self, mongo_store):
         """Test that compiled_ast and workflow_ast survive runner save/load."""
         workflow = WorkflowDefinition(
@@ -496,9 +495,7 @@ class TestRunnerOperations:
             version="1.0",
         )
         program_dict = {
-            "declarations": [
-                {"type": "WorkflowDecl", "name": "AstWorkflow", "params": []}
-            ]
+            "declarations": [{"type": "WorkflowDecl", "name": "AstWorkflow", "params": []}]
         }
         wf_ast = {"type": "WorkflowDecl", "name": "AstWorkflow", "params": []}
         runner = RunnerDefinition(

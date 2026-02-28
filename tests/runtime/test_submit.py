@@ -1,6 +1,5 @@
 """Tests for AFL CLI submit module (afl.runtime.submit)."""
 
-import json
 from unittest.mock import patch
 
 import pytest
@@ -142,18 +141,18 @@ class TestWorkflowLookup:
 
     def test_simple_workflow_found(self, simple_wf, capsys):
         """Simple name lookup — fails at MongoDB step (workflow was found)."""
-        result = main([str(simple_wf), "--workflow", "Run"])
+        _result = main([str(simple_wf), "--workflow", "Run"])
         captured = capsys.readouterr()
         # Should fail at MongoDB connection, not "not found"
         assert "not found" not in captured.err
 
     def test_qualified_workflow_found(self, namespaced_wf, capsys):
-        result = main([str(namespaced_wf), "--workflow", "app.Execute"])
+        _result = main([str(namespaced_wf), "--workflow", "app.Execute"])
         captured = capsys.readouterr()
         assert "not found" not in captured.err
 
     def test_nested_qualified_workflow_found(self, nested_wf, capsys):
-        result = main([str(nested_wf), "--workflow", "a.b.Deep"])
+        _result = main([str(nested_wf), "--workflow", "a.b.Deep"])
         captured = capsys.readouterr()
         assert "not found" not in captured.err
 
@@ -168,10 +167,16 @@ class TestWorkflowLookup:
             "  workflow Download(region: osm.geo.Region)\n"
             "}"
         )
-        result = main([
-            "--primary", str(main_f), "--library", str(lib),
-            "--workflow", "osm.geo.sample.Download",
-        ])
+        _result = main(
+            [
+                "--primary",
+                str(main_f),
+                "--library",
+                str(lib),
+                "--workflow",
+                "osm.geo.sample.Download",
+            ]
+        )
         captured = capsys.readouterr()
         assert "not found" not in captured.err
 
@@ -241,9 +246,7 @@ class TestMongoSubmit:
     def test_submit_namespaced_workflow(self, tmp_path, mock_store, capsys):
         f = tmp_path / "ns.afl"
         f.write_text("namespace app {\n  workflow Deploy()\n}")
-        result = self._run_with_mock_store(
-            mock_store, [str(f), "--workflow", "app.Deploy"]
-        )
+        result = self._run_with_mock_store(mock_store, [str(f), "--workflow", "app.Deploy"])
         assert result == 0
         ids = self._parse_ids(capsys.readouterr().out)
         task = mock_store.get_tasks_by_runner(ids["runner_id"])[0]
@@ -253,12 +256,7 @@ class TestMongoSubmit:
         lib = tmp_path / "types.afl"
         lib.write_text("namespace types {\n  schema Config { url: String }\n}")
         main_f = tmp_path / "main.afl"
-        main_f.write_text(
-            "namespace app {\n"
-            "  use types\n"
-            "  workflow Start(cfg: types.Config)\n"
-            "}"
-        )
+        main_f.write_text("namespace app {\n  use types\n  workflow Start(cfg: types.Config)\n}")
         result = self._run_with_mock_store(
             mock_store,
             ["--primary", str(main_f), "--library", str(lib), "--workflow", "app.Start"],
@@ -276,9 +274,7 @@ class TestMongoSubmit:
     def test_submit_with_default_params(self, tmp_path, mock_store, capsys):
         f = tmp_path / "wf.afl"
         f.write_text('namespace n {\n  workflow Go(count: Int = 5, name: String = "test")\n}')
-        result = self._run_with_mock_store(
-            mock_store, [str(f), "--workflow", "n.Go"]
-        )
+        result = self._run_with_mock_store(mock_store, [str(f), "--workflow", "n.Go"])
         assert result == 0
         ids = self._parse_ids(capsys.readouterr().out)
         task = mock_store.get_tasks_by_runner(ids["runner_id"])[0]
@@ -337,9 +333,7 @@ class TestMongoSubmit:
         """Verify submit stores compiled_ast on FlowDefinition."""
         f = tmp_path / "wf.afl"
         f.write_text("namespace n {\n  workflow Go(count: Int = 5)\n}")
-        result = self._run_with_mock_store(
-            mock_store, [str(f), "--workflow", "n.Go"]
-        )
+        result = self._run_with_mock_store(mock_store, [str(f), "--workflow", "n.Go"])
         assert result == 0
         ids = self._parse_ids(capsys.readouterr().out)
         flow = mock_store.get_flow(ids["flow_id"])
@@ -352,9 +346,7 @@ class TestMongoSubmit:
         """Verify that compiled_ast statement IDs are stable (not regenerated)."""
         f = tmp_path / "wf.afl"
         f.write_text("namespace n {\n  workflow Go(count: Int = 5)\n}")
-        result = self._run_with_mock_store(
-            mock_store, [str(f), "--workflow", "n.Go"]
-        )
+        result = self._run_with_mock_store(mock_store, [str(f), "--workflow", "n.Go"])
         assert result == 0
         ids = self._parse_ids(capsys.readouterr().out)
         flow = mock_store.get_flow(ids["flow_id"])

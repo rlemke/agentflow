@@ -194,9 +194,7 @@ class TestYieldDeferral:
                 "id": "y1",
                 "call": {
                     "target": "W",
-                    "args": [
-                        {"name": "out", "value": {"type": "StepRef", "path": ["s1", "x"]}}
-                    ],
+                    "args": [{"name": "out", "value": {"type": "StepRef", "path": ["s1", "x"]}}],
                 },
             },
         }

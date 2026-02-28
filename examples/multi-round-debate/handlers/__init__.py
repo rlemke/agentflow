@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .setup.setup_handlers import register_setup_handlers
 from .argumentation.argumentation_handlers import register_argumentation_handlers
 from .scoring.scoring_handlers import register_scoring_handlers
+from .setup.setup_handlers import register_setup_handlers
 from .synthesis.synthesis_handlers import register_synthesis_handlers
 
 
@@ -18,9 +18,9 @@ def register_all_handlers(poller) -> None:
 
 def register_all_registry_handlers(runner) -> None:
     """Register all handlers with a RegistryRunner."""
-    from .setup.setup_handlers import register_handlers as reg_setup
     from .argumentation.argumentation_handlers import register_handlers as reg_argumentation
     from .scoring.scoring_handlers import register_handlers as reg_scoring
+    from .setup.setup_handlers import register_handlers as reg_setup
     from .synthesis.synthesis_handlers import register_handlers as reg_synthesis
 
     reg_setup(runner)

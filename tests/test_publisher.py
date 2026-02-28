@@ -54,10 +54,7 @@ class TestPublish:
 
     def test_publish_multi_namespace_file(self, publisher, store):
         """A file with multiple namespaces creates one doc per namespace."""
-        source = (
-            "namespace ns.a { facet A() }\n"
-            "namespace ns.b { facet B() }\n"
-        )
+        source = "namespace ns.a { facet A() }\nnamespace ns.b { facet B() }\n"
         published = publisher.publish(source)
 
         assert len(published) == 2
@@ -115,7 +112,7 @@ class TestPublish:
     def test_publish_origin_tracked(self, publisher, store):
         """Origin is stored on the published document."""
         source = "namespace orig.ns { facet O() }"
-        published = publisher.publish(source, origin="test-origin")
+        _published = publisher.publish(source, origin="test-origin")
 
         found = store.get_source_by_namespace("orig.ns")
         assert found.origin == "test-origin"

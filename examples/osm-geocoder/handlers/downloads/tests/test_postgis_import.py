@@ -19,11 +19,10 @@ Run with:
 import importlib
 import os
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from pathlib import Path
 
 OSM_DIR = str(Path(__file__).resolve().parent.parent.parent.parent)
 
@@ -128,10 +127,12 @@ class TestPostgisHandlerDispatch:
 
     def test_handle_returns_dict_with_stats(self):
         mod = _osm_import("postgis_handlers")
-        result = mod.handle({
-            "_facet_name": "osm.geo.Operations.PostGisImport",
-            "cache": {"url": "http://example.com/test.pbf", "path": "", "date": "", "size": 0},
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "osm.geo.Operations.PostGisImport",
+                "cache": {"url": "http://example.com/test.pbf", "path": "", "date": "", "size": 0},
+            }
+        )
         assert isinstance(result, dict)
         assert "stats" in result
 
@@ -220,13 +221,11 @@ class TestPostgisImportLive:
                 row = cur.fetchone()
             assert row is not None
             assert row[1] == 42  # node_count
-            assert row[2] == 7   # way_count
+            assert row[2] == 7  # way_count
         finally:
             # Clean up test data
             with conn.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM osm_import_log WHERE url = %s", (test_url,)
-                )
+                cur.execute("DELETE FROM osm_import_log WHERE url = %s", (test_url,))
             conn.commit()
             conn.close()
 
@@ -247,8 +246,6 @@ class TestPostgisImportLive:
         finally:
             # Clean up test data
             with conn.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM osm_import_log WHERE url = %s", (test_url,)
-                )
+                cur.execute("DELETE FROM osm_import_log WHERE url = %s", (test_url,))
             conn.commit()
             conn.close()

@@ -14,89 +14,144 @@ No external dependencies. Run from the repo root:
 
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
-
-from examples.genomics.handlers.cache_handlers import RESOURCE_REGISTRY
+from examples.genomics.handlers.operations_handlers import download, index
 from examples.genomics.handlers.resolve_handlers import (
-    resolve_reference,
     resolve_annotation,
+    resolve_reference,
     resolve_sample,
 )
-from examples.genomics.handlers.index_handlers import (
-    REFERENCE_CONTIGS,
-    _make_index_handler,
-)
-from examples.genomics.handlers.operations_handlers import download, index
-
 
 # ---------------------------------------------------------------------------
 # Program AST — declares event facets the runtime needs to recognise.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 # Event facet declarations for the cache layer + original pipeline facets
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "genomics", "declarations": [
-            {"type": "Namespace", "name": "cache", "declarations": [
-                {"type": "Namespace", "name": "Resolve", "declarations": [
-                    _ef("ResolveReference",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_source", "type": "String"}],
-                        [{"name": "cache", "type": "GenomicsCache"},
-                         {"name": "resolution", "type": "ResourceResolution"}]),
-                    _ef("ResolveAnnotation",
-                        [{"name": "name", "type": "String"},
-                         {"name": "version", "type": "String"}],
-                        [{"name": "cache", "type": "GenomicsCache"},
-                         {"name": "resolution", "type": "ResourceResolution"}]),
-                    _ef("ResolveSample",
-                        [{"name": "accession", "type": "String"}],
-                        [{"name": "cache", "type": "GenomicsCache"},
-                         {"name": "resolution", "type": "ResourceResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Operations", "declarations": [
-                    _ef("Download",
-                        [{"name": "cache", "type": "GenomicsCache"}],
-                        [{"name": "cache", "type": "GenomicsCache"}]),
-                    _ef("Index",
-                        [{"name": "cache", "type": "GenomicsCache"},
-                         {"name": "aligner", "type": "String"}],
-                        [{"name": "cache", "type": "IndexCache"}]),
-                ]},
-            ]},
-            # Original pipeline facets needed by CachedCohortAnalysis
-            {"type": "Namespace", "name": "Facets", "declarations": [
-                _ef("JointGenotype",
-                    [{"name": "gvcf_dir", "type": "String"},
-                     {"name": "reference_build", "type": "String"},
-                     {"name": "sample_count", "type": "Long"}],
-                    [{"name": "result", "type": "CohortVariantResult"}]),
-                _ef("NormalizeFilter",
-                    [{"name": "vcf_path", "type": "String"},
-                     {"name": "reference_build", "type": "String"}],
-                    [{"name": "result", "type": "CohortVariantResult"}]),
-                _ef("Annotate",
-                    [{"name": "vcf_path", "type": "String"},
-                     {"name": "annotation_path", "type": "String"}],
-                    [{"name": "result", "type": "AnnotationResult"}]),
-                _ef("CohortAnalytics",
-                    [{"name": "variant_table_path", "type": "String"},
-                     {"name": "dataset_id", "type": "String"}],
-                    [{"name": "result", "type": "CohortStatsResult"}]),
-                _ef("Publish",
-                    [{"name": "variant_table_path", "type": "String"},
-                     {"name": "qc_report_path", "type": "String"},
-                     {"name": "stats_path", "type": "String"},
-                     {"name": "dataset_id", "type": "String"}],
-                    [{"name": "result", "type": "AnalysisPackage"}]),
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "genomics",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "cache",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Resolve",
+                            "declarations": [
+                                _ef(
+                                    "ResolveReference",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_source", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "GenomicsCache"},
+                                        {"name": "resolution", "type": "ResourceResolution"},
+                                    ],
+                                ),
+                                _ef(
+                                    "ResolveAnnotation",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "version", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "GenomicsCache"},
+                                        {"name": "resolution", "type": "ResourceResolution"},
+                                    ],
+                                ),
+                                _ef(
+                                    "ResolveSample",
+                                    [{"name": "accession", "type": "String"}],
+                                    [
+                                        {"name": "cache", "type": "GenomicsCache"},
+                                        {"name": "resolution", "type": "ResourceResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Operations",
+                            "declarations": [
+                                _ef(
+                                    "Download",
+                                    [{"name": "cache", "type": "GenomicsCache"}],
+                                    [{"name": "cache", "type": "GenomicsCache"}],
+                                ),
+                                _ef(
+                                    "Index",
+                                    [
+                                        {"name": "cache", "type": "GenomicsCache"},
+                                        {"name": "aligner", "type": "String"},
+                                    ],
+                                    [{"name": "cache", "type": "IndexCache"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+                # Original pipeline facets needed by CachedCohortAnalysis
+                {
+                    "type": "Namespace",
+                    "name": "Facets",
+                    "declarations": [
+                        _ef(
+                            "JointGenotype",
+                            [
+                                {"name": "gvcf_dir", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                                {"name": "sample_count", "type": "Long"},
+                            ],
+                            [{"name": "result", "type": "CohortVariantResult"}],
+                        ),
+                        _ef(
+                            "NormalizeFilter",
+                            [
+                                {"name": "vcf_path", "type": "String"},
+                                {"name": "reference_build", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "CohortVariantResult"}],
+                        ),
+                        _ef(
+                            "Annotate",
+                            [
+                                {"name": "vcf_path", "type": "String"},
+                                {"name": "annotation_path", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "AnnotationResult"}],
+                        ),
+                        _ef(
+                            "CohortAnalytics",
+                            [
+                                {"name": "variant_table_path", "type": "String"},
+                                {"name": "dataset_id", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "CohortStatsResult"}],
+                        ),
+                        _ef(
+                            "Publish",
+                            [
+                                {"name": "variant_table_path", "type": "String"},
+                                {"name": "qc_report_path", "type": "String"},
+                                {"name": "stats_path", "type": "String"},
+                                {"name": "dataset_id", "type": "String"},
+                            ],
+                            [{"name": "result", "type": "AnalysisPackage"}],
+                        ),
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -243,12 +298,15 @@ def compile_workflow(afl_source: str, workflow_name: str) -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def find_event_blocked_steps(store: MemoryStore, workflow_id: str) -> list[tuple[str, str]]:
     """Find steps blocked waiting for an event handler."""
     results = []
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             results.append((step.id, short))
     return results
 
@@ -265,6 +323,7 @@ def _fmt_size(size_bytes: int) -> str:
 # ---------------------------------------------------------------------------
 # Phase 1: Reference cache + BWA index
 # ---------------------------------------------------------------------------
+
 
 def run_reference_cache() -> None:
     """Resolve hg38, build BWA index, verify cache metadata."""
@@ -311,8 +370,14 @@ def run_reference_cache() -> None:
             # Track for summary
             if "cache" in handler_result:
                 c = handler_result["cache"]
-                resources.append((facet_short, c.get("resource_type", c.get("aligner", "index")),
-                                  c.get("size", 0), c.get("wasInCache", False)))
+                resources.append(
+                    (
+                        facet_short,
+                        c.get("resource_type", c.get("aligner", "index")),
+                        c.get("size", 0),
+                        c.get("wasInCache", False),
+                    )
+                )
 
         result = evaluator.resume(result.workflow_id, workflow_ast, PROGRAM_AST)
 
@@ -326,7 +391,7 @@ def run_reference_cache() -> None:
     print(f"\n{'-' * 70}")
     print("REFERENCE CACHE RESULTS")
     print(f"{'-' * 70}")
-    print(f"  Reference:      GRCh38")
+    print("  Reference:      GRCh38")
     print(f"  Cache path:     {cache.get('path', '')}")
     print(f"  Cache size:     {_fmt_size(cache.get('size', 0))}")
     print(f"  Was in cache:   {cache.get('wasInCache', False)}")
@@ -343,7 +408,7 @@ def run_reference_cache() -> None:
     # Summary table
     if resources:
         print(f"\n  {'Resource':<20} {'Type':<12} {'Size':>12} {'Cached':>8}")
-        print(f"  {'-'*20} {'-'*12} {'-'*12} {'-'*8}")
+        print(f"  {'-' * 20} {'-' * 12} {'-' * 12} {'-' * 8}")
         for name, rtype, size, cached in resources:
             print(f"  {name:<20} {rtype:<12} {_fmt_size(size):>12} {'Yes' if cached else 'No':>8}")
 
@@ -353,6 +418,7 @@ def run_reference_cache() -> None:
 # ---------------------------------------------------------------------------
 # Phase 2: Annotation + SRA cache
 # ---------------------------------------------------------------------------
+
 
 def run_annotation_sra_cache() -> None:
     """Resolve dbsnp annotation and SRA accession, verify metadata."""
@@ -398,12 +464,20 @@ def run_annotation_sra_cache() -> None:
 
     # Summary
     print(f"\n  {'Resource':<20} {'Type':<12} {'Size':>12} {'Cached':>8}")
-    print(f"  {'-'*20} {'-'*12} {'-'*12} {'-'*8}")
+    print(f"  {'-' * 20} {'-' * 12} {'-' * 12} {'-' * 8}")
     for name, rtype, size, cached in [
-        (annot_res["matched_name"], annot_cache["resource_type"],
-         annot_cache["size"], annot_cache["wasInCache"]),
-        (sra_res["matched_name"], sra_cache["resource_type"],
-         sra_cache["size"], sra_cache["wasInCache"]),
+        (
+            annot_res["matched_name"],
+            annot_cache["resource_type"],
+            annot_cache["size"],
+            annot_cache["wasInCache"],
+        ),
+        (
+            sra_res["matched_name"],
+            sra_cache["resource_type"],
+            sra_cache["size"],
+            sra_cache["wasInCache"],
+        ),
     ]:
         print(f"  {name:<20} {rtype:<12} {_fmt_size(size):>12} {'Yes' if cached else 'No':>8}")
 
@@ -413,6 +487,7 @@ def run_annotation_sra_cache() -> None:
 # ---------------------------------------------------------------------------
 # Phase 3: CachedCohortAnalysis (full end-to-end)
 # ---------------------------------------------------------------------------
+
 
 def run_cached_cohort_analysis() -> None:
     """Full cache-aware cohort analysis: resolve -> index -> analyze."""
@@ -501,6 +576,7 @@ def run_cached_cohort_analysis() -> None:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run all three cache pipeline phases."""

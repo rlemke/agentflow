@@ -13,6 +13,7 @@ from typing import Any
 
 try:
     from shapely.geometry import Point, shape
+
     HAS_SHAPELY = True
 except ImportError:
     HAS_SHAPELY = False
@@ -20,8 +21,9 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_SITESEL_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "sitesel-output"))
+_OUTPUT_DIR = os.environ.get(
+    "AFL_SITESEL_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "sitesel-output")
+)
 
 # Demand index weights (must sum to 1.0)
 DEMAND_WEIGHTS: dict[str, float] = {
@@ -88,8 +90,9 @@ def _count_restaurants_per_county(
     return dict(county_counts)
 
 
-def score_counties(demographics_path: str, restaurants_path: str,
-                   state_fips: str) -> dict[str, Any]:
+def score_counties(
+    demographics_path: str, restaurants_path: str, state_fips: str
+) -> dict[str, Any]:
     """Score counties by food-service suitability.
 
     1. Load demographics GeoJSON (county polygons with derived metrics)
@@ -133,8 +136,7 @@ def score_counties(demographics_path: str, restaurants_path: str,
         for field in DEMAND_WEIGHTS:
             if field == "inverse_poverty":
                 pov = props.get("pct_below_poverty")
-                raw_values[field].append(
-                    100.0 - float(pov) if pov is not None else 0.0)
+                raw_values[field].append(100.0 - float(pov) if pov is not None else 0.0)
             else:
                 v = props.get(field)
                 raw_values[field].append(float(v) if v is not None else 0.0)
@@ -162,10 +164,7 @@ def score_counties(demographics_path: str, restaurants_path: str,
                 population = float(population)
             except (ValueError, TypeError):
                 population = 0.0
-        restaurants_per_1000 = (
-            rest_count / (population / 1000.0)
-            if population > 0 else 0.0
-        )
+        restaurants_per_1000 = rest_count / (population / 1000.0) if population > 0 else 0.0
 
         # Demand index: weighted sum of normalized factors
         demand_index = 0.0
@@ -175,8 +174,7 @@ def score_counties(demographics_path: str, restaurants_path: str,
         demand_index = round(demand_index, 4)
 
         # Suitability score: high demand + low competition = high score
-        suitability_score = round(
-            demand_index * 100.0 / (1.0 + restaurants_per_1000), 2)
+        suitability_score = round(demand_index * 100.0 / (1.0 + restaurants_per_1000), 2)
 
         # Add scoring fields to properties
         props["restaurant_count"] = rest_count
@@ -184,11 +182,13 @@ def score_counties(demographics_path: str, restaurants_path: str,
         props["demand_index"] = demand_index
         props["suitability_score"] = suitability_score
 
-        scored_features.append({
-            "type": "Feature",
-            "properties": props,
-            "geometry": feat.get("geometry"),
-        })
+        scored_features.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": feat.get("geometry"),
+            }
+        )
 
         if suitability_score > top_score:
             top_score = suitability_score
@@ -204,8 +204,13 @@ def score_counties(demographics_path: str, restaurants_path: str,
     with open(output_path, "w") as f:
         json.dump({"type": "FeatureCollection", "features": scored_features}, f)
 
-    logger.info("Scored %d counties for state %s (top: %s = %.2f)",
-                len(scored_features), state_fips, top_county, top_score)
+    logger.info(
+        "Scored %d counties for state %s (top: %s = %.2f)",
+        len(scored_features),
+        state_fips,
+        top_county,
+        top_score,
+    )
 
     return {
         "output_path": output_path,

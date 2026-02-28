@@ -379,10 +379,7 @@ class ClaudeAgentRunner:
 
             # Check for target facet tool_use (the final answer)
             for block in response.content:
-                if (
-                    getattr(block, "type", None) == "tool_use"
-                    and block.name == step.facet_name
-                ):
+                if getattr(block, "type", None) == "tool_use" and block.name == step.facet_name:
                     return block.input
 
             # If stop_reason is not tool_use, Claude is done without calling target
@@ -394,23 +391,29 @@ class ClaudeAgentRunner:
             tool_results = []
             for block in response.content:
                 if getattr(block, "type", None) == "tool_use":
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
+                    assistant_content.append(
+                        {
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        }
+                    )
                     result = self._execute_tool_call(block.name, block.input, tool_defs)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": str(result),
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": str(result),
+                        }
+                    )
                 elif getattr(block, "type", None) == "text":
-                    assistant_content.append({
-                        "type": "text",
-                        "text": block.text,
-                    })
+                    assistant_content.append(
+                        {
+                            "type": "text",
+                            "text": block.text,
+                        }
+                    )
 
             messages.append({"role": "assistant", "content": assistant_content})
             messages.append({"role": "user", "content": tool_results})
@@ -438,8 +441,10 @@ class ClaudeAgentRunner:
             step, tool_defs
         )
 
-        system = template_system or self.system_prompt or (
-            f"You are an agent in workflow '{workflow_name}'. Use tools to complete tasks."
+        system = (
+            template_system
+            or self.system_prompt
+            or (f"You are an agent in workflow '{workflow_name}'. Use tools to complete tasks.")
         )
         model = model_override or self.model
 
@@ -610,6 +615,7 @@ class LLMHandler:
         """
         # Build user message from template or payload
         if self.prompt_template:
+
             class SafeDict(dict):
                 def __missing__(self, key: str) -> str:
                     return f"{{{key}}}"
@@ -628,10 +634,12 @@ class LLMHandler:
 
             if attempt < self.config.max_retries:
                 messages.append({"role": "assistant", "content": "I wasn't able to use the tool."})
-                messages.append({
-                    "role": "user",
-                    "content": f"Please use a tool to provide the result. (Retry attempt {attempt + 1})",
-                })
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"Please use a tool to provide the result. (Retry attempt {attempt + 1})",
+                    }
+                )
 
         return {}
 
@@ -652,8 +660,7 @@ class LLMHandler:
 
             # Check for tool_use blocks
             tool_use_blocks = [
-                b for b in response.content
-                if getattr(b, "type", None) == "tool_use"
+                b for b in response.content if getattr(b, "type", None) == "tool_use"
             ]
 
             if tool_use_blocks:
@@ -671,23 +678,29 @@ class LLMHandler:
                 tool_results = []
                 for block in response.content:
                     if getattr(block, "type", None) == "tool_use":
-                        assistant_content.append({
-                            "type": "tool_use",
-                            "id": block.id,
-                            "name": block.name,
-                            "input": block.input,
-                        })
+                        assistant_content.append(
+                            {
+                                "type": "tool_use",
+                                "id": block.id,
+                                "name": block.name,
+                                "input": block.input,
+                            }
+                        )
                         result = self.tool_registry.handle(block.name, block.input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": str(result if result is not None else block.input),
-                        })
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": str(result if result is not None else block.input),
+                            }
+                        )
                     elif getattr(block, "type", None) == "text":
-                        assistant_content.append({
-                            "type": "text",
-                            "text": block.text,
-                        })
+                        assistant_content.append(
+                            {
+                                "type": "text",
+                                "text": block.text,
+                            }
+                        )
 
                 messages.append({"role": "assistant", "content": assistant_content})
                 messages.append({"role": "user", "content": tool_results})

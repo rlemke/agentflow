@@ -403,7 +403,8 @@ class RunnerService:
             name for name in self._tool_registry._handlers.keys() if name != "afl:execute"
         }
         return [
-            t for t in tasks
+            t
+            for t in tasks
             if t.name not in event_handler_names
             and t.name in self._tool_registry._handlers
             and t.name != RESUME_TASK_NAME
@@ -803,6 +804,9 @@ class RunnerService:
                 program_dict = json.loads(emitter.emit(ast))
                 logger.warning("Flow '%s' has no compiled_ast, fell back to recompilation", flow_id)
 
+            if program_dict is None:
+                raise RuntimeError(f"Flow '{flow_id}' has no compiled AST")
+
             # Find workflow AST by name (supports qualified names like "ns.WorkflowName")
             workflow_ast = self._find_workflow_in_program(program_dict, workflow_name)
 
@@ -934,7 +938,13 @@ class RunnerService:
                 ast = parser.parse(flow.compiled_sources[0].content)
                 emitter = JSONEmitter(include_locations=False)
                 program_dict = json.loads(emitter.emit(ast))
-                logger.warning("Flow '%s' has no compiled_ast, fell back to recompilation", wf.flow_id)
+                logger.warning(
+                    "Flow '%s' has no compiled_ast, fell back to recompilation", wf.flow_id
+                )
+
+            # At this point program_dict is guaranteed non-None (guarded above)
+            if program_dict is None:
+                return None
 
             # Cache program AST for facet definition lookups during resume
             self._program_ast_cache[workflow_id] = program_dict

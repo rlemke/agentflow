@@ -5,21 +5,20 @@ Handles amenity extraction events defined in osmamenities.afl.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .amenity_extractor import (
+    EDUCATION_AMENITIES,
+    ENTERTAINMENT_AMENITIES,
+    FOOD_AMENITIES,
     HAS_OSMIUM,
-    AmenityCategory,
+    HEALTHCARE_AMENITIES,
+    SHOPPING_TAGS,
     AmenityResult,
     AmenityStats,
     calculate_amenity_stats,
     extract_amenities,
     search_amenities,
-    FOOD_AMENITIES,
-    SHOPPING_TAGS,
-    HEALTHCARE_AMENITIES,
-    EDUCATION_AMENITIES,
-    ENTERTAINMENT_AMENITIES,
 )
 
 log = logging.getLogger(__name__)
@@ -46,7 +45,10 @@ def _make_extract_amenities_handler(facet_name: str):
         try:
             result = extract_amenities(pbf_path, category=category)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {category} amenities", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {category} amenities",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract amenities: %s", e)
@@ -73,7 +75,10 @@ def _make_typed_amenity_handler(facet_name: str, amenity_types: set[str], catego
         try:
             result = extract_amenities(pbf_path, amenity_types=amenity_types)
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {category} amenities", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {category} amenities",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s amenities: %s", category, e)
@@ -100,7 +105,10 @@ def _make_single_amenity_handler(facet_name: str, amenity_type: str, category: s
         try:
             result = extract_amenities(pbf_path, amenity_types={amenity_type})
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {amenity_type}", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {amenity_type}",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s: %s", amenity_type, e)
@@ -157,7 +165,10 @@ def _make_search_amenities_handler(facet_name: str):
         try:
             result = search_amenities(input_path, name_pattern)
             if step_log:
-                step_log(f"{facet_name}: found {result.feature_count} matching '{name_pattern}'", level="success")
+                step_log(
+                    f"{facet_name}: found {result.feature_count} matching '{name_pattern}'",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to search amenities: %s", e)
@@ -209,15 +220,20 @@ def _make_filter_by_category_handler(facet_name: str):
 
             all_features = geojson.get("features", [])
             if step_log:
-                step_log(f"{facet_name}: {len(filtered)}/{len(all_features)} {category} amenities", level="success")
-            return {"result": {
-                "output_path": str(output_path),
-                "feature_count": len(filtered),
-                "amenity_category": category,
-                "amenity_types": category,
-                "format": "GeoJSON",
-                "extraction_date": datetime.now(timezone.utc).isoformat(),
-            }}
+                step_log(
+                    f"{facet_name}: {len(filtered)}/{len(all_features)} {category} amenities",
+                    level="success",
+                )
+            return {
+                "result": {
+                    "output_path": str(output_path),
+                    "feature_count": len(filtered),
+                    "amenity_category": category,
+                    "amenity_types": category,
+                    "format": "GeoJSON",
+                    "extraction_date": datetime.now(UTC).isoformat(),
+                }
+            }
         except Exception as e:
             log.error("Failed to filter amenities: %s", e)
             return {"result": _empty_result(category)}
@@ -262,7 +278,7 @@ def _empty_result(category: str) -> dict:
         "amenity_category": category,
         "amenity_types": category,
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 
@@ -286,18 +302,15 @@ def _empty_stats() -> dict:
 AMENITY_FACETS = [
     # General extraction
     ("ExtractAmenities", _make_extract_amenities_handler),
-
     # Food & Drink
     ("FoodAndDrink", lambda n: _make_typed_amenity_handler(n, FOOD_AMENITIES, "food")),
     ("Restaurants", lambda n: _make_single_amenity_handler(n, "restaurant", "food")),
     ("Cafes", lambda n: _make_single_amenity_handler(n, "cafe", "food")),
     ("Bars", lambda n: _make_single_amenity_handler(n, "bar", "food")),
     ("FastFood", lambda n: _make_single_amenity_handler(n, "fast_food", "food")),
-
     # Shopping
     ("Shopping", lambda n: _make_typed_amenity_handler(n, SHOPPING_TAGS, "shopping")),
     ("Supermarkets", lambda n: _make_single_amenity_handler(n, "supermarket", "shopping")),
-
     # Services
     ("Banks", lambda n: _make_single_amenity_handler(n, "bank", "services")),
     ("ATMs", lambda n: _make_single_amenity_handler(n, "atm", "services")),
@@ -305,25 +318,24 @@ AMENITY_FACETS = [
     ("FuelStations", lambda n: _make_single_amenity_handler(n, "fuel", "services")),
     ("ChargingStations", lambda n: _make_single_amenity_handler(n, "charging_station", "services")),
     ("Parking", lambda n: _make_single_amenity_handler(n, "parking", "services")),
-
     # Healthcare
     ("Healthcare", lambda n: _make_typed_amenity_handler(n, HEALTHCARE_AMENITIES, "healthcare")),
     ("Hospitals", lambda n: _make_single_amenity_handler(n, "hospital", "healthcare")),
     ("Clinics", lambda n: _make_single_amenity_handler(n, "clinic", "healthcare")),
     ("Pharmacies", lambda n: _make_single_amenity_handler(n, "pharmacy", "healthcare")),
     ("Dentists", lambda n: _make_single_amenity_handler(n, "dentist", "healthcare")),
-
     # Education
     ("Education", lambda n: _make_typed_amenity_handler(n, EDUCATION_AMENITIES, "education")),
     ("Schools", lambda n: _make_single_amenity_handler(n, "school", "education")),
     ("Universities", lambda n: _make_single_amenity_handler(n, "university", "education")),
     ("Libraries", lambda n: _make_single_amenity_handler(n, "library", "education")),
-
     # Entertainment
-    ("Entertainment", lambda n: _make_typed_amenity_handler(n, ENTERTAINMENT_AMENITIES, "entertainment")),
+    (
+        "Entertainment",
+        lambda n: _make_typed_amenity_handler(n, ENTERTAINMENT_AMENITIES, "entertainment"),
+    ),
     ("Cinemas", lambda n: _make_single_amenity_handler(n, "cinema", "entertainment")),
     ("Theatres", lambda n: _make_single_amenity_handler(n, "theatre", "entertainment")),
-
     # Statistics and filtering
     ("AmenityStatistics", _make_amenity_stats_handler),
     ("SearchAmenities", _make_search_amenities_handler),

@@ -11,7 +11,8 @@ import logging
 import os
 import shutil
 import time
-from typing import IO, Iterator, Protocol, runtime_checkable
+from collections.abc import Iterator
+from typing import IO, Any, Protocol, runtime_checkable
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,8 @@ try:
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
-    _ReqConnectionError = None  # type: ignore[assignment,misc]
-    _ReqHTTPError = None  # type: ignore[assignment,misc]
+    _ReqConnectionError: Any = None  # type: ignore[no-redef]
+    _ReqHTTPError: Any = None  # type: ignore[no-redef]
 
 
 @runtime_checkable
@@ -99,7 +100,9 @@ _HDFS_MAX_RETRIES = int(os.environ.get("AFL_HDFS_MAX_RETRIES", "3"))
 _HDFS_RETRY_BASE_DELAY = float(os.environ.get("AFL_HDFS_RETRY_DELAY", "1.0"))
 
 
-def _hdfs_retry(func, *, max_retries: int = _HDFS_MAX_RETRIES, base_delay: float = _HDFS_RETRY_BASE_DELAY):
+def _hdfs_retry(
+    func, *, max_retries: int = _HDFS_MAX_RETRIES, base_delay: float = _HDFS_RETRY_BASE_DELAY
+):
     """Execute *func* with retries on transient HTTP errors (404, 502, 503, 504, ConnectionError)."""
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
@@ -117,12 +120,16 @@ def _hdfs_retry(func, *, max_retries: int = _HDFS_MAX_RETRIES, base_delay: float
             if not retryable or attempt >= max_retries:
                 raise
             last_exc = exc
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             logger.warning(
                 "HDFS request failed (attempt %d/%d): %s — retrying in %.1fs",
-                attempt + 1, max_retries + 1, exc, delay,
+                attempt + 1,
+                max_retries + 1,
+                exc,
+                delay,
             )
             time.sleep(delay)
+    assert last_exc is not None  # pragma: no cover
     raise last_exc  # pragma: no cover
 
 
@@ -137,8 +144,7 @@ class HDFSStorageBackend:
     def __init__(self, host: str = "default", port: int = 0, user: str | None = None):
         if not HAS_REQUESTS:
             raise RuntimeError(
-                "requests is required for HDFS support. "
-                "Install it with: pip install requests"
+                "requests is required for HDFS support. Install it with: pip install requests"
             )
         # WebHDFS runs on port 9870 (HTTP) by default; the RPC port (8020)
         # is what callers typically pass, so we convert.
@@ -168,27 +174,26 @@ class HDFSStorageBackend:
             location = response.headers["Location"]
             parsed = urlparse(location)
             if parsed.hostname != "localhost":
-                location = parsed._replace(
-                    netloc=f"{parsed.hostname}:{parsed.port}"
-                ).geturl()
+                location = parsed._replace(netloc=f"{parsed.hostname}:{parsed.port}").geturl()
             return _requests.request(
-                response.request.method, location,
+                response.request.method,
+                location,
                 data=response.request.body,
-                headers={"Content-Type": "application/octet-stream"} if response.request.body else {},
+                headers={"Content-Type": "application/octet-stream"}
+                if response.request.body
+                else {},
             )
         return response
 
     def exists(self, path: str) -> bool:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="GETFILESTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="GETFILESTATUS"))
         return r.status_code != 404
 
     def open(self, path: str, mode: str = "r") -> IO:
         hdfs_path = self._strip_uri(path)
         if "w" in mode:
-            return _WebHDFSWriteStream(self, hdfs_path)
+            return _WebHDFSWriteStream(self, hdfs_path)  # type: ignore[return-value]
 
         # Read: OPEN with redirect follow and retry
         def _do_open():
@@ -202,6 +207,7 @@ class HDFSStorageBackend:
 
         r = _hdfs_retry(_do_open)
         import io
+
         if "b" in mode:
             return io.BytesIO(r.content)
         return io.StringIO(r.text)
@@ -217,25 +223,19 @@ class HDFSStorageBackend:
 
     def getsize(self, path: str) -> int:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="GETFILESTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="GETFILESTATUS"))
         r.raise_for_status()
         return r.json()["FileStatus"]["length"]
 
     def getmtime(self, path: str) -> float:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="GETFILESTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="GETFILESTATUS"))
         r.raise_for_status()
         return r.json()["FileStatus"]["modificationTime"] / 1000.0
 
     def isfile(self, path: str) -> bool:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="GETFILESTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="GETFILESTATUS"))
         if r.status_code == 404:
             return False
         r.raise_for_status()
@@ -243,9 +243,7 @@ class HDFSStorageBackend:
 
     def isdir(self, path: str) -> bool:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="GETFILESTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="GETFILESTATUS"))
         if r.status_code == 404:
             return False
         r.raise_for_status()
@@ -253,18 +251,14 @@ class HDFSStorageBackend:
 
     def listdir(self, path: str) -> list[str]:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="LISTSTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="LISTSTATUS"))
         r.raise_for_status()
         entries = r.json()["FileStatuses"]["FileStatus"]
         return [e["pathSuffix"] for e in entries]
 
     def walk(self, path: str) -> Iterator[tuple[str, list[str], list[str]]]:
         hdfs_path = self._strip_uri(path)
-        r = _requests.get(
-            self._url(hdfs_path), params=self._params(op="LISTSTATUS")
-        )
+        r = _requests.get(self._url(hdfs_path), params=self._params(op="LISTSTATUS"))
         r.raise_for_status()
         entries = r.json()["FileStatuses"]["FileStatus"]
 
@@ -317,6 +311,7 @@ class _WebHDFSWriteStream:
 
     def __init__(self, backend: HDFSStorageBackend, hdfs_path: str):
         import io
+
         self._backend = backend
         self._hdfs_path = hdfs_path
         self._buffer = io.BytesIO()
@@ -401,6 +396,7 @@ def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
     hdfs_path = parsed.path
+    assert isinstance(backend, HDFSStorageBackend)
 
     def _do_download() -> None:
         r = _requests.get(

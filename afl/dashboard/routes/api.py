@@ -300,19 +300,19 @@ def api_locks(store=Depends(get_store)):
     return JSONResponse(
         [
             {
-                "key": l.key,
-                "acquired_at": l.acquired_at,
-                "expires_at": l.expires_at,
+                "key": lock.key,
+                "acquired_at": lock.acquired_at,
+                "expires_at": lock.expires_at,
                 "meta": {
-                    "topic": l.meta.topic,
-                    "handler": l.meta.handler,
-                    "step_name": l.meta.step_name,
-                    "step_id": l.meta.step_id,
+                    "topic": lock.meta.topic,
+                    "handler": lock.meta.handler,
+                    "step_name": lock.meta.step_name,
+                    "step_id": lock.meta.step_id,
                 }
-                if l.meta
+                if lock.meta
                 else None,
             }
-            for l in locks
+            for lock in locks
         ]
     )
 
@@ -418,8 +418,12 @@ def _step_dict(step) -> dict:
         "last_modified": step.last_modified,
     }
     if step.attributes:
-        d["params"] = {k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.params.items()}
-        d["returns"] = {k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.returns.items()}
+        d["params"] = {
+            k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.params.items()
+        }
+        d["returns"] = {
+            k: {"value": v.value, "type": v.type_hint} for k, v in step.attributes.returns.items()
+        }
     return d
 
 

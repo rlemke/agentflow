@@ -63,7 +63,7 @@ def flow_detail(flow_id: str, request: Request, store=Depends(get_store)):
             {"name": ns or "(top-level)", "prefix": ns or "_top", "count": len(wfs)}
             for ns, wfs in ns_groups.items()
         ],
-        key=lambda x: x["name"],
+        key=lambda x: str(x["name"]),
     )
 
     return request.app.state.templates.TemplateResponse(
@@ -270,6 +270,7 @@ def flow_run_execute(
     import json
     import time
 
+    from afl.ast_utils import find_workflow
     from afl.emitter import JSONEmitter
     from afl.parser import AFLParser
     from afl.runtime.entities import (
@@ -278,7 +279,6 @@ def flow_run_execute(
         TaskDefinition,
         TaskState,
     )
-    from afl.ast_utils import find_workflow
     from afl.runtime.types import generate_id
 
     flow = store.get_flow(flow_id)
@@ -307,6 +307,8 @@ def flow_run_execute(
                 program_json = emitter.emit(ast)
                 program_dict = json.loads(program_json)
 
+            if program_dict is None:
+                raise ValueError("Flow has no compiled AST or sources")
             wf_ast = find_workflow(program_dict, workflow_def.name)
             if wf_ast:
                 for param in wf_ast.get("params", []):

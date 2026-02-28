@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import frame_debate, assign_roles
+from handlers.shared.debate_utils import assign_roles, frame_debate
 
 NAMESPACE = "debate.Framing"
 
@@ -20,7 +20,9 @@ def handle_frame_debate(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Framed debate on '{topic}' with {num_agents} agents", "level": "success"})
+        step_log.append(
+            {"message": f"Framed debate on '{topic}' with {num_agents} agents", "level": "success"}
+        )
 
     return {
         "topic_analysis": result["topic_analysis"],
@@ -40,7 +42,9 @@ def handle_assign_roles(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Assigned {len(assignments)} debate roles", "level": "success"})
+        step_log.append(
+            {"message": f"Assigned {len(assignments)} debate roles", "level": "success"}
+        )
 
     return {"assignments": assignments}
 

@@ -11,10 +11,9 @@ import json
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
@@ -188,8 +187,9 @@ def classify_park(tags: dict[str, str]) -> str:
     return "protected_area"
 
 
-def matches_park_type(tags: dict[str, str], park_type: ParkType,
-                      protect_classes: set[str] | None = None) -> bool:
+def matches_park_type(
+    tags: dict[str, str], park_type: ParkType, protect_classes: set[str] | None = None
+) -> bool:
     """Check if tags match the specified park type.
 
     Args:
@@ -206,9 +206,9 @@ def matches_park_type(tags: dict[str, str], park_type: ParkType,
 
     # First check if this is any kind of park/protected area
     is_park = (
-        boundary in ("national_park", "protected_area") or
-        leisure in ("park", "nature_reserve") or
-        protect_class != ""
+        boundary in ("national_park", "protected_area")
+        or leisure in ("park", "nature_reserve")
+        or protect_class != ""
     )
 
     if not is_park:
@@ -336,22 +336,27 @@ class ParkHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
 
         classification = classify_park(tags)
 
-        self.features.append({
-            "type": "Feature",
-            "properties": {
-                "osm_id": a.orig_id(),
-                "osm_type": "relation" if a.from_way() is False else "way",
-                "name": tags.get("name", ""),
-                "park_type": classification,
-                "protect_class": tags.get("protect_class", ""),
-                "designation": tags.get("designation", ""),
-                "operator": tags.get("operator", ""),
-                "area_km2": round(area_km2, 2),
-                **{k: v for k, v in tags.items()
-                   if k not in ("name", "protect_class", "designation", "operator")},
-            },
-            "geometry": geometry,
-        })
+        self.features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "osm_id": a.orig_id(),
+                    "osm_type": "relation" if a.from_way() is False else "way",
+                    "name": tags.get("name", ""),
+                    "park_type": classification,
+                    "protect_class": tags.get("protect_class", ""),
+                    "designation": tags.get("designation", ""),
+                    "operator": tags.get("operator", ""),
+                    "area_km2": round(area_km2, 2),
+                    **{
+                        k: v
+                        for k, v in tags.items()
+                        if k not in ("name", "protect_class", "designation", "operator")
+                    },
+                },
+                "geometry": geometry,
+            }
+        )
 
 
 def extract_parks(
@@ -402,10 +407,7 @@ def extract_parks(
     handler.apply_file(str(pbf_path), locations=True)
 
     # Calculate total area
-    total_area = sum(
-        f["properties"].get("area_km2", 0.0)
-        for f in handler.features
-    )
+    total_area = sum(f["properties"].get("area_km2", 0.0) for f in handler.features)
 
     # Build output GeoJSON
     geojson = {
@@ -423,7 +425,7 @@ def extract_parks(
         park_type=park_type.value,
         protect_classes=protect_classes,
         total_area_km2=round(total_area, 2),
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -457,6 +459,7 @@ def filter_parks_by_type(
     if output_path is None:
         stem = uri_stem(input_path)
         import posixpath
+
         _dir = posixpath.dirname(input_path)
         output_path = f"{_dir}/{stem}_{park_type.value}.geojson"
     output_path = str(output_path)
@@ -482,8 +485,9 @@ def filter_parks_by_type(
             "designation": props.get("designation", ""),
         }
 
-        if matches_park_type(tags, park_type,
-                            protect_class_set if protect_classes != "*" else None):
+        if matches_park_type(
+            tags, park_type, protect_class_set if protect_classes != "*" else None
+        ):
             filtered.append(feature)
             total_area += props.get("area_km2", 0.0)
 
@@ -503,7 +507,7 @@ def filter_parks_by_type(
         park_type=park_type.value,
         protect_classes=protect_classes,
         total_area_km2=round(total_area, 2),
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 

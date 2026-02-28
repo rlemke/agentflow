@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -20,7 +19,9 @@ def handle_calculate(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Calculated '{expression}' = {result['result']}", "level": "success"})
+        step_log.append(
+            {"message": f"Calculated '{expression}' = {result['result']}", "level": "success"}
+        )
 
     return {"calculation": result}
 
@@ -34,7 +35,12 @@ def handle_execute_code(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Executed {language} code (exit={result['exit_code']})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Executed {language} code (exit={result['exit_code']})",
+                "level": "success",
+            }
+        )
 
     return {"code_result": result}
 

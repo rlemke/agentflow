@@ -38,6 +38,7 @@ def _osm_handlers_on_path():
     """Ensure osm-geocoder handlers are on sys.path before each test."""
     _ensure_osm_handlers()
 
+
 from afl.runtime import Evaluator, Telemetry
 from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 

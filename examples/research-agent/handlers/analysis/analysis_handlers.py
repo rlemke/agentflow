@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.research_utils import synthesize_findings, identify_gaps
+from handlers.shared.research_utils import identify_gaps, synthesize_findings
 
 NAMESPACE = "research.Analysis"
 
@@ -25,7 +25,12 @@ def handle_synthesize_findings(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         name = topic.get("name", "unknown") if isinstance(topic, dict) else str(topic)
-        step_log.append({"message": f"Synthesized findings for '{name}': {len(analysis['themes'])} themes", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Synthesized findings for '{name}': {len(analysis['themes'])} themes",
+                "level": "success",
+            }
+        )
 
     return {"analysis": analysis}
 
@@ -44,7 +49,9 @@ def handle_identify_gaps(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         name = topic.get("name", "unknown") if isinstance(topic, dict) else str(topic)
-        step_log.append({"message": f"Identified {len(gaps)} gaps for '{name}'", "level": "success"})
+        step_log.append(
+            {"message": f"Identified {len(gaps)} gaps for '{name}'", "level": "success"}
+        )
 
     return {"gaps": gaps, "recommendations": recommendations}
 

@@ -237,9 +237,7 @@ class TestSubprocessEdgeCases:
     def test_print_does_not_corrupt_output(self):
         """print() in user code should not corrupt JSON output."""
         executor = ScriptExecutor()
-        result = executor.execute(
-            'print("debug info")\nresult["x"] = 42'
-        )
+        result = executor.execute('print("debug info")\nresult["x"] = 42')
         assert result.success
         assert result.result == {"x": 42}
 

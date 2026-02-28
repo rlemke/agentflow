@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import boto3
@@ -51,14 +51,18 @@ def _ensure_sfn_role() -> str:
         resp = iam.get_role(RoleName=role_name)
         return resp["Role"]["Arn"]
     except iam.exceptions.NoSuchEntityException:
-        trust_policy = json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {"Service": "states.amazonaws.com"},
-                "Action": "sts:AssumeRole",
-            }],
-        })
+        trust_policy = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "states.amazonaws.com"},
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        )
         resp = iam.create_role(
             RoleName=role_name,
             AssumeRolePolicyDocument=trust_policy,
@@ -69,17 +73,19 @@ def _ensure_sfn_role() -> str:
 
 def _default_definition() -> str:
     """Build a simple Pass-state ASL definition."""
-    return json.dumps({
-        "Comment": "AFL default state machine",
-        "StartAt": "PassState",
-        "States": {
-            "PassState": {
-                "Type": "Pass",
-                "Result": {"message": "Hello from AFL Step Functions"},
-                "End": True,
+    return json.dumps(
+        {
+            "Comment": "AFL default state machine",
+            "StartAt": "PassState",
+            "States": {
+                "PassState": {
+                    "Type": "Pass",
+                    "Result": {"message": "Hello from AFL Step Functions"},
+                    "End": True,
+                },
             },
-        },
-    })
+        }
+    )
 
 
 def _create_state_machine_handler(payload: dict) -> dict[str, Any]:
@@ -106,9 +112,9 @@ def _create_state_machine_handler(payload: dict) -> dict[str, Any]:
             "state_machine_name": sm_name,
             "definition": definition,
             "role_arn": custom_role or role_arn,
-            "creation_date": resp.get("creationDate", datetime.now(timezone.utc)).isoformat()
-                if isinstance(resp.get("creationDate"), datetime)
-                else str(resp.get("creationDate", datetime.now(timezone.utc).isoformat())),
+            "creation_date": resp.get("creationDate", datetime.now(UTC)).isoformat()
+            if isinstance(resp.get("creationDate"), datetime)
+            else str(resp.get("creationDate", datetime.now(UTC).isoformat())),
             "status": "ACTIVE",
         },
     }
@@ -130,7 +136,7 @@ def _start_execution_handler(payload: dict) -> dict[str, Any]:
         input=input_payload,
     )
 
-    start_date = resp.get("startDate", datetime.now(timezone.utc))
+    start_date = resp.get("startDate", datetime.now(UTC))
     start_str = start_date.isoformat() if isinstance(start_date, datetime) else str(start_date)
 
     return {
@@ -156,7 +162,7 @@ def _describe_execution_handler(payload: dict) -> dict[str, Any]:
 
     resp = client.describe_execution(executionArn=exec_arn)
 
-    start_date = resp.get("startDate", datetime.now(timezone.utc))
+    start_date = resp.get("startDate", datetime.now(UTC))
     start_str = start_date.isoformat() if isinstance(start_date, datetime) else str(start_date)
     stop_date = resp.get("stopDate")
     stop_str = stop_date.isoformat() if isinstance(stop_date, datetime) else str(stop_date or "")
@@ -218,7 +224,7 @@ def _list_executions_handler(payload: dict) -> dict[str, Any]:
     executions = resp.get("executions", [])
     if executions:
         ex = executions[0]
-        start_date = ex.get("startDate", datetime.now(timezone.utc))
+        start_date = ex.get("startDate", datetime.now(UTC))
         start_str = start_date.isoformat() if isinstance(start_date, datetime) else str(start_date)
         return {
             "info": {

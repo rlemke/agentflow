@@ -8,21 +8,22 @@ Usage:
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # Ensure handlers are importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 from handlers import register_all_handlers
+
+from afl.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
 
 def main() -> None:
     """Start the AgentPoller with all sensor monitoring handlers."""
     poller = AgentPoller(config=AgentPollerConfig(service_name="sensor-monitoring"))
     register_all_handlers(poller)
-    print(f"Sensor monitoring AgentPoller started")
+    print("Sensor monitoring AgentPoller started")
     poller.run()
 
 

@@ -6,7 +6,6 @@ or runtime execution required.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -58,7 +57,7 @@ def _compile_all() -> dict:
     return emit_dict(program_ast, include_locations=False)
 
 
-def _find_wf(node: dict, name: str) -> Optional[dict]:
+def _find_wf(node: dict, name: str) -> dict | None:
     """Recursively search compiled program for a workflow by name."""
     for decl in node.get("declarations", []):
         if decl.get("type") == "WorkflowDecl" and decl["name"] == name:
@@ -70,7 +69,7 @@ def _find_wf(node: dict, name: str) -> Optional[dict]:
     return None
 
 
-def _find_facet(node: dict, name: str) -> Optional[dict]:
+def _find_facet(node: dict, name: str) -> dict | None:
     """Recursively search compiled program for a facet by name."""
     for decl in node.get("declarations", []):
         if decl.get("type") == "FacetDecl" and decl["name"] == name:
@@ -110,6 +109,7 @@ def _step_names(wf: dict) -> list[str]:
 # ---------------------------------------------------------------------------
 # Module-scoped fixture — compile once, reuse across all tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def program():
@@ -301,8 +301,14 @@ class TestComposedWorkflows:
         assert _param_dict(f) == {"cache": "OSMCache"}
         assert len(_steps(f)) == 8
         assert _step_names(f) == [
-            "bicycle", "hiking", "train", "bus",
-            "bicycle_stats", "hiking_stats", "train_stats", "bus_stats",
+            "bicycle",
+            "hiking",
+            "train",
+            "bus",
+            "bicycle_stats",
+            "hiking_stats",
+            "train_stats",
+            "bus_stats",
         ]
 
     # ------------------------------------------------------------------
@@ -463,8 +469,12 @@ class TestComposedWorkflows:
         assert _param_dict(f) == {"cache": "OSMCache"}
         assert len(_steps(f)) == 7
         assert _step_names(f) == [
-            "parks", "routes", "cities",
-            "park_stats", "route_stats", "city_stats",
+            "parks",
+            "routes",
+            "cities",
+            "park_stats",
+            "route_stats",
+            "city_stats",
             "map",
         ]
 
@@ -609,7 +619,11 @@ class TestComposedWorkflows:
     def test_road_zoom_builder_from_cache(self, program):
         f = _find_facet(program, "RoadZoomBuilderFromCache")
         assert f is not None
-        assert _param_dict(f) == {"cache": "OSMCache", "output_dir": "String", "max_concurrent": "Long"}
+        assert _param_dict(f) == {
+            "cache": "OSMCache",
+            "output_dir": "String",
+            "max_concurrent": "Long",
+        }
         assert len(_steps(f)) == 2
         assert _step_names(f) == ["graph", "zoom"]
 

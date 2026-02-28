@@ -19,7 +19,6 @@ Usage:
 """
 
 import argparse
-import logging
 import os
 import signal
 
@@ -148,10 +147,13 @@ def main() -> None:
         dispatcher = RegistryDispatcher(persistence=store)
         registrations = store.list_handler_registrations()
         for reg in registrations:
+
             def _make_proxy(d: RegistryDispatcher, name: str):  # noqa: E301
                 def _proxy(payload: dict) -> dict:
-                    return d.dispatch(name, payload)
+                    return d.dispatch(name, payload) or {}
+
                 return _proxy
+
             tool_registry.register(reg.facet_name, _make_proxy(dispatcher, reg.facet_name))
         if registrations:
             names = [r.facet_name for r in registrations]

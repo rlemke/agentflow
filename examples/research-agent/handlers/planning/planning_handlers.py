@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.research_utils import plan_topic, decompose_topic
+from handlers.shared.research_utils import decompose_topic, plan_topic
 
 NAMESPACE = "research.Planning"
 
@@ -21,7 +21,9 @@ def handle_plan_research(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Planned research for '{topic}' at depth {depth}", "level": "success"})
+        step_log.append(
+            {"message": f"Planned research for '{topic}' at depth {depth}", "level": "success"}
+        )
 
     return {"plan": plan}
 
@@ -38,7 +40,9 @@ def handle_decompose_into_subtopics(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         name = topic.get("name", "unknown") if isinstance(topic, dict) else str(topic)
-        step_log.append({"message": f"Decomposed '{name}' into {len(subtopics)} subtopics", "level": "success"})
+        step_log.append(
+            {"message": f"Decomposed '{name}' into {len(subtopics)} subtopics", "level": "success"}
+        )
 
     return {"subtopics": subtopics}
 

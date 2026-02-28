@@ -220,13 +220,15 @@ class TestDownloadMirror:
         with open(mirror_file, "wb") as f:
             f.write(b"fake-pbf-data")
 
-        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
-             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.shutil.copy2"), \
-             mock.patch(f"{MODULE}.os.replace"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
-             mock.patch(f"{MODULE}.requests.get") as mock_get:
+        with (
+            mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.shutil.copy2"),
+            mock.patch(f"{MODULE}.os.replace"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=13),
+            mock.patch(f"{MODULE}.requests.get") as mock_get,
+        ):
             result = download(region)
 
         assert result["wasInCache"] is False
@@ -244,13 +246,15 @@ class TestDownloadMirror:
         mock_response.iter_content.return_value = [b"downloaded"]
         mock_response.raise_for_status.return_value = None
 
-        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
-             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=10), \
-             mock.patch(f"{MODULE}.os.replace"), \
-             mock.patch("builtins.open", new_callable=mock.mock_open), \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
+        with (
+            mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=10),
+            mock.patch(f"{MODULE}.os.replace"),
+            mock.patch("builtins.open", new_callable=mock.mock_open),
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get,
+        ):
             result = download("africa/algeria")
 
         assert result["wasInCache"] is False
@@ -262,14 +266,16 @@ class TestDownloadMirror:
         mock_response.iter_content.return_value = [b"data"]
         mock_response.raise_for_status.return_value = None
 
-        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", None), \
-             mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.path.isfile") as mock_isfile, \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=4), \
-             mock.patch(f"{MODULE}.os.replace"), \
-             mock.patch("builtins.open", new_callable=mock.mock_open), \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
+        with (
+            mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", None),
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.path.isfile") as mock_isfile,
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=4),
+            mock.patch(f"{MODULE}.os.replace"),
+            mock.patch("builtins.open", new_callable=mock.mock_open),
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response),
+        ):
             download("africa/algeria")
 
         mock_isfile.assert_not_called()
@@ -284,12 +290,14 @@ class TestDownloadMirror:
             with open(mirror_file, "wb") as f:
                 f.write(b"x" * 7)
 
-            with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
-                 mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-                 mock.patch(f"{MODULE}.os.makedirs"), \
-                 mock.patch(f"{MODULE}.shutil.copy2"), \
-                 mock.patch(f"{MODULE}.os.replace"), \
-                 mock.patch(f"{MODULE}.os.path.getsize", return_value=7):
+            with (
+                mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
+                mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+                mock.patch(f"{MODULE}.os.makedirs"),
+                mock.patch(f"{MODULE}.shutil.copy2"),
+                mock.patch(f"{MODULE}.os.replace"),
+                mock.patch(f"{MODULE}.os.path.getsize", return_value=7),
+            ):
                 result = download(region, fmt=fmt)
 
             assert result["path"] == cache_path(region, fmt)
@@ -313,10 +321,12 @@ class TestDownloadMirror:
         test_storage = get_storage_backend(test_cache_dir)
         expected_cache_file = test_storage.join(test_cache_dir, f"{region}-latest.{ext}")
 
-        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
-             mock.patch.object(_downloader_mod, "CACHE_DIR", test_cache_dir), \
-             mock.patch.object(_downloader_mod, "_storage", test_storage), \
-             mock.patch(f"{MODULE}.requests.get") as mock_get:
+        with (
+            mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
+            mock.patch.object(_downloader_mod, "CACHE_DIR", test_cache_dir),
+            mock.patch.object(_downloader_mod, "_storage", test_storage),
+            mock.patch(f"{MODULE}.requests.get") as mock_get,
+        ):
             result = download(region)
 
         assert os.path.isfile(expected_cache_file)
@@ -348,11 +358,13 @@ class TestDownloadMirror:
         with open(cache_file, "wb") as f:
             f.write(b"cached-data")
 
-        with mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir), \
-             mock.patch.object(_downloader_mod, "CACHE_DIR", test_cache_dir), \
-             mock.patch.object(_downloader_mod, "_storage", test_storage), \
-             mock.patch(f"{MODULE}.shutil.copy2") as mock_copy, \
-             mock.patch(f"{MODULE}.requests.get") as mock_get:
+        with (
+            mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
+            mock.patch.object(_downloader_mod, "CACHE_DIR", test_cache_dir),
+            mock.patch.object(_downloader_mod, "_storage", test_storage),
+            mock.patch(f"{MODULE}.shutil.copy2") as mock_copy,
+            mock.patch(f"{MODULE}.requests.get") as mock_get,
+        ):
             result = download(region)
 
         assert result["wasInCache"] is True
@@ -593,13 +605,14 @@ class TestDownloadLockDeduplication:
         mock_response.iter_content.return_value = [b"fake-data"]
         mock_response.raise_for_status.return_value = None
 
-        with mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
-             mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect), \
-             mock.patch("builtins.open", new_callable=mock.mock_open), \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
-
+        with (
+            mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=13),
+            mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect),
+            mock.patch("builtins.open", new_callable=mock.mock_open),
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get,
+        ):
             results = []
             errors = []
             barrier = threading.Barrier(5)
@@ -636,8 +649,10 @@ class TestDownloadLockDeduplication:
             # First call (fast-path) returns False; second call (re-check) returns True
             return call_count[0] > 1
 
-        with mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=100):
+        with (
+            mock.patch(f"{MODULE}.os.path.exists", side_effect=exists_effect),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=100),
+        ):
             result = download("africa/algeria")
 
         assert result["wasInCache"] is True
@@ -649,13 +664,14 @@ class TestDownloadLockDeduplication:
         mock_response.iter_content.return_value = [b"data"]
         mock_response.raise_for_status.return_value = None
 
-        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
-             mock.patch(f"{MODULE}.os.replace"), \
-             mock.patch("builtins.open", new_callable=mock.mock_open), \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get:
-
+        with (
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=13),
+            mock.patch(f"{MODULE}.os.replace"),
+            mock.patch("builtins.open", new_callable=mock.mock_open),
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response) as mock_get,
+        ):
             results = []
 
             def dl(region):
@@ -696,11 +712,13 @@ class TestDownloadUrlLockDeduplication:
         mock_response.iter_content.return_value = [b"data"]
         mock_response.raise_for_status.return_value = None
 
-        with mock.patch.object(_downloader_mod, "get_storage_backend", return_value=storage), \
-             mock.patch.object(_downloader_mod.requests, "get",
-                               return_value=mock_response) as mock_get, \
-             mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect):
-
+        with (
+            mock.patch.object(_downloader_mod, "get_storage_backend", return_value=storage),
+            mock.patch.object(
+                _downloader_mod.requests, "get", return_value=mock_response
+            ) as mock_get,
+            mock.patch(f"{MODULE}.os.replace", side_effect=replace_effect),
+        ):
             results = []
             barrier = threading.Barrier(3)
 
@@ -734,11 +752,12 @@ class TestDownloadAtomicWrite:
         mock_response = mock.Mock()
         mock_response.raise_for_status.side_effect = req_lib.HTTPError("500 Server Error")
 
-        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.remove") as mock_os_remove, \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
-
+        with (
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.remove") as mock_os_remove,
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response),
+        ):
             with pytest.raises(req_lib.HTTPError, match="500"):
                 download("africa/algeria")
 
@@ -762,13 +781,14 @@ class TestDownloadAtomicWrite:
             paths_opened.append(path)
             return mock_file()
 
-        with mock.patch(f"{MODULE}.os.path.exists", return_value=False), \
-             mock.patch(f"{MODULE}.os.makedirs"), \
-             mock.patch(f"{MODULE}.os.path.getsize", return_value=13), \
-             mock.patch(f"{MODULE}.os.replace") as mock_replace, \
-             mock.patch("builtins.open", side_effect=track_open), \
-             mock.patch(f"{MODULE}.requests.get", return_value=mock_response):
-
+        with (
+            mock.patch(f"{MODULE}.os.path.exists", return_value=False),
+            mock.patch(f"{MODULE}.os.makedirs"),
+            mock.patch(f"{MODULE}.os.path.getsize", return_value=13),
+            mock.patch(f"{MODULE}.os.replace") as mock_replace,
+            mock.patch("builtins.open", side_effect=track_open),
+            mock.patch(f"{MODULE}.requests.get", return_value=mock_response),
+        ):
             download("africa/algeria")
 
         # File was written to a temp path, not the final cache path

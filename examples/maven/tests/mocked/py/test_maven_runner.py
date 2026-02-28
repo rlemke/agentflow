@@ -43,10 +43,8 @@ from afl.runtime import (
 )
 from afl.runtime.entities import (
     ServerState,
-    TaskDefinition,
     TaskState,
 )
-from afl.runtime.types import generate_id
 
 # Ensure the maven example root is importable
 _MAVEN_DIR = str(Path(__file__).resolve().parent.parent.parent.parent)
@@ -57,6 +55,7 @@ from maven_runner import (
     MavenArtifactRunner,
     MavenRunnerConfig,
 )
+
 from afl.runtime.registry_runner import _current_time_ms
 
 # =========================================================================
@@ -354,8 +353,7 @@ class TestArtifactResolution:
 
             url = mock_urlopen.call_args[0][0]
             assert url == (
-                "https://repo1.maven.org/maven2/com/example"
-                "/my-handler/1.0.0/my-handler-1.0.0.jar"
+                "https://repo1.maven.org/maven2/com/example/my-handler/1.0.0/my-handler-1.0.0.jar"
             )
 
     def test_download_url_with_classifier(self, runner):
@@ -367,9 +365,7 @@ class TestArtifactResolution:
             mock_response.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_response
 
-            runner._download_artifact(
-                "com.example", "my-handler", "1.0.0", "jar-with-dependencies"
-            )
+            runner._download_artifact("com.example", "my-handler", "1.0.0", "jar-with-dependencies")
 
             url = mock_urlopen.call_args[0][0]
             assert "my-handler-1.0.0-jar-with-dependencies.jar" in url
@@ -438,9 +434,7 @@ class TestProcessEvent:
 
         return result, step, task
 
-    def test_successful_execution(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_successful_execution(self, store, evaluator, config, workflow_ast, program_ast):
         """Exit 0 -> continue_step + resume + COMPLETED."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
@@ -459,9 +453,7 @@ class TestProcessEvent:
         }
         store.save_step(step_obj)
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         # Register mvn: handler
         reg = HandlerRegistration(
@@ -475,8 +467,10 @@ class TestProcessEvent:
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
         # Mock subprocess to succeed
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
             )
@@ -490,17 +484,13 @@ class TestProcessEvent:
         updated_step = store.get_step(step.id)
         assert updated_step.state != StepState.EVENT_TRANSMIT
 
-    def test_failed_execution(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_failed_execution(self, store, evaluator, config, workflow_ast, program_ast):
         """Exit 1 -> fail_step + FAILED."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -510,8 +500,10 @@ class TestProcessEvent:
         store.save_handler_registration(reg)
         runner._refresh_registry()
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=1, stdout=b"", stderr=b"NullPointerException"
             )
@@ -526,17 +518,13 @@ class TestProcessEvent:
         updated_step = store.get_step(step.id)
         assert updated_step.state == StepState.STATEMENT_ERROR
 
-    def test_subprocess_timeout(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_subprocess_timeout(self, store, evaluator, config, workflow_ast, program_ast):
         """Subprocess timeout -> fail_step + FAILED."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -546,8 +534,10 @@ class TestProcessEvent:
         store.save_handler_registration(reg)
         runner._refresh_registry()
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.side_effect = subprocess.TimeoutExpired(cmd=["java"], timeout=1.0)
             dispatched = runner.poll_once()
 
@@ -557,17 +547,13 @@ class TestProcessEvent:
         assert updated_task.state == TaskState.FAILED
         assert "timed out" in updated_task.error["message"]
 
-    def test_no_registration_found(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_no_registration_found(self, store, evaluator, config, workflow_ast, program_ast):
         """Missing registration -> fail_step + FAILED."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         # Force the task name into registered_names so claim_task works,
         # but don't actually add a registration to _registrations
@@ -581,17 +567,13 @@ class TestProcessEvent:
         assert updated_task.state == TaskState.FAILED
         assert "No handler registration" in updated_task.error["message"]
 
-    def test_invalid_maven_uri(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_invalid_maven_uri(self, store, evaluator, config, workflow_ast, program_ast):
         """Invalid mvn: URI in registration -> fail_step + FAILED."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         # Manually insert a registration with a bad URI
         bad_reg = HandlerRegistration(
@@ -609,17 +591,13 @@ class TestProcessEvent:
         assert updated_task.state == TaskState.FAILED
         assert "Failed to resolve artifact" in updated_task.error["message"]
 
-    def test_jvm_args_from_metadata(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_jvm_args_from_metadata(self, store, evaluator, config, workflow_ast, program_ast):
         """JVM args from metadata are applied to the command."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -633,8 +611,10 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
             )
@@ -648,17 +628,13 @@ class TestProcessEvent:
             jar_idx = cmd.index("-jar")
             assert xmx_idx < jar_idx
 
-    def test_main_class_from_entrypoint(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_main_class_from_entrypoint(self, store, evaluator, config, workflow_ast, program_ast):
         """Main class from entrypoint uses -cp instead of -jar."""
         result, step, task = self._setup_paused_workflow(
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -671,8 +647,10 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
             )
@@ -691,9 +669,7 @@ class TestProcessEvent:
             store, evaluator, workflow_ast, program_ast
         )
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -705,8 +681,10 @@ class TestProcessEvent:
 
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
             )
@@ -726,9 +704,7 @@ class TestRegistryRefresh:
 
     def test_only_mvn_registrations_picked_up(self, store, evaluator, config):
         """Only registrations with mvn: URI scheme are loaded."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         # Save both a Python handler and a Maven handler
         python_reg = HandlerRegistration(
@@ -754,9 +730,7 @@ class TestRegistryRefresh:
             cache_dir=str(tmp_path / "cache"),
             topics=["osm.*"],
         )
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=cfg
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=cfg)
 
         reg1 = HandlerRegistration(
             facet_name="osm.Geocode",
@@ -777,9 +751,7 @@ class TestRegistryRefresh:
 
     def test_non_mvn_registrations_ignored(self, store, evaluator, config):
         """File-based registrations are not picked up."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="FileHandler",
@@ -840,9 +812,7 @@ class TestLifecycle:
 
     def test_start_stop_cycle(self, store, evaluator, config):
         """start() registers server; stop() triggers shutdown."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         # Run start in a background thread and stop quickly
         t = threading.Thread(target=runner.start)
@@ -860,9 +830,7 @@ class TestLifecycle:
 
     def test_server_registration_on_start(self, store, evaluator, config):
         """Server is registered as RUNNING on start and SHUTDOWN after stop."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         t = threading.Thread(target=runner.start)
         t.start()
@@ -885,15 +853,11 @@ class TestLifecycle:
         server = store.get_server(runner.server_id)
         assert server.state == ServerState.SHUTDOWN
 
-    def test_poll_once_dispatches_tasks(
-        self, store, evaluator, config, workflow_ast, program_ast
-    ):
+    def test_poll_once_dispatches_tasks(self, store, evaluator, config, workflow_ast, program_ast):
         """poll_once processes available tasks."""
         result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         reg = HandlerRegistration(
             facet_name="CountDocuments",
@@ -904,8 +868,10 @@ class TestLifecycle:
         runner._refresh_registry()
         runner.cache_workflow_ast(result.workflow_id, workflow_ast)
 
-        with patch("maven_runner.subprocess.run") as mock_run, \
-             patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")):
+        with (
+            patch("maven_runner.subprocess.run") as mock_run,
+            patch.object(runner, "_resolve_artifact", return_value=Path("/tmp/fake.jar")),
+        ):
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[], returncode=0, stdout=b"", stderr=b""
             )
@@ -915,9 +881,7 @@ class TestLifecycle:
 
     def test_ast_caching(self, store, evaluator, config):
         """Cached AST is used for workflow resume."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
 
         ast = {"type": "WorkflowDecl", "name": "Test"}
         program = {"type": "Program", "declarations": []}
@@ -937,7 +901,7 @@ class TestReadStepReturns:
 
     def test_read_returns_dict_format(self, store, evaluator, config, workflow_ast, program_ast):
         """Returns stored as dicts are read correctly."""
-        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        _result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
         blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
         step = blocked[0]
 
@@ -950,21 +914,17 @@ class TestReadStepReturns:
         }
         store.save_step(step_obj)
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
         returns = runner._read_step_returns(step.id)
         assert returns == {"output": 99}
 
     def test_read_returns_empty(self, store, evaluator, config, workflow_ast, program_ast):
         """No returns returns empty dict."""
-        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+        _result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
         blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
         step = blocked[0]
 
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
         returns = runner._read_step_returns(step.id)
         # May have params but returns should be empty or have existing returns
         # The exact state depends on the evaluator, but should not raise
@@ -972,8 +932,6 @@ class TestReadStepReturns:
 
     def test_read_returns_nonexistent_step(self, store, evaluator, config):
         """Nonexistent step returns empty dict."""
-        runner = MavenArtifactRunner(
-            persistence=store, evaluator=evaluator, config=config
-        )
+        runner = MavenArtifactRunner(persistence=store, evaluator=evaluator, config=config)
         returns = runner._read_step_returns("nonexistent-step-id")
         assert returns == {}

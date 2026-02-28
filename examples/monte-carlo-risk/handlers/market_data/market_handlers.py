@@ -16,16 +16,51 @@ NAMESPACE = "risk.MarketData"
 _DEFAULT_PORTFOLIO = {
     "name": "default",
     "positions": [
-        {"asset_id": "SPY", "quantity": 500, "price": 450.0, "value": 225000.0,
-         "volatility": 0.18, "expected_return": 0.10, "asset_class": "equity_index"},
-        {"asset_id": "AAPL", "quantity": 200, "price": 175.0, "value": 35000.0,
-         "volatility": 0.28, "expected_return": 0.12, "asset_class": "equity"},
-        {"asset_id": "GOOGL", "quantity": 100, "price": 140.0, "value": 14000.0,
-         "volatility": 0.30, "expected_return": 0.11, "asset_class": "equity"},
-        {"asset_id": "TLT", "quantity": 300, "price": 100.0, "value": 30000.0,
-         "volatility": 0.15, "expected_return": 0.04, "asset_class": "bond"},
-        {"asset_id": "GLD", "quantity": 150, "price": 185.0, "value": 27750.0,
-         "volatility": 0.16, "expected_return": 0.06, "asset_class": "commodity"},
+        {
+            "asset_id": "SPY",
+            "quantity": 500,
+            "price": 450.0,
+            "value": 225000.0,
+            "volatility": 0.18,
+            "expected_return": 0.10,
+            "asset_class": "equity_index",
+        },
+        {
+            "asset_id": "AAPL",
+            "quantity": 200,
+            "price": 175.0,
+            "value": 35000.0,
+            "volatility": 0.28,
+            "expected_return": 0.12,
+            "asset_class": "equity",
+        },
+        {
+            "asset_id": "GOOGL",
+            "quantity": 100,
+            "price": 140.0,
+            "value": 14000.0,
+            "volatility": 0.30,
+            "expected_return": 0.11,
+            "asset_class": "equity",
+        },
+        {
+            "asset_id": "TLT",
+            "quantity": 300,
+            "price": 100.0,
+            "value": 30000.0,
+            "volatility": 0.15,
+            "expected_return": 0.04,
+            "asset_class": "bond",
+        },
+        {
+            "asset_id": "GLD",
+            "quantity": 150,
+            "price": 185.0,
+            "value": 27750.0,
+            "volatility": 0.16,
+            "expected_return": 0.06,
+            "asset_class": "commodity",
+        },
     ],
     "base_currency": "USD",
     "valuation_date": "2026-02-26",
@@ -38,7 +73,7 @@ _DEFAULT_CORRELATION = [
     [0.75, 1.00, 0.65, -0.20, 0.08],  # AAPL
     [0.72, 0.65, 1.00, -0.25, 0.03],  # GOOGL
     [-0.30, -0.20, -0.25, 1.00, 0.15],  # TLT
-    [0.05, 0.08, 0.03, 0.15, 1.00],   # GLD
+    [0.05, 0.08, 0.03, 0.15, 1.00],  # GLD
 ]
 
 
@@ -51,10 +86,12 @@ def handle_load_portfolio(params: dict[str, Any]) -> dict[str, Any]:
     portfolio["name"] = portfolio_name
 
     if step_log:
-        step_log(f"LoadPortfolio: {portfolio_name} — "
-                 f"{len(portfolio['positions'])} positions, "
-                 f"total_value={portfolio['total_value']:,}",
-                 level="success")
+        step_log(
+            f"LoadPortfolio: {portfolio_name} — "
+            f"{len(portfolio['positions'])} positions, "
+            f"total_value={portfolio['total_value']:,}",
+            level="success",
+        )
 
     return {"portfolio": portfolio}
 
@@ -77,13 +114,17 @@ def handle_fetch_historical_data(params: dict[str, Any]) -> dict[str, Any]:
             corr.append([0.0] * i + [1.0] + [0.0] * (n - i - 1))
 
     chol = compute_cholesky(corr)
-    ids = [p.get("asset_id", f"asset_{i}") if isinstance(p, dict) else str(p)
-           for i, p in enumerate(asset_ids)] if isinstance(asset_ids, list) else []
+    ids = (
+        [
+            p.get("asset_id", f"asset_{i}") if isinstance(p, dict) else str(p)
+            for i, p in enumerate(asset_ids)
+        ]
+        if isinstance(asset_ids, list)
+        else []
+    )
 
     if step_log:
-        step_log(f"FetchHistoricalData: {n} assets, "
-                 f"lookback={lookback_days} days",
-                 level="success")
+        step_log(f"FetchHistoricalData: {n} assets, lookback={lookback_days} days", level="success")
 
     return {
         "correlation": {

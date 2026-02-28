@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-import math
 import os
-from typing import Any
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # TestMathUtils
@@ -126,13 +123,18 @@ class TestMarketData:
         from handlers.market_data.market_handlers import handle_fetch_historical_data
 
         positions = [
-            {"asset_id": "SPY"}, {"asset_id": "AAPL"},
-            {"asset_id": "GOOGL"}, {"asset_id": "TLT"}, {"asset_id": "GLD"},
+            {"asset_id": "SPY"},
+            {"asset_id": "AAPL"},
+            {"asset_id": "GOOGL"},
+            {"asset_id": "TLT"},
+            {"asset_id": "GLD"},
         ]
-        result = handle_fetch_historical_data({
-            "asset_ids": positions,
-            "lookback_days": 252,
-        })
+        result = handle_fetch_historical_data(
+            {
+                "asset_ids": positions,
+                "lookback_days": 252,
+            }
+        )
         corr = result["correlation"]
         assert len(corr["matrix"]) == 5
         assert len(corr["cholesky"]) == 5
@@ -159,14 +161,16 @@ class TestSimulation:
             {"value": 50_000, "volatility": 0.15, "expected_return": 0.08},
         ]
         cholesky = [[1.0, 0.0], [0.6, 0.8]]
-        result = handle_simulate_batch({
-            "positions": positions,
-            "cholesky": cholesky,
-            "num_paths": 100,
-            "time_horizon_days": 10,
-            "batch_id": 3,
-            "random_seed": 42,
-        })
+        result = handle_simulate_batch(
+            {
+                "positions": positions,
+                "cholesky": cholesky,
+                "num_paths": 100,
+                "time_horizon_days": 10,
+                "batch_id": 3,
+                "random_seed": 42,
+            }
+        )
         batch = result["result"]
         assert batch["batch_id"] == 3
         assert batch["num_paths"] == 100
@@ -178,16 +182,20 @@ class TestSimulation:
         """SimulateBatch handles JSON string params."""
         from handlers.simulation.simulation_handlers import handle_simulate_batch
 
-        positions = json.dumps([
-            {"value": 100_000, "volatility": 0.20, "expected_return": 0.10},
-        ])
+        positions = json.dumps(
+            [
+                {"value": 100_000, "volatility": 0.20, "expected_return": 0.10},
+            ]
+        )
         cholesky = json.dumps([[1.0]])
-        result = handle_simulate_batch({
-            "positions": positions,
-            "cholesky": cholesky,
-            "num_paths": 10,
-            "batch_id": 0,
-        })
+        result = handle_simulate_batch(
+            {
+                "positions": positions,
+                "cholesky": cholesky,
+                "num_paths": 10,
+                "batch_id": 0,
+            }
+        )
         assert len(result["result"]["pnl_distribution"]) == 10
 
     def test_simulate_stress_result_fields(self):
@@ -198,11 +206,13 @@ class TestSimulation:
             {"asset_id": "SPY", "value": 225000.0},
             {"asset_id": "AAPL", "value": 35000.0},
         ]
-        result = handle_simulate_stress({
-            "positions": positions,
-            "scenario_name": "market_crash",
-            "shock_factors": [-0.20, -0.30],
-        })
+        result = handle_simulate_stress(
+            {
+                "positions": positions,
+                "scenario_name": "market_crash",
+                "shock_factors": [-0.20, -0.30],
+            }
+        )
         stress = result["result"]
         assert stress["scenario_name"] == "market_crash"
         assert stress["portfolio_pnl"] < 0  # crash should lose money
@@ -223,10 +233,12 @@ class TestAnalytics:
         from handlers.analytics.analytics_handlers import handle_compute_var
 
         pnl = [float(x) for x in range(-500, 500)]
-        result = handle_compute_var({
-            "pnl_distributions": pnl,
-            "confidence_levels": [0.95, 0.99],
-        })
+        result = handle_compute_var(
+            {
+                "pnl_distributions": pnl,
+                "confidence_levels": [0.95, 0.99],
+            }
+        )
         metrics = result["metrics"]
         assert metrics["var_95"] < 0
         assert metrics["var_99"] < metrics["var_95"]  # 99% is more extreme
@@ -253,10 +265,12 @@ class TestAnalytics:
             {"value": 50_000, "volatility": 0.30},
         ]
         cholesky = [[1.0, 0.0], [0.5, 0.866]]
-        result = handle_compute_greeks({
-            "positions": positions,
-            "cholesky": cholesky,
-        })
+        result = handle_compute_greeks(
+            {
+                "positions": positions,
+                "cholesky": cholesky,
+            }
+        )
         greeks = result["greeks"]
         assert len(greeks["delta"]) == 2
         assert len(greeks["vega"]) == 2
@@ -275,12 +289,14 @@ class TestReporting:
         """GenerateReport returns report with summary and timestamp."""
         from handlers.reporting.report_handlers import handle_generate_report
 
-        result = handle_generate_report({
-            "portfolio": {"name": "test", "total_value": 100000, "positions": [{"a": 1}]},
-            "metrics": {"var_95": -5000, "var_99": -8000},
-            "greeks": {"portfolio_delta": 1.0, "portfolio_vega": 500.0},
-            "stress_results": "market_crash",
-        })
+        result = handle_generate_report(
+            {
+                "portfolio": {"name": "test", "total_value": 100000, "positions": [{"a": 1}]},
+                "metrics": {"var_95": -5000, "var_99": -8000},
+                "greeks": {"portfolio_delta": 1.0, "portfolio_vega": 500.0},
+                "stress_results": "market_crash",
+            }
+        )
         report = result["report"]
         assert "report_path" in report
         assert "summary" in report
@@ -291,12 +307,14 @@ class TestReporting:
         """Report timestamp is a non-empty ISO string."""
         from handlers.reporting.report_handlers import handle_generate_report
 
-        result = handle_generate_report({
-            "portfolio": {"name": "p1", "total_value": 0, "positions": []},
-            "metrics": {},
-            "greeks": {},
-            "stress_results": {},
-        })
+        result = handle_generate_report(
+            {
+                "portfolio": {"name": "p1", "total_value": 0, "positions": []},
+                "metrics": {},
+                "greeks": {},
+                "stress_results": {},
+            }
+        )
         ts = result["report"]["timestamp"]
         assert len(ts) > 10  # ISO format is at least 20+ chars
 
@@ -312,6 +330,7 @@ class TestDispatch:
     def test_market_data_dispatch(self):
         """Market data dispatch table has 2 entries."""
         from handlers.market_data.market_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "risk.MarketData.LoadPortfolio" in _DISPATCH
         assert "risk.MarketData.FetchHistoricalData" in _DISPATCH
@@ -319,6 +338,7 @@ class TestDispatch:
     def test_simulation_dispatch(self):
         """Simulation dispatch table has 2 entries."""
         from handlers.simulation.simulation_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "risk.Simulation.SimulateBatch" in _DISPATCH
         assert "risk.Simulation.SimulateStress" in _DISPATCH
@@ -326,6 +346,7 @@ class TestDispatch:
     def test_analytics_dispatch(self):
         """Analytics dispatch table has 2 entries."""
         from handlers.analytics.analytics_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "risk.Analytics.ComputeVaR" in _DISPATCH
         assert "risk.Analytics.ComputeGreeks" in _DISPATCH
@@ -333,15 +354,16 @@ class TestDispatch:
     def test_reporting_dispatch(self):
         """Reporting dispatch table has 1 entry."""
         from handlers.reporting.report_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 1
         assert "risk.Reporting.GenerateReport" in _DISPATCH
 
     def test_total_handler_count(self):
         """Total handlers across all namespaces is 7."""
-        from handlers.market_data.market_handlers import _DISPATCH as md
-        from handlers.simulation.simulation_handlers import _DISPATCH as sim
         from handlers.analytics.analytics_handlers import _DISPATCH as ana
+        from handlers.market_data.market_handlers import _DISPATCH as md
         from handlers.reporting.report_handlers import _DISPATCH as rpt
+        from handlers.simulation.simulation_handlers import _DISPATCH as sim
 
         total = len(md) + len(sim) + len(ana) + len(rpt)
         assert total == 7
@@ -360,9 +382,7 @@ class TestCompilation:
         """Parse the risk.afl file and return the AST."""
         from afl.parser import AFLParser
 
-        afl_path = os.path.join(
-            os.path.dirname(__file__), "..", "afl", "risk.afl"
-        )
+        afl_path = os.path.join(os.path.dirname(__file__), "..", "afl", "risk.afl")
         with open(afl_path) as f:
             source = f.read()
         return AFLParser().parse(source)

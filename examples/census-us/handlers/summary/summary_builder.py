@@ -17,36 +17,34 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "census-output"))
+_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "census-output"))
 
 
 @dataclass
 class JoinResult:
     """Result of a geographic join operation."""
+
     output_path: str
     feature_count: int
     join_field: str
-    extraction_date: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 @dataclass
 class SummaryResult:
     """Result of a state summary operation."""
+
     state_fips: str
     state_name: str
     output_path: str
     tables_joined: int
     record_count: int
-    extraction_date: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-def _safe_pct(num_key: str, den_key: str, props: dict[str, Any],
-              *, scale: float = 100.0) -> float | None:
+def _safe_pct(
+    num_key: str, den_key: str, props: dict[str, Any], *, scale: float = 100.0
+) -> float | None:
     """Compute num/den * scale, returning None if missing/zero."""
     num = props.get(num_key)
     den = props.get(den_key)
@@ -127,10 +125,14 @@ def _compute_derived_metrics(props: dict[str, Any]) -> dict[str, Any]:
             if tot > 0:
                 weighted_sum = 0.0
                 vehicle_pairs = [
-                    ("B25044_003E", 1), ("B25044_004E", 2),
-                    ("B25044_005E", 3), ("B25044_006E", 4),
-                    ("B25044_010E", 1), ("B25044_011E", 2),
-                    ("B25044_012E", 3), ("B25044_013E", 4),
+                    ("B25044_003E", 1),
+                    ("B25044_004E", 2),
+                    ("B25044_005E", 3),
+                    ("B25044_006E", 4),
+                    ("B25044_010E", 1),
+                    ("B25044_011E", 2),
+                    ("B25044_012E", 3),
+                    ("B25044_013E", 4),
                 ]
                 has_data = False
                 for col, weight in vehicle_pairs:
@@ -162,9 +164,12 @@ def _load_acs_csv(path: str, join_field: str) -> dict[str, dict[str, str]]:
     return data
 
 
-def join_geo(acs_path: str, tiger_path: str,
-             join_field: str = "GEOID",
-             extra_acs_paths: list[str] | None = None) -> JoinResult:
+def join_geo(
+    acs_path: str,
+    tiger_path: str,
+    join_field: str = "GEOID",
+    extra_acs_paths: list[str] | None = None,
+) -> JoinResult:
     """Join ACS CSV data with TIGER GeoJSON features.
 
     Args:
@@ -183,7 +188,7 @@ def join_geo(acs_path: str, tiger_path: str,
     acs_data = _load_acs_csv(acs_path, join_field)
 
     # Merge extra ACS CSVs
-    for extra_path in (extra_acs_paths or []):
+    for extra_path in extra_acs_paths or []:
         extra_data = _load_acs_csv(extra_path, join_field)
         for key, row in extra_data.items():
             if key in acs_data:
@@ -213,29 +218,27 @@ def join_geo(acs_path: str, tiger_path: str,
             try:
                 area_km2 = float(aland) / 1e6
                 pop = float(pop_est)
-                props["population_density_km2"] = (
-                    round(pop / area_km2, 2) if area_km2 > 0 else 0.0
-                )
+                props["population_density_km2"] = round(pop / area_km2, 2) if area_km2 > 0 else 0.0
             except (ValueError, TypeError):
                 pass
         # Compute derived percentage/rate metrics
         props.update(_compute_derived_metrics(props))
-        joined_features.append({
-            "type": "Feature",
-            "properties": props,
-            "geometry": feat.get("geometry"),
-        })
+        joined_features.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": feat.get("geometry"),
+            }
+        )
 
     acs_stem = Path(acs_path).stem if acs_path else "unknown"
     tiger_stem = Path(tiger_path).stem if tiger_path else "unknown"
-    output_path = os.path.join(output_dir,
-                               f"{acs_stem}_{tiger_stem}_joined.geojson")
+    output_path = os.path.join(output_dir, f"{acs_stem}_{tiger_stem}_joined.geojson")
 
     with open(output_path, "w") as f:
         json.dump({"type": "FeatureCollection", "features": joined_features}, f)
 
-    logger.info("Joined %d features (%s + %s)",
-                len(joined_features), acs_path, tiger_path)
+    logger.info("Joined %d features (%s + %s)", len(joined_features), acs_path, tiger_path)
 
     return JoinResult(
         output_path=output_path,
@@ -244,12 +247,17 @@ def join_geo(acs_path: str, tiger_path: str,
     )
 
 
-def summarize_state(population: dict[str, Any], income: dict[str, Any],
-                    housing: dict[str, Any], education: dict[str, Any],
-                    commuting: dict[str, Any], *,
-                    race: dict[str, Any] | None = None,
-                    poverty: dict[str, Any] | None = None,
-                    employment: dict[str, Any] | None = None) -> SummaryResult:
+def summarize_state(
+    population: dict[str, Any],
+    income: dict[str, Any],
+    housing: dict[str, Any],
+    education: dict[str, Any],
+    commuting: dict[str, Any],
+    *,
+    race: dict[str, Any] | None = None,
+    poverty: dict[str, Any] | None = None,
+    employment: dict[str, Any] | None = None,
+) -> SummaryResult:
     """Build a state-level summary from multiple ACS extraction results.
 
     Args:
@@ -313,8 +321,12 @@ def summarize_state(population: dict[str, Any], income: dict[str, Any],
     with open(output_path, "w") as f:
         json.dump(summary, f, indent=2)
 
-    logger.info("State summary for %s: %d tables, %d total records",
-                state_fips, tables_joined, total_records)
+    logger.info(
+        "State summary for %s: %d tables, %d total records",
+        state_fips,
+        tables_joined,
+        total_records,
+    )
 
     return SummaryResult(
         state_fips=state_fips,

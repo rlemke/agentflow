@@ -17,61 +17,106 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Population", "declarations": [
-                    _ef("ExtractPlacesWithPopulation",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "place_type", "type": "String"},
-                         {"name": "min_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                    _ef("FilterByPopulationRange",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "min_population", "type": "Long"},
-                         {"name": "max_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Routing", "declarations": [
-                    _ef("BuildRoutesBetweenCities",
-                        [{"name": "cities_path", "type": "String"},
-                         {"name": "profile", "type": "String"},
-                         {"name": "cache", "type": "OSMCache"}],
-                        [{"name": "result", "type": "RoutingResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Population",
+                            "declarations": [
+                                _ef(
+                                    "ExtractPlacesWithPopulation",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "place_type", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByPopulationRange",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                        {"name": "max_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Routing",
+                            "declarations": [
+                                _ef(
+                                    "BuildRoutesBetweenCities",
+                                    [
+                                        {"name": "cities_path", "type": "String"},
+                                        {"name": "profile", "type": "String"},
+                                        {"name": "cache", "type": "OSMCache"},
+                                    ],
+                                    [{"name": "result", "type": "RoutingResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -160,17 +205,34 @@ GERMAN_CITIES = [
     {"name": "Nuremberg", "state": "Bavaria", "population": 518365, "lat": 49.452, "lon": 11.077},
 ]
 
-RANGE_CITIES = [c for c in GERMAN_CITIES
-                if 1_000_000 <= c["population"] <= 2_000_000]
+RANGE_CITIES = [c for c in GERMAN_CITIES if 1_000_000 <= c["population"] <= 2_000_000]
 
 # Pairwise driving routes (from GraphHopper-style routing)
 ROUTES = [
-    {"from": "Hamburg", "to": "Munich", "distance_km": 790, "duration_min": 450,
-     "waypoints": 1247, "via": "Hanover - Nuremberg"},
-    {"from": "Hamburg", "to": "Cologne", "distance_km": 425, "duration_min": 245,
-     "waypoints": 672, "via": "Dortmund - Dusseldorf"},
-    {"from": "Munich", "to": "Cologne", "distance_km": 575, "duration_min": 330,
-     "waypoints": 918, "via": "Stuttgart - Frankfurt"},
+    {
+        "from": "Hamburg",
+        "to": "Munich",
+        "distance_km": 790,
+        "duration_min": 450,
+        "waypoints": 1247,
+        "via": "Hanover - Nuremberg",
+    },
+    {
+        "from": "Hamburg",
+        "to": "Cologne",
+        "distance_km": 425,
+        "duration_min": 245,
+        "waypoints": 672,
+        "via": "Dortmund - Dusseldorf",
+    },
+    {
+        "from": "Munich",
+        "to": "Cologne",
+        "distance_km": 575,
+        "duration_min": 330,
+        "waypoints": 918,
+        "via": "Stuttgart - Frankfurt",
+    },
 ]
 
 TOTAL_DISTANCE = sum(r["distance_km"] for r in ROUTES)
@@ -204,8 +266,9 @@ MOCK_HANDLERS = {
     "ExtractPlacesWithPopulation": lambda p: {
         "result": {
             "output_path": "/tmp/germany_cities.geojson",
-            "feature_count": len([c for c in GERMAN_CITIES
-                                  if c["population"] >= p.get("min_population", 0)]),
+            "feature_count": len(
+                [c for c in GERMAN_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "original_count": 2847,
             "place_type": "city",
             "min_population": p.get("min_population", 0),
@@ -219,13 +282,15 @@ MOCK_HANDLERS = {
         "result": {
             "output_path": "/tmp/germany_cities_1m_2m.geojson",
             "feature_count": len(RANGE_CITIES),
-            "original_count": len([c for c in GERMAN_CITIES
-                                   if c["population"] >= p.get("min_population", 0)]),
+            "original_count": len(
+                [c for c in GERMAN_CITIES if c["population"] >= p.get("min_population", 0)]
+            ),
             "place_type": "city",
             "min_population": p.get("min_population", 0),
             "max_population": p.get("max_population", 0),
-            "filter_applied": (f"{p.get('min_population', 0):,} <= population "
-                               f"<= {p.get('max_population', 0):,}"),
+            "filter_applied": (
+                f"{p.get('min_population', 0):,} <= population <= {p.get('max_population', 0):,}"
+            ),
             "format": "geojson",
             "extraction_date": "2026-02-06T12:00:02+00:00",
         },
@@ -264,7 +329,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -272,6 +339,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the city route map workflow end-to-end with mock handlers."""
@@ -283,8 +351,10 @@ def main() -> None:
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
 
     # 1. Execute workflow - pauses at the first event step (ResolveRegion)
-    print('Executing: CityRouteMapByRegion(region="Germany", '
-          'min_population=1000000, max_population=2000000, profile="car")')
+    print(
+        'Executing: CityRouteMapByRegion(region="Germany", '
+        'min_population=1000000, max_population=2000000, profile="car")'
+    )
     print("  Pipeline: ResolveRegion -> ExtractPlacesWithPopulation")
     print("            -> FilterByPopulationRange -> BuildRoutesBetweenCities -> RenderMap\n")
 
@@ -337,7 +407,7 @@ def main() -> None:
     print(f"  Map output:             {outputs.get('map_path')}")
 
     # Show the cities in range
-    print(f"\n  Cities with population between 1,000,000 and 2,000,000:")
+    print("\n  Cities with population between 1,000,000 and 2,000,000:")
     max_pop = RANGE_CITIES[0]["population"]
     for city in sorted(RANGE_CITIES, key=lambda c: c["population"], reverse=True):
         bar_len = int(35 * city["population"] / max_pop)
@@ -345,15 +415,17 @@ def main() -> None:
         print(f"    {city['name']:.<16} {city['population']:>10,}  {city['state']:<10} {bar}")
 
     # Show the routes
-    print(f"\n  Driving routes (profile: car):")
+    print("\n  Driving routes (profile: car):")
     print(f"    {'Route':<26} {'Distance':>10} {'Duration':>10} {'Via'}")
-    print(f"    {'-'*26} {'-'*10} {'-'*10} {'-'*30}")
+    print(f"    {'-' * 26} {'-' * 10} {'-' * 10} {'-' * 30}")
     for route in sorted(ROUTES, key=lambda r: r["distance_km"], reverse=True):
         label = f"{route['from']} -> {route['to']}"
         hours = route["duration_min"] // 60
         mins = route["duration_min"] % 60
-        print(f"    {label:<26} {route['distance_km']:>7,} km  "
-              f"{hours}h {mins:02d}m      {route['via']}")
+        print(
+            f"    {label:<26} {route['distance_km']:>7,} km  "
+            f"{hours}h {mins:02d}m      {route['via']}"
+        )
 
     print(f"\n    Total distance: {TOTAL_DISTANCE:,} km across {len(ROUTES)} routes")
     print(f"    Total drive time: {TOTAL_DURATION // 60}h {TOTAL_DURATION % 60:02d}m")
@@ -361,7 +433,7 @@ def main() -> None:
     # Show which cities are excluded and why
     too_big = [c for c in GERMAN_CITIES if c["population"] > 2_000_000]
     too_small = [c for c in GERMAN_CITIES if c["population"] < 1_000_000]
-    print(f"\n  Excluded cities:")
+    print("\n  Excluded cities:")
     for c in too_big:
         print(f"    {c['name']:.<16} {c['population']:>10,}  (above 2M)")
     for c in sorted(too_small, key=lambda x: x["population"], reverse=True)[:5]:

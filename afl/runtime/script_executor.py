@@ -64,18 +64,52 @@ class ScriptResult:
 # Names of builtins allowed in sandboxed execution
 _SAFE_BUILTIN_NAMES: list[str] = [
     # Types
-    "bool", "int", "float", "str", "list", "dict", "tuple",
-    "set", "frozenset", "bytes", "bytearray",
+    "bool",
+    "int",
+    "float",
+    "str",
+    "list",
+    "dict",
+    "tuple",
+    "set",
+    "frozenset",
+    "bytes",
+    "bytearray",
     # Functions
-    "len", "range", "enumerate", "zip", "map", "filter",
-    "sorted", "reversed", "min", "max", "sum", "abs", "round",
-    "all", "any", "isinstance", "issubclass",
-    "hasattr", "getattr", "setattr", "type", "repr", "print",
+    "len",
+    "range",
+    "enumerate",
+    "zip",
+    "map",
+    "filter",
+    "sorted",
+    "reversed",
+    "min",
+    "max",
+    "sum",
+    "abs",
+    "round",
+    "all",
+    "any",
+    "isinstance",
+    "issubclass",
+    "hasattr",
+    "getattr",
+    "setattr",
+    "type",
+    "repr",
+    "print",
     # Constants
-    "None", "True", "False",
+    "None",
+    "True",
+    "False",
     # Exceptions (for catching)
-    "Exception", "ValueError", "TypeError",
-    "KeyError", "IndexError", "AttributeError",
+    "Exception",
+    "ValueError",
+    "TypeError",
+    "KeyError",
+    "IndexError",
+    "AttributeError",
 ]
 
 # Allowed builtins for sandboxed execution (used by tests and reference)
@@ -148,7 +182,7 @@ def _parse_worker_output(stdout: str, stderr: str) -> ScriptResult:
         return ScriptResult(
             success=False,
             result={},
-            error=f"Script execution error: invalid output from script subprocess",
+            error="Script execution error: invalid output from script subprocess",
         )
 
     if data.get("success"):

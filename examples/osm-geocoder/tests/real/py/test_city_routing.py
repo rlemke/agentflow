@@ -28,16 +28,14 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from afl.runtime import ExecutionStatus
-
 from helpers import (
     EXAMPLE_AFL_FILES,
-    INTEGRATION_AFL_DIR,
     compile_afl_files,
     extract_workflow,
     run_to_completion,
 )
+
+from afl.runtime import ExecutionStatus
 
 # Add the osm-geocoder example to the path so we can import handlers
 _EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
@@ -48,12 +46,14 @@ if str(_EXAMPLE_ROOT) not in sys.path:
 # Check required dependencies
 try:
     import osmium  # noqa: F401
+
     HAS_OSMIUM = True
 except ImportError:
     HAS_OSMIUM = False
 
 try:
     import requests  # noqa: F401
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -81,10 +81,10 @@ def _compile_city_routing():
 
 def _register_all_handlers(poller):
     """Register all handlers needed for the 9-step pipeline."""
-    from handlers.graphhopper.graphhopper_handlers import register_graphhopper_handlers
-    from handlers.downloads.operations_handlers import register_operations_handlers
-    from handlers.population.population_handlers import register_population_handlers
     from handlers.cache.region_handlers import register_region_handlers
+    from handlers.downloads.operations_handlers import register_operations_handlers
+    from handlers.graphhopper.graphhopper_handlers import register_graphhopper_handlers
+    from handlers.population.population_handlers import register_population_handlers
     from handlers.routes.routing_handlers import register_routing_handlers
     from handlers.visualization.visualization_handlers import register_visualization_handlers
 
@@ -137,7 +137,10 @@ class TestCityRoutingIntegration:
         _register_all_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={
                 "region": "Liechtenstein",
                 "min_population": 0,

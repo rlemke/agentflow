@@ -38,9 +38,9 @@ except ImportError:
     ASCENDING = 1
 
     try:
-        from mongomock.collection import (
-            DuplicateKeyError,  # type: ignore[assignment]
-            ReturnDocument,  # type: ignore[assignment]
+        from mongomock.collection import (  # type: ignore[no-redef]
+            DuplicateKeyError,
+            ReturnDocument,
         )
     except ImportError:
 
@@ -50,6 +50,7 @@ except ImportError:
 
         class DuplicateKeyError(Exception):  # type: ignore[no-redef]
             pass
+
 
 if TYPE_CHECKING:
     from ..config import MongoDBConfig
@@ -115,13 +116,13 @@ class MongoStore(PersistenceAPI):
             client: Optional pre-built MongoClient (e.g. mongomock.MongoClient for testing)
         """
         if client is not None:
-            self._client = client
+            self._client: Any = client
         else:
             if not PYMONGO_AVAILABLE:
                 raise ImportError(
                     "pymongo is required for MongoStore. Install it with: pip install pymongo"
                 )
-            self._client: MongoClient = MongoClient(connection_string)
+            self._client = MongoClient(connection_string)
 
         self._db: Database = self._client[database_name]
 
@@ -238,32 +239,28 @@ class MongoStore(PersistenceAPI):
 
         # Handler registrations collection
         handler_regs = self._db.handler_registrations
-        handler_regs.create_index(
-            "facet_name", unique=True, name="handler_reg_facet_name_index"
-        )
+        handler_regs.create_index("facet_name", unique=True, name="handler_reg_facet_name_index")
 
     # =========================================================================
     # Step Operations (PersistenceAPI)
     # =========================================================================
 
-    def get_step(self, step_id: StepId) -> StepDefinition | None:
+    def get_step(self, step_id: str) -> StepDefinition | None:
         """Fetch a step by ID."""
         doc = self._db.steps.find_one({"uuid": step_id})
         return self._doc_to_step(doc) if doc else None
 
-    def get_steps_by_block(self, block_id: BlockId) -> Sequence[StepDefinition]:
+    def get_steps_by_block(self, block_id: StepId | BlockId) -> Sequence[StepDefinition]:
         """Fetch all steps in a block."""
         docs = self._db.steps.find({"block_id": block_id})
         return [self._doc_to_step(doc) for doc in docs]
 
-    def get_steps_by_workflow(self, workflow_id: WorkflowId) -> Sequence[StepDefinition]:
+    def get_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a workflow."""
         docs = self._db.steps.find({"workflow_id": workflow_id})
         return [self._doc_to_step(doc) for doc in docs]
 
-    def get_actionable_steps_by_workflow(
-        self, workflow_id: WorkflowId
-    ) -> Sequence[StepDefinition]:
+    def get_actionable_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch steps that need processing — DB-level filtering.
 
         Excludes terminal steps (Complete/Error) and EventTransmit steps
@@ -271,14 +268,16 @@ class MongoStore(PersistenceAPI):
         """
         from .states import StepState
 
-        docs = self._db.steps.find({
-            "workflow_id": workflow_id,
-            "$nor": [
-                {"state": StepState.STATEMENT_COMPLETE},
-                {"state": StepState.STATEMENT_ERROR},
-                {"state": StepState.EVENT_TRANSMIT, "request_transition": {"$ne": True}},
-            ],
-        })
+        docs = self._db.steps.find(
+            {
+                "workflow_id": workflow_id,
+                "$nor": [
+                    {"state": StepState.STATEMENT_COMPLETE},
+                    {"state": StepState.STATEMENT_ERROR},
+                    {"state": StepState.EVENT_TRANSMIT, "request_transition": {"$ne": True}},
+                ],
+            }
+        )
         return [self._doc_to_step(doc) for doc in docs]
 
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
@@ -286,7 +285,7 @@ class MongoStore(PersistenceAPI):
         docs = self._db.steps.find({"state": state})
         return [self._doc_to_step(doc) for doc in docs]
 
-    def get_steps_by_container(self, container_id: StepId) -> Sequence[StepDefinition]:
+    def get_steps_by_container(self, container_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps with a given container."""
         docs = self._db.steps.find({"container_id": container_id})
         return [self._doc_to_step(doc) for doc in docs]
@@ -300,7 +299,7 @@ class MongoStore(PersistenceAPI):
         doc = self._step_to_doc(step)
         self._db.steps.replace_one({"uuid": step.id}, doc, upsert=True)
 
-    def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
+    def get_blocks_by_step(self, step_id: str) -> Sequence[StepDefinition]:
         """Fetch all block steps for a containing step."""
         docs = self._db.steps.find(
             {
@@ -310,16 +309,16 @@ class MongoStore(PersistenceAPI):
         )
         return [self._doc_to_step(doc) for doc in docs]
 
-    def get_workflow_root(self, workflow_id: WorkflowId) -> StepDefinition | None:
+    def get_workflow_root(self, workflow_id: str) -> StepDefinition | None:
         """Get the root step of a workflow."""
         doc = self._db.steps.find_one(
             {"workflow_id": workflow_id, "root_id": None, "container_id": None}
         )
         return self._doc_to_step(doc) if doc else None
 
-    def step_exists(self, statement_id: str, block_id: BlockId | None) -> bool:
+    def step_exists(self, statement_id: str, block_id: StepId | BlockId | None) -> bool:
         """Check if a step already exists for a statement in a block."""
-        query = {"statement_id": statement_id}
+        query: dict[str, str | None] = {"statement_id": statement_id}
         if block_id:
             query["block_id"] = block_id
         else:
@@ -328,9 +327,12 @@ class MongoStore(PersistenceAPI):
 
     def block_step_exists(self, statement_id: str, container_id: StepId) -> bool:
         """Check if a block step already exists for a statement in a container."""
-        return self._db.steps.count_documents(
-            {"statement_id": statement_id, "container_id": container_id}, limit=1
-        ) > 0
+        return (
+            self._db.steps.count_documents(
+                {"statement_id": statement_id, "container_id": container_id}, limit=1
+            )
+            > 0
+        )
 
     # =========================================================================
     # Atomic Commit (PersistenceAPI)
@@ -555,9 +557,7 @@ class MongoStore(PersistenceAPI):
         docs = self._db.tasks.find(query).sort("created", -1)
         return [self._doc_to_task(doc) for doc in docs]
 
-    def get_step_logs_by_facet(
-        self, facet_name: str, limit: int = 20
-    ) -> Sequence[StepLogEntry]:
+    def get_step_logs_by_facet(self, facet_name: str, limit: int = 20) -> Sequence[StepLogEntry]:
         """Get recent step logs for a facet, ordered by time descending."""
         docs = self._db.step_logs.find({"facet_name": facet_name}).sort("time", -1).limit(limit)
         return [self._doc_to_step_log(doc) for doc in docs]
@@ -780,13 +780,9 @@ class MongoStore(PersistenceAPI):
             upsert=True,
         )
 
-    def get_source_by_namespace(
-        self, name: str, version: str = "latest"
-    ) -> PublishedSource | None:
+    def get_source_by_namespace(self, name: str, version: str = "latest") -> PublishedSource | None:
         """Get a published source by namespace name and version."""
-        doc = self._db.afl_sources.find_one(
-            {"namespace_name": name, "version": version}
-        )
+        doc = self._db.afl_sources.find_one({"namespace_name": name, "version": version})
         return self._doc_to_published_source(doc) if doc else None
 
     def get_sources_by_namespaces(
@@ -807,9 +803,7 @@ class MongoStore(PersistenceAPI):
 
     def delete_published_source(self, name: str, version: str = "latest") -> bool:
         """Delete a published source by namespace name and version."""
-        result = self._db.afl_sources.delete_one(
-            {"namespace_name": name, "version": version}
-        )
+        result = self._db.afl_sources.delete_one({"namespace_name": name, "version": version})
         return result.deleted_count > 0
 
     def list_published_sources(self) -> list[PublishedSource]:

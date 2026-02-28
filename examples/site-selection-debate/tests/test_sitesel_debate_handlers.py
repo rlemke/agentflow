@@ -14,6 +14,7 @@ import pytest
 class TestDebateUtils:
     def test_score_candidate_structure(self):
         from handlers.shared.debate_utils import score_candidate
+
         result = score_candidate("site_A")
         assert "candidate_id" in result
         assert "demographics_score" in result
@@ -24,18 +25,21 @@ class TestDebateUtils:
 
     def test_score_candidate_determinism(self):
         from handlers.shared.debate_utils import score_candidate
+
         a = score_candidate("site_B", penalty=-0.15)
         b = score_candidate("site_B", penalty=-0.15)
         assert a == b
 
     def test_score_candidate_penalty(self):
         from handlers.shared.debate_utils import score_candidate
+
         no_penalty = score_candidate("site_C", penalty=0.0)
         with_penalty = score_candidate("site_C", penalty=-5.0)
         assert with_penalty["overall_score"] < no_penalty["overall_score"]
 
     def test_accessibility_structure(self):
         from handlers.shared.debate_utils import compute_accessibility
+
         result = compute_accessibility("site_D")
         assert "walk_score" in result
         assert "transit_coverage" in result
@@ -44,18 +48,23 @@ class TestDebateUtils:
 
     def test_confidence_increases_with_round(self):
         from handlers.shared.debate_utils import present_analysis
+
         r1 = present_analysis("financial_analyst", "site_A", round_num=1)
         r3 = present_analysis("financial_analyst", "site_A", round_num=3)
         assert r3["confidence"] >= r1["confidence"]
 
     def test_challenge_weaknesses(self):
         from handlers.shared.debate_utils import challenge_position
-        rebuttal, weaknesses = challenge_position("financial_analyst", "community_analyst", "test position", 1)
+
+        rebuttal, weaknesses = challenge_position(
+            "financial_analyst", "community_analyst", "test position", 1
+        )
         assert isinstance(rebuttal, str)
         assert len(weaknesses) >= 1
 
     def test_convergence_detection(self):
         from handlers.shared.debate_utils import score_arguments
+
         # First round with no previous rankings
         r1 = score_arguments(
             [{"agent_role": "fa"}, {"agent_role": "ca"}],
@@ -69,6 +78,7 @@ class TestDebateUtils:
 
     def test_report_structure(self):
         from handlers.shared.debate_utils import generate_report
+
         result = generate_report("site_A", [{"candidate_id": "site_A"}], ["s1", "s2"], 0.85)
         assert result["top_candidate"] == "site_A"
         assert result["num_rounds"] == 2
@@ -82,12 +92,14 @@ class TestDebateUtils:
 class TestSpatialHandlers:
     def test_score_candidate_default(self):
         from handlers.spatial.spatial_handlers import handle_score_candidate
+
         result = handle_score_candidate({"candidate_id": "site_A"})
         assert "score" in result
         assert result["score"]["candidate_id"] == "site_A"
 
     def test_rank_candidates_null_weights(self):
         from handlers.spatial.spatial_handlers import handle_rank_candidates
+
         scores = [
             {"candidate_id": "A", "overall_score": 80},
             {"candidate_id": "B", "overall_score": 90},
@@ -99,10 +111,13 @@ class TestSpatialHandlers:
 
     def test_compute_accessibility_json_string(self):
         from handlers.spatial.spatial_handlers import handle_compute_accessibility
-        result = handle_compute_accessibility({
-            "candidate_id": "site_X",
-            "location": json.dumps({"lat": 40.7, "lng": -74.0}),
-        })
+
+        result = handle_compute_accessibility(
+            {
+                "candidate_id": "site_X",
+                "location": json.dumps({"lat": 40.7, "lng": -74.0}),
+            }
+        )
         assert "metrics" in result
         assert result["metrics"]["candidate_id"] == "site_X"
 
@@ -113,28 +128,34 @@ class TestSpatialHandlers:
 class TestResearchHandlers:
     def test_search_market_trends(self):
         from handlers.research.research_handlers import handle_search_market_trends
+
         result = handle_search_market_trends({"candidate_id": "site_A"})
         assert "research" in result
         assert "growth_rate" in result["research"]
 
     def test_gather_regulations(self):
         from handlers.research.research_handlers import handle_gather_regulations
+
         result = handle_gather_regulations({"candidate_id": "site_A"})
         assert "regulations" in result
         assert "permit_difficulty" in result["regulations"]
 
     def test_analyze_competitors_default(self):
         from handlers.research.research_handlers import handle_analyze_competitors
+
         result = handle_analyze_competitors({"candidate_id": "site_A"})
         assert "competitors" in result
         assert "threat_level" in result
 
     def test_analyze_competitors_json_string(self):
         from handlers.research.research_handlers import handle_analyze_competitors
-        result = handle_analyze_competitors({
-            "candidate_id": "site_B",
-            "radius_km": "10.0",
-        })
+
+        result = handle_analyze_competitors(
+            {
+                "candidate_id": "site_B",
+                "radius_km": "10.0",
+            }
+        )
         assert "competitors" in result
         assert "threat_level" in result
 
@@ -145,39 +166,51 @@ class TestResearchHandlers:
 class TestDebateHandlers:
     def test_present_analysis_default(self):
         from handlers.debate.debate_handlers import handle_present_analysis
-        result = handle_present_analysis({
-            "agent_role": "financial_analyst",
-            "candidate_id": "site_A",
-        })
+
+        result = handle_present_analysis(
+            {
+                "agent_role": "financial_analyst",
+                "candidate_id": "site_A",
+            }
+        )
         assert "position" in result
         assert result["position"]["agent_role"] == "financial_analyst"
 
     def test_present_analysis_custom_round(self):
         from handlers.debate.debate_handlers import handle_present_analysis
-        result = handle_present_analysis({
-            "agent_role": "community_analyst",
-            "candidate_id": "site_B",
-            "round_num": 3,
-        })
+
+        result = handle_present_analysis(
+            {
+                "agent_role": "community_analyst",
+                "candidate_id": "site_B",
+                "round_num": 3,
+            }
+        )
         assert result["position"]["confidence"] > 0
 
     def test_challenge_position_default(self):
         from handlers.debate.debate_handlers import handle_challenge_position
-        result = handle_challenge_position({
-            "agent_role": "financial_analyst",
-            "target_role": "community_analyst",
-            "target_position": "site is good for community",
-        })
+
+        result = handle_challenge_position(
+            {
+                "agent_role": "financial_analyst",
+                "target_role": "community_analyst",
+                "target_position": "site is good for community",
+            }
+        )
         assert "rebuttal" in result
         assert "weaknesses" in result
 
     def test_score_arguments_null_prev(self):
         from handlers.debate.debate_handlers import handle_score_arguments
-        result = handle_score_arguments({
-            "positions": [{"agent_role": "fa"}],
-            "challenges": ["ch1"],
-            "prev_rankings": "null",
-        })
+
+        result = handle_score_arguments(
+            {
+                "positions": [{"agent_role": "fa"}],
+                "challenges": ["ch1"],
+                "prev_rankings": "null",
+            }
+        )
         assert "rankings" in result
         assert "consensus_level" in result["rankings"]
 
@@ -188,42 +221,54 @@ class TestDebateHandlers:
 class TestSynthesisHandlers:
     def test_summarize_round_default(self):
         from handlers.synthesis.synthesis_handlers import handle_summarize_round
-        result = handle_summarize_round({
-            "positions": [{"agent_role": "fa"}, {"agent_role": "ca"}],
-            "challenges": ["ch1"],
-        })
+
+        result = handle_summarize_round(
+            {
+                "positions": [{"agent_role": "fa"}, {"agent_role": "ca"}],
+                "challenges": ["ch1"],
+            }
+        )
         assert "synthesis" in result
         assert "key_arguments" in result
 
     def test_summarize_round_json_string(self):
         from handlers.synthesis.synthesis_handlers import handle_summarize_round
-        result = handle_summarize_round({
-            "positions": json.dumps([{"agent_role": "fa"}]),
-            "challenges": json.dumps(["ch1"]),
-        })
+
+        result = handle_summarize_round(
+            {
+                "positions": json.dumps([{"agent_role": "fa"}]),
+                "challenges": json.dumps(["ch1"]),
+            }
+        )
         assert "synthesis" in result
 
     def test_produce_ranking(self):
         from handlers.synthesis.synthesis_handlers import handle_produce_ranking
-        result = handle_produce_ranking({
-            "round_syntheses": ["s1", "s2"],
-            "candidate_scores": [
-                {"candidate_id": "A", "overall_score": 80},
-                {"candidate_id": "B", "overall_score": 90},
-            ],
-        })
+
+        result = handle_produce_ranking(
+            {
+                "round_syntheses": ["s1", "s2"],
+                "candidate_scores": [
+                    {"candidate_id": "A", "overall_score": 80},
+                    {"candidate_id": "B", "overall_score": 90},
+                ],
+            }
+        )
         assert "ranked" in result
         assert "top_candidate" in result
         assert result["top_candidate"] == "B"
 
     def test_generate_report(self):
         from handlers.synthesis.synthesis_handlers import handle_generate_report
-        result = handle_generate_report({
-            "top_candidate": "site_A",
-            "ranked_candidates": [{"candidate_id": "site_A"}],
-            "round_syntheses": ["s1", "s2", "s3"],
-            "confidence": 0.9,
-        })
+
+        result = handle_generate_report(
+            {
+                "top_candidate": "site_A",
+                "ranked_candidates": [{"candidate_id": "site_A"}],
+                "round_syntheses": ["s1", "s2", "s3"],
+                "confidence": 0.9,
+            }
+        )
         assert "report" in result
         assert result["report"]["top_candidate"] == "site_A"
         assert result["report"]["num_rounds"] == 3
@@ -235,6 +280,7 @@ class TestSynthesisHandlers:
 class TestDispatch:
     def test_spatial_dispatch(self):
         from handlers.spatial.spatial_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 3
         assert "ssd.Spatial.ScoreCandidate" in _DISPATCH
         assert "ssd.Spatial.RankCandidates" in _DISPATCH
@@ -242,6 +288,7 @@ class TestDispatch:
 
     def test_research_dispatch(self):
         from handlers.research.research_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 3
         assert "ssd.Research.SearchMarketTrends" in _DISPATCH
         assert "ssd.Research.GatherRegulations" in _DISPATCH
@@ -249,6 +296,7 @@ class TestDispatch:
 
     def test_debate_dispatch(self):
         from handlers.debate.debate_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 3
         assert "ssd.Debate.PresentAnalysis" in _DISPATCH
         assert "ssd.Debate.ChallengePosition" in _DISPATCH
@@ -256,16 +304,18 @@ class TestDispatch:
 
     def test_synthesis_dispatch(self):
         from handlers.synthesis.synthesis_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 3
         assert "ssd.Synthesis.SummarizeRound" in _DISPATCH
         assert "ssd.Synthesis.ProduceRanking" in _DISPATCH
         assert "ssd.Synthesis.GenerateReport" in _DISPATCH
 
     def test_total_handler_count(self):
-        from handlers.spatial.spatial_handlers import _DISPATCH as d1
-        from handlers.research.research_handlers import _DISPATCH as d2
         from handlers.debate.debate_handlers import _DISPATCH as d3
+        from handlers.research.research_handlers import _DISPATCH as d2
+        from handlers.spatial.spatial_handlers import _DISPATCH as d1
         from handlers.synthesis.synthesis_handlers import _DISPATCH as d4
+
         assert len(d1) + len(d2) + len(d3) + len(d4) == 12
 
 
@@ -276,6 +326,7 @@ class TestCompilation:
     @pytest.fixture()
     def parsed_ast(self):
         from afl.parser import AFLParser
+
         afl_path = os.path.join(os.path.dirname(__file__), "..", "afl", "sitesel_debate.afl")
         with open(afl_path) as f:
             source = f.read()
@@ -304,6 +355,7 @@ class TestCompilation:
 
     def test_prompt_block_count(self, parsed_ast):
         from afl.ast import PromptBlock
+
         count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -324,6 +376,7 @@ class TestCompilation:
     def test_null_literals_present(self, parsed_ast):
         """Verify null literal appears in at least 2 event facet defaults."""
         from afl.ast import Literal
+
         null_count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -345,11 +398,12 @@ class TestCompilation:
 # ---------------------------------------------------------------------------
 class TestAgentIntegration:
     def test_tool_registry_dispatches_all_handlers(self):
-        from afl.runtime.agent import ToolRegistry
-        from handlers.spatial.spatial_handlers import _DISPATCH as d1
-        from handlers.research.research_handlers import _DISPATCH as d2
         from handlers.debate.debate_handlers import _DISPATCH as d3
+        from handlers.research.research_handlers import _DISPATCH as d2
+        from handlers.spatial.spatial_handlers import _DISPATCH as d1
         from handlers.synthesis.synthesis_handlers import _DISPATCH as d4
+
+        from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
         for dispatch in [d1, d2, d3, d4]:
@@ -358,18 +412,27 @@ class TestAgentIntegration:
                 registry.register(tool_name, handler)
 
         tool_names = [
-            "ScoreCandidate", "RankCandidates", "ComputeAccessibility",
-            "SearchMarketTrends", "GatherRegulations", "AnalyzeCompetitors",
-            "PresentAnalysis", "ChallengePosition", "ScoreArguments",
-            "SummarizeRound", "ProduceRanking", "GenerateReport",
+            "ScoreCandidate",
+            "RankCandidates",
+            "ComputeAccessibility",
+            "SearchMarketTrends",
+            "GatherRegulations",
+            "AnalyzeCompetitors",
+            "PresentAnalysis",
+            "ChallengePosition",
+            "ScoreArguments",
+            "SummarizeRound",
+            "ProduceRanking",
+            "GenerateReport",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
 
     def test_claude_agent_runner_with_score_candidate(self):
+        from handlers.spatial.spatial_handlers import handle_score_candidate
+
         from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
         from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
-        from handlers.spatial.spatial_handlers import handle_score_candidate
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))

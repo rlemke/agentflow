@@ -16,8 +16,6 @@
 
 import importlib
 
-import pytest
-
 
 class TestMcpEntryPoint:
     def test_module_importable(self):

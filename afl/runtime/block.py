@@ -58,7 +58,7 @@ class StepAnalysis:
     statements: Sequence[StatementDefinition]  # All statements in the block
 
     # Step collections
-    missing: list[StepDefinition] = field(default_factory=list)  # Not yet created
+    missing: list[StatementDefinition] = field(default_factory=list)  # Not yet created
     steps: list[StepDefinition] = field(default_factory=list)  # All created steps
     completed: list[StepDefinition] = field(default_factory=list)  # Complete steps
     errored: list[StepDefinition] = field(default_factory=list)  # Error steps
@@ -98,18 +98,16 @@ class StepAnalysis:
 
         # Categorize each statement/step
         for stmt in statements:
-            step = stmt_to_step.get(stmt.id)
-            if step is None:
+            matched_step = stmt_to_step.get(stmt.id)
+            if matched_step is None:
                 analysis.missing.append(stmt)
             else:
-                analysis.steps.append(step)
-                analysis._categorize_step(step)
+                analysis.steps.append(matched_step)
+                analysis._categorize_step(matched_step)
 
         # Done when all statements have terminal steps (complete or error)
         terminal_count = len(analysis.completed) + len(analysis.errored)
-        analysis.done = len(analysis.missing) == 0 and terminal_count == len(
-            analysis.statements
-        )
+        analysis.done = len(analysis.missing) == 0 and terminal_count == len(analysis.statements)
         analysis.has_errors = len(analysis.errored) > 0
 
         logger.debug(

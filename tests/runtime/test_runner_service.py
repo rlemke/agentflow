@@ -1900,12 +1900,12 @@ workflow OtherWF(x: Long) => (result: Long) andThen {
         assert mock_runner.state == RunnerState.FAILED
 
     def test_execute_workflow_no_get_flow(self, store, evaluator, config):
-        """afl:execute handler raises when store has no get_flow."""
-        # MemoryStore doesn't have get_flow
+        """afl:execute handler raises when flow is not found in store."""
+        # MemoryStore's default get_flow returns None (flow not in store)
         registry = ToolRegistry()
         svc = RunnerService(store, evaluator, config, registry)
 
-        with pytest.raises(RuntimeError, match="does not support get_flow"):
+        with pytest.raises(RuntimeError, match="Flow 'f-1' not found"):
             svc._handle_execute_workflow(
                 {
                     "flow_id": "f-1",
@@ -2000,8 +2000,13 @@ class TestRunnerASTSnapshot:
         from afl.runtime.entities import RunnerDefinition, WorkflowDefinition
 
         wf = WorkflowDefinition(
-            uuid="wf-1", name="W", namespace_id="ns",
-            facet_id="f-1", flow_id="fl-1", starting_step="s-1", version="1.0",
+            uuid="wf-1",
+            name="W",
+            namespace_id="ns",
+            facet_id="f-1",
+            flow_id="fl-1",
+            starting_step="s-1",
+            version="1.0",
         )
         runner = RunnerDefinition(uuid="r-1", workflow_id="wf-1", workflow=wf)
         assert runner.compiled_ast is None
@@ -2072,8 +2077,13 @@ workflow SnapshotWF(x: Long) => (result: Long) andThen {
 
         # Create a runner with snapshotted ASTs
         wf = WorkflowDefinition(
-            uuid="wf-snap", name="SnapWF", namespace_id="ns",
-            facet_id="f-1", flow_id="fl-1", starting_step="s-1", version="1.0",
+            uuid="wf-snap",
+            name="SnapWF",
+            namespace_id="ns",
+            facet_id="f-1",
+            flow_id="fl-1",
+            starting_step="s-1",
+            version="1.0",
         )
         program_dict = {"declarations": [{"type": "WorkflowDecl", "name": "SnapWF"}]}
         wf_ast = {"type": "WorkflowDecl", "name": "SnapWF"}
@@ -2103,8 +2113,13 @@ workflow SnapshotWF(x: Long) => (result: Long) andThen {
 
         # Create a runner WITHOUT snapshotted ASTs (legacy)
         wf = WorkflowDefinition(
-            uuid="wf-legacy", name="LegacyWF", namespace_id="ns",
-            facet_id="f-1", flow_id="fl-1", starting_step="s-1", version="1.0",
+            uuid="wf-legacy",
+            name="LegacyWF",
+            namespace_id="ns",
+            facet_id="f-1",
+            flow_id="fl-1",
+            starting_step="s-1",
+            version="1.0",
         )
         runner = RunnerDefinition(
             uuid="r-legacy",

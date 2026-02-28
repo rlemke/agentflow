@@ -22,6 +22,7 @@ _FACET_GEO_MAP = {
 
 def _make_tiger_handler(facet_name: str, geo_level: str):
     """Create a handler for a TIGER extraction event facet."""
+
     def handler(params: dict[str, Any]) -> dict[str, Any]:
         file_info = params.get("file", {})
         zip_path = file_info.get("path", "")
@@ -56,19 +57,18 @@ def _make_tiger_handler(facet_name: str, geo_level: str):
             if step_log:
                 step_log(f"{facet_name}: {exc}", level="error")
             raise
+
     return handler
 
 
 # Build handlers for each facet
 _HANDLERS = {
-    facet: _make_tiger_handler(facet, geo_level)
-    for facet, geo_level in _FACET_GEO_MAP.items()
+    facet: _make_tiger_handler(facet, geo_level) for facet, geo_level in _FACET_GEO_MAP.items()
 }
 
 # RegistryRunner dispatch adapter
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.{facet}": handler
-    for facet, handler in _HANDLERS.items()
+    f"{NAMESPACE}.{facet}": handler for facet, handler in _HANDLERS.items()
 }
 
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 
 import pytest
@@ -93,7 +92,9 @@ class TestDataHandlers:
     def test_prepare_default(self):
         from handlers.data.data_handlers import handle_prepare_dataset
 
-        result = handle_prepare_dataset({"dataset_name": "test_ds", "num_features": 5, "num_samples": 100})
+        result = handle_prepare_dataset(
+            {"dataset_name": "test_ds", "num_features": 5, "num_samples": 100}
+        )
         ds = result["dataset"]
         assert ds["name"] == "test_ds"
         assert ds["num_features"] == 5
@@ -109,10 +110,12 @@ class TestDataHandlers:
     def test_split_ratios(self):
         from handlers.data.data_handlers import handle_split_dataset
 
-        result = handle_split_dataset({
-            "dataset": {"num_samples": 1000},
-            "config": {"train_ratio": 0.7, "val_ratio": 0.15, "random_seed": 42},
-        })
+        result = handle_split_dataset(
+            {
+                "dataset": {"num_samples": 1000},
+                "config": {"train_ratio": 0.7, "val_ratio": 0.15, "random_seed": 42},
+            }
+        )
         assert result["train_count"] == 700
         assert result["val_count"] == 150
         assert result["test_count"] == 150
@@ -120,10 +123,12 @@ class TestDataHandlers:
     def test_split_json_string_params(self):
         from handlers.data.data_handlers import handle_split_dataset
 
-        result = handle_split_dataset({
-            "dataset": json.dumps({"num_samples": 200}),
-            "config": json.dumps({"train_ratio": 0.8, "val_ratio": 0.1}),
-        })
+        result = handle_split_dataset(
+            {
+                "dataset": json.dumps({"num_samples": 200}),
+                "config": json.dumps({"train_ratio": 0.8, "val_ratio": 0.1}),
+            }
+        )
         assert result["train_count"] == 160
         assert result["val_count"] == 20
         assert result["test_count"] == 20
@@ -136,12 +141,19 @@ class TestTrainingHandlers:
     def test_result_structure(self):
         from handlers.training.training_handlers import handle_train_model
 
-        result = handle_train_model({
-            "dataset_name": "test",
-            "hyperparams": {"learning_rate": 0.01, "epochs": 50, "dropout": 0.3, "batch_size": 32},
-            "model_config": {"model_type": "mlp"},
-            "run_label": "test_run",
-        })
+        result = handle_train_model(
+            {
+                "dataset_name": "test",
+                "hyperparams": {
+                    "learning_rate": 0.01,
+                    "epochs": 50,
+                    "dropout": 0.3,
+                    "batch_size": 32,
+                },
+                "model_config": {"model_type": "mlp"},
+                "run_label": "test_run",
+            }
+        )
         tr = result["result"]
         assert "model_id" in tr
         assert "final_loss" in tr
@@ -151,25 +163,31 @@ class TestTrainingHandlers:
     def test_json_string_params(self):
         from handlers.training.training_handlers import handle_train_model
 
-        result = handle_train_model({
-            "dataset_name": "test",
-            "hyperparams": json.dumps({"learning_rate": 0.01, "epochs": 10}),
-            "model_config": json.dumps({"model_type": "cnn"}),
-            "run_label": "json_run",
-        })
+        result = handle_train_model(
+            {
+                "dataset_name": "test",
+                "hyperparams": json.dumps({"learning_rate": 0.01, "epochs": 10}),
+                "model_config": json.dumps({"model_type": "cnn"}),
+                "run_label": "json_run",
+            }
+        )
         assert "mlp" not in result["result"]["model_id"]
 
     def test_different_configs_different_metrics(self):
         from handlers.training.training_handlers import handle_train_model
 
-        r1 = handle_train_model({
-            "hyperparams": {"learning_rate": 0.001, "epochs": 100, "dropout": 0.3},
-            "run_label": "low_lr",
-        })
-        r2 = handle_train_model({
-            "hyperparams": {"learning_rate": 0.1, "epochs": 10, "dropout": 0.0},
-            "run_label": "high_lr",
-        })
+        r1 = handle_train_model(
+            {
+                "hyperparams": {"learning_rate": 0.001, "epochs": 100, "dropout": 0.3},
+                "run_label": "low_lr",
+            }
+        )
+        r2 = handle_train_model(
+            {
+                "hyperparams": {"learning_rate": 0.1, "epochs": 10, "dropout": 0.0},
+                "run_label": "high_lr",
+            }
+        )
         assert r1["result"]["final_loss"] != r2["result"]["final_loss"]
 
 
@@ -182,7 +200,14 @@ class TestEvaluationHandlers:
 
         result = handle_evaluate_model({"model_id": "mlp_test_42", "test_path": "/data/test.csv"})
         ev = result["result"]
-        for field in ("model_id", "accuracy", "precision", "recall", "f1_score", "confusion_matrix"):
+        for field in (
+            "model_id",
+            "accuracy",
+            "precision",
+            "recall",
+            "f1_score",
+            "confusion_matrix",
+        ):
             assert field in ev
 
     def test_confusion_matrix(self):
@@ -196,25 +221,29 @@ class TestEvaluationHandlers:
     def test_compare_selects_highest(self):
         from handlers.evaluation.evaluation_handlers import handle_compare_to_best
 
-        result = handle_compare_to_best({
-            "eval_results": [
-                {"model_id": "a", "f1_score": 0.70},
-                {"model_id": "b", "f1_score": 0.90},
-                {"model_id": "c", "f1_score": 0.85},
-            ],
-            "metric_name": "f1_score",
-        })
+        result = handle_compare_to_best(
+            {
+                "eval_results": [
+                    {"model_id": "a", "f1_score": 0.70},
+                    {"model_id": "b", "f1_score": 0.90},
+                    {"model_id": "c", "f1_score": 0.85},
+                ],
+                "metric_name": "f1_score",
+            }
+        )
         assert result["comparison"]["best_model_id"] == "b"
 
     def test_compare_default_metric(self):
         from handlers.evaluation.evaluation_handlers import handle_compare_to_best
 
-        result = handle_compare_to_best({
-            "eval_results": [
-                {"model_id": "x", "f1_score": 0.88},
-                {"model_id": "y", "f1_score": 0.92},
-            ],
-        })
+        result = handle_compare_to_best(
+            {
+                "eval_results": [
+                    {"model_id": "x", "f1_score": 0.88},
+                    {"model_id": "y", "f1_score": 0.92},
+                ],
+            }
+        )
         assert result["comparison"]["metric_name"] == "f1_score"
         assert result["comparison"]["best_model_id"] == "y"
 
@@ -226,16 +255,18 @@ class TestReportingHandlers:
     def test_report_structure(self):
         from handlers.reporting.report_handlers import handle_generate_sweep_report
 
-        result = handle_generate_sweep_report({
-            "dataset_name": "test_ds",
-            "comparison": {
-                "best_model_id": "best_1",
-                "metric_name": "f1_score",
-                "ranking": [{"model_id": "best_1", "score": 0.95}],
-                "summary": "Best model: best_1",
-            },
-            "sweep_config": {"num_configs": 4},
-        })
+        result = handle_generate_sweep_report(
+            {
+                "dataset_name": "test_ds",
+                "comparison": {
+                    "best_model_id": "best_1",
+                    "metric_name": "f1_score",
+                    "ranking": [{"model_id": "best_1", "score": 0.95}],
+                    "summary": "Best model: best_1",
+                },
+                "sweep_config": {"num_configs": 4},
+            }
+        )
         rpt = result["report"]
         assert rpt["dataset_name"] == "test_ds"
         assert "timestamp" in rpt
@@ -244,20 +275,19 @@ class TestReportingHandlers:
     def test_total_configs_matches(self):
         from handlers.reporting.report_handlers import handle_generate_sweep_report
 
-        ranking = [
-            {"model_id": f"m{i}", "score": 0.8 + i * 0.01}
-            for i in range(3)
-        ]
-        result = handle_generate_sweep_report({
-            "dataset_name": "ds",
-            "comparison": {
-                "best_model_id": "m2",
-                "metric_name": "accuracy",
-                "ranking": ranking,
-                "summary": "ok",
-            },
-            "sweep_config": {},
-        })
+        ranking = [{"model_id": f"m{i}", "score": 0.8 + i * 0.01} for i in range(3)]
+        result = handle_generate_sweep_report(
+            {
+                "dataset_name": "ds",
+                "comparison": {
+                    "best_model_id": "m2",
+                    "metric_name": "accuracy",
+                    "ranking": ranking,
+                    "summary": "ok",
+                },
+                "sweep_config": {},
+            }
+        )
         assert result["report"]["total_configs"] == 3
 
 
@@ -293,9 +323,9 @@ class TestDispatch:
 
     def test_total_handler_count(self):
         from handlers.data.data_handlers import _DISPATCH as d1
-        from handlers.training.training_handlers import _DISPATCH as d2
         from handlers.evaluation.evaluation_handlers import _DISPATCH as d3
         from handlers.reporting.report_handlers import _DISPATCH as d4
+        from handlers.training.training_handlers import _DISPATCH as d2
 
         assert len(d1) + len(d2) + len(d3) + len(d4) == 6
 

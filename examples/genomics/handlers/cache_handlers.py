@@ -7,8 +7,9 @@ simulating a cached download with realistic metadata.
 
 import logging
 import os
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +131,7 @@ RESOURCE_REGISTRY: dict[str, dict[str, tuple[str, str, int, str]]] = {
 
 def _make_handler(url: str, path: str, size: int, resource_type: str) -> Callable:
     """Factory: create a cache handler returning a GenomicsCache dict."""
+
     def handler(payload: dict) -> dict[str, Any]:
         step_log = payload.get("_step_log")
         if step_log:
@@ -145,6 +147,7 @@ def _make_handler(url: str, path: str, size: int, resource_type: str) -> Callabl
                 "resource_type": resource_type,
             },
         }
+
     return handler
 
 

@@ -33,7 +33,12 @@ def handle_train_model(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Trained model '{result['model_id']}': loss={result['final_loss']:.4f}, acc={result['accuracy']:.4f}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Trained model '{result['model_id']}': loss={result['final_loss']:.4f}, acc={result['accuracy']:.4f}",
+                "level": "success",
+            }
+        )
 
     return {"result": result}
 

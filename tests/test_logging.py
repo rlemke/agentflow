@@ -24,10 +24,10 @@ import pytest
 
 from afl.logging import SplunkJsonFormatter, configure_logging
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_record(
     message: str = "hello",
@@ -50,6 +50,7 @@ def _make_record(
 # ---------------------------------------------------------------------------
 # SplunkJsonFormatter — output structure
 # ---------------------------------------------------------------------------
+
 
 class TestSplunkJsonFormatter:
     def test_output_is_valid_json(self):
@@ -109,6 +110,7 @@ class TestSplunkJsonFormatter:
             raise ValueError("boom")
         except ValueError:
             import sys
+
             exc = sys.exc_info()
 
         record = _make_record(exc_info=exc)
@@ -136,6 +138,7 @@ class TestSplunkJsonFormatter:
 # configure_logging
 # ---------------------------------------------------------------------------
 
+
 class TestConfigureLogging:
     @pytest.fixture(autouse=True)
     def _reset_root_logger(self):
@@ -148,9 +151,7 @@ class TestConfigureLogging:
     def test_json_format_installs_splunk_formatter(self):
         configure_logging(level="DEBUG", log_format="json")
         root = logging.getLogger()
-        json_handlers = [
-            h for h in root.handlers if isinstance(h.formatter, SplunkJsonFormatter)
-        ]
+        json_handlers = [h for h in root.handlers if isinstance(h.formatter, SplunkJsonFormatter)]
         assert len(json_handlers) >= 1
 
     def test_text_format_installs_plain_formatter(self):

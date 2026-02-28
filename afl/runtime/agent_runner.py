@@ -23,13 +23,13 @@ from __future__ import annotations
 
 import os
 import signal
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .agent_poller import AgentPoller
+    from .evaluator import Evaluator
     from .persistence import PersistenceAPI
-    from .registry_runner import RegistryRunner
 
 
 def make_store(database: str = "") -> PersistenceAPI:
@@ -113,7 +113,7 @@ def run_agent(
 def _run_registry(
     config: AgentConfig,
     store: PersistenceAPI,
-    evaluator: object,
+    evaluator: Evaluator,
     topics: list[str],
     register: Callable[..., object],
 ) -> None:
@@ -146,7 +146,7 @@ def _run_registry(
 def _run_poller(
     config: AgentConfig,
     store: PersistenceAPI,
-    evaluator: object,
+    evaluator: Evaluator,
     register: Callable[..., object],
 ) -> None:
     from .agent_poller import AgentPoller, AgentPollerConfig

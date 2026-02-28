@@ -7,12 +7,9 @@ Run from the repo root:
 
 import json
 import os
-import tempfile
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from handlers.voting.tiger_downloader import (
     DISTRICT_CONGRESSIONAL,
     DISTRICT_STATE_HOUSE,
@@ -248,11 +245,13 @@ class TestFilterDistrictsHandler:
 
         handler = _make_filter_districts_handler("FilterDistricts")
 
-        result = handler({
-            "input_path": str(sample_districts_geojson),
-            "attribute": "NAME",
-            "value": "District 2",
-        })
+        result = handler(
+            {
+                "input_path": str(sample_districts_geojson),
+                "attribute": "NAME",
+                "value": "District 2",
+            }
+        )
 
         assert result["result"]["feature_count"] == 1
         assert os.path.exists(result["result"]["output_path"])
@@ -268,11 +267,13 @@ class TestFilterDistrictsHandler:
 
         handler = _make_filter_districts_handler("FilterDistricts")
 
-        result = handler({
-            "input_path": str(sample_districts_geojson),
-            "attribute": "NAME",
-            "value": "District 99",
-        })
+        result = handler(
+            {
+                "input_path": str(sample_districts_geojson),
+                "attribute": "NAME",
+                "value": "District 99",
+            }
+        )
 
         assert result["result"]["feature_count"] == 0
 

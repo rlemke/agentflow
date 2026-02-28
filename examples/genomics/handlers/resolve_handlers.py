@@ -76,7 +76,7 @@ def _resolve_to_cache(namespace: str, facet_name: str) -> dict[str, Any]:
 def resolve_reference(payload: dict) -> dict[str, Any]:
     """Resolve a reference genome name to its cache entry."""
     name = payload.get("name", "").lower().strip()
-    prefer_source = payload.get("prefer_source", "")
+    _prefer_source = payload.get("prefer_source", "")
     step_log = payload.get("_step_log")
 
     entry = REFERENCE_ALIASES.get(name)
@@ -126,7 +126,7 @@ def resolve_reference(payload: dict) -> dict[str, Any]:
             "source_url": "",
             "is_ambiguous": True,
             "disambiguation": f"Unknown reference: '{name}'. Known: "
-                + ", ".join(sorted(REFERENCE_ALIASES.keys())),
+            + ", ".join(sorted(REFERENCE_ALIASES.keys())),
         },
     }
 
@@ -165,7 +165,7 @@ def resolve_annotation(payload: dict) -> dict[str, Any]:
             "source_url": "",
             "is_ambiguous": True,
             "disambiguation": f"Unknown annotation: '{name}'. Known: "
-                + ", ".join(sorted(ANNOTATION_ALIASES.keys())),
+            + ", ".join(sorted(ANNOTATION_ALIASES.keys())),
         },
     }
 
@@ -204,7 +204,7 @@ def resolve_sample(payload: dict) -> dict[str, Any]:
             "source_url": "",
             "is_ambiguous": True,
             "disambiguation": f"Unknown SRA accession: '{accession}'. Known: "
-                + ", ".join(sorted(facets.keys())),
+            + ", ".join(sorted(facets.keys())),
         },
     }
 
@@ -223,14 +223,16 @@ def list_resources(payload: dict) -> dict[str, Any]:
         for facet_name, (url, path, size, rtype) in facets.items():
             if category and rtype != category:
                 continue
-            resources.append({
-                "name": facet_name,
-                "namespace": namespace,
-                "url": url,
-                "path": path,
-                "size": size,
-                "resource_type": rtype,
-            })
+            resources.append(
+                {
+                    "name": facet_name,
+                    "namespace": namespace,
+                    "url": url,
+                    "path": path,
+                    "size": size,
+                    "resource_type": rtype,
+                }
+            )
             categories[rtype] = categories.get(rtype, 0) + 1
 
     return {

@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.rounds_utils import summarize_round, declare_outcome
+from handlers.shared.rounds_utils import declare_outcome, summarize_round
 
 NAMESPACE = "rounds.Synthesis"
 
@@ -53,7 +53,9 @@ def handle_declare_outcome(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Declared outcome: winner={outcome['winner']}", "level": "success"})
+        step_log.append(
+            {"message": f"Declared outcome: winner={outcome['winner']}", "level": "success"}
+        )
 
     return {"outcome": outcome}
 

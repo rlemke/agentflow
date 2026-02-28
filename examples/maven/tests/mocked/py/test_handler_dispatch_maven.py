@@ -53,7 +53,15 @@ class TestMavenRunnerHandlers:
 
     def test_handle_dispatches(self):
         mod = _maven_import("runner_handlers")
-        result = mod.handle({"_facet_name": "maven.runner.RunMavenArtifact", "step_id": "step-1", "group_id": "com.example", "artifact_id": "app", "version": "1.0.0"})
+        result = mod.handle(
+            {
+                "_facet_name": "maven.runner.RunMavenArtifact",
+                "step_id": "step-1",
+                "group_id": "com.example",
+                "artifact_id": "app",
+                "version": "1.0.0",
+            }
+        )
         assert isinstance(result, dict)
         assert "result" in result
         assert result["result"]["success"] is True
@@ -61,14 +69,16 @@ class TestMavenRunnerHandlers:
 
     def test_handle_plugin_dispatches(self):
         mod = _maven_import("runner_handlers")
-        result = mod.handle({
-            "_facet_name": "maven.runner.RunMavenPlugin",
-            "workspace_path": "/tmp/ws",
-            "plugin_group_id": "org.apache.maven.plugins",
-            "plugin_artifact_id": "maven-checkstyle-plugin",
-            "plugin_version": "3.3.1",
-            "goal": "check",
-        })
+        result = mod.handle(
+            {
+                "_facet_name": "maven.runner.RunMavenPlugin",
+                "workspace_path": "/tmp/ws",
+                "plugin_group_id": "org.apache.maven.plugins",
+                "plugin_artifact_id": "maven-checkstyle-plugin",
+                "plugin_version": "3.3.1",
+                "goal": "check",
+            }
+        )
         assert isinstance(result, dict)
         assert "result" in result
         assert result["result"]["success"] is True

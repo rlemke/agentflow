@@ -15,52 +15,87 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Parks", "declarations": [
-                    _ef("ExtractParks",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "park_type", "type": "String"},
-                         {"name": "protect_classes", "type": "String"}],
-                        [{"name": "result", "type": "ParkResult"}]),
-                    _ef("ParkStatistics",
-                        [{"name": "input_path", "type": "String"}],
-                        [{"name": "stats", "type": "ParkStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Parks",
+                            "declarations": [
+                                _ef(
+                                    "ExtractParks",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "park_type", "type": "String"},
+                                        {"name": "protect_classes", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "ParkResult"}],
+                                ),
+                                _ef(
+                                    "ParkStatistics",
+                                    [{"name": "input_path", "type": "String"}],
+                                    [{"name": "stats", "type": "ParkStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -130,38 +165,103 @@ BRAZIL_STATS = {
 
 NOTABLE_PARKS = {
     "National Parks (Amazon)": [
-        {"name": "Parque Nacional do Jau", "type": "national",
-         "area_km2": 23672, "state": "Amazonas", "biome": "Amazon"},
-        {"name": "Parque Nacional da Amazonia", "type": "national",
-         "area_km2": 10707, "state": "Para", "biome": "Amazon"},
-        {"name": "Parque Nacional do Pico da Neblina", "type": "national",
-         "area_km2": 22564, "state": "Amazonas", "biome": "Amazon"},
-        {"name": "Parque Nacional Montanhas do Tumucumaque", "type": "national",
-         "area_km2": 38874, "state": "Amapa", "biome": "Amazon"},
+        {
+            "name": "Parque Nacional do Jau",
+            "type": "national",
+            "area_km2": 23672,
+            "state": "Amazonas",
+            "biome": "Amazon",
+        },
+        {
+            "name": "Parque Nacional da Amazonia",
+            "type": "national",
+            "area_km2": 10707,
+            "state": "Para",
+            "biome": "Amazon",
+        },
+        {
+            "name": "Parque Nacional do Pico da Neblina",
+            "type": "national",
+            "area_km2": 22564,
+            "state": "Amazonas",
+            "biome": "Amazon",
+        },
+        {
+            "name": "Parque Nacional Montanhas do Tumucumaque",
+            "type": "national",
+            "area_km2": 38874,
+            "state": "Amapa",
+            "biome": "Amazon",
+        },
     ],
     "National Parks (Atlantic Forest)": [
-        {"name": "Parque Nacional da Tijuca", "type": "national",
-         "area_km2": 40, "state": "Rio de Janeiro", "biome": "Atlantic Forest"},
-        {"name": "Parque Nacional do Iguacu", "type": "national",
-         "area_km2": 1852, "state": "Parana", "biome": "Atlantic Forest"},
-        {"name": "Parque Nacional da Serra da Bocaina", "type": "national",
-         "area_km2": 1040, "state": "Sao Paulo", "biome": "Atlantic Forest"},
+        {
+            "name": "Parque Nacional da Tijuca",
+            "type": "national",
+            "area_km2": 40,
+            "state": "Rio de Janeiro",
+            "biome": "Atlantic Forest",
+        },
+        {
+            "name": "Parque Nacional do Iguacu",
+            "type": "national",
+            "area_km2": 1852,
+            "state": "Parana",
+            "biome": "Atlantic Forest",
+        },
+        {
+            "name": "Parque Nacional da Serra da Bocaina",
+            "type": "national",
+            "area_km2": 1040,
+            "state": "Sao Paulo",
+            "biome": "Atlantic Forest",
+        },
     ],
     "National Parks (Cerrado & Caatinga)": [
-        {"name": "Parque Nacional da Chapada dos Veadeiros", "type": "national",
-         "area_km2": 2404, "state": "Goias", "biome": "Cerrado"},
-        {"name": "Parque Nacional das Emas", "type": "national",
-         "area_km2": 1318, "state": "Goias", "biome": "Cerrado"},
-        {"name": "Parque Nacional da Chapada Diamantina", "type": "national",
-         "area_km2": 1524, "state": "Bahia", "biome": "Caatinga"},
+        {
+            "name": "Parque Nacional da Chapada dos Veadeiros",
+            "type": "national",
+            "area_km2": 2404,
+            "state": "Goias",
+            "biome": "Cerrado",
+        },
+        {
+            "name": "Parque Nacional das Emas",
+            "type": "national",
+            "area_km2": 1318,
+            "state": "Goias",
+            "biome": "Cerrado",
+        },
+        {
+            "name": "Parque Nacional da Chapada Diamantina",
+            "type": "national",
+            "area_km2": 1524,
+            "state": "Bahia",
+            "biome": "Caatinga",
+        },
     ],
     "Nature Reserves": [
-        {"name": "Reserva Biologica do Rio Trombetas", "type": "nature_reserve",
-         "area_km2": 3850, "state": "Para", "biome": "Amazon"},
-        {"name": "Estacao Ecologica de Maraca", "type": "nature_reserve",
-         "area_km2": 1013, "state": "Roraima", "biome": "Amazon"},
-        {"name": "Reserva Biologica do Gurupi", "type": "nature_reserve",
-         "area_km2": 2715, "state": "Maranhao", "biome": "Amazon"},
+        {
+            "name": "Reserva Biologica do Rio Trombetas",
+            "type": "nature_reserve",
+            "area_km2": 3850,
+            "state": "Para",
+            "biome": "Amazon",
+        },
+        {
+            "name": "Estacao Ecologica de Maraca",
+            "type": "nature_reserve",
+            "area_km2": 1013,
+            "state": "Roraima",
+            "biome": "Amazon",
+        },
+        {
+            "name": "Reserva Biologica do Gurupi",
+            "type": "nature_reserve",
+            "area_km2": 2715,
+            "state": "Maranhao",
+            "biome": "Amazon",
+        },
     ],
 }
 
@@ -218,7 +318,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -226,6 +328,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Brazil parks workflow end-to-end with mock handlers."""
@@ -295,20 +398,24 @@ def main() -> None:
     ]
     other = BRAZIL_STATS["other_protected"]
     total = outputs.get("total_parks", 1)
-    print(f"\n  Protected areas by type:")
+    print("\n  Protected areas by type:")
     for label, count in sorted(types, key=lambda x: x[1], reverse=True):
         pct = 100 * count / total
         bar = "#" * max(1, int(pct))
         print(f"    {label:.<22} {count:>6,}  ({pct:4.1f}%)  {bar}")
-    print(f"    {'Other protected':.<22} {other:>6,}  ({100*other/total:4.1f}%)  {'#' * max(1, int(100*other/total))}")
+    print(
+        f"    {'Other protected':.<22} {other:>6,}  ({100 * other / total:4.1f}%)  {'#' * max(1, int(100 * other / total))}"
+    )
 
     # Show area context
     total_area = outputs.get("total_area_km2", 0)
     brazil_area = 8515767.0
-    print(f"\n  Coverage: {total_area:,.1f} km2 = {100*total_area/brazil_area:.1f}% of Brazil's total area")
+    print(
+        f"\n  Coverage: {total_area:,.1f} km2 = {100 * total_area / brazil_area:.1f}% of Brazil's total area"
+    )
 
     # Show notable parks by region
-    print(f"\n  Notable parks:")
+    print("\n  Notable parks:")
     for category, parks in NOTABLE_PARKS.items():
         print(f"    {category}:")
         for park in sorted(parks, key=lambda p: p["area_km2"], reverse=True):

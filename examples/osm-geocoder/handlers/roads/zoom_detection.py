@@ -11,16 +11,16 @@ from collections import defaultdict
 
 log = logging.getLogger(__name__)
 
-from .zoom_graph import RoadGraph, LogicalEdge, _haversine_m
+from .zoom_graph import RoadGraph, _haversine_m
 from .zoom_sbs import (
-    _route_pair_with_time,
-    SegmentIndex,
     HAS_REQUESTS,
+    SegmentIndex,
+    _route_pair_with_time,
 )
 
 # Settlement model radii (spec §9)
 SETTLEMENT_RADII: dict[str, float] = {
-    "city": 3_000.0,      # r_core in meters
+    "city": 3_000.0,  # r_core in meters
     "town": 1_500.0,
     "village": 700.0,
 }
@@ -63,7 +63,7 @@ def detect_bypasses(
     segment_index = SegmentIndex(graph)
     flags: dict[int, str] = {}
 
-    for name, lon, lat, pop, place_type in settlements:
+    for _name, lon, lat, pop, place_type in settlements:
         settlement_type = _classify_settlement(place_type, pop)
         r_core = SETTLEMENT_RADII.get(settlement_type, 1_500.0)
         r_outer = r_core * R_OUTER_FACTOR
@@ -76,10 +76,17 @@ def detect_bypasses(
         # Pair by angular separation (>90°)
         pairs = _pair_by_angle(entry_exit, lon, lat)
 
-        for (entry_node, exit_node) in pairs:
+        for entry_node, exit_node in pairs:
             bypass_edges, thru_edges = _check_bypass_pair(
-                graph, entry_node, exit_node, lon, lat, r_core,
-                graph_dir, profile, segment_index,
+                graph,
+                entry_node,
+                exit_node,
+                lon,
+                lat,
+                r_core,
+                graph_dir,
+                profile,
+                segment_index,
             )
             for eid in bypass_edges:
                 if eid not in flags:
@@ -105,7 +112,8 @@ def detect_rings(
     """
     settlements = _load_settlements(cities_path)
     large_cities = [
-        (name, lon, lat, pop, pt) for name, lon, lat, pop, pt in settlements
+        (name, lon, lat, pop, pt)
+        for name, lon, lat, pop, pt in settlements
         if pop >= RING_MIN_POPULATION or pt == "city"
     ]
 
@@ -123,7 +131,11 @@ def detect_rings(
 
         # Find radial entry nodes
         radial_nodes = _find_radial_entries(
-            graph, lon, lat, b_radius_m, RING_RADIAL_COUNT,
+            graph,
+            lon,
+            lat,
+            b_radius_m,
+            RING_RADIAL_COUNT,
         )
         if len(radial_nodes) < 4:
             log.debug("Too few radial entries (%d) for %s", len(radial_nodes), name)
@@ -132,14 +144,18 @@ def detect_rings(
         # Sample radial pairs and route
         candidate_votes: dict[int, int] = defaultdict(int)
         total_pairs = 0
-        success_count = 0
+        _success_count = 0
 
         pairs = _sample_radial_pairs(radial_nodes, RING_SAMPLE_PAIRS)
 
-        for (na, nb) in pairs:
+        for na, nb in pairs:
             # Route via center (approximating "through core" penalty)
             coords_direct, time_direct = _route_pair_with_time(
-                na, nb, graph.node_coords, graph_dir, profile,
+                na,
+                nb,
+                graph.node_coords,
+                graph_dir,
+                profile,
             )
             if not coords_direct or time_direct <= 0:
                 continue
@@ -165,8 +181,7 @@ def detect_rings(
         # Filter to high-vote edges (orbital candidates)
         vote_threshold = max(2, total_pairs * 0.05)
         orbital_candidates = {
-            eid for eid, count in candidate_votes.items()
-            if count >= vote_threshold
+            eid for eid, count in candidate_votes.items() if count >= vote_threshold
         }
 
         if not orbital_candidates:
@@ -191,19 +206,24 @@ def detect_rings(
 
         # Check CV threshold and radius range
         if cv > RING_CV_THRESHOLD:
-            log.debug("Ring CV %.2f > %.2f for %s, skipping",
-                      cv, RING_CV_THRESHOLD, name)
+            log.debug("Ring CV %.2f > %.2f for %s, skipping", cv, RING_CV_THRESHOLD, name)
             continue
 
         min_r = 1.5 * r_core
         max_r = 1.2 * b_radius_m
         if not (min_r <= mean_r <= max_r):
-            log.debug("Ring mean radius %.0fm outside [%.0f, %.0f] for %s",
-                      mean_r, min_r, max_r, name)
+            log.debug(
+                "Ring mean radius %.0fm outside [%.0f, %.0f] for %s", mean_r, min_r, max_r, name
+            )
             continue
 
-        log.info("Ring detected for %s: %d edges, cv=%.2f, mean_r=%.0fm",
-                 name, len(orbital_candidates), cv, mean_r)
+        log.info(
+            "Ring detected for %s: %d edges, cv=%.2f, mean_r=%.0fm",
+            name,
+            len(orbital_candidates),
+            cv,
+            mean_r,
+        )
         for eid in orbital_candidates:
             ring_edges[eid] = True
 
@@ -257,7 +277,9 @@ def _classify_settlement(place_type: str, population: int) -> str:
 
 
 def _find_entry_exit_nodes(
-    graph: RoadGraph, center_lon: float, center_lat: float,
+    graph: RoadGraph,
+    center_lon: float,
+    center_lat: float,
     r_outer: float,
 ) -> list[int]:
     """Find nodes where major roads cross the outer boundary circle."""
@@ -289,7 +311,9 @@ def _find_entry_exit_nodes(
 
 
 def _pair_by_angle(
-    nodes: list[int], center_lon: float, center_lat: float,
+    nodes: list[int],
+    center_lon: float,
+    center_lat: float,
 ) -> list[tuple[int, int]]:
     """Pair entry/exit nodes by angular separation (>90°) around center.
 
@@ -303,7 +327,9 @@ def _pair_by_angle(
 
 
 def _pair_entry_exit_by_angle(
-    nodes: list[int], center_lon: float, center_lat: float,
+    nodes: list[int],
+    center_lon: float,
+    center_lat: float,
     node_coords: dict[int, tuple[float, float]],
 ) -> list[tuple[int, int]]:
     """Pair entry/exit nodes with >90° angular separation around center."""
@@ -356,7 +382,11 @@ def _check_bypass_pair(
 
     # P_fast: unconstrained fastest route
     coords_fast, time_fast = _route_pair_with_time(
-        entry_node, exit_node, graph.node_coords, graph_dir, profile,
+        entry_node,
+        exit_node,
+        graph.node_coords,
+        graph_dir,
+        profile,
     )
     if not coords_fast or time_fast <= 0:
         return bypass_edges, thru_edges
@@ -376,10 +406,18 @@ def _check_bypass_pair(
 
     # Route entry → center → exit
     _c1, time_thru_1 = _route_pair_with_time(
-        entry_node, center_node, graph.node_coords, graph_dir, profile,
+        entry_node,
+        center_node,
+        graph.node_coords,
+        graph_dir,
+        profile,
     )
     _c2, time_thru_2 = _route_pair_with_time(
-        center_node, exit_node, graph.node_coords, graph_dir, profile,
+        center_node,
+        exit_node,
+        graph.node_coords,
+        graph_dir,
+        profile,
     )
     if time_thru_1 <= 0 or time_thru_2 <= 0:
         return bypass_edges, thru_edges
@@ -425,8 +463,7 @@ def _avg_fc_score(graph: RoadGraph, edge_ids: set[int]) -> float:
     """Average functional class score of a set of edges."""
     if not edge_ids:
         return 0.0
-    total = sum(graph.edge_by_id[eid].fc_score for eid in edge_ids
-                if eid in graph.edge_by_id)
+    total = sum(graph.edge_by_id[eid].fc_score for eid in edge_ids if eid in graph.edge_by_id)
     return total / len(edge_ids)
 
 
@@ -482,7 +519,8 @@ def _find_radial_entries(
 
 
 def _sample_radial_pairs(
-    radial_nodes: list[int], n_pairs: int,
+    radial_nodes: list[int],
+    n_pairs: int,
 ) -> list[tuple[int, int]]:
     """Sample pairs of non-adjacent radial nodes."""
     import random

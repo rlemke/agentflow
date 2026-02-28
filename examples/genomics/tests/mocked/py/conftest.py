@@ -1,4 +1,5 @@
 """Conftest for genomics mocked tests."""
+
 import os
 import sys
 

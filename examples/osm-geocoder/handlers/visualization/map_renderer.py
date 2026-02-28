@@ -10,12 +10,11 @@ import os
 import posixpath
 import tempfile
 import webbrowser
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-from afl.runtime.storage import get_storage_backend, localize
+from afl.runtime.storage import localize
 
 from ..shared._output import resolve_local_output_dir, uri_stem
 
@@ -198,7 +197,9 @@ def render_map_html(
         MapResult with output path and metadata
     """
     if not HAS_FOLIUM:
-        raise RuntimeError("folium is required for HTML map rendering. Install with: pip install folium")
+        raise RuntimeError(
+            "folium is required for HTML map rendering. Install with: pip install folium"
+        )
 
     geojson_path_str = str(geojson_path)
     local_geojson = localize(geojson_path_str)
@@ -259,7 +260,9 @@ def render_map_html(
             fields=list(features[0].get("properties", {}).keys())[:5] if features else [],
             aliases=list(features[0].get("properties", {}).keys())[:5] if features else [],
             localize=True,
-        ) if features and features[0].get("properties") else None,
+        )
+        if features and features[0].get("properties")
+        else None,
     )
     geojson_layer.add_to(m)
 
@@ -273,14 +276,14 @@ def render_map_html(
         m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
 
     # Add title
-    title_html = f'''
+    title_html = f"""
     <div style="position: fixed; top: 10px; left: 50px; z-index: 1000;
                 background-color: white; padding: 10px; border-radius: 5px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-family: Arial, sans-serif;">
         <h3 style="margin: 0;">{title}</h3>
         <small>{len(features)} features</small>
     </div>
-    '''
+    """
     m.get_root().html.add_child(folium.Element(title_html))
 
     # Save map
@@ -292,7 +295,7 @@ def render_map_html(
         feature_count=len(features),
         bounds=bounds_to_string(bounds),
         title=title,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -378,7 +381,7 @@ def render_map_png(
         feature_count=len(gdf),
         bounds=bounds_to_string(bounds),
         title=title,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -438,8 +441,14 @@ def render_layers(
 
     # Default colors
     default_colors = [
-        "#3388ff", "#ff3333", "#33ff33", "#ffff33",
-        "#ff33ff", "#33ffff", "#ff8800", "#8800ff",
+        "#3388ff",
+        "#ff3333",
+        "#33ff33",
+        "#ffff33",
+        "#ff33ff",
+        "#33ffff",
+        "#ff8800",
+        "#8800ff",
     ]
     if colors is None:
         colors = default_colors
@@ -504,20 +513,19 @@ def render_layers(
 
     # Fit bounds
     if combined_bounds:
-        m.fit_bounds([
-            [combined_bounds[1], combined_bounds[0]],
-            [combined_bounds[3], combined_bounds[2]]
-        ])
+        m.fit_bounds(
+            [[combined_bounds[1], combined_bounds[0]], [combined_bounds[3], combined_bounds[2]]]
+        )
 
     # Add title
-    title_html = f'''
+    title_html = f"""
     <div style="position: fixed; top: 10px; left: 50px; z-index: 1000;
                 background-color: white; padding: 10px; border-radius: 5px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-family: Arial, sans-serif;">
         <h3 style="margin: 0;">{title}</h3>
         <small>{len(layer_paths)} layers, {total_features} features</small>
     </div>
-    '''
+    """
     m.get_root().html.add_child(folium.Element(title_html))
 
     m.save(str(output_path))
@@ -528,7 +536,7 @@ def render_layers(
         feature_count=total_features,
         bounds=bounds_to_string(combined_bounds),
         title=title,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -546,7 +554,9 @@ def preview_map(geojson_path: str | Path) -> MapResult:
     stem = uri_stem(geojson_path_str)
     output_path = os.path.join(tempfile.gettempdir(), f"preview_{stem}.html")
 
-    result = render_map_html(geojson_path_str, output_path, title=f"Preview: {posixpath.basename(geojson_path_str)}")
+    result = render_map_html(
+        geojson_path_str, output_path, title=f"Preview: {posixpath.basename(geojson_path_str)}"
+    )
 
     # Open in browser
     webbrowser.open(f"file://{output_path}")

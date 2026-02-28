@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
-from handlers.shared.quality_utils import compute_scores, assign_grade
+from handlers.shared.quality_utils import assign_grade, compute_scores
 
 NAMESPACE = "dq.Scoring"
 
@@ -20,8 +19,11 @@ def handle_compute_scores(params: dict[str, Any]) -> dict[str, Any]:
     w_freshness = float(params.get("w_freshness", 0.25))
 
     scores, overall = compute_scores(
-        completeness_score, accuracy_score,
-        w_completeness, w_accuracy, w_freshness,
+        completeness_score,
+        accuracy_score,
+        w_completeness,
+        w_accuracy,
+        w_freshness,
     )
 
     step_log = params.get("_step_log")
@@ -40,7 +42,9 @@ def handle_assign_grade(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Grade: {grade} ({'PASSED' if passed else 'FAILED'})", "level": "success"})
+        step_log.append(
+            {"message": f"Grade: {grade} ({'PASSED' if passed else 'FAILED'})", "level": "success"}
+        )
 
     return {"grade": grade, "passed": passed}
 

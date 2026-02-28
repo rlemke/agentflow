@@ -9,17 +9,14 @@ geo-dependencies required.
 
 import csv
 import hashlib
-import io
 import json
 import logging
 import math
 import os
 import zipfile
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import IntEnum
-from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend
 
@@ -43,6 +40,7 @@ MAX_GRID_CELLS = 10_000
 
 
 # ── GTFS route type enum ────────────────────────────────────────────────
+
 
 class GTFSRouteType(IntEnum):
     """GTFS route_type values (basic + extended)."""
@@ -282,7 +280,7 @@ def _write_geojson(path: str, features: list[dict]) -> None:
 
 def _now_iso() -> str:
     """Return current UTC timestamp in ISO format."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _find_feed_root(extract_dir: str) -> str:
@@ -333,7 +331,7 @@ def download_gtfs_feed(url: str, output_dir: str = "") -> dict:
     # Check cache
     if os.path.isfile(meta_path) and os.path.isdir(feed_dir):
         try:
-            with open(meta_path, "r") as f:
+            with open(meta_path) as f:
                 meta = json.load(f)
             meta["wasInCache"] = True
             log.info("Using cached GTFS feed for %s at %s", url, feed_dir)
@@ -460,20 +458,22 @@ def extract_stops(feed_path: str, output_path: str = "") -> StopResult:
         max_lat = max(max_lat, lat)
         max_lon = max(max_lon, lon)
 
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "stop_id": row.get("stop_id", ""),
-                "stop_name": row.get("stop_name", ""),
-                "stop_code": row.get("stop_code", ""),
-                "zone_id": row.get("zone_id", ""),
-                "wheelchair_boarding": row.get("wheelchair_boarding", ""),
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [lon, lat],
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "stop_id": row.get("stop_id", ""),
+                    "stop_name": row.get("stop_name", ""),
+                    "stop_code": row.get("stop_code", ""),
+                    "zone_id": row.get("zone_id", ""),
+                    "wheelchair_boarding": row.get("wheelchair_boarding", ""),
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat],
+                },
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -570,19 +570,21 @@ def extract_routes(feed_path: str, output_path: str = "") -> GTFSRouteResult:
             route_types_seen.add(rtype)
             rt = GTFSRouteType.from_string(rtype)
 
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    **info,
-                    "route_type_label": rt.label() if rt else f"Type {rtype}",
-                    "shape_id": sid,
-                    "point_count": len(coords),
-                },
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": coords,
-                },
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        **info,
+                        "route_type_label": rt.label() if rt else f"Type {rtype}",
+                        "shape_id": sid,
+                        "point_count": len(coords),
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coords,
+                    },
+                }
+            )
     else:
         # Fallback: use stop sequence from stop_times.txt
         stop_times_rows = _read_csv(feed_path, "stop_times.txt")
@@ -635,19 +637,21 @@ def extract_routes(feed_path: str, output_path: str = "") -> GTFSRouteResult:
             route_types_seen.add(rtype)
             rt = GTFSRouteType.from_string(rtype)
 
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    **info,
-                    "route_type_label": rt.label() if rt else f"Type {rtype}",
-                    "shape_id": "",
-                    "point_count": len(coords),
-                },
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": coords,
-                },
-            })
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        **info,
+                        "route_type_label": rt.label() if rt else f"Type {rtype}",
+                        "shape_id": "",
+                        "point_count": len(coords),
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coords,
+                    },
+                }
+            )
 
     _write_geojson(output_path, features)
 
@@ -691,8 +695,7 @@ def compute_service_frequency(feed_path: str, output_path: str = "") -> Frequenc
         for row in calendar_rows:
             sid = row.get("service_id", "")
             # Check if any day is active
-            days = ["monday", "tuesday", "wednesday", "thursday",
-                    "friday", "saturday", "sunday"]
+            days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
             if any(row.get(d, "0") == "1" for d in days):
                 active_services.add(sid)
         if calendar_rows:
@@ -760,18 +763,20 @@ def compute_service_frequency(feed_path: str, output_path: str = "") -> Frequenc
         total_trips += count
         max_trips = max(max_trips, count)
 
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "stop_id": stop_id,
-                "stop_name": name,
-                "trips_per_day": count,
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [lon, lat],
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "stop_id": stop_id,
+                    "stop_name": name,
+                    "trips_per_day": count,
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat],
+                },
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -806,10 +811,7 @@ def compute_transit_statistics(feed_path: str) -> TransitStats:
         agency_name = agency_rows[0].get("agency_name", "")
 
     # Count stops (location_type=0 only)
-    stop_count = sum(
-        1 for row in stops_rows
-        if row.get("location_type", "0").strip() in ("", "0")
-    )
+    stop_count = sum(1 for row in stops_rows if row.get("location_type", "0").strip() in ("", "0"))
 
     # Count routes by type
     type_counts: dict[str, int] = {}
@@ -859,9 +861,7 @@ def find_nearest_stops(
         NearestStopResult with match statistics
     """
     if not output_path:
-        output_path = os.path.join(
-            os.path.dirname(stops_path), "nearest_stops.geojson"
-        )
+        output_path = os.path.join(os.path.dirname(stops_path), "nearest_stops.geojson")
 
     osm_features = _load_geojson_features(osm_path)
     stop_features = _load_geojson_features(stops_path)
@@ -905,11 +905,13 @@ def find_nearest_stops(
             props["nearest_stop_name"] = ""
             props["nearest_stop_distance_m"] = -1
 
-        features.append({
-            "type": "Feature",
-            "properties": props,
-            "geometry": feat.get("geometry"),
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": feat.get("geometry"),
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -945,9 +947,7 @@ def compute_stop_accessibility(
         AccessibilityResult with band counts and percentages
     """
     if not output_path:
-        output_path = os.path.join(
-            os.path.dirname(stops_path), "accessibility.geojson"
-        )
+        output_path = os.path.join(os.path.dirname(stops_path), "accessibility.geojson")
 
     osm_features = _load_geojson_features(osm_path)
     stop_features = _load_geojson_features(stops_path)
@@ -993,11 +993,13 @@ def compute_stop_accessibility(
         props["transit_band"] = band
         props["nearest_stop_m"] = round(min_dist, 1) if min_dist < float("inf") else -1
 
-        features.append({
-            "type": "Feature",
-            "properties": props,
-            "geometry": feat.get("geometry"),
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": props,
+                "geometry": feat.get("geometry"),
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -1071,9 +1073,7 @@ def compute_coverage_gaps(
         CoverageResult with gap statistics
     """
     if not output_path:
-        output_path = os.path.join(
-            os.path.dirname(stops_path), "coverage_gaps.geojson"
-        )
+        output_path = os.path.join(os.path.dirname(stops_path), "coverage_gaps.geojson")
 
     stop_features = _load_geojson_features(stops_path)
     osm_features = _load_geojson_features(osm_path)
@@ -1083,7 +1083,8 @@ def compute_coverage_gaps(
     if not all_features:
         _write_geojson(output_path, [])
         return CoverageResult(
-            output_path=output_path, total_cells=0,
+            output_path=output_path,
+            total_cells=0,
             extraction_date=_now_iso(),
         )
 
@@ -1132,24 +1133,28 @@ def compute_coverage_gaps(
         cell_max_lat = cell_min_lat + lat_step
         cell_max_lon = cell_min_lon + lon_step
 
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "grid_row": row,
-                "grid_col": col,
-                "type": "gap",
-            },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [cell_min_lon, cell_min_lat],
-                    [cell_max_lon, cell_min_lat],
-                    [cell_max_lon, cell_max_lat],
-                    [cell_min_lon, cell_max_lat],
-                    [cell_min_lon, cell_min_lat],
-                ]],
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "grid_row": row,
+                    "grid_col": col,
+                    "type": "gap",
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [cell_min_lon, cell_min_lat],
+                            [cell_max_lon, cell_min_lat],
+                            [cell_max_lon, cell_max_lat],
+                            [cell_min_lon, cell_max_lat],
+                            [cell_min_lon, cell_min_lat],
+                        ]
+                    ],
+                },
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -1183,15 +1188,14 @@ def compute_route_density(
         DensityResult with density statistics
     """
     if not output_path:
-        output_path = os.path.join(
-            os.path.dirname(routes_path), "route_density.geojson"
-        )
+        output_path = os.path.join(os.path.dirname(routes_path), "route_density.geojson")
 
     route_features = _load_geojson_features(routes_path)
     if not route_features:
         _write_geojson(output_path, [])
         return DensityResult(
-            output_path=output_path, total_cells=0,
+            output_path=output_path,
+            total_cells=0,
             extraction_date=_now_iso(),
         )
 
@@ -1243,24 +1247,28 @@ def compute_route_density(
         cell_max_lat = cell_min_lat + lat_step
         cell_max_lon = cell_min_lon + lon_step
 
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "grid_row": row,
-                "grid_col": col,
-                "route_count": count,
-            },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [cell_min_lon, cell_min_lat],
-                    [cell_max_lon, cell_min_lat],
-                    [cell_max_lon, cell_max_lat],
-                    [cell_min_lon, cell_max_lat],
-                    [cell_min_lon, cell_min_lat],
-                ]],
-            },
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "grid_row": row,
+                    "grid_col": col,
+                    "route_count": count,
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [cell_min_lon, cell_min_lat],
+                            [cell_max_lon, cell_min_lat],
+                            [cell_max_lon, cell_max_lat],
+                            [cell_min_lon, cell_max_lat],
+                            [cell_min_lon, cell_min_lat],
+                        ]
+                    ],
+                },
+            }
+        )
 
     _write_geojson(output_path, features)
 
@@ -1327,7 +1335,8 @@ def generate_transit_report(
     if has_osm and stops_result.stop_count > 0:
         try:
             nearest = find_nearest_stops(
-                osm_path, stops_result.output_path,
+                osm_path,
+                stops_result.output_path,
                 output_path=os.path.join(output_dir, "nearest_stops.geojson"),
             )
             nearest_path = nearest.output_path
@@ -1336,7 +1345,8 @@ def generate_transit_report(
 
         try:
             access = compute_stop_accessibility(
-                osm_path, stops_result.output_path,
+                osm_path,
+                stops_result.output_path,
                 output_path=os.path.join(output_dir, "accessibility.geojson"),
             )
             accessibility_path = access.output_path
@@ -1345,7 +1355,8 @@ def generate_transit_report(
 
         try:
             coverage = compute_coverage_gaps(
-                stops_result.output_path, osm_path,
+                stops_result.output_path,
+                osm_path,
                 output_path=os.path.join(output_dir, "coverage_gaps.geojson"),
             )
             coverage_path = coverage.output_path

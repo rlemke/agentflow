@@ -155,9 +155,7 @@ class RegistryDispatcher:
 
         attr = getattr(module, reg.entrypoint)
         if not callable(attr):
-            raise TypeError(
-                f"Entrypoint '{reg.entrypoint}' in '{reg.module_uri}' is not callable"
-            )
+            raise TypeError(f"Entrypoint '{reg.entrypoint}' in '{reg.module_uri}' is not callable")
         return attr
 
     @staticmethod

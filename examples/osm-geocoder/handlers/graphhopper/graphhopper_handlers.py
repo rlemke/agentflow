@@ -37,14 +37,12 @@ PROFILES = ["car", "bike", "foot", "motorcycle", "truck", "hike", "mtb", "racing
 
 # Default GraphHopper JAR location (can be overridden via environment)
 GRAPHHOPPER_JAR = os.environ.get(
-    "GRAPHHOPPER_JAR",
-    os.path.expanduser("~/.graphhopper/graphhopper-web.jar")
+    "GRAPHHOPPER_JAR", os.path.expanduser("~/.graphhopper/graphhopper-web.jar")
 )
 
 # Base directory for storing routing graphs
 GRAPH_BASE_DIR = os.environ.get(
-    "GRAPHHOPPER_GRAPH_DIR",
-    os.path.expanduser("~/.graphhopper/graphs")
+    "GRAPHHOPPER_GRAPH_DIR", os.path.expanduser("~/.graphhopper/graphs")
 )
 _storage = get_storage_backend(GRAPH_BASE_DIR)
 
@@ -166,8 +164,12 @@ def _run_graphhopper_import(osm_path: str, graph_dir: str, profile: str) -> bool
             config_path = tmp.name
 
         cmd = [
-            "java", "-Xmx4g", "-jar", GRAPHHOPPER_JAR,
-            "import", config_path,
+            "java",
+            "-Xmx4g",
+            "-jar",
+            GRAPHHOPPER_JAR,
+            "import",
+            config_path,
         ]
 
         result = subprocess.run(
@@ -232,7 +234,10 @@ def build_graph_handler(payload: dict) -> dict:
     if _graph_exists(graph_dir) and not recreate:
         graph_result = _make_graph_result(osm_path, graph_dir, profile, True)
         if step_log:
-            step_log(f"BuildGraph: graph cached ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)", level="success")
+            step_log(
+                f"BuildGraph: graph cached ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)",
+                level="success",
+            )
         return {"graph": graph_result}
 
     # Remove existing graph if recreating
@@ -246,7 +251,10 @@ def build_graph_handler(payload: dict) -> dict:
 
     graph_result = _make_graph_result(osm_path, graph_dir, profile, False)
     if step_log:
-        step_log(f"BuildGraph: built graph ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)", level="success")
+        step_log(
+            f"BuildGraph: built graph ({graph_result['nodeCount']} nodes, {graph_result['edgeCount']} edges)",
+            level="success",
+        )
     return {"graph": graph_result}
 
 
@@ -262,11 +270,13 @@ def build_multi_profile_handler(payload: dict) -> dict:
 
     graphs = []
     for profile in profiles:
-        result = build_graph_handler({
-            "cache": cache,
-            "profile": profile,
-            "recreate": recreate,
-        })
+        result = build_graph_handler(
+            {
+                "cache": cache,
+                "profile": profile,
+                "recreate": recreate,
+            }
+        )
         graphs.append(result["graph"])
 
     if step_log:
@@ -294,7 +304,10 @@ def validate_graph_handler(payload: dict) -> dict:
 
     stats = _get_graph_stats(graph_dir)
     if step_log:
-        step_log(f"ValidateGraph: valid={stats['valid']} ({stats['nodes']} nodes, {stats['edges']} edges)", level="success")
+        step_log(
+            f"ValidateGraph: valid={stats['valid']} ({stats['nodes']} nodes, {stats['edges']} edges)",
+            level="success",
+        )
     return {
         "valid": stats["valid"],
         "nodeCount": stats["nodes"],

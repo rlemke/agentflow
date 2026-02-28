@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.research_utils import gather_sources, extract_findings
+from handlers.shared.research_utils import extract_findings, gather_sources
 
 NAMESPACE = "research.Gathering"
 
@@ -23,7 +23,9 @@ def handle_gather_sources(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         name = subtopic.get("name", "unknown") if isinstance(subtopic, dict) else str(subtopic)
-        step_log.append({"message": f"Gathered {len(sources)} sources for '{name}'", "level": "success"})
+        step_log.append(
+            {"message": f"Gathered {len(sources)} sources for '{name}'", "level": "success"}
+        )
 
     return {"sources": sources}
 
@@ -42,7 +44,9 @@ def handle_extract_findings(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
     if step_log:
         name = subtopic.get("name", "unknown") if isinstance(subtopic, dict) else str(subtopic)
-        step_log.append({"message": f"Extracted {len(findings)} findings for '{name}'", "level": "success"})
+        step_log.append(
+            {"message": f"Extracted {len(findings)} findings for '{name}'", "level": "success"}
+        )
 
     return {"findings": findings}
 

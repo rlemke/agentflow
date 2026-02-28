@@ -14,7 +14,6 @@
 
 """AFL (Agent Flow Language) compiler package."""
 
-from .ast_utils import find_all_workflows, find_workflow, normalize_program_ast
 from .ast import (
     AndThenBlock,
     ArrayLiteral,
@@ -51,6 +50,7 @@ from .ast import (
     WorkflowDecl,
     YieldStmt,
 )
+from .ast_utils import find_all_workflows, find_workflow, normalize_program_ast
 from .config import AFLConfig, MongoDBConfig, ResolverConfig, load_config
 from .emitter import JSONEmitter, emit_dict, emit_json
 from .loader import SourceLoader

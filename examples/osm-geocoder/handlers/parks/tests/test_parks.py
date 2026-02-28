@@ -6,13 +6,10 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from handlers.parks.park_extractor import (
     HAS_OSMIUM,
     HAS_SHAPELY,
     PROTECT_CLASS_ALL,
-    PROTECT_CLASS_NATIONAL,
-    PROTECT_CLASS_STATE,
     ParkResult,
     ParkStats,
     ParkType,
@@ -218,10 +215,7 @@ class TestCalculateAreaKm2:
     def test_calculate_polygon_area(self):
         """Test calculating area of a polygon."""
         # Simple 1x1 degree square near equator
-        geometry = {
-            "type": "Polygon",
-            "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
-        }
+        geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
         area = calculate_area_km2(geometry)
         # Should be roughly 12,300 km² (varies with latitude)
         assert 10000 < area < 15000

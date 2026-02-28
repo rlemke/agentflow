@@ -12,6 +12,7 @@ from typing import Any
 
 try:
     import osmium
+
     HAS_OSMIUM = True
 except ImportError:
     HAS_OSMIUM = False
@@ -19,16 +20,23 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_SITESEL_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "sitesel-output"))
+_OUTPUT_DIR = os.environ.get(
+    "AFL_SITESEL_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "sitesel-output")
+)
 
 FOOD_AMENITIES = {
-    "restaurant", "fast_food", "cafe", "bar", "pub",
-    "food_court", "ice_cream",
+    "restaurant",
+    "fast_food",
+    "cafe",
+    "bar",
+    "pub",
+    "food_court",
+    "ice_cream",
 }
 
 
 if HAS_OSMIUM:
+
     class RestaurantHandler(osmium.SimpleHandler):
         """Extract food amenity nodes from PBF."""
 
@@ -39,18 +47,20 @@ if HAS_OSMIUM:
         def node(self, n) -> None:
             amenity = n.tags.get("amenity", "")
             if amenity in FOOD_AMENITIES:
-                self.features.append({
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Point",
-                        "coordinates": [n.location.lon, n.location.lat],
-                    },
-                    "properties": {
-                        "name": n.tags.get("name", ""),
-                        "amenity": amenity,
-                        "cuisine": n.tags.get("cuisine", ""),
-                    },
-                })
+                self.features.append(
+                    {
+                        "type": "Feature",
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [n.location.lon, n.location.lat],
+                        },
+                        "properties": {
+                            "name": n.tags.get("name", ""),
+                            "amenity": amenity,
+                            "cuisine": n.tags.get("cuisine", ""),
+                        },
+                    }
+                )
 
 
 def extract_restaurants(pbf_path: str, region: str) -> dict[str, Any]:
@@ -75,14 +85,12 @@ def extract_restaurants(pbf_path: str, region: str) -> dict[str, Any]:
     if pbf_path and os.path.exists(pbf_path):
         handler.apply_file(pbf_path, locations=True)
 
-    output_path = os.path.join(output_dir,
-                               f"{region}_restaurants.geojson")
+    output_path = os.path.join(output_dir, f"{region}_restaurants.geojson")
     geojson = {"type": "FeatureCollection", "features": handler.features}
     with open(output_path, "w") as f:
         json.dump(geojson, f)
 
-    logger.info("Extracted %d restaurants from %s",
-                len(handler.features), pbf_path)
+    logger.info("Extracted %d restaurants from %s", len(handler.features), pbf_path)
 
     return {
         "output_path": output_path,

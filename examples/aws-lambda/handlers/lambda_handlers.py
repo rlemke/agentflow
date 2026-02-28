@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import boto3
@@ -52,14 +52,18 @@ def _ensure_role() -> str:
         resp = iam.get_role(RoleName=role_name)
         return resp["Role"]["Arn"]
     except iam.exceptions.NoSuchEntityException:
-        trust_policy = json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Effect": "Allow",
-                "Principal": {"Service": "lambda.amazonaws.com"},
-                "Action": "sts:AssumeRole",
-            }],
-        })
+        trust_policy = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "lambda.amazonaws.com"},
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        )
         resp = iam.create_role(
             RoleName=role_name,
             AssumeRolePolicyDocument=trust_policy,
@@ -123,7 +127,7 @@ def _create_function_handler(payload: dict) -> dict[str, Any]:
             "memory_mb": resp.get("MemorySize", memory_mb),
             "timeout_seconds": resp.get("Timeout", timeout_seconds),
             "code_size": resp.get("CodeSize", 0),
-            "last_modified": resp.get("LastModified", datetime.now(timezone.utc).isoformat()),
+            "last_modified": resp.get("LastModified", datetime.now(UTC).isoformat()),
         },
     }
 
@@ -138,13 +142,13 @@ def _invoke_function_handler(payload: dict) -> dict[str, Any]:
     input_payload = payload.get("input_payload", "{}")
     invocation_type = payload.get("invocation_type", "RequestResponse")
 
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     resp = client.invoke(
         FunctionName=function_name,
         InvocationType=invocation_type,
         Payload=input_payload.encode("utf-8"),
     )
-    duration = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+    duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
 
     response_payload = ""
     if "Payload" in resp:
@@ -194,7 +198,7 @@ def _update_function_code_handler(payload: dict) -> dict[str, Any]:
             "memory_mb": resp.get("MemorySize", 128),
             "timeout_seconds": resp.get("Timeout", 30),
             "code_size": resp.get("CodeSize", 0),
-            "last_modified": resp.get("LastModified", datetime.now(timezone.utc).isoformat()),
+            "last_modified": resp.get("LastModified", datetime.now(UTC).isoformat()),
         },
     }
 
@@ -219,7 +223,7 @@ def _delete_function_handler(payload: dict) -> dict[str, Any]:
             "memory_mb": 0,
             "timeout_seconds": 0,
             "code_size": 0,
-            "last_modified": datetime.now(timezone.utc).isoformat(),
+            "last_modified": datetime.now(UTC).isoformat(),
         },
     }
 

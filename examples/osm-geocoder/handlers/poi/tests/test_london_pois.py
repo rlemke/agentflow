@@ -14,47 +14,78 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "POIs", "declarations": [
-                    _ef("POI",
-                        [{"name": "cache", "type": "OSMCache"}],
-                        [{"name": "pois", "type": "OSMCache"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "POIs",
+                            "declarations": [
+                                _ef(
+                                    "POI",
+                                    [{"name": "cache", "type": "OSMCache"}],
+                                    [{"name": "pois", "type": "OSMCache"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -106,32 +137,60 @@ def compile_workflow() -> dict:
 
 LONDON_POIS = {
     "Museums & Galleries": [
-        "British Museum", "Natural History Museum", "Tate Modern",
-        "Victoria and Albert Museum", "Science Museum", "National Gallery",
-        "Imperial War Museum", "Museum of London",
+        "British Museum",
+        "Natural History Museum",
+        "Tate Modern",
+        "Victoria and Albert Museum",
+        "Science Museum",
+        "National Gallery",
+        "Imperial War Museum",
+        "Museum of London",
     ],
     "Historic Sites": [
-        "Tower of London", "Westminster Abbey", "Buckingham Palace",
-        "St Paul's Cathedral", "Hampton Court Palace", "Greenwich Observatory",
-        "Houses of Parliament", "Kensington Palace",
+        "Tower of London",
+        "Westminster Abbey",
+        "Buckingham Palace",
+        "St Paul's Cathedral",
+        "Hampton Court Palace",
+        "Greenwich Observatory",
+        "Houses of Parliament",
+        "Kensington Palace",
     ],
     "Parks & Gardens": [
-        "Hyde Park", "Regent's Park", "Kew Gardens",
-        "Richmond Park", "Greenwich Park", "St James's Park",
-        "Hampstead Heath", "Victoria Park",
+        "Hyde Park",
+        "Regent's Park",
+        "Kew Gardens",
+        "Richmond Park",
+        "Greenwich Park",
+        "St James's Park",
+        "Hampstead Heath",
+        "Victoria Park",
     ],
     "Transport Hubs": [
-        "King's Cross St Pancras", "Paddington Station", "Waterloo Station",
-        "Liverpool Street Station", "Victoria Station", "Heathrow Airport",
-        "London City Airport", "Euston Station",
+        "King's Cross St Pancras",
+        "Paddington Station",
+        "Waterloo Station",
+        "Liverpool Street Station",
+        "Victoria Station",
+        "Heathrow Airport",
+        "London City Airport",
+        "Euston Station",
     ],
     "Markets": [
-        "Borough Market", "Camden Market", "Portobello Road Market",
-        "Covent Garden Market", "Brick Lane Market", "Columbia Road Flower Market",
+        "Borough Market",
+        "Camden Market",
+        "Portobello Road Market",
+        "Covent Garden Market",
+        "Brick Lane Market",
+        "Columbia Road Flower Market",
     ],
     "Entertainment": [
-        "O2 Arena", "Royal Albert Hall", "Shakespeare's Globe",
-        "West End Theatre District", "Wembley Stadium", "Lord's Cricket Ground",
+        "O2 Arena",
+        "Royal Albert Hall",
+        "Shakespeare's Globe",
+        "West End Theatre District",
+        "Wembley Stadium",
+        "Lord's Cricket Ground",
     ],
 }
 
@@ -185,7 +244,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -193,6 +254,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the London POI workflow end-to-end with mock handlers."""
@@ -254,7 +316,7 @@ def main() -> None:
     print(f"  Map output:             {outputs.get('map_path')}")
 
     # Show POIs by category
-    print(f"\n  POIs by category:")
+    print("\n  POIs by category:")
     for category in sorted(LONDON_POIS, key=lambda c: len(LONDON_POIS[c]), reverse=True):
         pois = LONDON_POIS[category]
         print(f"    {category:.<30} {len(pois):>2} places")

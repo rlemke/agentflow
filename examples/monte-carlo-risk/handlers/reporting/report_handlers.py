@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 NAMESPACE = "risk.Reporting"
@@ -28,7 +28,7 @@ def handle_generate_report(params: dict[str, Any]) -> dict[str, Any]:
     if isinstance(greeks, str):
         greeks = json.loads(greeks)
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
 
     summary = {
         "portfolio_name": portfolio.get("name", "unknown"),
@@ -44,9 +44,10 @@ def handle_generate_report(params: dict[str, Any]) -> dict[str, Any]:
     }
 
     if step_log:
-        step_log(f"GenerateReport: portfolio={portfolio.get('name', 'unknown')} "
-                 f"timestamp={timestamp}",
-                 level="success")
+        step_log(
+            f"GenerateReport: portfolio={portfolio.get('name', 'unknown')} timestamp={timestamp}",
+            level="success",
+        )
 
     return {
         "report": {

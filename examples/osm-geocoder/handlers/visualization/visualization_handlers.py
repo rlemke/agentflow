@@ -5,7 +5,7 @@ Handles visualization events defined in osmvisualization.afl under osm.geo.Visua
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .map_renderer import (
     HAS_FOLIUM,
@@ -61,7 +61,10 @@ def _make_render_map_handler(facet_name: str):
                 height=height,
             )
             if step_log:
-                step_log(f"{facet_name}: rendered {result.feature_count} features as {format}", level="success")
+                step_log(
+                    f"{facet_name}: rendered {result.feature_count} features as {format}",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render map: %s", e)
@@ -82,9 +85,12 @@ def _make_render_map_at_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: rendering {geojson_path} at ({lat:.4f}, {lon:.4f}) zoom {zoom}")
-        log.info("%s rendering %s at (%.4f, %.4f) zoom %d",
-                 facet_name, geojson_path, lat, lon, zoom)
+            step_log(
+                f"{facet_name}: rendering {geojson_path} at ({lat:.4f}, {lon:.4f}) zoom {zoom}"
+            )
+        log.info(
+            "%s rendering %s at (%.4f, %.4f) zoom %d", facet_name, geojson_path, lat, lon, zoom
+        )
 
         if not geojson_path:
             return {"result": _empty_result(title, "html")}
@@ -102,7 +108,10 @@ def _make_render_map_at_handler(facet_name: str):
                 zoom=zoom,
             )
             if step_log:
-                step_log(f"{facet_name}: rendered {result.feature_count} features at ({lat:.4f}, {lon:.4f})", level="success")
+                step_log(
+                    f"{facet_name}: rendered {result.feature_count} features at ({lat:.4f}, {lon:.4f})",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render map: %s", e)
@@ -123,7 +132,7 @@ def _make_render_layers_handler(facet_name: str):
 
         # Normalize layers to list
         if isinstance(layers, str):
-            layers = [l.strip() for l in layers.split(",") if l.strip()]
+            layers = [layer.strip() for layer in layers.split(",") if layer.strip()]
         if isinstance(colors, str):
             colors = [c.strip() for c in colors.split(",") if c.strip()]
 
@@ -146,7 +155,10 @@ def _make_render_layers_handler(facet_name: str):
                 format=format,
             )
             if step_log:
-                step_log(f"{facet_name}: rendered {result.feature_count} features across {len(layers)} layers", level="success")
+                step_log(
+                    f"{facet_name}: rendered {result.feature_count} features across {len(layers)} layers",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render layers: %s", e)
@@ -190,7 +202,10 @@ def _make_render_styled_map_handler(facet_name: str):
                 style=style,
             )
             if step_log:
-                step_log(f"{facet_name}: rendered {result.feature_count} features with custom style", level="success")
+                step_log(
+                    f"{facet_name}: rendered {result.feature_count} features with custom style",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to render styled map: %s", e)
@@ -220,7 +235,9 @@ def _make_preview_map_handler(facet_name: str):
         try:
             result = preview_map(geojson_path)
             if step_log:
-                step_log(f"{facet_name}: previewed {result.feature_count} features", level="success")
+                step_log(
+                    f"{facet_name}: previewed {result.feature_count} features", level="success"
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to preview map: %s", e)
@@ -249,7 +266,7 @@ def _empty_result(title: str, format: str) -> dict:
         "feature_count": 0,
         "bounds": "",
         "title": title,
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

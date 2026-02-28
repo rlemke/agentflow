@@ -16,8 +16,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from afl.runtime.step import StepDefinition
@@ -50,7 +51,7 @@ def build_step_tree(steps: Sequence[StepDefinition]) -> list[StepNode]:
         return []
 
     # Index by id for quick lookup
-    by_id: dict[str, StepDefinition] = {s.id: s for s in steps}
+    _by_id: dict[str, StepDefinition] = {s.id: s for s in steps}
 
     # Group block steps by container_id
     blocks_by_container: dict[str, list[StepDefinition]] = {}

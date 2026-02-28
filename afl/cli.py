@@ -15,7 +15,6 @@
 """AFL command-line interface."""
 
 import argparse
-import logging
 import sys
 from pathlib import Path
 
@@ -27,7 +26,6 @@ from .source import (
     CompilerInput,
     FileOrigin,
     SourceEntry,
-    SourceRegistry,
 )
 from .validator import validate
 

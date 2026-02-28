@@ -32,9 +32,7 @@ router = APIRouter(prefix="/workflows")
 # ---------------------------------------------------------------------------
 
 
-def _collect_workflows_with_ns(
-    node: dict, ns_prefix: str, acc: list[dict]
-) -> None:
+def _collect_workflows_with_ns(node: dict, ns_prefix: str, acc: list[dict]) -> None:
     """Recursively collect WorkflowDecl nodes with their namespace path."""
     for decl in node.get("declarations", []):
         if decl.get("type") == "WorkflowDecl":
@@ -127,13 +125,11 @@ def workflow_new(request: Request, store=Depends(get_store)):
     for item in all_wf_items:
         ns_map.setdefault(item["ns"], []).append(item)
 
-    ns_groups = sorted(
-        [
-            {"name": ns, "workflows": sorted(wfs, key=lambda w: w["name"])}
-            for ns, wfs in ns_map.items()
-        ],
-        key=lambda g: g["name"],
-    )
+    ns_groups_list: list[dict] = [
+        {"name": ns, "workflows": sorted(wfs, key=lambda w: w["name"])}
+        for ns, wfs in ns_map.items()
+    ]
+    ns_groups = sorted(ns_groups_list, key=lambda g: str(g["name"]))
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -173,13 +169,13 @@ def workflow_validate(request: Request, source: str = Form(...)):
         for ns in ast.namespaces:
             namespaces.append(ns.name)
             for f in ns.facets:
-                facets.append(f"{ns.name}.{f.name}")
+                facets.append(f"{ns.name}.{f.sig.name}")
             for w in ns.workflows:
-                workflows.append(f"{ns.name}.{w.name}")
-        for node in ast.facets:
-            facets.append(node.name)
-        for node in ast.workflows:
-            workflows.append(node.name)
+                workflows.append(f"{ns.name}.{w.sig.name}")
+        for facet_node in ast.facets:
+            facets.append(facet_node.sig.name)
+        for wf_node in ast.workflows:
+            workflows.append(wf_node.sig.name)
 
     except Exception as exc:
         errors.append({"message": str(exc), "line": None, "column": None})

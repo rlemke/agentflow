@@ -16,12 +16,11 @@ Via Docker:
     docker compose --profile seed run --rm seed
 """
 
-import json
 import logging
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add parent to path for afl imports
@@ -29,8 +28,8 @@ sys.path.insert(0, os.environ.get("PYTHONPATH", "/app"))
 
 from pymongo import MongoClient
 
-from afl.parser import parse
 from afl.emitter import emit_dict
+from afl.parser import parse
 from afl.validator import validate
 
 logging.basicConfig(
@@ -42,6 +41,7 @@ logger = logging.getLogger("continental-lz-seed")
 # AFL source files in dependency order
 # When running in Docker, paths are relative to /app
 # When running locally, paths are relative to the script location
+
 
 def _find_afl_root() -> Path:
     """Determine the AFL source root based on environment."""
@@ -105,12 +105,14 @@ def seed_database() -> None:
             sys.exit(1)
         content = resolved.read_text()
         sources += content + "\n"
-        source_docs.append({
-            "name": resolved.name,
-            "content": content,
-            "language": "afl",
-            "namespace": ns_name,
-        })
+        source_docs.append(
+            {
+                "name": resolved.name,
+                "content": content,
+                "language": "afl",
+                "namespace": ns_name,
+            }
+        )
         logger.info(f"  Loaded: {resolved.name} ({ns_name})")
 
     # Step 2: Parse and validate
@@ -151,7 +153,7 @@ def seed_database() -> None:
         "path": "/continental-lz/",
         "sources": source_docs,
         "compiled": compiled,
-        "created": datetime.now(timezone.utc).isoformat(),
+        "created": datetime.now(UTC).isoformat(),
         "seeded": True,
     }
     flow_doc["workflows"] = workflow_names
@@ -180,8 +182,8 @@ def seed_database() -> None:
             "runner_id": "",
             "step_id": "",
             "state": "pending",
-            "created": datetime.now(timezone.utc).isoformat(),
-            "updated": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
+            "updated": datetime.now(UTC).isoformat(),
             "data": {"inputs": inputs},
             "data_type": "execute",
             "task_list_name": "afl:execute",

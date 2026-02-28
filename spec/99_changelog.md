@@ -1,5 +1,49 @@
 # Implementation Changelog
 
+## Completed (v0.23.1) - CI Pipeline Fix + Pre-commit Hooks
+
+Fix all CI errors and activate pre-commit hooks so lint, tests, and typecheck
+pass in GitHub Actions. Single squashed commit: `ee16e52`.
+
+### Ruff formatting and lint (308 files)
+- Run `ruff format` on 256 files
+- Fix 596 lint errors (479 auto-fixed, 117 manual):
+  - Remove unused imports (F401) and variables (F841, prefixed with `_`)
+  - Rename ambiguous `l` variables to descriptive names (E741)
+  - Fix forward references and undefined names (F821)
+  - Add `raise ... from None` for exception chaining (B904)
+  - Prefix unused loop variables with underscore (B007)
+  - Simplify unnecessary dict comprehension (C416)
+  - Use modern `X | Y` union syntax (UP007)
+- Add `per-file-ignores` in `pyproject.toml` for pytest fixture redefinitions (F811) in HDFS test files
+- Add `UP038` to ruff ignore list (rule removed in ruff 0.12+)
+
+### CI workflow (`.github/workflows/ci.yml`)
+- Install `[test,dashboard,mcp,mongodb]` extras (was only `[test]`)
+- Add `requests` and `pyshp` to `[test]` dependencies in `pyproject.toml`
+- Include `examples/` in pytest test path to match `pyproject.toml` testpaths
+
+### Mypy type errors (123 errors across 26 files)
+- Widen `PersistenceAPI` method signatures to accept `str` for `StepId`/`BlockId`/`WorkflowId` (these NewTypes are interchangeable at runtime)
+- Add missing `PersistenceAPI` methods: `get_flow`, `save_server`, `get_server`, `update_server_ping`
+- Annotate dict literals as `dict[str, Any]` in emitter, telemetry, MCP server
+- Wrap MCP `Resource` uri strings with `AnyUrl()` constructor
+- Fix dashboard store typing from `object` to `PersistenceAPI`/`Any`
+- Add None guards for optional `Block`/`SourceLocation` access in resolver
+- Add None guards for `get_flow()` returns in agent_poller, registry_runner, runner service, dashboard flows
+- Handle `PromptBlock` in resolver body processing
+- Fix transformer body type annotation for `list[AndThenBlock]`
+- Rename shadowed validator loop variable (`MixinCall` vs `MixinSig`)
+- Remove unused `type: ignore` comments in mongo_store and resolver
+- Use `AttributeValue()` constructor instead of dict literals in agent_poller/registry_runner
+- Suppress `no-redef` for optional `requests` import fallbacks in storage.py
+- Add mypy override for `mongo_store` to handle version differences between pre-commit mypy v1.14.1 and CI latest
+
+### Pre-commit hooks
+- Activate pre-commit hooks: ruff lint (with `--fix`), ruff format, mypy
+- Update ruff-pre-commit from v0.8.6 to v0.11.12
+- All 4 CI jobs green: lint, test 3.11, test 3.12, typecheck
+
 ## Completed (v0.23.0) - Dashboard UI Full Redesign
 
 Comprehensive dashboard UI redesign replacing the flat horizontal navbar with a

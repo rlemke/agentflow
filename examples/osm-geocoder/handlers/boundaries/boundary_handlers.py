@@ -6,7 +6,7 @@ in osmboundaries.afl under osm.geo.Boundaries.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .boundary_extractor import (
     ADMIN_LEVEL_CITY,
@@ -53,16 +53,19 @@ def _make_admin_handler(facet_name: str, admin_levels: list[int]):
                 "result": {
                     "output_path": "",
                     "feature_count": 0,
-                    "boundary_type": ", ".join(_level_name(l) for l in admin_levels),
-                    "admin_levels": ",".join(str(l) for l in admin_levels),
+                    "boundary_type": ", ".join(_level_name(lvl) for lvl in admin_levels),
+                    "admin_levels": ",".join(str(lvl) for lvl in admin_levels),
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
         result = extract_boundaries(pbf_path, admin_levels=admin_levels)
         if step_log:
-            step_log(f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries", level="success")
+            step_log(
+                f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
+                level="success",
+            )
         return {
             "result": {
                 "output_path": result.output_path,
@@ -111,13 +114,16 @@ def _make_natural_handler(facet_name: str, natural_types: list[str]):
                     "boundary_type": ", ".join(natural_types),
                     "admin_levels": "",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
         result = extract_boundaries(pbf_path, natural_types=natural_types)
         if step_log:
-            step_log(f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries", level="success")
+            step_log(
+                f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
+                level="success",
+            )
         return {
             "result": {
                 "output_path": result.output_path,
@@ -161,13 +167,16 @@ def _make_configurable_admin_handler(facet_name: str):
                     "boundary_type": _level_name(admin_level),
                     "admin_levels": str(admin_level),
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
         result = extract_boundaries(pbf_path, admin_levels=[admin_level])
         if step_log:
-            step_log(f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries", level="success")
+            step_log(
+                f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
+                level="success",
+            )
         return {
             "result": {
                 "output_path": result.output_path,
@@ -211,13 +220,16 @@ def _make_configurable_natural_handler(facet_name: str):
                     "boundary_type": natural_type,
                     "admin_levels": "",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
         result = extract_boundaries(pbf_path, natural_types=[natural_type])
         if step_log:
-            step_log(f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries", level="success")
+            step_log(
+                f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
+                level="success",
+            )
         return {
             "result": {
                 "output_path": result.output_path,
@@ -277,9 +289,7 @@ def register_boundary_handlers(poller) -> None:
     # Register fixed natural type handlers
     for facet_name, natural_types in NATURAL_FACETS.items():
         qualified_name = f"{NAMESPACE}.{facet_name}"
-        poller.register(
-            qualified_name, _make_natural_handler(facet_name, natural_types)
-        )
+        poller.register(qualified_name, _make_natural_handler(facet_name, natural_types))
 
     # Register configurable natural handler
     poller.register(
@@ -298,7 +308,9 @@ def _build_dispatch() -> None:
     _DISPATCH[f"{NAMESPACE}.AdminBoundary"] = _make_configurable_admin_handler("AdminBoundary")
     for facet_name, natural_types in NATURAL_FACETS.items():
         _DISPATCH[f"{NAMESPACE}.{facet_name}"] = _make_natural_handler(facet_name, natural_types)
-    _DISPATCH[f"{NAMESPACE}.NaturalBoundary"] = _make_configurable_natural_handler("NaturalBoundary")
+    _DISPATCH[f"{NAMESPACE}.NaturalBoundary"] = _make_configurable_natural_handler(
+        "NaturalBoundary"
+    )
 
 
 _build_dispatch()

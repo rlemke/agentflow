@@ -16,59 +16,100 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Population", "declarations": [
-                    _ef("ExtractPlacesWithPopulation",
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "place_type", "type": "String"},
-                         {"name": "min_population", "type": "Long"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                    _ef("FilterByPopulation",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "min_population", "type": "Long"},
-                         {"name": "place_type", "type": "String"},
-                         {"name": "operator", "type": "String"}],
-                        [{"name": "result", "type": "PopulationFilterResult"}]),
-                    _ef("PopulationStatistics",
-                        [{"name": "input_path", "type": "String"},
-                         {"name": "place_type", "type": "String"}],
-                        [{"name": "stats", "type": "PopulationStats"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Population",
+                            "declarations": [
+                                _ef(
+                                    "ExtractPlacesWithPopulation",
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "place_type", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                                _ef(
+                                    "FilterByPopulation",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "min_population", "type": "Long"},
+                                        {"name": "place_type", "type": "String"},
+                                        {"name": "operator", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "PopulationFilterResult"}],
+                                ),
+                                _ef(
+                                    "PopulationStatistics",
+                                    [
+                                        {"name": "input_path", "type": "String"},
+                                        {"name": "place_type", "type": "String"},
+                                    ],
+                                    [{"name": "stats", "type": "PopulationStats"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -242,7 +283,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -250,6 +293,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Nigeria population workflow end-to-end with mock handlers."""
@@ -314,7 +358,7 @@ def main() -> None:
     print(f"  Map output:             {outputs.get('map_path')}")
 
     # Show cities with population bar chart
-    print(f"\n  Cities with population >= 500,000:")
+    print("\n  Cities with population >= 500,000:")
     max_pop = LARGE_CITIES[0]["population"]
     for city in sorted(LARGE_CITIES, key=lambda c: c["population"], reverse=True):
         bar_len = int(40 * city["population"] / max_pop)
@@ -328,11 +372,15 @@ def main() -> None:
         regions.setdefault(state, []).append(city)
 
     print(f"\n  Distribution across {len(regions)} states:")
-    for state in sorted(regions, key=lambda s: sum(c["population"] for c in regions[s]), reverse=True):
+    for state in sorted(
+        regions, key=lambda s: sum(c["population"] for c in regions[s]), reverse=True
+    ):
         cities = regions[state]
         state_pop = sum(c["population"] for c in cities)
         names = ", ".join(c["name"] for c in cities)
-        print(f"    {state:.<20} {state_pop:>11,}  ({len(cities)} {'city' if len(cities) == 1 else 'cities'}: {names})")
+        print(
+            f"    {state:.<20} {state_pop:>11,}  ({len(cities)} {'city' if len(cities) == 1 else 'cities'}: {names})"
+        )
 
     assert result.success
     assert outputs["region_name"] == "Nigeria"

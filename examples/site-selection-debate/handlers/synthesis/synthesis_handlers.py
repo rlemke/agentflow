@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import summarize_round, produce_ranking, generate_report
+from handlers.shared.debate_utils import generate_report, produce_ranking, summarize_round
 
 NAMESPACE = "ssd.Synthesis"
 
@@ -30,7 +30,12 @@ def handle_summarize_round(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Summarized round {round_num}: {len(key_arguments)} key arguments", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Summarized round {round_num}: {len(key_arguments)} key arguments",
+                "level": "success",
+            }
+        )
 
     return {"synthesis": synthesis, "key_arguments": key_arguments}
 
@@ -53,7 +58,9 @@ def handle_produce_ranking(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Produced ranking: top={top}, confidence={confidence}", "level": "success"})
+        step_log.append(
+            {"message": f"Produced ranking: top={top}, confidence={confidence}", "level": "success"}
+        )
 
     return {"ranked": ranked, "top_candidate": top, "confidence": confidence}
 

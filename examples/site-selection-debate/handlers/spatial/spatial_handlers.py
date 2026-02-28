@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.debate_utils import score_candidate, rank_candidates, compute_accessibility
+from handlers.shared.debate_utils import compute_accessibility, rank_candidates, score_candidate
 
 NAMESPACE = "ssd.Spatial"
 
@@ -29,7 +29,12 @@ def handle_score_candidate(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Scored candidate '{candidate_id}': {result['overall_score']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Scored candidate '{candidate_id}': {result['overall_score']}",
+                "level": "success",
+            }
+        )
 
     return {"score": result}
 
@@ -50,7 +55,9 @@ def handle_rank_candidates(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Ranked {len(ranked)} candidates, top: {top}", "level": "success"})
+        step_log.append(
+            {"message": f"Ranked {len(ranked)} candidates, top: {top}", "level": "success"}
+        )
 
     return {"ranked": ranked, "top_candidate": top}
 
@@ -66,7 +73,12 @@ def handle_compute_accessibility(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Computed accessibility for '{candidate_id}': walk_score={result['walk_score']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Computed accessibility for '{candidate_id}': walk_score={result['walk_score']}",
+                "level": "success",
+            }
+        )
 
     return {"metrics": result}
 

@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from afl.runtime.entities import HandlerRegistration, RunnerDefinition, ServerDefinition
@@ -210,7 +210,7 @@ def compute_step_progress(runner: RunnerDefinition, steps: list) -> dict:
     }
 
 
-def search_all(query: str, store: object) -> list[dict]:
+def search_all(query: str, store: Any) -> list[dict]:
     """Search across workflows (runners), flows, servers, and handlers.
 
     Returns a list of dicts:
@@ -228,12 +228,14 @@ def search_all(query: str, store: object) -> list[dict]:
         for r in runners:
             name = r.workflow.name if r.workflow else r.uuid
             if q in name.lower():
-                results.append({
-                    "name": name,
-                    "type": "workflow",
-                    "href": f"/v2/workflows/{r.uuid}",
-                    "icon": "&#x25B6;",
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "type": "workflow",
+                        "href": f"/v2/workflows/{r.uuid}",
+                        "icon": "&#x25B6;",
+                    }
+                )
     except Exception:
         pass
 
@@ -243,12 +245,14 @@ def search_all(query: str, store: object) -> list[dict]:
         for f in flows:
             name = f.name.name if hasattr(f.name, "name") else str(f.name)
             if q in name.lower():
-                results.append({
-                    "name": name,
-                    "type": "flow",
-                    "href": f"/flows/{f.uuid}",
-                    "icon": "&#x2B22;",
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "type": "flow",
+                        "href": f"/flows/{f.uuid}",
+                        "icon": "&#x2B22;",
+                    }
+                )
     except Exception:
         pass
 
@@ -258,12 +262,14 @@ def search_all(query: str, store: object) -> list[dict]:
         for s in servers:
             name = getattr(s, "server_group", "") or s.uuid
             if q in name.lower() or q in s.uuid.lower():
-                results.append({
-                    "name": f"{name} ({s.uuid[:8]})",
-                    "type": "server",
-                    "href": f"/v2/servers/{s.uuid}",
-                    "icon": "&#x2699;",
-                })
+                results.append(
+                    {
+                        "name": f"{name} ({s.uuid[:8]})",
+                        "type": "server",
+                        "href": f"/v2/servers/{s.uuid}",
+                        "icon": "&#x2699;",
+                    }
+                )
     except Exception:
         pass
 
@@ -272,12 +278,14 @@ def search_all(query: str, store: object) -> list[dict]:
         handlers = store.list_handler_registrations()
         for h in handlers:
             if q in h.facet_name.lower():
-                results.append({
-                    "name": h.facet_name,
-                    "type": "handler",
-                    "href": f"/v2/handlers/{h.facet_name}",
-                    "icon": "&#x26A1;",
-                })
+                results.append(
+                    {
+                        "name": h.facet_name,
+                        "type": "handler",
+                        "href": f"/v2/handlers/{h.facet_name}",
+                        "icon": "&#x26A1;",
+                    }
+                )
     except Exception:
         pass
 

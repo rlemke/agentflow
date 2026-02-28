@@ -10,7 +10,6 @@ these stubs provide synthetic fallback for testing.
 from __future__ import annotations
 
 import hashlib
-import json
 from typing import Any
 
 
@@ -37,11 +36,13 @@ def frame_debate(topic: str, num_agents: int = 3) -> dict[str, Any]:
     positions = []
     for i in range(num_agents):
         stance = _STANCES[i % len(_STANCES)]
-        positions.append({
-            "stance": stance,
-            "rationale": f"Position {i} on '{topic}': {stance} (hash: {h[i*2:i*2+4]})",
-            "priority": num_agents - i,
-        })
+        positions.append(
+            {
+                "stance": stance,
+                "rationale": f"Position {i} on '{topic}': {stance} (hash: {h[i * 2 : i * 2 + 4]})",
+                "priority": num_agents - i,
+            }
+        )
     return {
         "topic_analysis": f"Analysis of '{topic}': {num_agents} positions identified covering {', '.join(s['stance'] for s in positions)}",
         "positions": positions,
@@ -55,13 +56,15 @@ def assign_roles(topic_analysis: str, positions: list[dict[str, Any]]) -> list[d
     for i, pos in enumerate(positions):
         persona = _PERSONAS[i % len(_PERSONAS)]
         seed = f"{topic_analysis}_{i}"
-        assignments.append({
-            "persona": persona,
-            "expertise": ["advocacy", "analysis", "integration"][i % 3],
-            "position": pos.get("stance", "neutral"),
-            "agent_id": f"agent_{i}",
-            "seed": hashlib.md5(seed.encode()).hexdigest()[:8],
-        })
+        assignments.append(
+            {
+                "persona": persona,
+                "expertise": ["advocacy", "analysis", "integration"][i % 3],
+                "position": pos.get("stance", "neutral"),
+                "agent_id": f"agent_{i}",
+                "seed": hashlib.md5(seed.encode()).hexdigest()[:8],
+            }
+        )
     return assignments
 
 
@@ -72,8 +75,7 @@ def generate_argument(role: dict[str, Any], topic: str, context: str = "") -> di
     seed = f"{persona}_{topic}_{context}"
     confidence = round(_hash_float(seed, 0.4, 0.95), 2)
     claims = [
-        f"Claim {i} by {persona}: {topic} supports {position} (seed: {seed[:12]})"
-        for i in range(3)
+        f"Claim {i} by {persona}: {topic} supports {position} (seed: {seed[:12]})" for i in range(3)
     ]
     evidence = [
         f"Evidence {i}: empirical data supports claim {i} (hash: {hashlib.md5(f'{seed}_{i}'.encode()).hexdigest()[:6]})"
@@ -108,7 +110,7 @@ def generate_rebuttal(role: dict[str, Any], arguments: list[dict[str, Any]]) -> 
         for i in range(min(len(arguments), 2))
     ]
     if not weaknesses:
-        weaknesses = [f"Weakness: no opposing arguments provided"]
+        weaknesses = ["Weakness: no opposing arguments provided"]
     return {
         "agent_role": persona,
         "target_role": target_role,
@@ -130,13 +132,15 @@ def score_arguments(
         evidence_quality = _hash_int(f"{seed}_evidence", 35, 90)
         persuasiveness = _hash_int(f"{seed}_persuasion", 30, 95)
         overall = (clarity + evidence_quality + persuasiveness) // 3
-        scores.append({
-            "agent_role": agent_role,
-            "clarity": clarity,
-            "evidence_quality": evidence_quality,
-            "persuasiveness": persuasiveness,
-            "overall": overall,
-        })
+        scores.append(
+            {
+                "agent_role": agent_role,
+                "clarity": clarity,
+                "evidence_quality": evidence_quality,
+                "persuasiveness": persuasiveness,
+                "overall": overall,
+            }
+        )
     return scores
 
 
@@ -164,7 +168,8 @@ def judge_debate(topic: str, synthesis: str, scores: list[dict[str, Any]]) -> di
     dissenting = [
         f"Dissent: {s.get('agent_role', '?')} scored within 10 points"
         for s in scores
-        if isinstance(s, dict) and s.get("agent_role") != winner
+        if isinstance(s, dict)
+        and s.get("agent_role") != winner
         and abs(s.get("overall", 0) - best.get("overall", 0)) <= 10
     ]
     return {
@@ -206,17 +211,15 @@ def synthesize_positions(
     return synthesis, themes
 
 
-def build_consensus(
-    verdict: dict[str, Any], synthesis: str, themes: list[Any]
-) -> dict[str, Any]:
+def build_consensus(verdict: dict[str, Any], synthesis: str, themes: list[Any]) -> dict[str, Any]:
     """Build a consensus result from the verdict and synthesis."""
     winner = verdict.get("winner", "unknown") if isinstance(verdict, dict) else "unknown"
     margin = verdict.get("margin", 0.0) if isinstance(verdict, dict) else 0.0
     seed = f"{winner}_{len(themes)}"
     agreement_level = round(_hash_float(seed, 0.2, 0.9), 2)
     common_ground = [
-        f"All agents agree on the importance of evidence-based claims",
-        f"Shared recognition of complexity in the debate topic",
+        "All agents agree on the importance of evidence-based claims",
+        "Shared recognition of complexity in the debate topic",
     ]
     if agreement_level > 0.6:
         common_ground.append("Convergence on key policy recommendations")

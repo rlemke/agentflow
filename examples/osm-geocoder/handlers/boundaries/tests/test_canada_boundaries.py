@@ -15,50 +15,83 @@ Uses mock handlers (no network calls). Run from the repo root:
 from afl import emit_dict, parse
 from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
 
-
 # ---------------------------------------------------------------------------
 # Program AST - declares the event facets the runtime needs to recognise.
 # Uses nested Namespace nodes so the evaluator can resolve qualified names.
 # ---------------------------------------------------------------------------
 
+
 def _ef(name: str, params: list[dict], returns: list[dict]) -> dict:
     """Shorthand for an EventFacetDecl node."""
-    return {"type": "EventFacetDecl", "name": name,
-            "params": params, "returns": returns}
+    return {"type": "EventFacetDecl", "name": name, "params": params, "returns": returns}
 
 
 PROGRAM_AST = {
     "type": "Program",
     "declarations": [
-        {"type": "Namespace", "name": "osm", "declarations": [
-            {"type": "Namespace", "name": "geo", "declarations": [
-                {"type": "Namespace", "name": "Region", "declarations": [
-                    _ef("ResolveRegion",
-                        [{"name": "name", "type": "String"},
-                         {"name": "prefer_continent", "type": "String"}],
-                        [{"name": "cache", "type": "OSMCache"},
-                         {"name": "resolution", "type": "RegionResolution"}]),
-                ]},
-                {"type": "Namespace", "name": "Boundaries", "declarations": [
-                    _ef("StateBoundaries",
-                        [{"name": "cache", "type": "OSMCache"}],
-                        [{"name": "result", "type": "BoundaryResult"}]),
-                    _ef("LakeBoundaries",
-                        [{"name": "cache", "type": "OSMCache"}],
-                        [{"name": "result", "type": "BoundaryResult"}]),
-                ]},
-                {"type": "Namespace", "name": "Visualization", "declarations": [
-                    _ef("RenderMap",
-                        [{"name": "geojson_path", "type": "String"},
-                         {"name": "title", "type": "String"},
-                         {"name": "format", "type": "String"},
-                         {"name": "width", "type": "Long"},
-                         {"name": "height", "type": "Long"},
-                         {"name": "color", "type": "String"}],
-                        [{"name": "result", "type": "MapResult"}]),
-                ]},
-            ]},
-        ]},
+        {
+            "type": "Namespace",
+            "name": "osm",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "geo",
+                    "declarations": [
+                        {
+                            "type": "Namespace",
+                            "name": "Region",
+                            "declarations": [
+                                _ef(
+                                    "ResolveRegion",
+                                    [
+                                        {"name": "name", "type": "String"},
+                                        {"name": "prefer_continent", "type": "String"},
+                                    ],
+                                    [
+                                        {"name": "cache", "type": "OSMCache"},
+                                        {"name": "resolution", "type": "RegionResolution"},
+                                    ],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Boundaries",
+                            "declarations": [
+                                _ef(
+                                    "StateBoundaries",
+                                    [{"name": "cache", "type": "OSMCache"}],
+                                    [{"name": "result", "type": "BoundaryResult"}],
+                                ),
+                                _ef(
+                                    "LakeBoundaries",
+                                    [{"name": "cache", "type": "OSMCache"}],
+                                    [{"name": "result", "type": "BoundaryResult"}],
+                                ),
+                            ],
+                        },
+                        {
+                            "type": "Namespace",
+                            "name": "Visualization",
+                            "declarations": [
+                                _ef(
+                                    "RenderMap",
+                                    [
+                                        {"name": "geojson_path", "type": "String"},
+                                        {"name": "title", "type": "String"},
+                                        {"name": "format", "type": "String"},
+                                        {"name": "width", "type": "Long"},
+                                        {"name": "height", "type": "Long"},
+                                        {"name": "color", "type": "String"},
+                                    ],
+                                    [{"name": "result", "type": "MapResult"}],
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 }
 
@@ -112,59 +145,112 @@ def compile_workflow() -> dict:
 # ---------------------------------------------------------------------------
 
 PROVINCES = [
-    {"name": "Ontario", "capital": "Toronto", "area_km2": 1076395,
-     "pop_2021": 14223942, "abbrev": "ON"},
-    {"name": "Quebec", "capital": "Quebec City", "area_km2": 1542056,
-     "pop_2021": 8501833, "abbrev": "QC"},
-    {"name": "British Columbia", "capital": "Victoria", "area_km2": 944735,
-     "pop_2021": 5000879, "abbrev": "BC"},
-    {"name": "Alberta", "capital": "Edmonton", "area_km2": 661848,
-     "pop_2021": 4262635, "abbrev": "AB"},
-    {"name": "Manitoba", "capital": "Winnipeg", "area_km2": 647797,
-     "pop_2021": 1342153, "abbrev": "MB"},
-    {"name": "Saskatchewan", "capital": "Regina", "area_km2": 651036,
-     "pop_2021": 1132505, "abbrev": "SK"},
-    {"name": "Nova Scotia", "capital": "Halifax", "area_km2": 55284,
-     "pop_2021": 969383, "abbrev": "NS"},
-    {"name": "New Brunswick", "capital": "Fredericton", "area_km2": 72908,
-     "pop_2021": 775610, "abbrev": "NB"},
-    {"name": "Newfoundland and Labrador", "capital": "St. John's", "area_km2": 405212,
-     "pop_2021": 510550, "abbrev": "NL"},
-    {"name": "Prince Edward Island", "capital": "Charlottetown", "area_km2": 5660,
-     "pop_2021": 154331, "abbrev": "PE"},
-    {"name": "Northwest Territories", "capital": "Yellowknife", "area_km2": 1346106,
-     "pop_2021": 41070, "abbrev": "NT"},
-    {"name": "Yukon", "capital": "Whitehorse", "area_km2": 482443,
-     "pop_2021": 40232, "abbrev": "YT"},
-    {"name": "Nunavut", "capital": "Iqaluit", "area_km2": 2093190,
-     "pop_2021": 36858, "abbrev": "NU"},
+    {
+        "name": "Ontario",
+        "capital": "Toronto",
+        "area_km2": 1076395,
+        "pop_2021": 14223942,
+        "abbrev": "ON",
+    },
+    {
+        "name": "Quebec",
+        "capital": "Quebec City",
+        "area_km2": 1542056,
+        "pop_2021": 8501833,
+        "abbrev": "QC",
+    },
+    {
+        "name": "British Columbia",
+        "capital": "Victoria",
+        "area_km2": 944735,
+        "pop_2021": 5000879,
+        "abbrev": "BC",
+    },
+    {
+        "name": "Alberta",
+        "capital": "Edmonton",
+        "area_km2": 661848,
+        "pop_2021": 4262635,
+        "abbrev": "AB",
+    },
+    {
+        "name": "Manitoba",
+        "capital": "Winnipeg",
+        "area_km2": 647797,
+        "pop_2021": 1342153,
+        "abbrev": "MB",
+    },
+    {
+        "name": "Saskatchewan",
+        "capital": "Regina",
+        "area_km2": 651036,
+        "pop_2021": 1132505,
+        "abbrev": "SK",
+    },
+    {
+        "name": "Nova Scotia",
+        "capital": "Halifax",
+        "area_km2": 55284,
+        "pop_2021": 969383,
+        "abbrev": "NS",
+    },
+    {
+        "name": "New Brunswick",
+        "capital": "Fredericton",
+        "area_km2": 72908,
+        "pop_2021": 775610,
+        "abbrev": "NB",
+    },
+    {
+        "name": "Newfoundland and Labrador",
+        "capital": "St. John's",
+        "area_km2": 405212,
+        "pop_2021": 510550,
+        "abbrev": "NL",
+    },
+    {
+        "name": "Prince Edward Island",
+        "capital": "Charlottetown",
+        "area_km2": 5660,
+        "pop_2021": 154331,
+        "abbrev": "PE",
+    },
+    {
+        "name": "Northwest Territories",
+        "capital": "Yellowknife",
+        "area_km2": 1346106,
+        "pop_2021": 41070,
+        "abbrev": "NT",
+    },
+    {
+        "name": "Yukon",
+        "capital": "Whitehorse",
+        "area_km2": 482443,
+        "pop_2021": 40232,
+        "abbrev": "YT",
+    },
+    {
+        "name": "Nunavut",
+        "capital": "Iqaluit",
+        "area_km2": 2093190,
+        "pop_2021": 36858,
+        "abbrev": "NU",
+    },
 ]
 
 LAKES = [
-    {"name": "Lake Superior", "area_km2": 82100, "shared_with": "USA",
-     "provinces": "ON"},
-    {"name": "Lake Huron", "area_km2": 59600, "shared_with": "USA",
-     "provinces": "ON"},
-    {"name": "Great Bear Lake", "area_km2": 31153, "shared_with": "-",
-     "provinces": "NT"},
-    {"name": "Great Slave Lake", "area_km2": 28568, "shared_with": "-",
-     "provinces": "NT"},
-    {"name": "Lake Erie", "area_km2": 25700, "shared_with": "USA",
-     "provinces": "ON"},
-    {"name": "Lake Winnipeg", "area_km2": 24514, "shared_with": "-",
-     "provinces": "MB"},
-    {"name": "Lake Ontario", "area_km2": 19009, "shared_with": "USA",
-     "provinces": "ON"},
-    {"name": "Lake Athabasca", "area_km2": 7935, "shared_with": "-",
-     "provinces": "AB/SK"},
-    {"name": "Reindeer Lake", "area_km2": 6650, "shared_with": "-",
-     "provinces": "MB/SK"},
-    {"name": "Nettilling Lake", "area_km2": 5542, "shared_with": "-",
-     "provinces": "NU"},
-    {"name": "Lake Winnipegosis", "area_km2": 5374, "shared_with": "-",
-     "provinces": "MB"},
-    {"name": "Lake Nipigon", "area_km2": 4848, "shared_with": "-",
-     "provinces": "ON"},
+    {"name": "Lake Superior", "area_km2": 82100, "shared_with": "USA", "provinces": "ON"},
+    {"name": "Lake Huron", "area_km2": 59600, "shared_with": "USA", "provinces": "ON"},
+    {"name": "Great Bear Lake", "area_km2": 31153, "shared_with": "-", "provinces": "NT"},
+    {"name": "Great Slave Lake", "area_km2": 28568, "shared_with": "-", "provinces": "NT"},
+    {"name": "Lake Erie", "area_km2": 25700, "shared_with": "USA", "provinces": "ON"},
+    {"name": "Lake Winnipeg", "area_km2": 24514, "shared_with": "-", "provinces": "MB"},
+    {"name": "Lake Ontario", "area_km2": 19009, "shared_with": "USA", "provinces": "ON"},
+    {"name": "Lake Athabasca", "area_km2": 7935, "shared_with": "-", "provinces": "AB/SK"},
+    {"name": "Reindeer Lake", "area_km2": 6650, "shared_with": "-", "provinces": "MB/SK"},
+    {"name": "Nettilling Lake", "area_km2": 5542, "shared_with": "-", "provinces": "NU"},
+    {"name": "Lake Winnipegosis", "area_km2": 5374, "shared_with": "-", "provinces": "MB"},
+    {"name": "Lake Nipigon", "area_km2": 4848, "shared_with": "-", "provinces": "ON"},
 ]
 
 MOCK_HANDLERS = {
@@ -226,7 +312,9 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
     """
     for step in store._steps.values():
         if step.workflow_id == workflow_id and step.state == "state.EventTransmit":
-            short = step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            short = (
+                step.facet_name.rsplit(".", 1)[-1] if "." in step.facet_name else step.facet_name
+            )
             return step.id, short
     return None
 
@@ -234,6 +322,7 @@ def find_event_blocked_step(store: MemoryStore, workflow_id: str) -> tuple[str, 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the Canada boundaries workflow end-to-end with mock handlers."""
@@ -298,20 +387,24 @@ def main() -> None:
     # Show provinces and territories
     total_area = sum(p["area_km2"] for p in PROVINCES)
     total_pop = sum(p["pop_2021"] for p in PROVINCES)
-    print(f"\n  Provinces and Territories (10 provinces + 3 territories):")
+    print("\n  Provinces and Territories (10 provinces + 3 territories):")
     print(f"  {'Name':<30} {'Abbrev':<8} {'Capital':<16} {'Area (km2)':>12} {'Pop. 2021':>12}")
-    print(f"  {'-'*30} {'-'*6}  {'-'*14}  {'-'*12} {'-'*12}")
+    print(f"  {'-' * 30} {'-' * 6}  {'-' * 14}  {'-' * 12} {'-' * 12}")
     for prov in sorted(PROVINCES, key=lambda p: p["pop_2021"], reverse=True):
-        print(f"  {prov['name']:<30} {prov['abbrev']:<8} {prov['capital']:<16} {prov['area_km2']:>10,}   {prov['pop_2021']:>10,}")
-    print(f"  {'-'*30} {'-'*6}  {'-'*14}  {'-'*12} {'-'*12}")
+        print(
+            f"  {prov['name']:<30} {prov['abbrev']:<8} {prov['capital']:<16} {prov['area_km2']:>10,}   {prov['pop_2021']:>10,}"
+        )
+    print(f"  {'-' * 30} {'-' * 6}  {'-' * 14}  {'-' * 12} {'-' * 12}")
     print(f"  {'Total':<30} {'':8} {'':16} {total_area:>10,}   {total_pop:>10,}")
 
     # Show major lakes
     total_lake_area = sum(lk["area_km2"] for lk in LAKES)
     print(f"\n  Major Lakes ({len(LAKES)} lakes, {total_lake_area:,} km2 total):")
-    for lake in sorted(LAKES, key=lambda l: l["area_km2"], reverse=True):
+    for lake in sorted(LAKES, key=lambda lk: lk["area_km2"], reverse=True):
         shared = f"(shared w/ {lake['shared_with']})" if lake["shared_with"] != "-" else ""
-        print(f"    {lake['name']:.<30} {lake['area_km2']:>7,} km2  {lake['provinces']:<6} {shared}")
+        print(
+            f"    {lake['name']:.<30} {lake['area_km2']:>7,} km2  {lake['provinces']:<6} {shared}"
+        )
 
     assert result.success
     assert outputs["region_name"] == "Canada"

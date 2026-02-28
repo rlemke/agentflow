@@ -25,13 +25,14 @@ def handle_score_counties(params: dict[str, Any]) -> dict[str, Any]:
     step_log = params.get("_step_log")
 
     try:
-        result = score_counties(demographics_path, restaurants_path,
-                                state_fips)
+        result = score_counties(demographics_path, restaurants_path, state_fips)
         if step_log:
-            step_log(f"ScoreCounties: state={state_fips} "
-                     f"counties={result['county_count']} "
-                     f"top={result['top_county']} ({result['top_score']:.2f})",
-                     level="success")
+            step_log(
+                f"ScoreCounties: state={state_fips} "
+                f"counties={result['county_count']} "
+                f"top={result['top_county']} ({result['top_score']:.2f})",
+                level="success",
+            )
         return {"result": result}
     except Exception as exc:
         if step_log:

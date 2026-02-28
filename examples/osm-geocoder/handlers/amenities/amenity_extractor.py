@@ -7,7 +7,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 try:
     import osmium
+
     HAS_OSMIUM = True
 except ImportError:
     HAS_OSMIUM = False
@@ -42,14 +43,25 @@ class AmenityCategory(Enum):
     def from_string(cls, value: str) -> "AmenityCategory":
         normalized = value.lower().strip()
         aliases = {
-            "food": cls.FOOD, "food_and_drink": cls.FOOD, "restaurant": cls.FOOD,
-            "shopping": cls.SHOPPING, "shop": cls.SHOPPING, "retail": cls.SHOPPING,
-            "services": cls.SERVICES, "service": cls.SERVICES,
-            "healthcare": cls.HEALTHCARE, "health": cls.HEALTHCARE, "medical": cls.HEALTHCARE,
-            "education": cls.EDUCATION, "school": cls.EDUCATION,
-            "entertainment": cls.ENTERTAINMENT, "leisure": cls.ENTERTAINMENT,
-            "transport": cls.TRANSPORT, "transportation": cls.TRANSPORT,
-            "all": cls.ALL, "*": cls.ALL,
+            "food": cls.FOOD,
+            "food_and_drink": cls.FOOD,
+            "restaurant": cls.FOOD,
+            "shopping": cls.SHOPPING,
+            "shop": cls.SHOPPING,
+            "retail": cls.SHOPPING,
+            "services": cls.SERVICES,
+            "service": cls.SERVICES,
+            "healthcare": cls.HEALTHCARE,
+            "health": cls.HEALTHCARE,
+            "medical": cls.HEALTHCARE,
+            "education": cls.EDUCATION,
+            "school": cls.EDUCATION,
+            "entertainment": cls.ENTERTAINMENT,
+            "leisure": cls.ENTERTAINMENT,
+            "transport": cls.TRANSPORT,
+            "transportation": cls.TRANSPORT,
+            "all": cls.ALL,
+            "*": cls.ALL,
         }
         if normalized in aliases:
             return aliases[normalized]
@@ -102,8 +114,25 @@ AMENITY_CATEGORIES = {
 }
 
 # Specific amenity types for typed handlers
-FOOD_AMENITIES = {"restaurant", "cafe", "bar", "pub", "fast_food", "food_court", "ice_cream", "biergarten"}
-SHOPPING_TAGS = {"supermarket", "convenience", "mall", "department_store", "clothes", "shoes", "electronics"}
+FOOD_AMENITIES = {
+    "restaurant",
+    "cafe",
+    "bar",
+    "pub",
+    "fast_food",
+    "food_court",
+    "ice_cream",
+    "biergarten",
+}
+SHOPPING_TAGS = {
+    "supermarket",
+    "convenience",
+    "mall",
+    "department_store",
+    "clothes",
+    "shoes",
+    "electronics",
+}
 HEALTHCARE_AMENITIES = {"hospital", "clinic", "doctors", "dentist", "pharmacy", "veterinary"}
 EDUCATION_AMENITIES = {"school", "university", "college", "library", "kindergarten"}
 ENTERTAINMENT_AMENITIES = {"cinema", "theatre", "nightclub", "casino", "arts_centre"}
@@ -201,28 +230,43 @@ class AmenityHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         if not self._matches(tags):
             return
 
-        self.features.append({
-            "type": "Feature",
-            "properties": {
-                "osm_id": n.id,
-                "osm_type": "node",
-                "amenity": tags.get("amenity", ""),
-                "shop": tags.get("shop", ""),
-                "category": classify_amenity(tags),
-                "name": tags.get("name", ""),
-                "opening_hours": tags.get("opening_hours", ""),
-                "phone": tags.get("phone", ""),
-                "website": tags.get("website", ""),
-                "cuisine": tags.get("cuisine", ""),
-                "brand": tags.get("brand", ""),
-                **{k: v for k, v in tags.items()
-                   if k not in ("amenity", "shop", "name", "opening_hours", "phone", "website", "cuisine", "brand")},
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [n.location.lon, n.location.lat],
-            },
-        })
+        self.features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "osm_id": n.id,
+                    "osm_type": "node",
+                    "amenity": tags.get("amenity", ""),
+                    "shop": tags.get("shop", ""),
+                    "category": classify_amenity(tags),
+                    "name": tags.get("name", ""),
+                    "opening_hours": tags.get("opening_hours", ""),
+                    "phone": tags.get("phone", ""),
+                    "website": tags.get("website", ""),
+                    "cuisine": tags.get("cuisine", ""),
+                    "brand": tags.get("brand", ""),
+                    **{
+                        k: v
+                        for k, v in tags.items()
+                        if k
+                        not in (
+                            "amenity",
+                            "shop",
+                            "name",
+                            "opening_hours",
+                            "phone",
+                            "website",
+                            "cuisine",
+                            "brand",
+                        )
+                    },
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [n.location.lon, n.location.lat],
+                },
+            }
+        )
 
 
 def extract_amenities(
@@ -262,7 +306,7 @@ def extract_amenities(
         feature_count=len(handler.features),
         amenity_category=category.value,
         amenity_types=types_str,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -318,8 +362,9 @@ def calculate_amenity_stats(input_path: str | Path) -> AmenityStats:
     )
 
 
-def search_amenities(input_path: str | Path, name_pattern: str,
-                     output_path: str | Path | None = None) -> AmenityResult:
+def search_amenities(
+    input_path: str | Path, name_pattern: str, output_path: str | Path | None = None
+) -> AmenityResult:
     """Search amenities by name pattern."""
     input_path = str(input_path)
 
@@ -336,6 +381,7 @@ def search_amenities(input_path: str | Path, name_pattern: str,
 
     if output_path is None:
         import posixpath
+
         _dir = posixpath.dirname(input_path)
         output_path_str = f"{_dir}/{uri_stem(input_path)}_search.geojson"
     else:
@@ -350,5 +396,5 @@ def search_amenities(input_path: str | Path, name_pattern: str,
         feature_count=len(filtered),
         amenity_category="search",
         amenity_types=name_pattern,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )

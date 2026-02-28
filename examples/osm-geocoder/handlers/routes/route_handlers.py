@@ -5,13 +5,12 @@ Handles route extraction events defined in osmroutes.afl under osm.geo.Routes.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .route_extractor import (
     HAS_OSMIUM,
     RouteResult,
     RouteStats,
-    RouteType,
     calculate_route_stats,
     extract_routes,
     filter_routes_by_type,
@@ -37,7 +36,11 @@ def _make_extract_routes_handler(facet_name: str):
             step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
         log.info(
             "%s extracting %s routes from %s (network=%s, infra=%s)",
-            facet_name, route_type, pbf_path, network, include_infrastructure
+            facet_name,
+            route_type,
+            pbf_path,
+            network,
+            include_infrastructure,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -51,7 +54,10 @@ def _make_extract_routes_handler(facet_name: str):
                 include_infrastructure=include_infrastructure,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {route_type} routes", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {route_type} routes",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract routes: %s", e)
@@ -73,7 +79,10 @@ def _make_filter_routes_handler(facet_name: str):
             step_log(f"{facet_name}: filtering {input_path} for {route_type} routes")
         log.info(
             "%s filtering %s for %s routes (network=%s)",
-            facet_name, input_path, route_type, network
+            facet_name,
+            input_path,
+            route_type,
+            network,
         )
 
         if not input_path:
@@ -86,7 +95,10 @@ def _make_filter_routes_handler(facet_name: str):
                 network=network,
             )
             if step_log:
-                step_log(f"{facet_name}: filtered to {result.feature_count} {route_type} routes", level="success")
+                step_log(
+                    f"{facet_name}: filtered to {result.feature_count} {route_type} routes",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter routes: %s", e)
@@ -112,7 +124,10 @@ def _make_route_stats_handler(facet_name: str):
         try:
             stats = calculate_route_stats(input_path)
             if step_log:
-                step_log(f"{facet_name}: {stats.route_count} routes, {stats.total_length_km:.1f} km", level="success")
+                step_log(
+                    f"{facet_name}: {stats.route_count} routes, {stats.total_length_km:.1f} km",
+                    level="success",
+                )
             return {"stats": _stats_to_dict(stats)}
         except Exception as e:
             log.error("Failed to calculate stats: %s", e)
@@ -135,7 +150,10 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
             step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
         log.info(
             "%s extracting from %s (network=%s, infra=%s)",
-            facet_name, pbf_path, network, include_infrastructure
+            facet_name,
+            pbf_path,
+            network,
+            include_infrastructure,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -149,7 +167,10 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
                 include_infrastructure=include_infrastructure,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {route_type} routes", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {route_type} routes",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract %s routes: %s", route_type, e)
@@ -180,7 +201,10 @@ def _make_public_transport_handler(facet_name: str):
                 include_infrastructure=True,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} public transport routes", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} public transport routes",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract public transport: %s", e)
@@ -221,7 +245,7 @@ def _empty_result(route_type: str, network: str, include_infra: bool) -> dict:
         "network_level": network,
         "include_infrastructure": include_infra,
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

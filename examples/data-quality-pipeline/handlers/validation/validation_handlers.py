@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.quality_utils import validate_completeness, validate_accuracy
+from handlers.shared.quality_utils import validate_accuracy, validate_completeness
 
 NAMESPACE = "dq.Validation"
 

@@ -80,7 +80,7 @@ def _run_maven_plugin_handler(payload: dict) -> dict[str, Any]:
     plugin_version = payload.get("plugin_version", "3.11.0")
     goal = payload.get("goal", "compile")
     phase = payload.get("phase", "") or _default_phase(goal)
-    properties = payload.get("properties", "")
+    _properties = payload.get("properties", "")
 
     plugin_key = f"{plugin_group_id}:{plugin_artifact_id}:{plugin_version}"
 

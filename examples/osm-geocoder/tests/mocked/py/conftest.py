@@ -4,7 +4,6 @@ Adds the osm-geocoder example root to sys.path so that
 ``from handlers.xxx import ...`` works from the new test location.
 """
 
-import importlib
 import os
 import sys
 

@@ -12,19 +12,14 @@ Run with:
     pytest examples/osm-geocoder/tests/real/py/test_osm_handlers_hdfs.py --hdfs -v
 """
 
-import os
-from unittest.mock import patch
-
 import pytest
 
 from afl.runtime.storage import (
     HDFSStorageBackend,
     LocalStorageBackend,
-    _hdfs_backends,
-    _local_backend,
     get_storage_backend,
 )
-from tests.hdfs_helpers import WebHDFSClient, hdfs, workdir  # noqa: F401
+from tests.hdfs_helpers import WebHDFSClient, hdfs, workdir  # noqa: F401, F811
 
 # Skip entire module unless --hdfs is passed
 pytestmark = pytest.mark.skipif("not config.getoption('--hdfs')")

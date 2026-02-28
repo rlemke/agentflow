@@ -19,10 +19,14 @@ ACS_TABLES: dict[str, dict] = {
     "B01003": {"label": "Total Population", "columns": ["B01003_001E"]},
     "B19013": {"label": "Median Household Income", "columns": ["B19013_001E"]},
     "B25001": {"label": "Housing Units", "columns": ["B25001_001E"]},
-    "B15003": {"label": "Educational Attainment", "columns": [
-        "B15003_001E", "B15003_022E", "B15003_023E", "B15003_024E", "B15003_025E"]},
-    "B08301": {"label": "Means of Transportation", "columns": [
-        "B08301_001E", "B08301_003E", "B08301_010E", "B08301_019E", "B08301_021E"]},
+    "B15003": {
+        "label": "Educational Attainment",
+        "columns": ["B15003_001E", "B15003_022E", "B15003_023E", "B15003_024E", "B15003_025E"],
+    },
+    "B08301": {
+        "label": "Means of Transportation",
+        "columns": ["B08301_001E", "B08301_003E", "B08301_010E", "B08301_019E", "B08301_021E"],
+    },
     "B25003": {
         "label": "Housing Tenure",
         "columns": ["B25003_001E", "B25003_002E", "B25003_003E"],
@@ -30,32 +34,52 @@ ACS_TABLES: dict[str, dict] = {
     "B11001": {
         "label": "Household Type",
         "columns": [
-            "B11001_001E", "B11001_002E", "B11001_003E",
-            "B11001_004E", "B11001_005E", "B11001_006E",
-            "B11001_007E", "B11001_008E", "B11001_009E",
+            "B11001_001E",
+            "B11001_002E",
+            "B11001_003E",
+            "B11001_004E",
+            "B11001_005E",
+            "B11001_006E",
+            "B11001_007E",
+            "B11001_008E",
+            "B11001_009E",
         ],
     },
     "B01001": {
         "label": "Sex by Age",
-        "columns": [
-            f"B01001_{i:03d}E" for i in range(1, 50)
-        ],
+        "columns": [f"B01001_{i:03d}E" for i in range(1, 50)],
     },
     "B25044": {
         "label": "Vehicles Available",
         "columns": [
-            "B25044_001E", "B25044_002E", "B25044_003E",
-            "B25044_004E", "B25044_005E", "B25044_006E",
-            "B25044_007E", "B25044_008E", "B25044_009E",
-            "B25044_010E", "B25044_011E", "B25044_012E",
-            "B25044_013E", "B25044_014E", "B25044_015E",
+            "B25044_001E",
+            "B25044_002E",
+            "B25044_003E",
+            "B25044_004E",
+            "B25044_005E",
+            "B25044_006E",
+            "B25044_007E",
+            "B25044_008E",
+            "B25044_009E",
+            "B25044_010E",
+            "B25044_011E",
+            "B25044_012E",
+            "B25044_013E",
+            "B25044_014E",
+            "B25044_015E",
         ],
     },
     "B02001": {
         "label": "Race",
         "columns": [
-            "B02001_001E", "B02001_002E", "B02001_003E", "B02001_004E",
-            "B02001_005E", "B02001_006E", "B02001_007E", "B02001_008E",
+            "B02001_001E",
+            "B02001_002E",
+            "B02001_003E",
+            "B02001_004E",
+            "B02001_005E",
+            "B02001_006E",
+            "B02001_007E",
+            "B02001_008E",
         ],
     },
     "B17001": {
@@ -65,33 +89,36 @@ ACS_TABLES: dict[str, dict] = {
     "B23025": {
         "label": "Employment Status",
         "columns": [
-            "B23025_001E", "B23025_002E", "B23025_003E", "B23025_004E",
-            "B23025_005E", "B23025_006E", "B23025_007E",
+            "B23025_001E",
+            "B23025_002E",
+            "B23025_003E",
+            "B23025_004E",
+            "B23025_005E",
+            "B23025_006E",
+            "B23025_007E",
         ],
     },
 }
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR",
-                             os.path.join(_LOCAL_OUTPUT, "census-output"))
+_OUTPUT_DIR = os.environ.get("AFL_CENSUS_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "census-output"))
 
 
 @dataclass
 class ACSExtractionResult:
     """Result of an ACS table extraction."""
+
     table_id: str
     output_path: str
     record_count: int
     geography_level: str
     year: str
-    extraction_date: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
-                      geo_level: str = "county",
-                      year: str = "2023") -> ACSExtractionResult:
+def extract_acs_table(
+    csv_path: str, table_id: str, state_fips: str, geo_level: str = "county", year: str = "2023"
+) -> ACSExtractionResult:
     """Extract a specific ACS table from a downloaded CSV file.
 
     The CSV is produced by the Census API downloader with columns:
@@ -109,14 +136,12 @@ def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
     """
     table_info = ACS_TABLES.get(table_id)
     if table_info is None:
-        raise ValueError(f"Unknown ACS table: {table_id}. "
-                         f"Supported: {list(ACS_TABLES.keys())}")
+        raise ValueError(f"Unknown ACS table: {table_id}. Supported: {list(ACS_TABLES.keys())}")
 
     target_cols = table_info["columns"]
     output_dir = os.path.join(_OUTPUT_DIR, "acs", table_id.lower())
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_path = os.path.join(output_dir,
-                               f"{state_fips}_{geo_level}_{table_id}.csv")
+    output_path = os.path.join(output_dir, f"{state_fips}_{geo_level}_{table_id}.csv")
 
     records: list[dict[str, Any]] = []
 
@@ -144,8 +169,13 @@ def extract_acs_table(csv_path: str, table_id: str, state_fips: str,
         writer.writeheader()
         writer.writerows(records)
 
-    logger.info("Extracted %d records for %s (state=%s, level=%s)",
-                len(records), table_id, state_fips, geo_level)
+    logger.info(
+        "Extracted %d records for %s (state=%s, level=%s)",
+        len(records),
+        table_id,
+        state_fips,
+        geo_level,
+    )
 
     return ACSExtractionResult(
         table_id=table_id,

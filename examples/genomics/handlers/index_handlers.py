@@ -7,7 +7,8 @@ dict simulating a pre-built aligner index.
 
 import logging
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ def _make_index_handler(aligner: str, reference: str) -> Callable:
                 "total_bases": bases,
             },
         }
+
     return handler
 
 

@@ -1099,9 +1099,7 @@ class TestMultiTurnToolUse:
 class TestIntelligentRetry:
     """Tests for retry when Claude doesn't call target tool."""
 
-    def test_retry_succeeds_on_second_attempt(
-        self, example4_workflow_ast, example4_program_ast
-    ):
+    def test_retry_succeeds_on_second_attempt(self, example4_workflow_ast, example4_program_ast):
         """Retry succeeds when second attempt uses the target tool."""
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
@@ -1134,9 +1132,7 @@ class TestIntelligentRetry:
         assert result.success is True
         assert len(client.messages.calls) == 2
 
-    def test_retry_message_contains_facet_name(
-        self, example4_workflow_ast, example4_program_ast
-    ):
+    def test_retry_message_contains_facet_name(self, example4_workflow_ast, example4_program_ast):
         """Retry message includes the expected facet name."""
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
@@ -1178,9 +1174,7 @@ class TestIntelligentRetry:
                 break
         assert retry_found
 
-    def test_retries_exhausted_returns_empty(
-        self, example4_workflow_ast, example4_program_ast
-    ):
+    def test_retries_exhausted_returns_empty(self, example4_workflow_ast, example4_program_ast):
         """All retries exhausted returns empty dict."""
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
@@ -1256,11 +1250,16 @@ class TestLLMHandler:
 
         handler = LLMHandler(
             anthropic_client=client,
-            tool_definitions=[{
-                "name": "process",
-                "description": "Process input",
-                "input_schema": {"type": "object", "properties": {"result": {"type": "string"}}},
-            }],
+            tool_definitions=[
+                {
+                    "name": "process",
+                    "description": "Process input",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"result": {"type": "string"}},
+                    },
+                }
+            ],
         )
 
         result = handler.handle({"input": "test"})
@@ -1269,18 +1268,18 @@ class TestLLMHandler:
     def test_prompt_interpolation(self):
         """LLMHandler interpolates prompt template with payload."""
         client = MockAnthropicClient()
-        client.messages.set_response(
-            MockResponse([MockToolUseBlock("process", {"output": "ok"})])
-        )
+        client.messages.set_response(MockResponse([MockToolUseBlock("process", {"output": "ok"})]))
 
         handler = LLMHandler(
             anthropic_client=client,
             prompt_template="Process the data: {data} with mode={mode}",
-            tool_definitions=[{
-                "name": "process",
-                "description": "Process",
-                "input_schema": {"type": "object", "properties": {}},
-            }],
+            tool_definitions=[
+                {
+                    "name": "process",
+                    "description": "Process",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
         )
 
         handler.handle({"data": "test_data", "mode": "fast"})
@@ -1292,20 +1291,20 @@ class TestLLMHandler:
     def test_custom_system_prompt(self):
         """LLMHandler uses custom system prompt from config."""
         client = MockAnthropicClient()
-        client.messages.set_response(
-            MockResponse([MockToolUseBlock("process", {})])
-        )
+        client.messages.set_response(MockResponse([MockToolUseBlock("process", {})]))
 
         config = LLMHandlerConfig(system_prompt="You are a specialized counter.")
 
         handler = LLMHandler(
             anthropic_client=client,
             config=config,
-            tool_definitions=[{
-                "name": "process",
-                "description": "Process",
-                "input_schema": {"type": "object", "properties": {}},
-            }],
+            tool_definitions=[
+                {
+                    "name": "process",
+                    "description": "Process",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
         )
 
         handler.handle({"input": "test"})
@@ -1335,11 +1334,13 @@ class TestLLMHandler:
         handler = LLMHandler(
             anthropic_client=client,
             tool_registry=registry,
-            tool_definitions=[{
-                "name": "lookup",
-                "description": "Lookup",
-                "input_schema": {"type": "object", "properties": {}},
-            }],
+            tool_definitions=[
+                {
+                    "name": "lookup",
+                    "description": "Lookup",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
         )
 
         result = handler.handle({"input": "test"})
@@ -1357,11 +1358,13 @@ class TestLLMHandler:
 
         handler = LLMHandler(
             anthropic_client=client,
-            tool_definitions=[{
-                "name": "process",
-                "description": "Process",
-                "input_schema": {"type": "object", "properties": {}},
-            }],
+            tool_definitions=[
+                {
+                    "name": "process",
+                    "description": "Process",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
         )
 
         result = asyncio.run(handler.handle_async({"input": "test"}))

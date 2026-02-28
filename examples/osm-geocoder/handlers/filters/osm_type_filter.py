@@ -9,10 +9,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
@@ -40,7 +39,7 @@ class OSMType(Enum):
     ALL = "*"
 
     @classmethod
-    def from_string(cls, value: str) -> "OSMType":
+    def from_string(cls, value: str) -> OSMType:
         """Parse an OSM type string (case-insensitive)."""
         normalized = value.lower().strip()
         aliases = {
@@ -87,7 +86,9 @@ class OSMElement:
     node_refs: list[int] = field(default_factory=list)  # For ways
     members: list[dict] = field(default_factory=list)  # For relations
 
-    def to_geojson_feature(self, node_coords: dict[int, tuple[float, float]] | None = None) -> dict | None:
+    def to_geojson_feature(
+        self, node_coords: dict[int, tuple[float, float]] | None = None
+    ) -> dict | None:
         """Convert to GeoJSON feature.
 
         Args:
@@ -255,10 +256,7 @@ class OSMTypeHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         self.total_count += 1
 
         if self._matches_filter(r.tags, OSMType.RELATION):
-            members = [
-                {"type": m.type, "ref": m.ref, "role": m.role}
-                for m in r.members
-            ]
+            members = [{"type": m.type, "ref": m.ref, "role": m.role} for m in r.members]
             self.elements.append(
                 OSMElement(
                     id=r.id,
@@ -362,7 +360,7 @@ def filter_pbf_by_type(
         filter_applied=filter_desc,
         dependencies_included=include_dependencies,
         dependency_count=len(handler.dependency_nodes) if include_dependencies else 0,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -445,7 +443,7 @@ def filter_geojson_by_osm_type(
         osm_type=osm_type.value,
         filter_applied=filter_desc,
         dependencies_included=False,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 

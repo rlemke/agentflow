@@ -246,7 +246,9 @@ class BlockExecutionBeginHandler(StateHandler):
         """
         # Build params from the container step's attributes
         params: dict = {}
-        container = self.context._find_step(self.step.container_id) if self.step.container_id else None
+        container = (
+            self.context._find_step(self.step.container_id) if self.step.container_id else None
+        )
         if container:
             for name, attr in container.attributes.params.items():
                 params[name] = attr.value

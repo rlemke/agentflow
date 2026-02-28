@@ -12,10 +12,10 @@ from afl.runtime.storage import (
     get_storage_backend,
 )
 
-
 # ---------------------------------------------------------------------------
 # TestLocalStorageBackend
 # ---------------------------------------------------------------------------
+
 
 class TestLocalStorageBackend:
     """Tests for LocalStorageBackend (wraps os / builtins)."""
@@ -135,12 +135,14 @@ class TestLocalStorageBackend:
 # TestHDFSStorageBackend
 # ---------------------------------------------------------------------------
 
+
 class TestHDFSStorageBackend:
     """Tests for HDFSStorageBackend (WebHDFS via mocked requests)."""
 
     def _make_backend(self, **kwargs):
         """Create an HDFSStorageBackend with requests available."""
         import afl.runtime.storage as mod
+
         orig = mod.HAS_REQUESTS
         mod.HAS_REQUESTS = True
         try:
@@ -200,6 +202,7 @@ class TestHDFSStorageBackend:
         backend = self._make_backend()
         stream = backend.open("hdfs://host:8020/data/file.txt", "w")
         from afl.runtime.storage import _WebHDFSWriteStream
+
         assert isinstance(stream, _WebHDFSWriteStream)
 
     @patch("afl.runtime.storage._requests")
@@ -275,10 +278,12 @@ class TestHDFSStorageBackend:
         backend = self._make_backend()
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
-            "FileStatuses": {"FileStatus": [
-                {"pathSuffix": "a.txt"},
-                {"pathSuffix": "b.txt"},
-            ]}
+            "FileStatuses": {
+                "FileStatus": [
+                    {"pathSuffix": "a.txt"},
+                    {"pathSuffix": "b.txt"},
+                ]
+            }
         }
         mock_resp.raise_for_status = MagicMock()
         mock_req.get.return_value = mock_resp
@@ -289,64 +294,80 @@ class TestHDFSStorageBackend:
 # TestHDFSRetry
 # ---------------------------------------------------------------------------
 
+
 class TestHDFSRetry:
     """Tests for the _hdfs_retry helper."""
 
     def test_success_no_retry(self):
         calls = []
+
         def fn():
             calls.append(1)
             return "ok"
+
         assert _hdfs_retry(fn, max_retries=3, base_delay=0) == "ok"
         assert len(calls) == 1
 
     def test_retries_on_404(self):
         import requests
+
         calls = []
+
         def fn():
             calls.append(1)
             if len(calls) < 3:
                 resp = MagicMock(status_code=404)
                 raise requests.exceptions.HTTPError(response=resp)
             return "recovered"
+
         assert _hdfs_retry(fn, max_retries=3, base_delay=0) == "recovered"
         assert len(calls) == 3
 
     def test_retries_on_connection_error(self):
         import requests
+
         calls = []
+
         def fn():
             calls.append(1)
             if len(calls) < 2:
                 raise requests.exceptions.ConnectionError("refused")
             return "ok"
+
         assert _hdfs_retry(fn, max_retries=2, base_delay=0) == "ok"
         assert len(calls) == 2
 
     def test_raises_after_max_retries(self):
         import requests
+
         def fn():
             resp = MagicMock(status_code=404)
             raise requests.exceptions.HTTPError(response=resp)
+
         with pytest.raises(requests.exceptions.HTTPError):
             _hdfs_retry(fn, max_retries=2, base_delay=0)
 
     def test_no_retry_on_non_retryable_status(self):
         import requests
+
         calls = []
+
         def fn():
             calls.append(1)
             resp = MagicMock(status_code=403)
             raise requests.exceptions.HTTPError(response=resp)
+
         with pytest.raises(requests.exceptions.HTTPError):
             _hdfs_retry(fn, max_retries=3, base_delay=0)
         assert len(calls) == 1
 
     def test_no_retry_on_value_error(self):
         calls = []
+
         def fn():
             calls.append(1)
             raise ValueError("not retryable")
+
         with pytest.raises(ValueError):
             _hdfs_retry(fn, max_retries=3, base_delay=0)
         assert len(calls) == 1
@@ -354,8 +375,9 @@ class TestHDFSRetry:
     @patch("afl.runtime.storage._requests")
     def test_write_stream_retries(self, mock_req):
         """_WebHDFSWriteStream.close() retries on transient datanode 404."""
-        import afl.runtime.storage as mod
         import requests
+
+        import afl.runtime.storage as mod
 
         orig = mod.HAS_REQUESTS
         mod.HAS_REQUESTS = True
@@ -368,7 +390,10 @@ class TestHDFSRetry:
         stream.write(b"test data")
 
         # First call: namenode returns 307 redirect
-        redirect_resp = MagicMock(status_code=307, headers={"Location": "http://datanode:9864/webhdfs/v1/data/file.bin?op=CREATE"})
+        redirect_resp = MagicMock(
+            status_code=307,
+            headers={"Location": "http://datanode:9864/webhdfs/v1/data/file.bin?op=CREATE"},
+        )
         redirect_resp.raise_for_status = MagicMock()
 
         # First attempt: datanode returns 404
@@ -380,8 +405,10 @@ class TestHDFSRetry:
         success_resp.raise_for_status = MagicMock()
 
         mock_req.put.side_effect = [
-            redirect_resp, error_404,   # attempt 1: namenode OK, datanode 404
-            redirect_resp, success_resp, # attempt 2: both OK
+            redirect_resp,
+            error_404,  # attempt 1: namenode OK, datanode 404
+            redirect_resp,
+            success_resp,  # attempt 2: both OK
         ]
 
         stream.close()  # should succeed after retry
@@ -392,12 +419,14 @@ class TestHDFSRetry:
 # TestGetStorageBackend
 # ---------------------------------------------------------------------------
 
+
 class TestGetStorageBackend:
     """Tests for the get_storage_backend factory function."""
 
     def setup_method(self):
         """Reset cached backends between tests."""
         import afl.runtime.storage as mod
+
         mod._local_backend = None
         mod._hdfs_backends.clear()
 

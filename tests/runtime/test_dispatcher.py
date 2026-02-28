@@ -14,8 +14,6 @@
 
 """Unit tests for handler dispatcher implementations."""
 
-import asyncio
-
 import pytest
 
 from afl.runtime import (
@@ -29,7 +27,6 @@ from afl.runtime.dispatcher import (
     RegistryDispatcher,
     ToolRegistryDispatcher,
 )
-
 
 # =========================================================================
 # Fixtures
@@ -46,10 +43,7 @@ def store():
 def handler_file(tmp_path):
     """Create a temporary handler module file."""
     f = tmp_path / "test_handler.py"
-    f.write_text(
-        "def handle(payload):\n"
-        "    return {'output': payload['input'] * 2}\n"
-    )
+    f.write_text("def handle(payload):\n    return {'output': payload['input'] * 2}\n")
     return f
 
 
@@ -63,11 +57,13 @@ class TestRegistryDispatcher:
 
     def test_can_dispatch_registered_handler(self, store, handler_file):
         """Registered facet returns True."""
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         assert dispatcher.can_dispatch("ns.Double") is True
 
@@ -78,22 +74,26 @@ class TestRegistryDispatcher:
 
     def test_can_dispatch_short_name_fallback(self, store, handler_file):
         """ns.Facet found via short name 'Facet' when registered as 'Facet'."""
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         # Exact match fails, but short-name fallback succeeds
         assert dispatcher.can_dispatch("ns.Double") is True
 
     def test_dispatch_sync_handler(self, store, handler_file):
         """Sync handler invoked and result returned."""
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         result = dispatcher.dispatch("ns.Double", {"input": 5})
         assert result == {"output": 10}
@@ -107,11 +107,13 @@ class TestRegistryDispatcher:
             "    await asyncio.sleep(0)\n"
             "    return {'output': payload['input'] + 100}\n"
         )
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.AsyncOp",
-            module_uri=f"file://{f}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.AsyncOp",
+                module_uri=f"file://{f}",
+                entrypoint="handle",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         result = dispatcher.dispatch("ns.AsyncOp", {"input": 7})
         assert result["output"] == 107
@@ -119,27 +121,28 @@ class TestRegistryDispatcher:
     def test_dispatch_handler_exception(self, store, tmp_path):
         """Exception from handler propagated."""
         f = tmp_path / "error_handler.py"
-        f.write_text(
-            "def handle(payload):\n"
-            "    raise ValueError('handler failed')\n"
+        f.write_text("def handle(payload):\n    raise ValueError('handler failed')\n")
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Fail",
+                module_uri=f"file://{f}",
+                entrypoint="handle",
+            )
         )
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Fail",
-            module_uri=f"file://{f}",
-            entrypoint="handle",
-        ))
         dispatcher = RegistryDispatcher(persistence=store)
         with pytest.raises(ValueError, match="handler failed"):
             dispatcher.dispatch("ns.Fail", {"input": 1})
 
     def test_module_cache_hit(self, store, handler_file):
         """Second dispatch uses cached module."""
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-            checksum="abc",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+                checksum="abc",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         dispatcher.dispatch("ns.Double", {"input": 1})
         dispatcher.dispatch("ns.Double", {"input": 2})
@@ -148,22 +151,26 @@ class TestRegistryDispatcher:
 
     def test_module_cache_invalidation(self, store, handler_file):
         """Changed checksum reloads module."""
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-            checksum="v1",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+                checksum="v1",
+            )
+        )
         dispatcher = RegistryDispatcher(persistence=store)
         dispatcher.dispatch("ns.Double", {"input": 1})
 
         # Update registration with new checksum
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.Double",
-            module_uri=f"file://{handler_file}",
-            entrypoint="handle",
-            checksum="v2",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Double",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+                checksum="v2",
+            )
+        )
         dispatcher.dispatch("ns.Double", {"input": 2})
         # Two cache entries: (uri, v1) and (uri, v2)
         assert len(dispatcher.module_cache) == 2
@@ -171,15 +178,14 @@ class TestRegistryDispatcher:
     def test_file_uri_handler(self, store, tmp_path):
         """file:// URI loading works."""
         f = tmp_path / "file_handler.py"
-        f.write_text(
-            "def process(payload):\n"
-            "    return {'result': payload.get('x', 0) + 42}\n"
+        f.write_text("def process(payload):\n    return {'result': payload.get('x', 0) + 42}\n")
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.FileOp",
+                module_uri=f"file://{f}",
+                entrypoint="process",
+            )
         )
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="ns.FileOp",
-            module_uri=f"file://{f}",
-            entrypoint="process",
-        ))
         dispatcher = RegistryDispatcher(persistence=store)
         result = dispatcher.dispatch("ns.FileOp", {"x": 8})
         assert result["result"] == 50

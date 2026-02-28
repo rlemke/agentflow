@@ -15,6 +15,7 @@ from typing import Any
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -22,8 +23,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-_CACHE_DIR = os.environ.get("AFL_CENSUS_CACHE_DIR",
-                            os.path.join(_LOCAL_OUTPUT, "census-cache"))
+_CACHE_DIR = os.environ.get("AFL_CENSUS_CACHE_DIR", os.path.join(_LOCAL_OUTPUT, "census-cache"))
 
 # Per-path locks to prevent duplicate concurrent downloads
 _locks: dict[str, threading.Lock] = {}
@@ -75,21 +75,24 @@ def _download_file(url: str, dest: str) -> int:
     return size
 
 
-def download_acs(year: str = "2023", period: str = "5-Year",
-                 state_fips: str = "01",
-                 columns: str = "B01003_001E,B19013_001E,B25001_001E,"
-                                "B15003_001E,B15003_022E,B15003_023E,B15003_024E,B15003_025E,"
-                                "B08301_001E,B08301_003E,B08301_010E,B08301_019E,B08301_021E,"
-                                "B25003_001E,B25003_002E,B25003_003E,"
-                                "B11001_001E,B11001_002E,B11001_003E,"
-                                "B11001_004E,B11001_005E,B11001_006E,"
-                                "B11001_007E,B11001_008E,B11001_009E,"
-                                "B25044_001E,B25044_002E,B25044_003E,"
-                                "B25044_004E,B25044_005E,B25044_006E,"
-                                "B25044_007E,B25044_008E,B25044_009E,"
-                                "B25044_010E,B25044_011E,B25044_012E,"
-                                "B25044_013E,B25044_014E,B25044_015E",
-                 tag: str = "default") -> dict[str, Any]:
+def download_acs(
+    year: str = "2023",
+    period: str = "5-Year",
+    state_fips: str = "01",
+    columns: str = "B01003_001E,B19013_001E,B25001_001E,"
+    "B15003_001E,B15003_022E,B15003_023E,B15003_024E,B15003_025E,"
+    "B08301_001E,B08301_003E,B08301_010E,B08301_019E,B08301_021E,"
+    "B25003_001E,B25003_002E,B25003_003E,"
+    "B11001_001E,B11001_002E,B11001_003E,"
+    "B11001_004E,B11001_005E,B11001_006E,"
+    "B11001_007E,B11001_008E,B11001_009E,"
+    "B25044_001E,B25044_002E,B25044_003E,"
+    "B25044_004E,B25044_005E,B25044_006E,"
+    "B25044_007E,B25044_008E,B25044_009E,"
+    "B25044_010E,B25044_011E,B25044_012E,"
+    "B25044_013E,B25044_014E,B25044_015E",
+    tag: str = "default",
+) -> dict[str, Any]:
     """Download ACS data for a state via the Census Bureau REST API.
 
     The API returns JSON: [[header...], [row1...], ...].
@@ -106,8 +109,7 @@ def download_acs(year: str = "2023", period: str = "5-Year",
     """
     filename = f"acs_{year}_{state_fips}_{tag}.csv"
     dest = os.path.join(_CACHE_DIR, "acs", year, filename)
-    url = (f"{CENSUS_API_BASE}/{year}/acs/acs5"
-           f"?get=NAME,{columns}&for=county:*&in=state:{state_fips}")
+    url = f"{CENSUS_API_BASE}/{year}/acs/acs5?get=NAME,{columns}&for=county:*&in=state:{state_fips}"
 
     requested_cols = {c.strip() for c in columns.split(",")}
 
@@ -180,13 +182,13 @@ def _download_acs_api(url: str, dest: str, state_fips: str) -> int:
 
     size = os.path.getsize(dest)
     elapsed = time.monotonic() - start
-    logger.info("Fetched ACS API -> %s (%d rows, %d bytes, %.1fs)",
-                dest, len(rows), size, elapsed)
+    logger.info("Fetched ACS API -> %s (%d rows, %d bytes, %.1fs)", dest, len(rows), size, elapsed)
     return size
 
 
-def download_tiger(year: str = "2024", geo_level: str = "COUNTY",
-                   state_fips: str = "01") -> dict[str, Any]:
+def download_tiger(
+    year: str = "2024", geo_level: str = "COUNTY", state_fips: str = "01"
+) -> dict[str, Any]:
     """Download TIGER/Line shapefile for a state and geography level.
 
     For COUNTY, downloads the national file (tl_{year}_us_county.zip).
@@ -196,8 +198,9 @@ def download_tiger(year: str = "2024", geo_level: str = "COUNTY",
     """
     geo_upper = geo_level.upper()
     if geo_upper not in _TIGER_GEO:
-        raise ValueError(f"Unsupported geo_level: {geo_level}. "
-                         f"Supported: {list(_TIGER_GEO.keys())}")
+        raise ValueError(
+            f"Unsupported geo_level: {geo_level}. Supported: {list(_TIGER_GEO.keys())}"
+        )
 
     tiger_dir, tiger_suffix = _TIGER_GEO[geo_upper]
 

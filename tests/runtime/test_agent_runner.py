@@ -16,8 +16,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from afl.runtime.agent_runner import AgentConfig, make_store, run_agent
 from afl.runtime.memory_store import MemoryStore
 
@@ -44,7 +42,7 @@ class TestMakeStore:
 
         with patch("afl.runtime.mongo_store.MongoStore") as MockMongoStore:
             MockMongoStore.return_value = MagicMock()
-            store = make_store()
+            _store = make_store()
             MockMongoStore.assert_called_once_with(
                 connection_string="mongodb://testhost:27017",
                 database_name="afl",
@@ -158,8 +156,10 @@ class TestRunAgent:
 
         config = AgentConfig(service_name="test-agent", server_group="test")
 
-        with patch("afl.runtime.registry_runner.RegistryRunner") as MockRunner, \
-             patch("afl.runtime.registry_runner.RegistryRunnerConfig") as MockConfig:
+        with (
+            patch("afl.runtime.registry_runner.RegistryRunner") as MockRunner,
+            patch("afl.runtime.registry_runner.RegistryRunnerConfig") as MockConfig,
+        ):
             runner_instance = MockRunner.return_value
             runner_instance.start = MagicMock()
 
@@ -181,8 +181,10 @@ class TestRunAgent:
             max_concurrent=8,
         )
 
-        with patch("afl.runtime.registry_runner.RegistryRunner") as MockRunner, \
-             patch("afl.runtime.registry_runner.RegistryRunnerConfig") as MockConfig:
+        with (
+            patch("afl.runtime.registry_runner.RegistryRunner") as MockRunner,
+            patch("afl.runtime.registry_runner.RegistryRunnerConfig") as MockConfig,
+        ):
             runner_instance = MockRunner.return_value
             runner_instance.start = MagicMock()
 

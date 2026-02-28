@@ -156,7 +156,10 @@ def _cache_handler(payload: dict) -> dict:
     cache = download(region_path)
     source = cache.get("source", "unknown")
     if step_log:
-        step_log(f"Cache: region '{region}' -> '{region_path}' (source={source}, size={cache.get('size', 0)})", level="success")
+        step_log(
+            f"Cache: region '{region}' -> '{region_path}' (source={source}, size={cache.get('size', 0)})",
+            level="success",
+        )
     return {"cache": cache}
 
 

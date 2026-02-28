@@ -24,15 +24,17 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 from .step import StepDefinition
-from .types import BlockId, StepId, WorkflowId
+from .types import BlockId, StepId
 
 if TYPE_CHECKING:
     from .entities import (
+        FlowDefinition,
         HandlerRegistration,
         LockDefinition,
         LockMetaData,
         LogDefinition,
         RunnerDefinition,
+        ServerDefinition,
         StepLogEntry,
         TaskDefinition,
     )
@@ -105,7 +107,7 @@ class PersistenceAPI(Protocol):
 
     # Step operations
     @abstractmethod
-    def get_step(self, step_id: StepId) -> StepDefinition | None:
+    def get_step(self, step_id: str) -> StepDefinition | None:
         """Fetch a step by its persistent ID.
 
         Args:
@@ -117,11 +119,12 @@ class PersistenceAPI(Protocol):
         ...
 
     @abstractmethod
-    def get_steps_by_block(self, block_id: BlockId) -> Sequence[StepDefinition]:
+    def get_steps_by_block(self, block_id: StepId | BlockId) -> Sequence[StepDefinition]:
         """Fetch all steps belonging to a block.
 
         Args:
-            block_id: The block's unique identifier
+            block_id: The block's unique identifier (StepId or BlockId,
+                since blocks are steps)
 
         Returns:
             All steps in the block
@@ -129,7 +132,7 @@ class PersistenceAPI(Protocol):
         ...
 
     @abstractmethod
-    def get_steps_by_workflow(self, workflow_id: WorkflowId) -> Sequence[StepDefinition]:
+    def get_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps belonging to a workflow.
 
         Args:
@@ -140,9 +143,7 @@ class PersistenceAPI(Protocol):
         """
         ...
 
-    def get_actionable_steps_by_workflow(
-        self, workflow_id: WorkflowId
-    ) -> Sequence[StepDefinition]:
+    def get_actionable_steps_by_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
         """Fetch steps that need processing in an evaluator iteration.
 
         Returns steps that are NOT terminal (Complete/Error) and NOT
@@ -163,8 +164,7 @@ class PersistenceAPI(Protocol):
             for s in steps
             if not StepState.is_terminal(s.state)
             and not (
-                s.state == StepState.EVENT_TRANSMIT
-                and not s.transition.is_requesting_state_change
+                s.state == StepState.EVENT_TRANSMIT and not s.transition.is_requesting_state_change
             )
         ]
 
@@ -181,7 +181,7 @@ class PersistenceAPI(Protocol):
         ...
 
     @abstractmethod
-    def get_steps_by_container(self, container_id: StepId) -> Sequence[StepDefinition]:
+    def get_steps_by_container(self, container_id: str) -> Sequence[StepDefinition]:
         """Fetch all steps with a given container.
 
         Args:
@@ -203,7 +203,7 @@ class PersistenceAPI(Protocol):
 
     # Block operations
     @abstractmethod
-    def get_blocks_by_step(self, step_id: StepId) -> Sequence[StepDefinition]:
+    def get_blocks_by_step(self, step_id: str) -> Sequence[StepDefinition]:
         """Fetch all block steps for a containing step.
 
         Args:
@@ -229,7 +229,7 @@ class PersistenceAPI(Protocol):
 
     # Query operations
     @abstractmethod
-    def get_workflow_root(self, workflow_id: WorkflowId) -> StepDefinition | None:
+    def get_workflow_root(self, workflow_id: str) -> StepDefinition | None:
         """Get the root step of a workflow.
 
         Args:
@@ -241,14 +241,15 @@ class PersistenceAPI(Protocol):
         ...
 
     @abstractmethod
-    def step_exists(self, statement_id: str, block_id: BlockId | None) -> bool:
+    def step_exists(self, statement_id: str, block_id: StepId | BlockId | None) -> bool:
         """Check if a step already exists for a statement in a block.
 
         Used to prevent duplicate step creation (idempotency).
 
         Args:
             statement_id: The statement definition ID
-            block_id: The containing block ID
+            block_id: The containing block ID (StepId or BlockId,
+                since blocks are steps)
 
         Returns:
             True if step already exists
@@ -433,9 +434,7 @@ class PersistenceAPI(Protocol):
         """
         return []
 
-    def get_step_logs_by_facet(
-        self, facet_name: str, limit: int = 20
-    ) -> Sequence["StepLogEntry"]:
+    def get_step_logs_by_facet(self, facet_name: str, limit: int = 20) -> Sequence["StepLogEntry"]:
         """Get recent step logs for a facet, ordered by time descending.
 
         Args:
@@ -545,3 +544,44 @@ class PersistenceAPI(Protocol):
             True if deleted, False if not found
         """
         ...
+
+    # Flow operations
+
+    def get_flow(self, flow_id: str) -> Optional["FlowDefinition"]:
+        """Get a flow by ID.
+
+        Args:
+            flow_id: The flow's unique identifier
+
+        Returns:
+            The flow if found, None otherwise
+        """
+        return None
+
+    # Server operations
+
+    def save_server(self, server: "ServerDefinition") -> None:
+        """Save a server definition.
+
+        Args:
+            server: The server definition to save
+        """
+
+    def get_server(self, server_id: str) -> Optional["ServerDefinition"]:
+        """Get a server by ID.
+
+        Args:
+            server_id: The server's unique identifier
+
+        Returns:
+            The server if found, None otherwise
+        """
+        return None
+
+    def update_server_ping(self, server_id: str, ping_time: int) -> None:
+        """Update a server's ping time.
+
+        Args:
+            server_id: The server's unique identifier
+            ping_time: The new ping time in milliseconds
+        """

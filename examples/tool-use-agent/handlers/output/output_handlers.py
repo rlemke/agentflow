@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.tool_utils import synthesize_results, format_answer
+from handlers.shared.tool_utils import format_answer, synthesize_results
 
 NAMESPACE = "tools.Output"
 
@@ -25,12 +25,20 @@ def handle_synthesize_results(params: dict[str, Any]) -> dict[str, Any]:
     query = params.get("query", "")
 
     synthesis, confidence, key_findings = synthesize_results(
-        search_results, calculations, code_results, query,
+        search_results,
+        calculations,
+        code_results,
+        query,
     )
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Synthesized results for '{query}' (confidence={confidence})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Synthesized results for '{query}' (confidence={confidence})",
+                "level": "success",
+            }
+        )
 
     return {
         "synthesis": synthesis,

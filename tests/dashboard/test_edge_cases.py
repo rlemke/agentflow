@@ -100,7 +100,9 @@ def _make_task(uuid="task-1", name="SendEmail", state="pending", error=None, dat
     )
 
 
-def _make_event_task(uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"):
+def _make_event_task(
+    uuid="evt-1", step_id="step-1", workflow_id="wf-1", state="pending", name="afl:execute"
+):
     from afl.runtime.entities import TaskDefinition
 
     return TaskDefinition(
@@ -293,12 +295,22 @@ class TestFlowEdgeCases:
             name=FlowIdentity(name="MultiFlow", path="/multi", uuid="flow-1"),
             workflows=[
                 WorkflowDefinition(
-                    uuid="wf-1", name="WF1", namespace_id="ns-1", facet_id="f-1",
-                    flow_id="flow-1", starting_step="s-1", version="1.0",
+                    uuid="wf-1",
+                    name="WF1",
+                    namespace_id="ns-1",
+                    facet_id="f-1",
+                    flow_id="flow-1",
+                    starting_step="s-1",
+                    version="1.0",
                 ),
                 WorkflowDefinition(
-                    uuid="wf-2", name="WF2", namespace_id="ns-1", facet_id="f-2",
-                    flow_id="flow-1", starting_step="s-2", version="1.0",
+                    uuid="wf-2",
+                    name="WF2",
+                    namespace_id="ns-1",
+                    facet_id="f-2",
+                    flow_id="flow-1",
+                    starting_step="s-2",
+                    version="1.0",
                 ),
             ],
         )
@@ -423,14 +435,24 @@ class TestServerEdgeCases:
         tc, store = client
         from afl.runtime.entities import ServerDefinition, ServerState
 
-        store.save_server(ServerDefinition(
-            uuid="s-1", server_group="workers", service_name="afl",
-            server_name="worker-01", state=ServerState.RUNNING,
-        ))
-        store.save_server(ServerDefinition(
-            uuid="s-2", server_group="managers", service_name="afl",
-            server_name="manager-01", state=ServerState.RUNNING,
-        ))
+        store.save_server(
+            ServerDefinition(
+                uuid="s-1",
+                server_group="workers",
+                service_name="afl",
+                server_name="worker-01",
+                state=ServerState.RUNNING,
+            )
+        )
+        store.save_server(
+            ServerDefinition(
+                uuid="s-2",
+                server_group="managers",
+                service_name="afl",
+                server_name="manager-01",
+                state=ServerState.RUNNING,
+            )
+        )
         resp = tc.get("/servers")
         assert resp.status_code == 200
         assert "workers" in resp.text
@@ -441,8 +463,11 @@ class TestServerEdgeCases:
         from afl.runtime.entities import ServerDefinition, ServerState
 
         server = ServerDefinition(
-            uuid="s-3", server_group="workers", service_name="afl",
-            server_name="worker-02", state=ServerState.RUNNING,
+            uuid="s-3",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-02",
+            state=ServerState.RUNNING,
             handlers=["osm.CacheLookup", "osm.ReverseGeocode"],
         )
         store.save_server(server)
@@ -455,8 +480,11 @@ class TestServerEdgeCases:
         from afl.runtime.entities import ServerDefinition, ServerState
 
         server = ServerDefinition(
-            uuid="s-4", server_group="workers", service_name="afl",
-            server_name="worker-03", state=ServerState.SHUTDOWN,
+            uuid="s-4",
+            server_group="workers",
+            service_name="afl",
+            server_name="worker-03",
+            state=ServerState.SHUTDOWN,
         )
         store.save_server(server)
         resp = tc.get("/servers/s-4")
@@ -468,8 +496,11 @@ class TestServerEdgeCases:
         from afl.runtime.entities import ServerDefinition, ServerState
 
         server = ServerDefinition(
-            uuid="s-5", server_group="default", service_name="afl",
-            server_name="minimal-server", state=ServerState.STARTUP,
+            uuid="s-5",
+            server_group="default",
+            service_name="afl",
+            server_name="minimal-server",
+            state=ServerState.STARTUP,
         )
         store.save_server(server)
         resp = tc.get("/servers/s-5")
@@ -574,6 +605,7 @@ class TestLockEdgeCases:
         # Acquire a lock with very short TTL (1ms) -- it'll be expired
         self._make_lock(store, "expired-lock", duration_ms=1)
         import time
+
         time.sleep(0.01)  # Ensure it expires
         resp = tc.get("/locks")
         assert resp.status_code == 200
@@ -609,10 +641,12 @@ class TestFilteringEdgeCases:
         tc, store = client
         from afl.runtime.entities import FlowDefinition, FlowIdentity
 
-        store.save_flow(FlowDefinition(
-            uuid="flow-1",
-            name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
-        ))
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-1",
+                name=FlowIdentity(name="TestFlow", path="/test", uuid="flow-1"),
+            )
+        )
         # Search with lowercase should match uppercase name
         resp = tc.get("/flows?q=testflow")
         assert resp.status_code == 200
@@ -622,14 +656,18 @@ class TestFilteringEdgeCases:
         tc, store = client
         from afl.runtime.entities import FlowDefinition, FlowIdentity
 
-        store.save_flow(FlowDefinition(
-            uuid="flow-1",
-            name=FlowIdentity(name="FlowA", path="/a", uuid="flow-1"),
-        ))
-        store.save_flow(FlowDefinition(
-            uuid="flow-2",
-            name=FlowIdentity(name="FlowB", path="/b", uuid="flow-2"),
-        ))
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-1",
+                name=FlowIdentity(name="FlowA", path="/a", uuid="flow-1"),
+            )
+        )
+        store.save_flow(
+            FlowDefinition(
+                uuid="flow-2",
+                name=FlowIdentity(name="FlowB", path="/b", uuid="flow-2"),
+            )
+        )
         resp = tc.get("/flows")
         assert resp.status_code == 200
         assert "FlowA" in resp.text

@@ -53,7 +53,9 @@ class TestGenomicsHandlers:
 
     def test_handle_dispatches(self):
         mod = _genomics_import("genomics_handlers")
-        result = mod.handle({"_facet_name": "genomics.Facets.IngestReference", "reference_build": "GRCh38"})
+        result = mod.handle(
+            {"_facet_name": "genomics.Facets.IngestReference", "reference_build": "GRCh38"}
+        )
         assert isinstance(result, dict)
         assert "result" in result
 

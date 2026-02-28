@@ -12,10 +12,10 @@ from __future__ import annotations
 import hashlib
 import json
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
     """Deterministic integer from seed string."""
@@ -36,6 +36,7 @@ _AGENT_ROLES = ["financial_analyst", "community_analyst", "competitive_strategis
 # ---------------------------------------------------------------------------
 # Spatial (3 functions)
 # ---------------------------------------------------------------------------
+
 
 def score_candidate(
     candidate_id: str,
@@ -80,7 +81,9 @@ def rank_candidates(
     """Rank candidates by overall_score; returns (ranked_list, top_candidate)."""
     if isinstance(scores, str):
         scores = json.loads(scores)
-    ranked = sorted(scores, key=lambda s: s.get("overall_score", 0) if isinstance(s, dict) else 0, reverse=True)
+    ranked = sorted(
+        scores, key=lambda s: s.get("overall_score", 0) if isinstance(s, dict) else 0, reverse=True
+    )
     ranked = ranked[:top_n]
     top = ranked[0].get("candidate_id", "unknown") if ranked else "unknown"
     return ranked, top
@@ -109,6 +112,7 @@ def compute_accessibility(
 # Research (3 functions)
 # ---------------------------------------------------------------------------
 
+
 def search_market_trends(
     candidate_id: str,
     market_area: str = "default",
@@ -116,9 +120,7 @@ def search_market_trends(
     """Search market trends; returns MarketResearch dict."""
     seed = f"market:{candidate_id}:{market_area}"
     growth_rate = _hash_float(seed, -0.05, 0.15)
-    risk_factors = [
-        f"risk_{i}_{market_area}" for i in range(_hash_int(f"{seed}:risks", 1, 4))
-    ]
+    risk_factors = [f"risk_{i}_{market_area}" for i in range(_hash_int(f"{seed}:risks", 1, 4))]
     opportunity_score = _hash_float(f"{seed}:opp", 30.0, 95.0)
     return {
         "candidate_id": candidate_id,
@@ -170,6 +172,7 @@ def analyze_competitors(
 # ---------------------------------------------------------------------------
 # Debate (3 functions)
 # ---------------------------------------------------------------------------
+
 
 def present_analysis(
     agent_role: str,
@@ -234,10 +237,12 @@ def score_arguments(
     for i, pos in enumerate(positions):
         agent_role = pos.get("agent_role", f"agent_{i}") if isinstance(pos, dict) else f"agent_{i}"
         s = _hash_float(f"{seed}:agent:{agent_role}", 60.0, 95.0)
-        agent_scores.append({
-            "agent_role": agent_role,
-            "score": round(s, 2),
-        })
+        agent_scores.append(
+            {
+                "agent_role": agent_role,
+                "score": round(s, 2),
+            }
+        )
     return {
         "consensus_level": round(consensus_level, 4),
         "score_delta": round(score_delta, 4),
@@ -250,6 +255,7 @@ def score_arguments(
 # ---------------------------------------------------------------------------
 # Synthesis (3 functions)
 # ---------------------------------------------------------------------------
+
 
 def summarize_round(
     positions: list,

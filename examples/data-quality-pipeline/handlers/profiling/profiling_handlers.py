@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.quality_utils import profile_dataset, detect_anomalies
+from handlers.shared.quality_utils import detect_anomalies, profile_dataset
 
 NAMESPACE = "dq.Profiling"
 
@@ -22,7 +22,12 @@ def handle_profile_dataset(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Profiled '{dataset}': {len(profiles)} columns, {row_count} rows", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Profiled '{dataset}': {len(profiles)} columns, {row_count} rows",
+                "level": "success",
+            }
+        )
 
     return {"profiles": profiles, "row_count": row_count}
 

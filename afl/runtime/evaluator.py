@@ -53,7 +53,7 @@ class ExecutionResult:
     """Result of workflow execution."""
 
     success: bool
-    workflow_id: WorkflowId
+    workflow_id: str  # WorkflowId (str-based NewType)
     outputs: dict[str, Any] = field(default_factory=dict)
     error: Exception | None = None
     iterations: int = 0
@@ -70,36 +70,36 @@ class ExecutionContext:
     persistence: PersistenceAPI
     telemetry: Telemetry
     changes: IterationChanges
-    workflow_id: WorkflowId
+    workflow_id: str  # WorkflowId (str-based NewType)
     workflow_ast: dict | None = None
     workflow_defaults: dict = field(default_factory=dict)
     program_ast: dict | None = None
     runner_id: str = ""
     dispatcher: "HandlerDispatcher | None" = None
 
-    # Cache for block dependency graphs
-    _block_graphs: dict[StepId, DependencyGraph] = field(default_factory=dict)
+    # Cache for block dependency graphs (keyed by block step ID)
+    _block_graphs: dict[str, DependencyGraph] = field(default_factory=dict)
 
     # Cache for block AST overrides (e.g., foreach sub-blocks)
-    _block_ast_cache: dict[StepId, dict] = field(default_factory=dict)
+    _block_ast_cache: dict[str, dict] = field(default_factory=dict)
 
     # Cache for completed steps by name within blocks
     _completed_step_cache: dict[str, StepDefinition] = field(default_factory=dict)
 
     # Track which block IDs need Continue re-evaluation.
     # None = all dirty (first iteration), empty set = nothing dirty.
-    _dirty_blocks: set[StepId] | None = field(default=None)
+    _dirty_blocks: set[str] | None = field(default=None)
 
-    def mark_block_dirty(self, block_id: StepId | None) -> None:
+    def mark_block_dirty(self, block_id: StepId | BlockId | None) -> None:
         """Mark a block as needing Continue re-evaluation."""
         if block_id and self._dirty_blocks is not None:
             self._dirty_blocks.add(block_id)
 
-    def is_block_dirty(self, block_id: StepId) -> bool:
+    def is_block_dirty(self, block_id: StepId | BlockId) -> bool:
         """Check if a block needs Continue re-evaluation."""
         return self._dirty_blocks is None or block_id in self._dirty_blocks
 
-    def mark_block_processed(self, block_id: StepId) -> None:
+    def mark_block_processed(self, block_id: StepId | BlockId) -> None:
         """Remove a block from the dirty set after processing."""
         if self._dirty_blocks is not None:
             self._dirty_blocks.discard(block_id)
@@ -216,11 +216,12 @@ class ExecutionContext:
             return body[0] if body else None
         return body
 
-    def _find_step(self, step_id: StepId) -> StepDefinition | None:
+    def _find_step(self, step_id: StepId | BlockId) -> StepDefinition | None:
         """Find a step by ID, checking pending changes first.
 
         Args:
-            step_id: The step ID to find
+            step_id: The step ID to find (StepId or BlockId,
+                since blocks are steps)
 
         Returns:
             The step, or None
@@ -287,18 +288,18 @@ class ExecutionContext:
         # Recursively resolve block AST
         return self.get_block_ast(block_step)
 
-    def get_block_graph(self, block_id: StepId) -> DependencyGraph | None:
+    def get_block_graph(self, block_id: StepId | BlockId) -> DependencyGraph | None:
         """Get cached dependency graph for a block."""
         return self._block_graphs.get(block_id)
 
-    def set_block_graph(self, block_id: StepId, graph: DependencyGraph) -> None:
+    def set_block_graph(self, block_id: StepId | BlockId, graph: DependencyGraph) -> None:
         """Cache a dependency graph for a block."""
         self._block_graphs[block_id] = graph
 
     def get_completed_step_by_name(
         self,
         step_name: str,
-        block_id: BlockId | None,
+        block_id: StepId | BlockId | None,
     ) -> StepDefinition | None:
         """Get a completed step by name within a block.
 
@@ -445,13 +446,15 @@ class ExecutionContext:
                     inner = decl.get("declarations", [])
                     target = parts[i]
                     for inner_decl in inner:
-                        if inner_decl.get("type") in ("FacetDecl", "EventFacetDecl", "WorkflowDecl"):
+                        if inner_decl.get("type") in (
+                            "FacetDecl",
+                            "EventFacetDecl",
+                            "WorkflowDecl",
+                        ):
                             if inner_decl.get("name") == target:
                                 return inner_decl
                     # Also check nested namespaces within this namespace
-                    result = self._search_declarations(
-                        decl.get("declarations", []), facet_short
-                    )
+                    result = self._search_declarations(decl.get("declarations", []), facet_short)
                     if result:
                         return result
 
@@ -515,9 +518,7 @@ class ExecutionContext:
             self.program_ast.get("declarations", []), facet_name
         )
 
-    def _search_implicit_declarations(
-        self, declarations: list, facet_name: str
-    ) -> dict | None:
+    def _search_implicit_declarations(self, declarations: list, facet_name: str) -> dict | None:
         """Search declarations for an ImplicitDecl targeting facet_name.
 
         Args:
@@ -534,10 +535,7 @@ class ExecutionContext:
                 target = call.get("target", "")
                 target_short = target.split(".")[-1] if "." in target else target
                 if target == facet_name or target_short == short_name:
-                    return {
-                        arg["name"]: arg["value"]
-                        for arg in call.get("args", [])
-                    }
+                    return {arg["name"]: arg["value"] for arg in call.get("args", [])}
             elif decl.get("type") == "Namespace":
                 result = self._search_implicit_declarations(
                     decl.get("declarations", []), facet_name
@@ -776,9 +774,7 @@ class Evaluator:
 
         # Get actionable steps for this workflow (excludes terminal and
         # EventTransmit steps without pending transitions).
-        steps = list(
-            self.persistence.get_actionable_steps_by_workflow(context.workflow_id)
-        )
+        steps = list(self.persistence.get_actionable_steps_by_workflow(context.workflow_id))
         logger.debug(
             "Iteration start: workflow_id=%s actionable_step_count=%d",
             context.workflow_id,
@@ -893,7 +889,7 @@ class Evaluator:
 
         return False
 
-    def _build_result(self, wf_id: WorkflowId, iteration: int) -> ExecutionResult:
+    def _build_result(self, wf_id: str, iteration: int) -> ExecutionResult:
         """Build the final execution result.
 
         Args:
@@ -955,7 +951,7 @@ class Evaluator:
                 return True
         return False
 
-    def continue_step(self, step_id: StepId, result: dict | None = None) -> None:
+    def continue_step(self, step_id: str, result: dict | None = None) -> None:
         """Continue an event-blocked step with a result.
 
         Called by external code (or test harness) between evaluator runs
@@ -989,7 +985,7 @@ class Evaluator:
         # Save directly to persistence
         self.persistence.save_step(step)
 
-    def fail_step(self, step_id: StepId, error_message: str) -> None:
+    def fail_step(self, step_id: str, error_message: str) -> None:
         """Fail an event-blocked step with an error.
 
         Sets the step to STATEMENT_ERROR and records the error.
@@ -1049,7 +1045,7 @@ class Evaluator:
 
     def resume(
         self,
-        workflow_id_val: WorkflowId,
+        workflow_id_val: str,
         workflow_ast: dict,
         program_ast: dict | None = None,
         inputs: dict[str, Any] | None = None,
@@ -1107,7 +1103,7 @@ class Evaluator:
                 # Seed the set from steps that changed this iteration
                 # (before commit clears the changes).
                 if context._dirty_blocks is None:
-                    dirty: set[StepId] = set()
+                    dirty: set[str] = set()
                     for s in context.changes.updated_steps:
                         if s.block_id:
                             dirty.add(s.block_id)
@@ -1152,8 +1148,8 @@ class Evaluator:
 
     def resume_step(
         self,
-        workflow_id_val: WorkflowId,
-        step_id: StepId,
+        workflow_id_val: str,
+        step_id: str,
         workflow_ast: dict,
         program_ast: dict | None = None,
         runner_id: str = "",
@@ -1205,7 +1201,7 @@ class Evaluator:
                 # parent steps see committed child changes.
                 # Walk: step → block → block.container → ancestor block → ...
                 target_steps: list[StepDefinition] = []
-                seen_ids: set[StepId] = set()
+                seen_ids: set[str] = set()
                 current_id: str | None = step_id
 
                 while current_id and current_id not in seen_ids:
@@ -1230,6 +1226,7 @@ class Evaluator:
                     break
 
                 # Seed dirty set with all Continue-state blocks in the chain
+                assert context._dirty_blocks is not None
                 for ts in target_steps:
                     if ts.state in {
                         StepState.BLOCK_EXECUTION_CONTINUE,
@@ -1241,7 +1238,7 @@ class Evaluator:
                 context.changes = IterationChanges()
 
                 # Process the chain (leaf first, then ancestors)
-                processed_ids: set[StepId] = set()
+                processed_ids: set[str] = set()
                 for step in target_steps:
                     if step.id in processed_ids:
                         continue
@@ -1253,9 +1250,7 @@ class Evaluator:
                 # until no unprocessed created steps remain.
                 while True:
                     unprocessed = [
-                        s
-                        for s in context.changes.created_steps
-                        if s.id not in processed_ids
+                        s for s in context.changes.created_steps if s.id not in processed_ids
                     ]
                     if not unprocessed:
                         break
@@ -1278,10 +1273,7 @@ class Evaluator:
             # Check if the workflow root reached a terminal state
             root = self.persistence.get_workflow_root(workflow_id_val)
             if root and root.is_complete:
-                outputs = {
-                    name: attr.value
-                    for name, attr in root.attributes.returns.items()
-                }
+                outputs = {name: attr.value for name, attr in root.attributes.returns.items()}
                 self.telemetry.log_workflow_complete(workflow_id_val, outputs)
                 return ExecutionResult(
                     success=True,

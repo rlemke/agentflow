@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.rounds_utils import refine_argument, challenge_argument
+from handlers.shared.rounds_utils import challenge_argument, refine_argument
 
 NAMESPACE = "rounds.Argumentation"
 
@@ -23,7 +23,12 @@ def handle_refine_argument(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"{agent} refined {stance} argument (round {round_num})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"{agent} refined {stance} argument (round {round_num})",
+                "level": "success",
+            }
+        )
 
     return {"refined": result}
 
@@ -44,7 +49,12 @@ def handle_challenge_argument(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"{agent} challenged {target_agent} (round {round_num})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"{agent} challenged {target_agent} (round {round_num})",
+                "level": "success",
+            }
+        )
 
     return {
         "challenge": result["challenge"],

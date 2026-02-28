@@ -15,8 +15,7 @@ from .db_ingest import OutputStore, get_mongo_db
 NAMESPACE = "census.Ingestion"
 
 
-def _ingestion_result(dataset_key: str, record_count: int,
-                      data_type: str) -> dict[str, Any]:
+def _ingestion_result(dataset_key: str, record_count: int, data_type: str) -> dict[str, Any]:
     """Build the standard IngestionResult return dict."""
     return {
         "ingestion": {
@@ -32,8 +31,10 @@ def _ingestion_result(dataset_key: str, record_count: int,
 # ACS → MongoDB (CSV)
 # ------------------------------------------------------------------
 
+
 def _make_acs_db_handler(table_id: str) -> Callable:
     """Factory: create a handler that ingests an ACS CSV into MongoDB."""
+
     def handler(params: dict[str, Any]) -> dict[str, Any]:
         result = params.get("result", {})
         state_fips = params.get("state_fips", "")
@@ -62,12 +63,14 @@ def _make_acs_db_handler(table_id: str) -> Callable:
             if step_log:
                 step_log(f"{facet_name}: {exc}", level="error")
             raise
+
     return handler
 
 
 # ------------------------------------------------------------------
 # TIGER counties → MongoDB (GeoJSON)
 # ------------------------------------------------------------------
+
 
 def _handle_counties_to_db(params: dict[str, Any]) -> dict[str, Any]:
     """Ingest TIGER county GeoJSON into MongoDB."""
@@ -88,8 +91,7 @@ def _handle_counties_to_db(params: dict[str, Any]) -> dict[str, Any]:
 
         if step_log:
             step_log(
-                f"{facet_name}: ingested {count} county features "
-                f"(state={state_fips})",
+                f"{facet_name}: ingested {count} county features (state={state_fips})",
                 level="success",
             )
 
@@ -103,6 +105,7 @@ def _handle_counties_to_db(params: dict[str, Any]) -> dict[str, Any]:
 # ------------------------------------------------------------------
 # Joined geo → MongoDB (GeoJSON)
 # ------------------------------------------------------------------
+
 
 def _handle_joined_to_db(params: dict[str, Any]) -> dict[str, Any]:
     """Ingest joined ACS+TIGER GeoJSON into MongoDB."""
@@ -128,8 +131,7 @@ def _handle_joined_to_db(params: dict[str, Any]) -> dict[str, Any]:
 
         if step_log:
             step_log(
-                f"{facet_name}: ingested {count} joined features "
-                f"(state={state_fips})",
+                f"{facet_name}: ingested {count} joined features (state={state_fips})",
                 level="success",
             )
 
@@ -143,6 +145,7 @@ def _handle_joined_to_db(params: dict[str, Any]) -> dict[str, Any]:
 # ------------------------------------------------------------------
 # Summary → MongoDB (JSON)
 # ------------------------------------------------------------------
+
 
 def _handle_summary_to_db(params: dict[str, Any]) -> dict[str, Any]:
     """Ingest state summary JSON into MongoDB."""

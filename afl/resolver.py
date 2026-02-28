@@ -27,19 +27,15 @@ from typing import TYPE_CHECKING
 from .ast import (
     AndThenBlock,
     CallExpr,
-    EventFacetDecl,
-    FacetDecl,
-    MixinCall,
     MixinSig,
     Program,
-    StepStmt,
-    WorkflowDecl,
-    YieldStmt,
+    PromptBlock,
 )
 from .source import CompilerInput, FileOrigin, SourceEntry, SourceRegistry
 
 if TYPE_CHECKING:
     from .config import MongoDBConfig
+    from .runtime.mongo_store import MongoStore
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +62,8 @@ def _namespace_candidates_from_qualified(name: str) -> list[str]:
 def _collect_calls_from_block(block: AndThenBlock) -> list[CallExpr]:
     """Recursively collect all CallExpr nodes from an andThen block."""
     calls: list[CallExpr] = []
+    if block.block is None:
+        return calls
     for step in block.block.steps:
         calls.append(step.call)
         for mixin in step.call.mixins:
@@ -92,8 +90,8 @@ def _collect_qualified_namespace_refs(program: Program) -> set[str]:
             for cand in _namespace_candidates_from_qualified(call.name):
                 candidates.add(cand)
 
-    def _process_body(body: list[AndThenBlock] | AndThenBlock | None) -> None:
-        if body is None:
+    def _process_body(body: list[AndThenBlock] | AndThenBlock | PromptBlock | None) -> None:
+        if body is None or isinstance(body, PromptBlock):
             return
         blocks = body if isinstance(body, list) else [body]
         for block in blocks:
@@ -200,9 +198,9 @@ class MongoDBNamespaceResolver:
 
     def __init__(self, config: MongoDBConfig) -> None:
         self._config = config
-        self._store: object | None = None
+        self._store: MongoStore | None = None
 
-    def _get_store(self) -> object:
+    def _get_store(self) -> MongoStore:
         """Lazily create MongoStore."""
         if self._store is None:
             from .runtime.mongo_store import MongoStore
@@ -218,7 +216,7 @@ class MongoDBNamespaceResolver:
         """
         try:
             store = self._get_store()
-            source = store.get_source_by_namespace(name)  # type: ignore[union-attr]
+            source = store.get_source_by_namespace(name)
             return source.source_text if source else None
         except Exception as e:
             logger.debug("MongoDB namespace lookup failed for '%s': %s", name, e)
@@ -234,7 +232,7 @@ class MongoDBNamespaceResolver:
             return {}
         try:
             store = self._get_store()
-            sources = store.get_sources_by_namespaces(names)  # type: ignore[union-attr]
+            sources = store.get_sources_by_namespaces(names)
             return {name: ps.source_text for name, ps in sources.items()}
         except Exception as e:
             logger.debug("MongoDB batch namespace lookup failed: %s", e)
@@ -342,9 +340,7 @@ class DependencyResolver:
             # Then try MongoDB for still-missing namespaces
             if self._mongo_resolver is not None:
                 # Recalculate what's still missing after filesystem resolution
-                newly_defined = {
-                    ns.name for p in new_programs for ns in p.namespaces
-                }
+                newly_defined = {ns.name for p in new_programs for ns in p.namespaces}
                 still_missing = missing - newly_defined - defined
                 if still_missing:
                     mongo_results = self._mongo_resolver.batch_find(still_missing)
@@ -377,9 +373,7 @@ class DependencyResolver:
                             resolved_any = True
                             logger.debug("Resolved '%s' from MongoDB", name)
                         except (ParseError, Exception) as e:
-                            logger.warning(
-                                "Failed to parse MongoDB source for '%s': %s", name, e
-                            )
+                            logger.warning("Failed to parse MongoDB source for '%s': %s", name, e)
 
             if not resolved_any:
                 logger.debug(

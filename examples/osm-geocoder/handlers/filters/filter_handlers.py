@@ -8,19 +8,21 @@ Handles filtering events defined in osmfilters.afl under osm.geo.Filters:
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from .radius_filter import (
-    FilterResult,
-    HAS_SHAPELY,
-    filter_geojson,
-    parse_criteria,
-)
 from .osm_type_filter import (
     HAS_OSMIUM as HAS_OSMIUM_TYPE,
+)
+from .osm_type_filter import (
     OSMFilterResult,
     filter_geojson_by_osm_type,
     filter_pbf_by_type,
+)
+from .radius_filter import (
+    HAS_SHAPELY,
+    FilterResult,
+    filter_geojson,
+    parse_criteria,
 )
 
 log = logging.getLogger(__name__)
@@ -71,7 +73,7 @@ def _make_radius_filter_handler(facet_name: str):
                     "boundary_type": "all",
                     "filter_applied": f"radius {operator} {radius} {unit}",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -79,7 +81,10 @@ def _make_radius_filter_handler(facet_name: str):
         result = filter_geojson(input_path, criteria)
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {operator} {radius} {unit})", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {operator} {radius} {unit})",
+                level="success",
+            )
         return {"result": _result_to_dict(result)}
 
     return handler
@@ -99,7 +104,9 @@ def _make_radius_range_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: filtering {input_path} with radius {min_radius}-{max_radius} {unit}")
+            step_log(
+                f"{facet_name}: filtering {input_path} with radius {min_radius}-{max_radius} {unit}"
+            )
         log.info(
             "%s filtering %s with radius %s-%s %s",
             facet_name,
@@ -118,7 +125,7 @@ def _make_radius_range_handler(facet_name: str):
                     "boundary_type": "all",
                     "filter_applied": f"radius {min_radius}-{max_radius} {unit}",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -131,7 +138,10 @@ def _make_radius_range_handler(facet_name: str):
         result = filter_geojson(input_path, criteria)
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {min_radius}-{max_radius} {unit})", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {min_radius}-{max_radius} {unit})",
+                level="success",
+            )
         return {"result": _result_to_dict(result)}
 
     return handler
@@ -152,7 +162,9 @@ def _make_type_and_radius_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: filtering {input_path} type={boundary_type} radius {operator} {radius} {unit}")
+            step_log(
+                f"{facet_name}: filtering {input_path} type={boundary_type} radius {operator} {radius} {unit}"
+            )
         log.info(
             "%s filtering %s type=%s with radius %s %s %s",
             facet_name,
@@ -172,7 +184,7 @@ def _make_type_and_radius_handler(facet_name: str):
                     "boundary_type": boundary_type,
                     "filter_applied": f"type={boundary_type}, radius {operator} {radius} {unit}",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -180,7 +192,10 @@ def _make_type_and_radius_handler(facet_name: str):
         result = filter_geojson(input_path, criteria, boundary_type=boundary_type)
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={boundary_type}, radius)", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={boundary_type}, radius)",
+                level="success",
+            )
         return {"result": _result_to_dict(result)}
 
     return handler
@@ -203,7 +218,9 @@ def _make_extract_and_filter_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: extracting from {pbf_path} then filtering radius {operator} {radius} {unit}")
+            step_log(
+                f"{facet_name}: extracting from {pbf_path} then filtering radius {operator} {radius} {unit}"
+            )
 
         # Normalize admin_levels to list of ints
         if isinstance(admin_levels, str):
@@ -236,7 +253,7 @@ def _make_extract_and_filter_handler(facet_name: str):
                     "boundary_type": boundary_type,
                     "filter_applied": f"radius {operator} {radius} {unit}",
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -265,7 +282,10 @@ def _make_extract_and_filter_handler(facet_name: str):
         filter_result = filter_geojson(extraction_result.output_path, criteria)
 
         if step_log:
-            step_log(f"{facet_name}: extracted {extraction_result.feature_count}, filtered to {filter_result.feature_count}", level="success")
+            step_log(
+                f"{facet_name}: extracted {extraction_result.feature_count}, filtered to {filter_result.feature_count}",
+                level="success",
+            )
         return {
             "result": {
                 "output_path": filter_result.output_path,
@@ -343,7 +363,7 @@ def _make_osm_type_filter_handler(facet_name: str):
                     "dependencies_included": include_dependencies,
                     "dependency_count": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -354,7 +374,10 @@ def _make_osm_type_filter_handler(facet_name: str):
         )
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})",
+                level="success",
+            )
         return {"result": _osm_result_to_dict(result)}
 
     return handler
@@ -397,7 +420,7 @@ def _make_osm_tag_filter_handler(facet_name: str):
                     "dependencies_included": include_dependencies,
                     "dependency_count": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -410,7 +433,10 @@ def _make_osm_tag_filter_handler(facet_name: str):
         )
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (tag {tag_key}={tag_value})", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (tag {tag_key}={tag_value})",
+                level="success",
+            )
         return {"result": _osm_result_to_dict(result)}
 
     return handler
@@ -451,7 +477,7 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
                     "dependencies_included": False,
                     "dependency_count": 0,
                     "format": "GeoJSON",
-                    "extraction_date": datetime.now(timezone.utc).isoformat(),
+                    "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
 
@@ -463,7 +489,10 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
         )
 
         if step_log:
-            step_log(f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})", level="success")
+            step_log(
+                f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})",
+                level="success",
+            )
         return {"result": _osm_result_to_dict(result)}
 
     return handler

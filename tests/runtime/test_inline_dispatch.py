@@ -28,9 +28,8 @@ from afl.runtime import (
     StepState,
     Telemetry,
 )
-from afl.runtime.dispatcher import InMemoryDispatcher, RegistryDispatcher
+from afl.runtime.dispatcher import InMemoryDispatcher
 from afl.runtime.registry_runner import RegistryRunner, RegistryRunnerConfig
-
 
 # =========================================================================
 # Fixtures
@@ -508,7 +507,7 @@ class TestInlineDispatchAddOne:
         dispatcher = InMemoryDispatcher()
         dispatcher.register("AddOne", failing_handler)
 
-        result = evaluator.execute(
+        _result = evaluator.execute(
             ADDONE_WORKFLOW_AST,
             inputs={"x": 1},
             program_ast=ADDONE_PROGRAM_AST,
@@ -710,18 +709,22 @@ class TestInlineDispatchWithRegistryRunner:
         # Register both handlers
         f_double = tmp_path / "double_handler.py"
         f_double.write_text("def handle(payload):\n    return {'output': payload['input'] * 2}\n")
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="compute.Double",
-            module_uri=f"file://{f_double}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="compute.Double",
+                module_uri=f"file://{f_double}",
+                entrypoint="handle",
+            )
+        )
         f_square = tmp_path / "square_handler.py"
         f_square.write_text("def handle(payload):\n    return {'output': payload['input'] ** 2}\n")
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="compute.Square",
-            module_uri=f"file://{f_square}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="compute.Square",
+                module_uri=f"file://{f_square}",
+                entrypoint="handle",
+            )
+        )
 
         runner = RegistryRunner(
             persistence=store,
@@ -757,11 +760,13 @@ class TestInlineDispatchWithRegistryRunner:
         # Only register Double, NOT Square
         f_double = tmp_path / "double_handler.py"
         f_double.write_text("def handle(payload):\n    return {'output': payload['input'] * 2}\n")
-        store.save_handler_registration(HandlerRegistration(
-            facet_name="compute.Double",
-            module_uri=f"file://{f_double}",
-            entrypoint="handle",
-        ))
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="compute.Double",
+                module_uri=f"file://{f_double}",
+                entrypoint="handle",
+            )
+        )
 
         runner = RegistryRunner(
             persistence=store,

@@ -23,15 +23,14 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from afl.runtime import ExecutionStatus
-
 from helpers import (
     EXAMPLE_AFL_FILES,
     compile_afl_files,
     extract_workflow,
     run_to_completion,
 )
+
+from afl.runtime import ExecutionStatus
 
 # Add the osm-geocoder example to the path so we can import handlers
 _EXAMPLE_ROOT = Path(__file__).parent.parent.parent.parent
@@ -140,7 +139,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -161,7 +163,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -187,7 +192,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein", "min_pop": 0},
             max_rounds=50,
         )
@@ -211,7 +219,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=100,
         )
@@ -234,7 +245,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -257,7 +271,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein", "min_population": 0},
             max_rounds=50,
         )
@@ -279,7 +296,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -299,7 +319,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -320,7 +343,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=50,
         )
@@ -346,7 +372,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein"},
             max_rounds=100,
         )
@@ -370,7 +399,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein", "output_dir": "/tmp"},
             max_rounds=50,
         )
@@ -393,7 +425,10 @@ class TestComposedWorkflowsIntegration:
         _register_handlers(poller)
 
         result = run_to_completion(
-            evaluator, poller, workflow, program,
+            evaluator,
+            poller,
+            workflow,
+            program,
             inputs={"region": "Liechtenstein", "output_dir": "/tmp"},
             max_rounds=50,
         )

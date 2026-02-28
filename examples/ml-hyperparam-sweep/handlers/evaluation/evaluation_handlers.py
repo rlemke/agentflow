@@ -20,7 +20,12 @@ def handle_evaluate_model(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Evaluated model '{model_id}': f1={result['f1_score']:.4f}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Evaluated model '{model_id}': f1={result['f1_score']:.4f}",
+                "level": "success",
+            }
+        )
 
     return {"result": result}
 
@@ -37,7 +42,12 @@ def handle_compare_to_best(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Best model: {comparison['best_model_id']} ({metric_name})", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Best model: {comparison['best_model_id']} ({metric_name})",
+                "level": "success",
+            }
+        )
 
     return {"comparison": comparison}
 

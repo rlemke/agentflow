@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.rounds_utils import initiate_round, assign_positions
+from handlers.shared.rounds_utils import assign_positions, initiate_round
 
 NAMESPACE = "rounds.Setup"
 
@@ -25,7 +25,9 @@ def handle_initiate_round(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Initiated round {round_num} on '{topic}'", "level": "success"})
+        step_log.append(
+            {"message": f"Initiated round {round_num} on '{topic}'", "level": "success"}
+        )
 
     return {"round_state": result}
 
@@ -41,7 +43,12 @@ def handle_assign_positions(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Assigned {len(assignments)} positions for round {round_num}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Assigned {len(assignments)} positions for round {round_num}",
+                "level": "success",
+            }
+        )
 
     return {"assignments": assignments}
 

@@ -11,6 +11,7 @@ import logging
 import math
 import posixpath
 from dataclasses import dataclass
+from datetime import UTC
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -358,13 +359,14 @@ def filter_geojson(
 
     # Write output
     from ..shared._output import open_output as _open_output
+
     with _open_output(output_path) as f:
         json.dump(output_geojson, f, indent=2)
 
     # Build filter description
     filter_desc = _describe_filter(criteria, boundary_type)
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     return FilterResult(
         output_path=str(output_path),
@@ -372,7 +374,7 @@ def filter_geojson(
         original_count=original_count,
         boundary_type=boundary_type or "all",
         filter_applied=filter_desc,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
@@ -388,9 +390,7 @@ def _describe_filter(criteria: RadiusCriteria, boundary_type: str | None) -> str
     }
 
     if criteria.operator == Operator.BETWEEN:
-        filter_str = (
-            f"radius {criteria.threshold}-{criteria.max_threshold} {criteria.unit.value}"
-        )
+        filter_str = f"radius {criteria.threshold}-{criteria.max_threshold} {criteria.unit.value}"
     else:
         symbol = op_symbols.get(criteria.operator, criteria.operator.value)
         filter_str = f"radius {symbol} {criteria.threshold} {criteria.unit.value}"

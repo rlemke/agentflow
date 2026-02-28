@@ -4,8 +4,13 @@ Provides compilation, workflow extraction, and execution helpers
 that use real AFL source files and the full compiler pipeline.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pymongo.database import Database
 
 from afl.emitter import emit_dict
 from afl.parser import AFLParser
@@ -157,9 +162,7 @@ def run_to_completion(
             # No tasks claimed — try resuming anyway (may have been continued already)
             pass
 
-        result = evaluator.resume(
-            result.workflow_id, workflow_ast, program_ast, inputs
-        )
+        result = evaluator.resume(result.workflow_id, workflow_ast, program_ast, inputs)
 
         if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):
             return result
@@ -173,7 +176,7 @@ def run_to_completion(
 
 
 def store_flow(
-    db: "Database",
+    db: Database,
     name: str,
     afl_sources: list[tuple[str, str]],
 ) -> str:
@@ -200,8 +203,7 @@ def store_flow(
         uuid=flow_id,
         name=FlowIdentity(name=name, path=f"/test/{name}", uuid=flow_id),
         compiled_sources=[
-            SourceText(name=filename, content=content)
-            for filename, content in afl_sources
+            SourceText(name=filename, content=content) for filename, content in afl_sources
         ],
     )
 
@@ -212,7 +214,7 @@ def store_flow(
 
 
 def submit_workflow(
-    db: "Database",
+    db: Database,
     flow_id: str,
     workflow_name: str,
     inputs: dict | None = None,
@@ -262,7 +264,7 @@ def submit_workflow(
 
 
 def wait_for_task(
-    db: "Database",
+    db: Database,
     task_id: str,
     timeout_s: int = 120,
     poll_interval_s: float = 2.0,
@@ -293,6 +295,4 @@ def wait_for_task(
     # Fetch final state for the error message
     doc = db.tasks.find_one({"uuid": task_id})
     state = doc.get("state", "unknown") if doc else "not found"
-    raise TimeoutError(
-        f"Task {task_id} did not complete within {timeout_s}s (state={state})"
-    )
+    raise TimeoutError(f"Task {task_id} did not complete within {timeout_s}s (state={state})")

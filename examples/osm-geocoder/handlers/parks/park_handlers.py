@@ -5,7 +5,7 @@ Handles park extraction events defined in osmparks.afl under osm.geo.Parks.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .park_extractor import (
     HAS_OSMIUM,
@@ -43,7 +43,10 @@ def _make_national_parks_handler(facet_name: str):
                 park_type=ParkType.NATIONAL,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} national parks", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} national parks",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract national parks: %s", e)
@@ -73,7 +76,9 @@ def _make_state_parks_handler(facet_name: str):
                 park_type=ParkType.STATE,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} state parks", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} state parks", level="success"
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract state parks: %s", e)
@@ -103,7 +108,10 @@ def _make_nature_reserves_handler(facet_name: str):
                 park_type=ParkType.NATURE_RESERVE,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} nature reserves", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} nature reserves",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract nature reserves: %s", e)
@@ -125,7 +133,9 @@ def _make_protected_areas_handler(facet_name: str):
             step_log(f"{facet_name}: extracting protected areas from {pbf_path}")
         log.info(
             "%s extracting protected areas from %s (classes=%s)",
-            facet_name, pbf_path, protect_classes
+            facet_name,
+            pbf_path,
+            protect_classes,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -138,7 +148,10 @@ def _make_protected_areas_handler(facet_name: str):
                 protect_classes=protect_classes,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} protected areas", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} protected areas",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract protected areas: %s", e)
@@ -161,7 +174,10 @@ def _make_extract_parks_handler(facet_name: str):
             step_log(f"{facet_name}: extracting {park_type} parks from {pbf_path}")
         log.info(
             "%s extracting %s parks from %s (classes=%s)",
-            facet_name, park_type, pbf_path, protect_classes
+            facet_name,
+            park_type,
+            pbf_path,
+            protect_classes,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -174,7 +190,10 @@ def _make_extract_parks_handler(facet_name: str):
                 protect_classes=protect_classes,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} {park_type} parks", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} {park_type} parks",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract parks: %s", e)
@@ -196,7 +215,10 @@ def _make_filter_parks_handler(facet_name: str):
             step_log(f"{facet_name}: filtering {input_path} for {park_type} parks")
         log.info(
             "%s filtering %s for %s parks (classes=%s)",
-            facet_name, input_path, park_type, protect_classes
+            facet_name,
+            input_path,
+            park_type,
+            protect_classes,
         )
 
         if not input_path:
@@ -209,7 +231,10 @@ def _make_filter_parks_handler(facet_name: str):
                 protect_classes=protect_classes,
             )
             if step_log:
-                step_log(f"{facet_name}: filtered to {result.feature_count} {park_type} parks", level="success")
+                step_log(
+                    f"{facet_name}: filtered to {result.feature_count} {park_type} parks",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to filter parks: %s", e)
@@ -260,10 +285,15 @@ def _make_large_parks_handler(facet_name: str):
         step_log = payload.get("_step_log")
 
         if step_log:
-            step_log(f"{facet_name}: extracting {park_type} parks >= {min_area_km2:.1f} km2 from {pbf_path}")
+            step_log(
+                f"{facet_name}: extracting {park_type} parks >= {min_area_km2:.1f} km2 from {pbf_path}"
+            )
         log.info(
             "%s extracting %s parks >= %.1f km² from %s",
-            facet_name, park_type, min_area_km2, pbf_path
+            facet_name,
+            park_type,
+            min_area_km2,
+            pbf_path,
         )
 
         if not HAS_OSMIUM or not pbf_path:
@@ -276,7 +306,10 @@ def _make_large_parks_handler(facet_name: str):
                 min_area_km2=min_area_km2,
             )
             if step_log:
-                step_log(f"{facet_name}: extracted {result.feature_count} large {park_type} parks (>= {min_area_km2:.1f} km2)", level="success")
+                step_log(
+                    f"{facet_name}: extracted {result.feature_count} large {park_type} parks (>= {min_area_km2:.1f} km2)",
+                    level="success",
+                )
             return {"result": _result_to_dict(result)}
         except Exception as e:
             log.error("Failed to extract large parks: %s", e)
@@ -320,7 +353,7 @@ def _empty_result(park_type: str, protect_classes: str) -> dict:
         "protect_classes": protect_classes,
         "total_area_km2": 0.0,
         "format": "GeoJSON",
-        "extraction_date": datetime.now(timezone.utc).isoformat(),
+        "extraction_date": datetime.now(UTC).isoformat(),
     }
 
 

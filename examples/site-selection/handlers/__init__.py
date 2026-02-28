@@ -6,8 +6,8 @@ supporting both AgentPoller and RegistryRunner execution models.
 
 from .downloads.download_handlers import register_download_handlers
 from .extract.extract_handlers import register_extract_handlers
-from .scoring.scoring_handlers import register_scoring_handlers
 from .output.output_handlers import register_output_handlers
+from .scoring.scoring_handlers import register_scoring_handlers
 
 __all__ = [
     "register_all_handlers",
@@ -31,8 +31,8 @@ def register_all_registry_handlers(runner) -> None:
     """Register all facet handlers with a RegistryRunner."""
     from .downloads.download_handlers import register_handlers as reg_downloads
     from .extract.extract_handlers import register_handlers as reg_extract
-    from .scoring.scoring_handlers import register_handlers as reg_scoring
     from .output.output_handlers import register_handlers as reg_output
+    from .scoring.scoring_handlers import register_handlers as reg_scoring
 
     reg_downloads(runner)
     reg_extract(runner)

@@ -43,7 +43,9 @@ def handle_select_next_tool(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Selected next tool: {result['next_tool']}", "level": "success"})
+        step_log.append(
+            {"message": f"Selected next tool: {result['next_tool']}", "level": "success"}
+        )
 
     return {
         "next_tool": result["next_tool"],

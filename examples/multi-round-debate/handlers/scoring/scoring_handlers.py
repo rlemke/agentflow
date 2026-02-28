@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-from handlers.shared.rounds_utils import score_round, evaluate_convergence
+from handlers.shared.rounds_utils import evaluate_convergence, score_round
 
 NAMESPACE = "rounds.Scoring"
 
@@ -28,7 +28,9 @@ def handle_score_round(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Scored round {round_num} for {len(scores)} agents", "level": "success"})
+        step_log.append(
+            {"message": f"Scored round {round_num} for {len(scores)} agents", "level": "success"}
+        )
 
     return {"scores": scores}
 
@@ -47,7 +49,12 @@ def handle_evaluate_convergence(params: dict[str, Any]) -> dict[str, Any]:
 
     step_log = params.get("_step_log")
     if step_log:
-        step_log.append({"message": f"Convergence at round {round_num}: delta={metrics['score_delta']}", "level": "success"})
+        step_log.append(
+            {
+                "message": f"Convergence at round {round_num}: delta={metrics['score_delta']}",
+                "level": "success",
+            }
+        )
 
     return {"metrics": metrics}
 

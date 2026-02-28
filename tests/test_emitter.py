@@ -223,12 +223,12 @@ class TestPromptBlockEmission:
 
     def test_prompt_block_all_directives(self, emitter):
         """Prompt block with all directives."""
-        source = '''event facet Test()
+        source = """event facet Test()
 prompt {
     system "sys"
     template "tmpl"
     model "model-id"
-}'''
+}"""
         ast = parse(source)
         data = emitter.emit_dict(ast)
 

@@ -14,6 +14,7 @@ import pytest
 class TestDebateUtils:
     def test_frame_structure(self):
         from handlers.shared.debate_utils import frame_debate
+
         result = frame_debate("artificial intelligence", 3)
         assert "topic_analysis" in result
         assert "positions" in result
@@ -25,12 +26,14 @@ class TestDebateUtils:
 
     def test_frame_determinism(self):
         from handlers.shared.debate_utils import frame_debate
+
         r1 = frame_debate("climate change", 3)
         r2 = frame_debate("climate change", 3)
         assert r1 == r2
 
     def test_role_count(self):
         from handlers.shared.debate_utils import assign_roles
+
         positions = [
             {"stance": "for", "rationale": "r1", "priority": 3},
             {"stance": "against", "rationale": "r2", "priority": 2},
@@ -44,6 +47,7 @@ class TestDebateUtils:
 
     def test_argument_structure(self):
         from handlers.shared.debate_utils import generate_argument
+
         role = {"persona": "proposer", "position": "for"}
         arg = generate_argument(role, "AI safety", "context")
         assert arg["agent_role"] == "proposer"
@@ -54,6 +58,7 @@ class TestDebateUtils:
 
     def test_rebuttal_references(self):
         from handlers.shared.debate_utils import generate_rebuttal
+
         role = {"persona": "critic"}
         arguments = [
             {"agent_role": "proposer", "claims": ["c1"], "evidence": ["e1"]},
@@ -67,6 +72,7 @@ class TestDebateUtils:
 
     def test_score_range(self):
         from handlers.shared.debate_utils import score_arguments
+
         arguments = [
             {"agent_role": "proposer"},
             {"agent_role": "critic"},
@@ -82,6 +88,7 @@ class TestDebateUtils:
 
     def test_verdict_structure(self):
         from handlers.shared.debate_utils import judge_debate
+
         scores = [
             {"agent_role": "proposer", "overall": 80},
             {"agent_role": "critic", "overall": 70},
@@ -95,7 +102,12 @@ class TestDebateUtils:
 
     def test_synthesis_themes(self):
         from handlers.shared.debate_utils import synthesize_positions
-        arguments = [{"agent_role": "proposer"}, {"agent_role": "critic"}, {"agent_role": "synthesizer"}]
+
+        arguments = [
+            {"agent_role": "proposer"},
+            {"agent_role": "critic"},
+            {"agent_role": "synthesizer"},
+        ]
         rebuttals = [{"agent_role": "proposer"}]
         scores = [{"overall": 80}]
         synthesis, themes = synthesize_positions(arguments, rebuttals, scores)
@@ -105,6 +117,7 @@ class TestDebateUtils:
 
     def test_consensus_level(self):
         from handlers.shared.debate_utils import build_consensus
+
         verdict = {"winner": "proposer", "margin": 12.5}
         consensus = build_consensus(verdict, "synthesis text", ["theme1", "theme2"])
         assert 0.2 <= consensus["agreement_level"] <= 0.9
@@ -119,6 +132,7 @@ class TestDebateUtils:
 class TestFramingHandlers:
     def test_frame_default(self):
         from handlers.framing.framing_handlers import handle_frame_debate
+
         result = handle_frame_debate({"topic": "renewable energy"})
         assert "topic_analysis" in result
         assert len(result["positions"]) == 3
@@ -126,19 +140,23 @@ class TestFramingHandlers:
 
     def test_custom_num_agents(self):
         from handlers.framing.framing_handlers import handle_frame_debate
+
         result = handle_frame_debate({"topic": "space exploration", "num_agents": 4})
         assert len(result["positions"]) == 4
 
     def test_assign_roles_json_string(self):
         from handlers.framing.framing_handlers import handle_assign_roles
+
         positions = [
             {"stance": "for", "rationale": "r1", "priority": 2},
             {"stance": "against", "rationale": "r2", "priority": 1},
         ]
-        result = handle_assign_roles({
-            "topic_analysis": "analysis text",
-            "positions": json.dumps(positions),
-        })
+        result = handle_assign_roles(
+            {
+                "topic_analysis": "analysis text",
+                "positions": json.dumps(positions),
+            }
+        )
         assert len(result["assignments"]) == 2
         assert result["assignments"][0]["persona"] == "proposer"
 
@@ -149,10 +167,13 @@ class TestFramingHandlers:
 class TestArgumentationHandlers:
     def test_argument_structure(self):
         from handlers.argumentation.argumentation_handlers import handle_generate_argument
-        result = handle_generate_argument({
-            "role": {"persona": "proposer", "position": "for"},
-            "topic": "AI regulation",
-        })
+
+        result = handle_generate_argument(
+            {
+                "role": {"persona": "proposer", "position": "for"},
+                "topic": "AI regulation",
+            }
+        )
         arg = result["argument"]
         assert arg["agent_role"] == "proposer"
         assert len(arg["claims"]) == 3
@@ -160,33 +181,42 @@ class TestArgumentationHandlers:
 
     def test_rebuttal_with_arguments(self):
         from handlers.argumentation.argumentation_handlers import handle_generate_rebuttal
+
         arguments = [
             {"agent_role": "proposer", "claims": ["c1"]},
             {"agent_role": "synthesizer", "claims": ["c2"]},
         ]
-        result = handle_generate_rebuttal({
-            "role": {"persona": "critic"},
-            "arguments": arguments,
-        })
+        result = handle_generate_rebuttal(
+            {
+                "role": {"persona": "critic"},
+                "arguments": arguments,
+            }
+        )
         reb = result["rebuttal"]
         assert reb["agent_role"] == "critic"
         assert reb["target_role"] == "proposer"
 
     def test_json_string_role(self):
         from handlers.argumentation.argumentation_handlers import handle_generate_argument
+
         role = {"persona": "critic", "position": "against", "expertise": "analysis"}
-        result = handle_generate_argument({
-            "role": json.dumps(role),
-            "topic": "testing",
-        })
+        result = handle_generate_argument(
+            {
+                "role": json.dumps(role),
+                "topic": "testing",
+            }
+        )
         assert result["argument"]["agent_role"] == "critic"
 
     def test_empty_arguments(self):
         from handlers.argumentation.argumentation_handlers import handle_generate_rebuttal
-        result = handle_generate_rebuttal({
-            "role": {"persona": "synthesizer"},
-            "arguments": [],
-        })
+
+        result = handle_generate_rebuttal(
+            {
+                "role": {"persona": "synthesizer"},
+                "arguments": [],
+            }
+        )
         reb = result["rebuttal"]
         assert reb["target_role"] == "unknown"
         assert len(reb["counter_claims"]) >= 1
@@ -198,10 +228,13 @@ class TestArgumentationHandlers:
 class TestEvaluationHandlers:
     def test_score_range(self):
         from handlers.evaluation.evaluation_handlers import handle_score_arguments
-        result = handle_score_arguments({
-            "arguments": [{"agent_role": "proposer"}],
-            "rebuttals": [{"agent_role": "critic"}],
-        })
+
+        result = handle_score_arguments(
+            {
+                "arguments": [{"agent_role": "proposer"}],
+                "rebuttals": [{"agent_role": "critic"}],
+            }
+        )
         scores = result["scores"]
         assert len(scores) == 1
         assert 40 <= scores[0]["clarity"] <= 95
@@ -209,34 +242,47 @@ class TestEvaluationHandlers:
 
     def test_multiple_arguments(self):
         from handlers.evaluation.evaluation_handlers import handle_score_arguments
-        result = handle_score_arguments({
-            "arguments": [{"agent_role": "proposer"}, {"agent_role": "critic"}, {"agent_role": "synthesizer"}],
-            "rebuttals": [],
-        })
+
+        result = handle_score_arguments(
+            {
+                "arguments": [
+                    {"agent_role": "proposer"},
+                    {"agent_role": "critic"},
+                    {"agent_role": "synthesizer"},
+                ],
+                "rebuttals": [],
+            }
+        )
         assert len(result["scores"]) == 3
 
     def test_judge_verdict(self):
         from handlers.evaluation.evaluation_handlers import handle_judge_debate
-        result = handle_judge_debate({
-            "topic": "climate policy",
-            "synthesis": "balanced analysis",
-            "scores": [
-                {"agent_role": "proposer", "overall": 85},
-                {"agent_role": "critic", "overall": 72},
-            ],
-        })
+
+        result = handle_judge_debate(
+            {
+                "topic": "climate policy",
+                "synthesis": "balanced analysis",
+                "scores": [
+                    {"agent_role": "proposer", "overall": 85},
+                    {"agent_role": "critic", "overall": 72},
+                ],
+            }
+        )
         verdict = result["verdict"]
         assert verdict["winner"] == "proposer"
         assert "rationale" in verdict
 
     def test_json_string_scores(self):
         from handlers.evaluation.evaluation_handlers import handle_judge_debate
+
         scores = [{"agent_role": "critic", "overall": 90}]
-        result = handle_judge_debate({
-            "topic": "test",
-            "synthesis": "test synthesis",
-            "scores": json.dumps(scores),
-        })
+        result = handle_judge_debate(
+            {
+                "topic": "test",
+                "synthesis": "test synthesis",
+                "scores": json.dumps(scores),
+            }
+        )
         assert result["verdict"]["winner"] == "critic"
 
 
@@ -246,11 +292,14 @@ class TestEvaluationHandlers:
 class TestSynthesisHandlers:
     def test_synthesis_output(self):
         from handlers.synthesis.synthesis_handlers import handle_synthesize_positions
-        result = handle_synthesize_positions({
-            "arguments": [{"agent_role": "proposer"}, {"agent_role": "critic"}],
-            "rebuttals": [{"agent_role": "proposer"}],
-            "scores": [{"overall": 80}],
-        })
+
+        result = handle_synthesize_positions(
+            {
+                "arguments": [{"agent_role": "proposer"}, {"agent_role": "critic"}],
+                "rebuttals": [{"agent_role": "proposer"}],
+                "scores": [{"overall": 80}],
+            }
+        )
         assert "synthesis" in result
         assert "themes" in result
         assert isinstance(result["themes"], list)
@@ -258,32 +307,41 @@ class TestSynthesisHandlers:
 
     def test_consensus_level(self):
         from handlers.synthesis.synthesis_handlers import handle_build_consensus
-        result = handle_build_consensus({
-            "verdict": {"winner": "proposer", "margin": 10.0},
-            "synthesis": "test synthesis",
-            "themes": ["theme1", "theme2"],
-        })
+
+        result = handle_build_consensus(
+            {
+                "verdict": {"winner": "proposer", "margin": 10.0},
+                "synthesis": "test synthesis",
+                "themes": ["theme1", "theme2"],
+            }
+        )
         consensus = result["consensus"]
         assert 0.2 <= consensus["agreement_level"] <= 0.9
         assert isinstance(consensus["common_ground"], list)
 
     def test_json_string_inputs(self):
         from handlers.synthesis.synthesis_handlers import handle_synthesize_positions
-        result = handle_synthesize_positions({
-            "arguments": json.dumps([{"agent_role": "proposer"}]),
-            "rebuttals": json.dumps([]),
-            "scores": json.dumps([]),
-        })
+
+        result = handle_synthesize_positions(
+            {
+                "arguments": json.dumps([{"agent_role": "proposer"}]),
+                "rebuttals": json.dumps([]),
+                "scores": json.dumps([]),
+            }
+        )
         assert "synthesis" in result
         assert len(result["themes"]) >= 3
 
     def test_agreement_detection(self):
         from handlers.synthesis.synthesis_handlers import handle_build_consensus
-        result = handle_build_consensus({
-            "verdict": json.dumps({"winner": "critic", "margin": 5.0}),
-            "synthesis": "high agreement synthesis",
-            "themes": json.dumps(["t1", "t2", "t3"]),
-        })
+
+        result = handle_build_consensus(
+            {
+                "verdict": json.dumps({"winner": "critic", "margin": 5.0}),
+                "synthesis": "high agreement synthesis",
+                "themes": json.dumps(["t1", "t2", "t3"]),
+            }
+        )
         consensus = result["consensus"]
         assert "summary" in consensus
         assert len(consensus["unresolved"]) >= 1
@@ -295,33 +353,38 @@ class TestSynthesisHandlers:
 class TestDispatch:
     def test_framing_dispatch(self):
         from handlers.framing.framing_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "debate.Framing.FrameDebate" in _DISPATCH
         assert "debate.Framing.AssignRoles" in _DISPATCH
 
     def test_argumentation_dispatch(self):
         from handlers.argumentation.argumentation_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "debate.Argumentation.GenerateArgument" in _DISPATCH
         assert "debate.Argumentation.GenerateRebuttal" in _DISPATCH
 
     def test_evaluation_dispatch(self):
         from handlers.evaluation.evaluation_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "debate.Evaluation.ScoreArguments" in _DISPATCH
         assert "debate.Evaluation.JudgeDebate" in _DISPATCH
 
     def test_synthesis_dispatch(self):
         from handlers.synthesis.synthesis_handlers import _DISPATCH
+
         assert len(_DISPATCH) == 2
         assert "debate.Synthesis.SynthesizePositions" in _DISPATCH
         assert "debate.Synthesis.BuildConsensus" in _DISPATCH
 
     def test_total_handler_count(self):
-        from handlers.framing.framing_handlers import _DISPATCH as d1
         from handlers.argumentation.argumentation_handlers import _DISPATCH as d2
         from handlers.evaluation.evaluation_handlers import _DISPATCH as d3
+        from handlers.framing.framing_handlers import _DISPATCH as d1
         from handlers.synthesis.synthesis_handlers import _DISPATCH as d4
+
         assert len(d1) + len(d2) + len(d3) + len(d4) == 8
 
 
@@ -332,6 +395,7 @@ class TestCompilation:
     @pytest.fixture()
     def parsed_ast(self):
         from afl.parser import AFLParser
+
         afl_path = os.path.join(os.path.dirname(__file__), "..", "afl", "debate.afl")
         with open(afl_path) as f:
             source = f.read()
@@ -360,6 +424,7 @@ class TestCompilation:
 
     def test_prompt_block_count(self, parsed_ast):
         from afl.ast import PromptBlock
+
         count = 0
         for ns in parsed_ast.namespaces:
             for ef in ns.event_facets:
@@ -380,10 +445,7 @@ class TestCompilation:
     def test_foreach_present(self, parsed_ast):
         workflows_ns = [ns for ns in parsed_ast.namespaces if ns.name == "debate.workflows"][0]
         consensus = [w for w in workflows_ns.workflows if w.sig.name == "ConsensusDebate"][0]
-        has_foreach = any(
-            block.foreach is not None
-            for block in consensus.body
-        )
+        has_foreach = any(block.foreach is not None for block in consensus.body)
         assert has_foreach
 
 
@@ -392,11 +454,12 @@ class TestCompilation:
 # ---------------------------------------------------------------------------
 class TestAgentIntegration:
     def test_tool_registry_dispatches_all_handlers(self):
-        from afl.runtime.agent import ToolRegistry
-        from handlers.framing.framing_handlers import _DISPATCH as d1
         from handlers.argumentation.argumentation_handlers import _DISPATCH as d2
         from handlers.evaluation.evaluation_handlers import _DISPATCH as d3
+        from handlers.framing.framing_handlers import _DISPATCH as d1
         from handlers.synthesis.synthesis_handlers import _DISPATCH as d4
+
+        from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
         for dispatch in [d1, d2, d3, d4]:
@@ -405,17 +468,23 @@ class TestAgentIntegration:
                 registry.register(tool_name, handler)
 
         tool_names = [
-            "FrameDebate", "AssignRoles", "GenerateArgument",
-            "GenerateRebuttal", "ScoreArguments", "JudgeDebate",
-            "SynthesizePositions", "BuildConsensus",
+            "FrameDebate",
+            "AssignRoles",
+            "GenerateArgument",
+            "GenerateRebuttal",
+            "ScoreArguments",
+            "JudgeDebate",
+            "SynthesizePositions",
+            "BuildConsensus",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
 
     def test_claude_agent_runner_with_custom_handlers(self):
+        from handlers.framing.framing_handlers import handle_frame_debate
+
         from afl.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
         from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
-        from handlers.framing.framing_handlers import handle_frame_debate
 
         store = MemoryStore()
         evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))

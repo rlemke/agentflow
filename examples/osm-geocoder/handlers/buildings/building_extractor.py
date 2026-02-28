@@ -9,10 +9,9 @@ import json
 import logging
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from afl.runtime.storage import get_storage_backend, localize
 
@@ -202,6 +201,7 @@ def calculate_building_area(geometry: dict) -> float:
 
     try:
         from shapely.geometry import shape
+
         geom = shape(geometry)
 
         # Approximate conversion (degrees to meters at mid-latitudes)
@@ -276,22 +276,28 @@ class BuildingHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
         if self.min_area_m2 > 0 and area_m2 < self.min_area_m2:
             return
 
-        self.features.append({
-            "type": "Feature",
-            "properties": {
-                "osm_id": a.orig_id(),
-                "osm_type": "way" if a.from_way() else "relation",
-                "building_type": classification,
-                "name": tags.get("name", ""),
-                "height": height,
-                "levels": levels,
-                "area_m2": round(area_m2, 1),
-                "building": tags.get("building", "yes"),
-                **{k: v for k, v in tags.items()
-                   if k not in ("building", "name", "height", "building:height", "building:levels")},
-            },
-            "geometry": geometry,
-        })
+        self.features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "osm_id": a.orig_id(),
+                    "osm_type": "way" if a.from_way() else "relation",
+                    "building_type": classification,
+                    "name": tags.get("name", ""),
+                    "height": height,
+                    "levels": levels,
+                    "area_m2": round(area_m2, 1),
+                    "building": tags.get("building", "yes"),
+                    **{
+                        k: v
+                        for k, v in tags.items()
+                        if k
+                        not in ("building", "name", "height", "building:height", "building:levels")
+                    },
+                },
+                "geometry": geometry,
+            }
+        )
 
 
 def extract_buildings(
@@ -326,8 +332,11 @@ def extract_buildings(
 
     # Calculate totals
     total_area = sum(f["properties"].get("area_m2", 0) for f in handler.features)
-    with_height = sum(1 for f in handler.features
-                      if f["properties"].get("height") or f["properties"].get("levels"))
+    with_height = sum(
+        1
+        for f in handler.features
+        if f["properties"].get("height") or f["properties"].get("levels")
+    )
 
     geojson = {
         "type": "FeatureCollection",
@@ -343,7 +352,7 @@ def extract_buildings(
         building_type=building_type.value,
         total_area_km2=round(total_area / 1_000_000, 4),
         with_height_data=with_height,
-        extraction_date=datetime.now(timezone.utc).isoformat(),
+        extraction_date=datetime.now(UTC).isoformat(),
     )
 
 
