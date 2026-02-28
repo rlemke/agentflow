@@ -602,6 +602,27 @@ the `step_logs` collection name, level values, source values, and the
 All non-Python SDKs also inject the handler-level `_step_log` callback
 (§7.5) into params before handler invocation, using `source=handler`.
 
+### 7.8 Type Hint Inference (Non-Python SDKs)
+
+When non-Python SDKs build `StepAttributes` from handler return values,
+they infer a `type_hint` string for each value using `inferTypeHint()`.
+In Scala this lives on the `StepAttributes` companion object (as
+`private[agent]`); in Go, TypeScript, and Java it is an internal helper
+within the poller.
+
+| Value type | Inferred hint |
+|------------|---------------|
+| Boolean | `"Boolean"` |
+| Int / Short | `"Long"` |
+| Long | `"Long"` |
+| Float | `"Double"` |
+| Double | `"Double"` |
+| String | `"String"` |
+| Seq / Array / List | `"List"` |
+| Map / Object | `"Map"` |
+| null / undefined | `"Any"` |
+| other | `"Any"` |
+
 ---
 
 ## 8. RunnerService
@@ -1008,7 +1029,7 @@ wraps an `AgentPoller` instance and provides:
 1. `CollectionHandlerRegistrations = "handler_registrations"` protocol constant
 2. `refreshTopics()` — reads `handler_registrations` from MongoDB
 3. `effectiveHandlers()` — returns the intersection of registered handlers and active DB topics
-4. Refresh loop (default 30s) to pick up new registrations
+4. Auto-started refresh loop (default 30s) to pick up new registrations
 
 **Key logic** (same across all SDKs):
 
@@ -1021,12 +1042,18 @@ effectiveHandlers():
   return registeredHandlers ∩ activeTopics
 ```
 
-| SDK | File | Notes |
-|-----|------|-------|
-| Scala | `RegistryRunner.scala` | Wraps `AgentPoller`, `AtomicReference[Set[String]]` for topics |
-| Go | `registry_runner.go` | Sets `topicFilter` func on `AgentPoller`, `sync.RWMutex` for topics |
-| TypeScript | `registry-runner.ts` | Wraps `AgentPoller`, exported from `index.ts` |
-| Java | `RegistryRunner.java` | Wraps `AgentPoller`, `ConcurrentHashMap.newKeySet()` for topics |
+**Refresh loop wiring:** All SDKs auto-start the refresh loop in
+`start()` — creating their own MongoDB client from poller config,
+calling `refreshTopics()` once immediately, then scheduling periodic
+refreshes every 30 seconds. The MongoDB client is disconnected in
+`stop()`.
+
+| SDK | File | Refresh mechanism | Topic storage |
+|-----|------|-------------------|---------------|
+| Scala | `RegistryRunner.scala` | Daemon thread with sleep loop | `AtomicReference[Set[String]]` |
+| Go | `registry_runner.go` | `time.Ticker` goroutine + `stopCh` select | `sync.RWMutex` protected set |
+| TypeScript | `registry-runner.ts` | `setInterval` (auto-started) | `Set<string>` |
+| Java | `RegistryRunner.java` | `ScheduledExecutorService` (daemon factory) | `ConcurrentHashMap.newKeySet()` |
 
 ---
 

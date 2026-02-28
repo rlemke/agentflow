@@ -1,6 +1,113 @@
 # Implementation Changelog
 
-**Current version: v0.25.0**
+**Current version: v0.26.0**
+
+## Completed (v0.26.0) - SDK CI Tests, inferTypeHint Parity, RegistryRunner Refresh, New Example, Dashboard Handler Forms
+
+Add SDK test jobs to CI, Scala `inferTypeHint` test parity, RegistryRunner
+auto-refresh wiring in Go/Scala/Java, new `event-driven-etl` example, and
+dashboard handler registration create/edit UI + API.
+
+### Item 1: SDK Tests in CI
+
+Added 4 new parallel CI jobs for non-Python SDK test suites:
+
+| Job | Runtime | Command | Working directory |
+|-----|---------|---------|-------------------|
+| `test-go` | Go 1.21 | `go test -v ./...` | `agents/go/afl-agent` |
+| `test-typescript` | Node 20 | `npm ci && npm test` | `agents/typescript/afl-agent` |
+| `test-scala` | JDK 17 (Temurin) | `sbt test` | `agents/scala/afl-agent` |
+| `test-java` | JDK 17 (Temurin) | `mvn test -B` | `agents/java/afl-agent` |
+
+File: `.github/workflows/ci.yml`
+
+### Item 2: Scala inferTypeHint Test Parity
+
+Moved `inferTypeHint` from private method in `AgentPoller` to
+`StepAttributes` companion object as `private[agent]`, enabling direct
+unit testing. Added 11 test cases covering all type mappings.
+
+| Type | inferred hint |
+|------|---------------|
+| Boolean | `"Boolean"` |
+| Int | `"Long"` |
+| Long | `"Long"` |
+| Double | `"Double"` |
+| Float | `"Double"` |
+| String | `"String"` |
+| Seq | `"List"` |
+| Map | `"Map"` |
+| null | `"Any"` |
+| other | `"Any"` |
+
+Files: `StepAttributes.scala`, `AgentPoller.scala`, `AgentPollerSpec.scala`
+
+### Item 3: RegistryRunner Auto-Refresh Wiring
+
+Go, Scala, and Java RegistryRunners now auto-start a refresh loop on
+`start()` — creates own MongoDB client from config, calls `refreshTopics()`
+once at start, then every 30 seconds. TypeScript already had this.
+
+| SDK | Mechanism | Cleanup |
+|-----|-----------|---------|
+| Go | `time.Ticker` goroutine + `stopCh` select | Disconnect MongoDB client in `Stop()` |
+| Scala | Daemon thread with sleep loop | Interrupt thread + close client in `stop()` |
+| Java | `ScheduledExecutorService` (daemon thread factory) | Shutdown scheduler + close client in `stop()` |
+
+Files: `registry_runner.go`, `RegistryRunner.scala`, `RegistryRunner.java` + corresponding test files
+
+### Item 4: New Example — event-driven-etl
+
+Simple ETL pipeline demonstrating extract→transform→load with schemas,
+event facets, andThen chaining, foreach, and RegistryRunner-first approach.
+
+**AFL constructs:** 5 namespaces, 3 schemas (`DataSource`, `TransformConfig`,
+`LoadResult`), 6 event facets, 2 workflows (`SimpleETL` with andThen chain
++ statement-level andThen + schema instantiation + map literal,
+`BatchETL` with andThen foreach).
+
+**Tests (39):** 11 utils, 5 extract handlers, 3 transform handlers,
+4 load handlers, 6 dispatch, 8 compilation (incl. array type + map literal
+AST tests), 2 agent integration (RegistryRunner + handler names).
+
+```
+examples/event-driven-etl/
+├── afl/etl.afl
+├── handlers/{__init__,shared/etl_utils,extract/extract_handlers,
+│             transform/transform_handlers,load/load_handlers}.py
+├── tests/{conftest,test_etl_handlers}.py
+├── agent.py, agent_registry.py, conftest.py
+```
+
+### Item 5: Dashboard Handler Registration Create/Edit
+
+Added create and edit UI for handler registrations plus JSON API endpoints.
+
+**Routes:**
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/v2/handlers/new` | Render create form |
+| POST | `/v2/handlers/new` | Create handler, redirect to detail |
+| GET | `/v2/handlers/{name}/edit` | Render pre-populated edit form |
+| POST | `/v2/handlers/{name}/edit` | Update handler, redirect to detail |
+| POST | `/api/handlers` | JSON create (201/400/409) |
+| PUT | `/api/handlers/{name}` | JSON update (200/404) |
+
+**Template:** `form.html` — shared for create/edit (facet_name disabled on edit).
+
+**Tests (9):** form render, create, empty facet_name error, duplicate error,
+edit form render, edit missing redirects, update handler, API create, API update.
+
+Files: `dashboard_v2.py`, `api.py`, `form.html`, `_detail_content.html`,
+`list.html`, `test_handlers_v2.py`
+
+### Spec updates
+
+- `spec/60_agent_sdk.md` §9.13: Updated refresh loop to note auto-start wiring in Go/Scala/Java
+- `spec/99_changelog.md`: This entry
+
+---
 
 ## Completed (v0.25.0) - SDK Tests, CI Build, Handler Logging, RegistryRunner
 
