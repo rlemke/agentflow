@@ -1,0 +1,104 @@
+// Event-Driven ETL Pipeline
+// Demonstrates extract→transform→load with schemas, event facets,
+// andThen chaining, schema instantiation as steps, and RegistryRunner-first approach.
+
+namespace etl.types {
+    schema DataSource {
+        name: String,
+        format: String,
+        path: String
+    }
+
+    schema TransformConfig {
+        filter_expr: String,
+        rename_map: Json,
+        deduplicate: Boolean
+    }
+
+    schema LoadResult {
+        target: String,
+        rows_written: Int,
+        duration_ms: Int,
+        status: String
+    }
+}
+
+namespace etl.Extract {
+    use etl.types
+
+    /** Extract records from a CSV file. */
+    event facet ExtractCSV(source: String, delimiter: String = ",", has_header: Boolean = true) => (records: Json, row_count: Int) prompt {
+        system "You are a data extraction agent."
+        template "Extract CSV records from {source} with delimiter={delimiter}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Extract records from a JSON file. */
+    event facet ExtractJSON(source: String, json_path: String = "$") => (records: Json, row_count: Int) prompt {
+        system "You are a data extraction agent."
+        template "Extract JSON records from {source} at path={json_path}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Validate extracted records against an expected schema. */
+    event facet ValidateSchema(records: Json, expected_fields: [String]) => (valid_records: Json, error_count: Int, errors: Json) prompt {
+        system "You are a data validation agent."
+        template "Validate {records} against fields {expected_fields}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace etl.Transform {
+    use etl.types
+
+    /** Transform records by filtering, renaming, and deduplicating. */
+    event facet TransformRecords(records: Json, filter_expr: String = "true", deduplicate: Boolean = false) => (transformed: Json, transform_count: Int, dropped_count: Int) prompt {
+        system "You are a data transformation agent."
+        template "Transform records with filter={filter_expr} dedup={deduplicate}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace etl.Load {
+    use etl.types
+
+    /** Load transformed records into a target store. */
+    event facet LoadToStore(records: Json, target: String, mode: String = "append") => (result: LoadResult) prompt {
+        system "You are a data loading agent."
+        template "Load records into {target} with mode={mode}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Generate a summary report for the ETL run. */
+    event facet GenerateReport(source: String, target: String, row_count: Int, error_count: Int, load_result: LoadResult) => (report: String, success: Boolean) prompt {
+        system "You are a reporting agent."
+        template "Generate ETL report: source={source} target={target} rows={row_count} errors={error_count}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace etl.Pipelines {
+    use etl.types
+
+    /** Simple ETL pipeline: extract a single source, validate, transform, load. */
+    workflow SimpleETL(source: String, target: String, format: String = "csv", delimiter: String = ",", expected_fields: [String] = ["id", "name", "value"]) => (report: String, success: Boolean) andThen {
+        ext = ExtractCSV(source = $.source, delimiter = $.delimiter)
+        val = ValidateSchema(records = ext.records, expected_fields = $.expected_fields) andThen {
+            cfg = TransformConfig(filter_expr = "true", rename_map = #{}, deduplicate = true)
+            tx = TransformRecords(records = val.valid_records, filter_expr = cfg.filter_expr, deduplicate = cfg.deduplicate)
+        }
+        ld = LoadToStore(records = tx.transformed, target = $.target, mode = "append")
+        rpt = GenerateReport(source = $.source, target = $.target, row_count = ext.row_count, error_count = val.error_count, load_result = ld.result)
+        yield SimpleETL(report = rpt.report, success = rpt.success)
+    }
+
+    /** Batch ETL pipeline: process multiple sources in parallel. */
+    workflow BatchETL(sources: [String], target: String) => (report: String, success: Boolean) andThen {
+        summary = LoadToStore(records = [], target = $.target, mode = "overwrite")
+    } andThen foreach src in $.sources {
+        ext = ExtractCSV(source = $.src, delimiter = ",")
+        val = ValidateSchema(records = ext.records, expected_fields = ["id", "name", "value"])
+        tx = TransformRecords(records = val.valid_records, filter_expr = "true", deduplicate = true)
+        batch_load = LoadToStore(records = tx.transformed, target = $.target, mode = "append")
+    }
+}

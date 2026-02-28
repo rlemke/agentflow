@@ -33,6 +33,19 @@ object StepAttributes:
       key -> AttributeValue(name, value, typeHint)
     attrs.toMap
 
+  /** Infer AFL type hint from a Scala value. */
+  private[agent] def inferTypeHint(value: Any): String = value match
+    case _: Boolean    => "Boolean"
+    case _: Int        => "Long"
+    case _: Long       => "Long"
+    case _: Double     => "Double"
+    case _: Float      => "Double"
+    case _: String     => "String"
+    case _: Seq[?]     => "List"
+    case _: Map[?, ?]  => "Map"
+    case null          => "Any"
+    case _             => "Any"
+
   /** Convert a BsonValue to a Scala value. */
   private[model] def bsonToScala(bson: BsonValue): Any =
     if bson == null || bson.isNull then null

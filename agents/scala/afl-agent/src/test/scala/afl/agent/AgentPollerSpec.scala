@@ -149,3 +149,47 @@ class AgentPollerSpec extends AnyFlatSpec with Matchers:
   it should "have correct EventTransmit state" in {
     Protocol.StepState.EventTransmit shouldBe "state.facet.execution.EventTransmit"
   }
+
+  // --- StepAttributes.inferTypeHint tests ---
+
+  "StepAttributes.inferTypeHint" should "infer Boolean" in {
+    StepAttributes.inferTypeHint(true) shouldBe "Boolean"
+    StepAttributes.inferTypeHint(false) shouldBe "Boolean"
+  }
+
+  it should "infer Int as Long" in {
+    StepAttributes.inferTypeHint(42) shouldBe "Long"
+  }
+
+  it should "infer Long as Long" in {
+    StepAttributes.inferTypeHint(42L) shouldBe "Long"
+  }
+
+  it should "infer Double as Double" in {
+    StepAttributes.inferTypeHint(3.14) shouldBe "Double"
+  }
+
+  it should "infer Float as Double" in {
+    StepAttributes.inferTypeHint(3.14f) shouldBe "Double"
+  }
+
+  it should "infer String" in {
+    StepAttributes.inferTypeHint("hello") shouldBe "String"
+  }
+
+  it should "infer Seq as List" in {
+    StepAttributes.inferTypeHint(Seq(1, 2, 3)) shouldBe "List"
+    StepAttributes.inferTypeHint(List("a", "b")) shouldBe "List"
+  }
+
+  it should "infer Map as Map" in {
+    StepAttributes.inferTypeHint(Map("k" -> "v")) shouldBe "Map"
+  }
+
+  it should "infer null as Any" in {
+    StepAttributes.inferTypeHint(null) shouldBe "Any"
+  }
+
+  it should "infer unknown types as Any" in {
+    StepAttributes.inferTypeHint(java.time.Instant.now()) shouldBe "Any"
+  }

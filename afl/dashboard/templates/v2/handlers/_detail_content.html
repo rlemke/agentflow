@@ -19,6 +19,8 @@
         <article>
             <header>Actions</header>
             <div class="actions">
+                <a href="/v2/handlers/{{ handler.facet_name }}/edit"
+                   role="button" class="outline">Edit</a>
                 <button hx-post="/v2/handlers/{{ handler.facet_name }}/delete"
                         hx-confirm="Delete this handler registration?"
                         class="outline secondary">Delete</button>

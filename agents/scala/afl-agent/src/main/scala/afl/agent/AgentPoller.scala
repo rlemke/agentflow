@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
+import afl.agent.model.StepAttributes
 import scala.collection.concurrent.TrieMap
 
 /** Main polling agent for processing AFL event tasks.
@@ -205,18 +206,9 @@ class AgentPoller(val config: AgentPollerConfig):
       else None
     }
 
-  /** Infer type hint from a Scala value. */
-  private def inferTypeHint(value: Any): String = value match
-    case _: Boolean    => "Boolean"
-    case _: Int        => "Long"
-    case _: Long       => "Long"
-    case _: Double     => "Double"
-    case _: Float      => "Double"
-    case _: String     => "String"
-    case _: Seq[?]     => "List"
-    case _: Map[?, ?]  => "Map"
-    case null          => "Any"
-    case _             => "Any"
+  /** Infer type hint from a Scala value (delegates to StepAttributes). */
+  private def inferTypeHint(value: Any): String =
+    StepAttributes.inferTypeHint(value)
 
   private def initMongo(): Unit =
     val settings = MongoClientSettings

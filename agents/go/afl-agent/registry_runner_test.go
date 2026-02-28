@@ -118,3 +118,36 @@ func TestHandlerRegistrationsConstant(t *testing.T) {
 			CollectionHandlerRegistrations)
 	}
 }
+
+func TestRegistryRunnerHasRefreshFields(t *testing.T) {
+	cfg := DefaultConfig()
+	poller := NewAgentPoller(cfg)
+	rr := NewRegistryRunner(poller)
+
+	// Verify stopCh is initialized (non-nil)
+	if rr.stopCh == nil {
+		t.Error("Expected stopCh to be initialized")
+	}
+
+	// client and db should be nil before Start()
+	if rr.client != nil {
+		t.Error("Expected client to be nil before Start()")
+	}
+	if rr.db != nil {
+		t.Error("Expected db to be nil before Start()")
+	}
+}
+
+func TestRegistryRunnerCustomRefreshInterval(t *testing.T) {
+	cfg := DefaultConfig()
+	poller := NewAgentPoller(cfg)
+	rr := NewRegistryRunner(poller)
+
+	// Override refresh interval
+	rr.RefreshInterval = 5 * time.Second
+
+	expected := 5 * time.Second
+	if rr.RefreshInterval != expected {
+		t.Errorf("Expected refresh interval %v, got %v", expected, rr.RefreshInterval)
+	}
+}

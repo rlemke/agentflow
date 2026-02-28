@@ -22,18 +22,21 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // RegistryRunner wraps an AgentPoller and restricts polling to only those
 // handler names that also appear in MongoDB's handler_registrations collection.
 // This provides DB-driven topic filtering without requiring dynamic module loading.
 type RegistryRunner struct {
-	Poller            *AgentPoller
-	RefreshInterval   time.Duration
+	Poller          *AgentPoller
+	RefreshInterval time.Duration
 
 	activeTopics map[string]bool
 	topicsMu     sync.RWMutex
 	stopCh       chan struct{}
+	client       *mongo.Client
+	db           *mongo.Database
 }
 
 // NewRegistryRunner creates a RegistryRunner wrapping the given poller.
@@ -97,11 +100,43 @@ func (rr *RegistryRunner) RefreshTopics(ctx context.Context, db *mongo.Database)
 
 // Start connects to MongoDB, starts the topic refresh loop, and delegates to the poller.
 func (rr *RegistryRunner) Start(ctx context.Context) error {
+	// Connect to MongoDB for refresh loop
+	clientOpts := options.Client().ApplyURI(rr.Poller.cfg.MongoURL)
+	client, err := mongo.Connect(ctx, clientOpts)
+	if err != nil {
+		return err
+	}
+	rr.client = client
+	rr.db = client.Database(rr.Poller.cfg.Database)
+
+	// Initial refresh
+	rr.RefreshTopics(ctx, rr.db)
+
+	// Start periodic refresh goroutine
+	go rr.refreshLoop(ctx)
+
 	return rr.Poller.Start(ctx)
 }
 
-// Stop signals the runner and poller to stop.
+// refreshLoop periodically refreshes topics from the DB.
+func (rr *RegistryRunner) refreshLoop(ctx context.Context) {
+	ticker := time.NewTicker(rr.RefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			rr.RefreshTopics(ctx, rr.db)
+		case <-rr.stopCh:
+			return
+		}
+	}
+}
+
+// Stop signals the runner and poller to stop, and disconnects the refresh client.
 func (rr *RegistryRunner) Stop(ctx context.Context) error {
 	close(rr.stopCh)
+	if rr.client != nil {
+		_ = rr.client.Disconnect(ctx)
+	}
 	return rr.Poller.Stop(ctx)
 }

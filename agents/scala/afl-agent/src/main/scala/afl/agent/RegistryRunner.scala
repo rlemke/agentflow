@@ -1,11 +1,10 @@
 package afl.agent
 
-import org.mongodb.scala.MongoDatabase
-import org.mongodb.scala.model.Filters
+import com.mongodb.{ConnectionString, MongoClientSettings}
+import org.mongodb.scala.{MongoClient, MongoDatabase}
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.concurrent.TrieMap
 import scala.jdk.CollectionConverters.*
 
 /** RegistryRunner wraps an AgentPoller and restricts polling to only those
@@ -25,6 +24,7 @@ class RegistryRunner(
   private val logger = LoggerFactory.getLogger(getClass)
   private val activeTopics = AtomicReference(Set.empty[String])
   private var refreshThread: Thread = _
+  private var refreshClient: MongoClient = _
 
   /** Register a handler (delegates to the underlying poller). */
   def register(facetName: String)(
@@ -57,18 +57,38 @@ class RegistryRunner(
       case e: Exception =>
         logger.warn(s"Failed to refresh topics: ${e.getMessage}")
 
-  /** Start the runner. Initializes the refresh loop and delegates to the poller. */
+  /** Start the runner. Connects to MongoDB, performs initial refresh, starts
+    * periodic refresh thread, and delegates to the poller.
+    */
   def start(): Unit =
-    // Override the poller's poll cycle to use effective handlers
-    // We achieve this by starting a refresh thread and starting the poller
-    // The poller calls registeredNames in pollCycle — we can't override that
-    // directly, so we start the refresh thread and then start the poller.
-    // The topic filtering happens via the poller's registered handlers:
-    // we don't need to modify the poller — instead, RegistryRunner manages
-    // which handlers are active by providing effectiveHandlers.
+    // Create own MongoDB connection for refresh loop
+    val settings = MongoClientSettings
+      .builder()
+      .applyConnectionString(ConnectionString(poller.config.mongoUrl))
+      .build()
+    refreshClient = MongoClient(settings)
+    val db = refreshClient.getDatabase(poller.config.database)
+
+    // Initial refresh
+    refreshTopics(db)
+
+    // Start periodic refresh thread
+    refreshThread = Thread(() => {
+      while !Thread.currentThread().isInterrupted do
+        try
+          Thread.sleep(refreshIntervalMs)
+          refreshTopics(db)
+        catch case _: InterruptedException =>
+          Thread.currentThread().interrupt()
+    })
+    refreshThread.setDaemon(true)
+    refreshThread.setName("afl-registry-refresh")
+    refreshThread.start()
+
     poller.start()
 
   /** Stop the runner. */
   def stop(): Unit =
     poller.stop()
     if refreshThread != null then refreshThread.interrupt()
+    if refreshClient != null then refreshClient.close()

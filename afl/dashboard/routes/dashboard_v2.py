@@ -16,9 +16,10 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 if TYPE_CHECKING:
@@ -454,6 +455,127 @@ def handler_detail_partial(
             "recent_logs": recent_logs,
         },
     )
+
+
+@router.get("/handlers/new")
+def handler_new_form(
+    request: Request,
+    store=Depends(get_store),
+):
+    """Render create handler registration form."""
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/form.html",
+        {
+            "active_tab": "handlers",
+            "handler": None,
+            "error": None,
+        },
+    )
+
+
+@router.post("/handlers/new")
+def handler_create(
+    request: Request,
+    facet_name: str = Form(""),
+    module_uri: str = Form(""),
+    entrypoint: str = Form("handle"),
+    description: str = Form(""),
+    store=Depends(get_store),
+):
+    """Create a new handler registration and redirect to detail."""
+    from afl.runtime.entities import HandlerRegistration
+
+    if not facet_name.strip():
+        return request.app.state.templates.TemplateResponse(
+            request,
+            "v2/handlers/form.html",
+            {
+                "active_tab": "handlers",
+                "handler": None,
+                "error": "Facet name is required.",
+            },
+        )
+
+    existing = store.get_handler_registration(facet_name.strip())
+    if existing:
+        return request.app.state.templates.TemplateResponse(
+            request,
+            "v2/handlers/form.html",
+            {
+                "active_tab": "handlers",
+                "handler": None,
+                "error": f"Handler '{facet_name}' already exists.",
+            },
+        )
+
+    now_ms = int(time.time() * 1000)
+    reg = HandlerRegistration(
+        facet_name=facet_name.strip(),
+        module_uri=module_uri.strip(),
+        entrypoint=entrypoint.strip() or "handle",
+        metadata={"description": description.strip()} if description.strip() else {},
+        created=now_ms,
+        updated=now_ms,
+    )
+    store.save_handler_registration(reg)
+    return RedirectResponse(url=f"/v2/handlers/{facet_name.strip()}", status_code=303)
+
+
+@router.get("/handlers/{facet_name:path}/edit")
+def handler_edit_form(
+    facet_name: str,
+    request: Request,
+    store=Depends(get_store),
+):
+    """Render edit handler registration form."""
+    handler = store.get_handler_registration(facet_name)
+    if not handler:
+        return RedirectResponse(url="/v2/handlers", status_code=303)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/handlers/form.html",
+        {
+            "active_tab": "handlers",
+            "handler": handler,
+            "error": None,
+        },
+    )
+
+
+@router.post("/handlers/{facet_name:path}/edit")
+def handler_update(
+    facet_name: str,
+    request: Request,
+    module_uri: str = Form(""),
+    entrypoint: str = Form("handle"),
+    description: str = Form(""),
+    store=Depends(get_store),
+):
+    """Update a handler registration and redirect to detail."""
+    handler = store.get_handler_registration(facet_name)
+    if not handler:
+        return RedirectResponse(url="/v2/handlers", status_code=303)
+
+    from afl.runtime.entities import HandlerRegistration
+
+    now_ms = int(time.time() * 1000)
+    updated = HandlerRegistration(
+        facet_name=handler.facet_name,
+        module_uri=module_uri.strip() or handler.module_uri,
+        entrypoint=entrypoint.strip() or handler.entrypoint,
+        version=handler.version,
+        checksum=handler.checksum,
+        timeout_ms=handler.timeout_ms,
+        requirements=handler.requirements,
+        metadata={**handler.metadata, "description": description.strip()}
+        if description.strip()
+        else handler.metadata,
+        created=handler.created,
+        updated=now_ms,
+    )
+    store.save_handler_registration(updated)
+    return RedirectResponse(url=f"/v2/handlers/{facet_name}", status_code=303)
 
 
 @router.post("/handlers/{facet_name:path}/delete")

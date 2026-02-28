@@ -41,6 +41,14 @@ class RegistryRunnerSpec extends AnyFlatSpec with Matchers:
     runner.refreshIntervalMs shouldBe 5000
   }
 
+  it should "stop without error when refresh thread was never started" in {
+    val poller = makePoller()
+    val runner = RegistryRunner(poller)
+
+    // stop() should not throw even if start() was never called
+    noException should be thrownBy runner.stop()
+  }
+
   "Protocol.Collections.HandlerRegistrations" should "be handler_registrations" in {
     Protocol.Collections.HandlerRegistrations shouldBe "handler_registrations"
   }

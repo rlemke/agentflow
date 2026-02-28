@@ -42,15 +42,19 @@ public class RegistryRunner implements AutoCloseable {
     private static final Logger logger = Logger.getLogger(RegistryRunner.class.getName());
 
     private final AgentPoller poller;
+    private final AgentPollerConfig config;
     private final long refreshIntervalMs;
     private final Set<String> activeTopics = ConcurrentHashMap.newKeySet();
     private ScheduledExecutorService refreshScheduler;
+    private MongoClient refreshClient;
+    private MongoDatabase refreshDb;
 
     public RegistryRunner(AgentPollerConfig config) {
         this(config, 30000);
     }
 
     public RegistryRunner(AgentPollerConfig config, long refreshIntervalMs) {
+        this.config = config;
         this.poller = new AgentPoller(config);
         this.refreshIntervalMs = refreshIntervalMs;
     }
@@ -106,9 +110,31 @@ public class RegistryRunner implements AutoCloseable {
     }
 
     /**
-     * Starts the runner. Delegates to the underlying poller.
+     * Starts the runner. Connects to MongoDB, performs initial refresh,
+     * starts periodic refresh scheduler, and delegates to the underlying poller.
      */
     public void start() throws InterruptedException {
+        // Create own MongoDB connection for refresh loop
+        String mongoUrl = config.mongoUrl();
+        if (mongoUrl == null || mongoUrl.isEmpty()) {
+            mongoUrl = "mongodb://localhost:27017";
+        }
+        refreshClient = MongoClients.create(mongoUrl);
+        refreshDb = refreshClient.getDatabase(config.database());
+
+        // Initial refresh
+        refreshTopics(refreshDb);
+
+        // Start periodic refresh
+        refreshScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "afl-registry-refresh");
+            t.setDaemon(true);
+            return t;
+        });
+        refreshScheduler.scheduleAtFixedRate(
+                () -> refreshTopics(refreshDb),
+                refreshIntervalMs, refreshIntervalMs, TimeUnit.MILLISECONDS);
+
         poller.start();
     }
 
@@ -123,6 +149,9 @@ public class RegistryRunner implements AutoCloseable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
+        }
+        if (refreshClient != null) {
+            refreshClient.close();
         }
         poller.stop();
     }

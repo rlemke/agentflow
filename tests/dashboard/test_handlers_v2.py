@@ -309,3 +309,96 @@ class TestV2HandlerNav:
         tc, store = client
         resp = tc.get("/handlers")
         assert resp.status_code == 200
+
+
+@pytestmark_routes
+class TestV2HandlerCreateEdit:
+    def test_new_form_renders(self, client):
+        tc, store = client
+        resp = tc.get("/v2/handlers/new")
+        assert resp.status_code == 200
+        assert "New Handler" in resp.text
+        assert 'name="facet_name"' in resp.text
+
+    def test_create_handler(self, client):
+        tc, store = client
+        resp = tc.post(
+            "/v2/handlers/new",
+            data={
+                "facet_name": "etl.Extract.CSV",
+                "module_uri": "etl.handlers",
+                "entrypoint": "handle",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        assert "/v2/handlers/etl.Extract.CSV" in resp.headers["location"]
+        assert store.get_handler_registration("etl.Extract.CSV") is not None
+
+    def test_create_empty_facet_name_shows_error(self, client):
+        tc, store = client
+        resp = tc.post(
+            "/v2/handlers/new",
+            data={"facet_name": "", "module_uri": "m"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 200
+        assert "required" in resp.text.lower()
+
+    def test_create_duplicate_shows_error(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler_entity("etl.Dup"))
+        resp = tc.post(
+            "/v2/handlers/new",
+            data={"facet_name": "etl.Dup", "module_uri": "m"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 200
+        assert "already exists" in resp.text
+
+    def test_edit_form_renders(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler_entity("osm.geo.Cache"))
+        resp = tc.get("/v2/handlers/osm.geo.Cache/edit")
+        assert resp.status_code == 200
+        assert "Edit Handler" in resp.text
+        assert "osm.geo.Cache" in resp.text
+        assert "disabled" in resp.text  # facet_name disabled on edit
+
+    def test_edit_form_missing_handler_redirects(self, client):
+        tc, store = client
+        resp = tc.get("/v2/handlers/nonexistent/edit", follow_redirects=False)
+        assert resp.status_code == 303
+
+    def test_update_handler(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler_entity("osm.geo.Cache"))
+        resp = tc.post(
+            "/v2/handlers/osm.geo.Cache/edit",
+            data={"module_uri": "new.module", "entrypoint": "run"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        updated = store.get_handler_registration("osm.geo.Cache")
+        assert updated.module_uri == "new.module"
+        assert updated.entrypoint == "run"
+
+    def test_api_create_handler(self, client):
+        tc, store = client
+        resp = tc.post(
+            "/api/handlers",
+            json={"facet_name": "api.Test.Create", "module_uri": "test.mod"},
+        )
+        assert resp.status_code == 201
+        assert store.get_handler_registration("api.Test.Create") is not None
+
+    def test_api_update_handler(self, client):
+        tc, store = client
+        store.save_handler_registration(_make_handler_entity("api.Test.Update"))
+        resp = tc.put(
+            "/api/handlers/api.Test.Update",
+            json={"module_uri": "updated.mod", "entrypoint": "run"},
+        )
+        assert resp.status_code == 200
+        updated = store.get_handler_registration("api.Test.Update")
+        assert updated.module_uri == "updated.mod"

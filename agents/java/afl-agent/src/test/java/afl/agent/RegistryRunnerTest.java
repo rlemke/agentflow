@@ -69,4 +69,13 @@ class RegistryRunnerTest {
     void testHandlerRegistrationsConstant() {
         assertEquals("handler_registrations", Protocol.COLLECTION_HANDLER_REGISTRATIONS);
     }
+
+    @Test
+    void testStopWithoutStartDoesNotThrow() {
+        AgentPollerConfig config = AgentPollerConfig.defaults();
+        RegistryRunner runner = new RegistryRunner(config);
+
+        // stop() should not throw even if start() was never called
+        assertDoesNotThrow(runner::stop);
+    }
 }

@@ -270,6 +270,64 @@ def api_handlers(q: str | None = None, store=Depends(get_store)):
     )
 
 
+@router.post("/handlers")
+async def api_handler_create(request: Request, store=Depends(get_store)):
+    """Create a new handler registration from JSON body."""
+    import time
+
+    from afl.runtime.entities import HandlerRegistration
+
+    body = await request.json()
+    facet_name = body.get("facet_name", "").strip()
+    if not facet_name:
+        return JSONResponse({"error": "facet_name is required"}, status_code=400)
+
+    existing = store.get_handler_registration(facet_name)
+    if existing:
+        return JSONResponse({"error": f"Handler '{facet_name}' already exists"}, status_code=409)
+
+    now_ms = int(time.time() * 1000)
+    reg = HandlerRegistration(
+        facet_name=facet_name,
+        module_uri=body.get("module_uri", "").strip(),
+        entrypoint=body.get("entrypoint", "handle").strip(),
+        metadata=body.get("metadata", {}),
+        created=now_ms,
+        updated=now_ms,
+    )
+    store.save_handler_registration(reg)
+    return JSONResponse({"facet_name": reg.facet_name, "created": True}, status_code=201)
+
+
+@router.put("/handlers/{facet_name:path}")
+async def api_handler_update(facet_name: str, request: Request, store=Depends(get_store)):
+    """Update an existing handler registration from JSON body."""
+    import time
+
+    from afl.runtime.entities import HandlerRegistration
+
+    handler = store.get_handler_registration(facet_name)
+    if not handler:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    body = await request.json()
+    now_ms = int(time.time() * 1000)
+    updated = HandlerRegistration(
+        facet_name=handler.facet_name,
+        module_uri=body.get("module_uri", handler.module_uri).strip(),
+        entrypoint=body.get("entrypoint", handler.entrypoint).strip(),
+        version=handler.version,
+        checksum=handler.checksum,
+        timeout_ms=body.get("timeout_ms", handler.timeout_ms),
+        requirements=handler.requirements,
+        metadata={**handler.metadata, **body.get("metadata", {})},
+        created=handler.created,
+        updated=now_ms,
+    )
+    store.save_handler_registration(updated)
+    return JSONResponse({"facet_name": updated.facet_name, "updated": True})
+
+
 @router.get("/servers/{server_id}")
 def api_server_detail(server_id: str, store=Depends(get_store)):
     """Return a single server as JSON."""
