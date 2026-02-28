@@ -1,5 +1,51 @@
 # Implementation Changelog
 
+## Completed (v0.22.0) - Site-Selection Debate Example
+
+### New example: `examples/site-selection-debate/`
+
+The **first example combining spatial analysis, web research enrichment, and
+adversarial multi-agent debate** in a single workflow. Three previously separate
+patterns (site-selection scoring, research-agent enrichment, multi-round-debate
+evaluation) are composed into a unified pipeline.
+
+### AFL definitions
+- `sitesel_debate.afl`: 8 namespaces, 8 schemas, 12 event facets (all with prompt blocks), 2 mixin facets, 2 implicits, 1 composed facet (EvaluationRound — 10 internal steps), 2 workflows
+- `EvaluateSites`: pre-script → cfg=DebateConfig(below_market_penalty=-0.15) → ScoreCandidate with ResearchConfig() as research_cfg → ComputeAccessibility andThen { GatherRegulations } → SearchMarketTrends andThen { AnalyzeCompetitors } → 3× EvaluationRound with cross-round state (prev_synthesis, prev_rankings) using inline map literals → ProduceRanking → GenerateReport → yield with `++` → andThen script
+- `BatchEvaluate`: batch_cfg=DebateConfig() → yield with `++` and `(expr)*100` → andThen foreach over $.candidate_ids with ScoreCandidate with ResearchConfig() as research_cfg → statement-level andThen(SearchMarketTrends)
+- `EvaluationRound` (composed facet): 3× PresentAnalysis (financial_analyst, community_analyst, competitive_strategist) with DebatePolicy() → 3× ChallengePosition → ScoreArguments → SummarizeRound → yield
+
+### Feature showcase locations
+- **12 prompt-block event facets**: all event facets across ssd.Spatial, ssd.Research, ssd.Debate, ssd.Synthesis
+- **Composed facet**: EvaluationRound encapsulates 10 steps (3 present + 3 challenge + score + summarize + yield)
+- **Cross-round state**: `r1.synthesis → r2.prev_synthesis`, `r1.rankings → r2.prev_rankings`
+- **Statement-level andThen**: `access = ComputeAccessibility(...) andThen { regs = ... }`
+- **andThen foreach**: `BatchEvaluate` iterates `$.candidate_ids`
+- **Map literals**: `#{"market": ..., "regulations": ..., ...}` as inline call arguments
+- **Null literals**: `prev_rankings = null`, `weights = null` (4 occurrences in event facet defaults)
+- **Unary negation**: `below_market_penalty = -0.15` in DebateConfig schema instantiation
+- **Mixin alias**: `with ResearchConfig(depth = 5) as research_cfg`
+- **Schema instantiation as steps**: `cfg = DebateConfig(below_market_penalty = -0.15, ...)`
+- **String concatenation (++)**: yield expressions
+- **Arithmetic expressions**: `(batch_cfg.below_market_penalty + 1) * 100`
+- **RegistryRunner as primary entry point**: `agent_registry.py`
+
+### Handler modules (4 categories, 12 event facets)
+- **Spatial**: ScoreCandidate (weighted scoring with penalty adjustment), RankCandidates (sort by overall_score), ComputeAccessibility (walk_score, transit, highway)
+- **Research**: SearchMarketTrends (growth_rate, risk_factors, opportunity_score), GatherRegulations (permit_difficulty, zoning, regulatory_score), AnalyzeCompetitors (competitor_list, threat_level)
+- **Debate**: PresentAnalysis (confidence = base + round_num × 0.05), ChallengePosition (1-3 weaknesses), ScoreArguments (consensus_level, score_delta, converged)
+- **Synthesis**: SummarizeRound (synthesis + key_arguments), ProduceRanking (ranked + top_candidate + confidence), GenerateReport (FinalReport with recommendation)
+
+### Tests (39 new)
+- **TestDebateUtils** (8): score_candidate structure/determinism/penalty, accessibility, confidence_increases, weaknesses, convergence, report
+- **TestSpatialHandlers** (3): score default, rank null weights, accessibility JSON string
+- **TestResearchHandlers** (4): market trends, regulations, competitors default + JSON string
+- **TestDebateHandlers** (4): present default + custom round, challenge default, score null prev
+- **TestSynthesisHandlers** (4): summarize default + JSON string, produce ranking, generate report
+- **TestDispatch** (5): 3+3+3+3 per category, total==12
+- **TestCompilation** (9): parses, 8 schemas, 12 event facets, 2 workflows, 12 prompt blocks, 2 mixins, 2 implicits, null literals ≥2, composed facet present
+- **TestAgentIntegration** (2): ToolRegistry dispatches all 12, ClaudeAgentRunner with ScoreCandidate
+
 ## Completed (v0.21.1) - Spec Cleanup: MongoDB/Maven CLI Loaders
 
 Removed outdated "(not yet implemented)" annotations from `spec/20_compiler.md`

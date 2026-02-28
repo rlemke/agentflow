@@ -1,0 +1,345 @@
+// Site-Selection Debate -- spatial scoring + research enrichment + multi-agent debate.
+//
+// Demonstrates:
+//   - Combining spatial analysis, web research, and adversarial debate patterns
+//   - 12 prompt-block event facets across 4 namespaces
+//   - Composed facet (EvaluationRound with 10 steps)
+//   - Cross-round state passing (r1 -> r2 -> r3)
+//   - Statement-level andThen, andThen foreach
+//   - Map literals, null literals, unary negation
+//   - Mixin aliases, schema instantiation as steps
+//   - String concatenation (++), arithmetic expressions
+//   - RegistryRunner as primary entry point
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
+namespace ssd.types {
+    schema SpatialScore {
+        candidate_id: String,
+        demographics_score: Double,
+        competition_score: Double,
+        accessibility_score: Double,
+        overall_score: Double,
+        penalty_applied: Double
+    }
+
+    schema MarketResearch {
+        candidate_id: String,
+        growth_rate: Double,
+        risk_factors: Json,
+        opportunity_score: Double,
+        market_area: String
+    }
+
+    schema AgentPosition {
+        agent_role: String,
+        candidate_id: String,
+        position: String,
+        confidence: Double,
+        key_factors: Json
+    }
+
+    schema RoundRankings {
+        consensus_level: Double,
+        score_delta: Double,
+        converged: Boolean,
+        agent_scores: Json,
+        round_num: Int
+    }
+
+    schema DebateConfig {
+        below_market_penalty: Double,
+        max_rounds: Int,
+        convergence_threshold: Double
+    }
+
+    schema AccessibilityMetrics {
+        candidate_id: String,
+        walk_score: Int,
+        transit_coverage: Double,
+        highway_distance_km: Double
+    }
+
+    schema RegulationSummary {
+        candidate_id: String,
+        permit_difficulty: Int,
+        zoning_compatible: Boolean,
+        regulatory_score: Double,
+        jurisdiction: String
+    }
+
+    schema FinalReport {
+        top_candidate: String,
+        confidence: Double,
+        num_candidates_evaluated: Int,
+        num_rounds: Int,
+        ranked_candidates: Json,
+        round_summaries: Json,
+        recommendation: String
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Mixins and implicits
+// ---------------------------------------------------------------------------
+namespace ssd.mixins {
+    facet ResearchConfig(depth: Int = 3, market_area: String = "default")
+    facet DebatePolicy(max_challenges: Int = 3, require_evidence: Boolean = true)
+
+    implicit defaultResearch = ResearchConfig(depth = 3, market_area = "default")
+    implicit defaultDebatePolicy = DebatePolicy(max_challenges = 3, require_evidence = true)
+}
+
+// ---------------------------------------------------------------------------
+// Spatial -- ScoreCandidate, RankCandidates, ComputeAccessibility
+// ---------------------------------------------------------------------------
+namespace ssd.Spatial {
+    use ssd.types
+
+    /** Score a candidate site using demographics, competition, and accessibility data. */
+    event facet ScoreCandidate(
+        candidate_id: String,
+        demographics: Json = #{},
+        competition: Json = #{},
+        weights: Json = #{},
+        penalty: Double = 0.0
+    ) => (score: SpatialScore) prompt {
+        system "You are a spatial analysis agent scoring candidate sites for commercial development."
+        template "Score candidate site '{candidate_id}' with demographics={demographics}, competition={competition}, weights={weights}, penalty={penalty}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Rank candidate sites by overall score. */
+    event facet RankCandidates(
+        scores: Json,
+        top_n: Int = 5,
+        weights: Json = null
+    ) => (ranked: Json, top_candidate: String) prompt {
+        system "You are a site ranking agent that orders candidates by composite score."
+        template "Rank {top_n} candidates from scores: {scores} with weights={weights}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Compute accessibility metrics for a candidate site. */
+    event facet ComputeAccessibility(
+        candidate_id: String,
+        location: Json = #{}
+    ) => (metrics: AccessibilityMetrics) prompt {
+        system "You are an accessibility analyst computing walk scores, transit coverage, and highway proximity."
+        template "Compute accessibility for candidate '{candidate_id}' at location={location}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Research -- SearchMarketTrends, GatherRegulations, AnalyzeCompetitors
+// ---------------------------------------------------------------------------
+namespace ssd.Research {
+    use ssd.types
+
+    /** Search for market trends and growth indicators in the candidate area. */
+    event facet SearchMarketTrends(
+        candidate_id: String,
+        market_area: String = "default"
+    ) => (research: MarketResearch) prompt {
+        system "You are a market research agent analyzing growth trends, risk factors, and opportunities."
+        template "Search market trends for candidate '{candidate_id}' in area '{market_area}'"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Gather regulatory information for the candidate jurisdiction. */
+    event facet GatherRegulations(
+        candidate_id: String,
+        jurisdiction: String = "default"
+    ) => (regulations: RegulationSummary) prompt {
+        system "You are a regulatory analyst evaluating permit requirements, zoning, and compliance."
+        template "Gather regulations for candidate '{candidate_id}' in jurisdiction '{jurisdiction}'"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Analyze competitor presence near the candidate site. */
+    event facet AnalyzeCompetitors(
+        candidate_id: String,
+        radius_km: Double = 5.0
+    ) => (competitors: Json, threat_level: String) prompt {
+        system "You are a competitive intelligence agent mapping nearby competitors and market threats."
+        template "Analyze competitors for candidate '{candidate_id}' within {radius_km}km radius"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Debate -- PresentAnalysis, ChallengePosition, ScoreArguments
+// ---------------------------------------------------------------------------
+namespace ssd.Debate {
+    use ssd.types
+
+    /** An agent presents their analysis of the candidate site. */
+    event facet PresentAnalysis(
+        agent_role: String,
+        candidate_id: String,
+        spatial_score: Json = #{},
+        market_data: Json = #{},
+        round_num: Int = 1
+    ) => (position: AgentPosition) prompt {
+        system "You are a specialist agent presenting your analysis of a candidate site to a review panel."
+        template "Agent '{agent_role}' presents analysis of '{candidate_id}' (round {round_num}): spatial={spatial_score}, market={market_data}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** An agent challenges another agent's position with counter-arguments. */
+    event facet ChallengePosition(
+        agent_role: String,
+        target_role: String,
+        target_position: Json = #{},
+        round_num: Int = 1
+    ) => (rebuttal: String, weaknesses: Json) prompt {
+        system "You are a debate challenger identifying weaknesses in another agent's site evaluation."
+        template "Agent '{agent_role}' challenges '{target_role}' position: {target_position} (round {round_num})"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Score the quality of arguments presented in this round. */
+    event facet ScoreArguments(
+        positions: Json,
+        challenges: Json,
+        prev_rankings: Json = null,
+        round_num: Int = 1
+    ) => (rankings: RoundRankings) prompt {
+        system "You are an impartial judge scoring the quality and evidence of debate arguments."
+        template "Score arguments in round {round_num}: {positions} with challenges {challenges}, prev={prev_rankings}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Synthesis -- SummarizeRound, ProduceRanking, GenerateReport
+// ---------------------------------------------------------------------------
+namespace ssd.Synthesis {
+    use ssd.types
+
+    /** Summarize a debate round with key arguments and shifts. */
+    event facet SummarizeRound(
+        positions: Json,
+        challenges: Json,
+        rankings: Json = null,
+        round_num: Int = 1
+    ) => (synthesis: String, key_arguments: Json) prompt {
+        system "You are a synthesis agent capturing round-by-round evolution of the site debate."
+        template "Summarize round {round_num}: positions={positions}, challenges={challenges}, rankings={rankings}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Produce a final ranking of candidate sites based on all debate rounds. */
+    event facet ProduceRanking(
+        round_syntheses: Json,
+        final_rankings: Json = null,
+        candidate_scores: Json = []
+    ) => (ranked: Json, top_candidate: String, confidence: Double) prompt {
+        system "You are a decision-making agent producing the final site ranking from debate evidence."
+        template "Produce ranking from {round_syntheses} with final_rankings={final_rankings}, scores={candidate_scores}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Generate a comprehensive evaluation report with recommendation. */
+    event facet GenerateReport(
+        top_candidate: String,
+        ranked_candidates: Json,
+        round_syntheses: Json,
+        confidence: Double = 0.8
+    ) => (report: FinalReport) prompt {
+        system "You are a report generation agent creating comprehensive site evaluation documents."
+        template "Generate report for top candidate '{top_candidate}' with confidence {confidence}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Composed facet -- EvaluationRound (10 steps)
+// ---------------------------------------------------------------------------
+namespace ssd.composition {
+    use ssd.types
+    use ssd.mixins
+    use ssd.Debate
+    use ssd.Synthesis
+
+    /** A complete evaluation round: 3 agents present, 3 challenge, score, summarize. */
+    facet EvaluationRound(
+        candidate_id: String,
+        spatial_score: Json = #{},
+        market_data: Json = #{},
+        round_num: Int = 1,
+        prev_synthesis: String = "",
+        prev_rankings: Json = null
+    ) => (synthesis: String, rankings: Json, key_arguments: Json) andThen {
+        fa = PresentAnalysis(agent_role = "financial_analyst", candidate_id = $.candidate_id, spatial_score = $.spatial_score, market_data = $.market_data, round_num = $.round_num) with DebatePolicy()
+        ca = PresentAnalysis(agent_role = "community_analyst", candidate_id = $.candidate_id, spatial_score = $.spatial_score, market_data = $.market_data, round_num = $.round_num) with DebatePolicy()
+        cs = PresentAnalysis(agent_role = "competitive_strategist", candidate_id = $.candidate_id, spatial_score = $.spatial_score, market_data = $.market_data, round_num = $.round_num) with DebatePolicy()
+        ch_fa = ChallengePosition(agent_role = "financial_analyst", target_role = "community_analyst", target_position = ca.position, round_num = $.round_num)
+        ch_ca = ChallengePosition(agent_role = "community_analyst", target_role = "competitive_strategist", target_position = cs.position, round_num = $.round_num)
+        ch_cs = ChallengePosition(agent_role = "competitive_strategist", target_role = "financial_analyst", target_position = fa.position, round_num = $.round_num)
+        sc = ScoreArguments(positions = [fa.position, ca.position, cs.position], challenges = [ch_fa.rebuttal, ch_ca.rebuttal, ch_cs.rebuttal], prev_rankings = $.prev_rankings, round_num = $.round_num)
+        summ = SummarizeRound(positions = [fa.position, ca.position, cs.position], challenges = [ch_fa.rebuttal, ch_ca.rebuttal, ch_cs.rebuttal], rankings = sc.rankings, round_num = $.round_num)
+        yield EvaluationRound(synthesis = summ.synthesis, rankings = sc.rankings, key_arguments = summ.key_arguments)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workflows
+// ---------------------------------------------------------------------------
+namespace ssd.workflows {
+    use ssd.types
+    use ssd.mixins
+    use ssd.Spatial
+    use ssd.Research
+    use ssd.Debate
+    use ssd.Synthesis
+    use ssd.composition
+
+    /** Full site evaluation: spatial scoring -> research enrichment -> 3-round debate -> report. */
+    workflow EvaluateSites(
+        candidate_id: String,
+        demographics: Json = #{},
+        competition: Json = #{}
+    ) => (
+        report: FinalReport,
+        summary: String
+    ) script {
+        result["summary"] = "Starting evaluation for candidate " + params.get("candidate_id", "unknown")
+    } andThen {
+        cfg = DebateConfig(below_market_penalty = -0.15, max_rounds = 3, convergence_threshold = 0.1)
+        spatial = ScoreCandidate(candidate_id = $.candidate_id, demographics = $.demographics, competition = $.competition, penalty = cfg.below_market_penalty) with ResearchConfig(depth = 5, market_area = "metro") as research_cfg
+        access = ComputeAccessibility(candidate_id = $.candidate_id) andThen { regs = GatherRegulations(candidate_id = $.candidate_id) }
+        market = SearchMarketTrends(candidate_id = $.candidate_id) andThen { competitors = AnalyzeCompetitors(candidate_id = $.candidate_id) }
+        r1 = EvaluationRound(candidate_id = $.candidate_id, spatial_score = spatial.score, market_data = #{"market": market.research, "regulations": regs.regulations, "accessibility": access.metrics, "competitors": competitors.competitors}, round_num = 1, prev_rankings = null)
+        r2 = EvaluationRound(candidate_id = $.candidate_id, spatial_score = spatial.score, market_data = #{"market": market.research, "regulations": regs.regulations, "accessibility": access.metrics, "competitors": competitors.competitors}, round_num = 2, prev_synthesis = r1.synthesis, prev_rankings = r1.rankings)
+        r3 = EvaluationRound(candidate_id = $.candidate_id, spatial_score = spatial.score, market_data = #{"market": market.research, "regulations": regs.regulations, "accessibility": access.metrics, "competitors": competitors.competitors}, round_num = 3, prev_synthesis = r2.synthesis, prev_rankings = r2.rankings)
+        ranking = ProduceRanking(round_syntheses = [r1.synthesis, r2.synthesis, r3.synthesis], final_rankings = r3.rankings, candidate_scores = [spatial.score])
+        rpt = GenerateReport(top_candidate = ranking.top_candidate, ranked_candidates = ranking.ranked, round_syntheses = [r1.synthesis, r2.synthesis, r3.synthesis], confidence = ranking.confidence)
+        yield EvaluateSites(report = rpt.report, summary = "Evaluated " ++ $.candidate_id ++ " across 3 rounds, top: " ++ ranking.top_candidate)
+    } andThen script {
+        result["summary"] = (
+            "Completed evaluation for " + params.get("candidate_id", "unknown")
+            + " with confidence " + str(params.get("summary", "?"))
+        )
+    }
+
+    /** Batch evaluate multiple candidate sites using foreach. */
+    workflow BatchEvaluate(
+        candidate_ids: Json,
+        demographics: Json = #{},
+        competition: Json = #{}
+    ) => (
+        summary: String,
+        report: String
+    ) andThen {
+        batch_cfg = DebateConfig(below_market_penalty = -0.15, max_rounds = 3, convergence_threshold = 0.1)
+        yield BatchEvaluate(summary = "Batch started", report = "Configured with penalty " ++ (batch_cfg.below_market_penalty + 1) * 100 ++ "%")
+    } andThen foreach cid in $.candidate_ids {
+        spatial = ScoreCandidate(candidate_id = $.cid, demographics = $.demographics, competition = $.competition, penalty = batch_cfg.below_market_penalty) with ResearchConfig() as research_cfg andThen {
+            market = SearchMarketTrends(candidate_id = $.cid)
+        }
+        yield BatchEvaluate(summary = "Processed candidate: " ++ $.cid)
+    }
+}
