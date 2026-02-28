@@ -60,8 +60,6 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    # Type checking is advisory for now - gradually tighten as coverage improves
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
