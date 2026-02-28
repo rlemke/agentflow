@@ -1,5 +1,7 @@
 # Implementation Changelog
 
+**Current version: v0.24.0**
+
 ## Completed (v0.24.0) - Agent SDK Step Logs + PyPI Packaging + Cleanups
 
 Add step-log emission to all four non-Python agent SDKs (Scala, Go, TypeScript,
