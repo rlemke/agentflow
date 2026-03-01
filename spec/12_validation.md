@@ -334,6 +334,43 @@ s2 = Process(input = $.data) andThen when {
 
 ---
 
+### 9. Catch Clause Validation
+
+#### Structure Rules
+- At most one `catch` per step or declaration
+- `catch` may appear on steps, facets, event facets, and workflows
+
+#### Simple Catch (`catch { ... }`)
+- Block contents validated like `andThen` blocks: step names unique, valid facet/schema refs, yield targets
+
+#### Conditional Catch (`catch when { ... }`)
+- Delegates to when block validation (same rules as `andThen when`):
+  - At least one case required
+  - Exactly one default case (`case _`) is **required**
+  - At most one default case
+  - Default case must be last
+  - Each non-default condition must infer to `Boolean` type
+
+```afl
+// Valid catch
+s = RiskyCall(input = $.data) catch {
+    fallback = SafeDefault(reason = s.error)
+}
+
+// Valid catch when
+s = RiskyCall(input = $.data) catch when {
+    case s.error_type == "timeout" => { r = Retry(input = $.data) }
+    case _ => { r = LogAndSkip(error = s.error) }
+}
+
+// ERROR: catch when missing default
+s = RiskyCall(input = $.data) catch when {
+    case s.error_type == "timeout" => { r = Retry(input = $.data) }
+}
+```
+
+---
+
 ## Implementation
 
 ### File: `afl/validator.py`

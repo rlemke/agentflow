@@ -1459,3 +1459,69 @@ class TestWhenBlockEmitter:
         assert case["type"] == "WhenCase"
         assert case["default"] is True
         assert "condition" not in case
+
+
+class TestCatchBlockEmitter:
+    """Test emission of catch blocks."""
+
+    def test_catch_simple_emission(self):
+        """Simple catch block emits CatchClause with steps."""
+        ast = parse("""
+        facet Transform(data: String) => (output: String)
+        facet SafeDefault(reason: String) => (output: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Transform(data = $.input) catch { fallback = SafeDefault(reason = $.input) }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        wf = _first_decl(data, "WorkflowDecl")
+        step = wf["body"]["steps"][0]
+        assert "catch" in step
+        catch = step["catch"]
+        assert catch["type"] == "CatchClause"
+        assert "steps" in catch
+        assert len(catch["steps"]) == 1
+        assert catch["steps"][0]["name"] == "fallback"
+
+    def test_catch_when_emission(self):
+        """Catch when block emits CatchClause with when/cases."""
+        ast = parse("""
+        facet F(x: String) => (out: String)
+        facet Retry(input: String) => (out: String)
+        facet LogAndSkip(error: String) => (out: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case $.input == "bad" => { r = Retry(input = $.input) }
+                case _ => { r = LogAndSkip(error = $.input) }
+            }
+        }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        wf = _first_decl(data, "WorkflowDecl")
+        step = wf["body"]["steps"][0]
+        assert "catch" in step
+        catch = step["catch"]
+        assert catch["type"] == "CatchClause"
+        assert "when" in catch
+        assert catch["when"]["type"] == "WhenBlock"
+        assert len(catch["when"]["cases"]) == 2
+
+    def test_workflow_catch_emission(self):
+        """Workflow-level catch emits CatchClause on declaration."""
+        ast = parse("""
+        facet Build(service: String) => (image: String)
+        facet Notify(service: String) => (status: String)
+        workflow Deploy(service: String) => (status: String) andThen {
+            build = Build(service = $.service)
+        } catch { fallback = Notify(service = $.service) }
+        """)
+        emitter = JSONEmitter(include_locations=False)
+        data = emitter.emit_dict(ast)
+        wf = _first_decl(data, "WorkflowDecl")
+        assert "catch" in wf
+        catch = wf["catch"]
+        assert catch["type"] == "CatchClause"
+        assert "steps" in catch
+        assert len(catch["steps"]) == 1

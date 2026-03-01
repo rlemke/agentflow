@@ -290,6 +290,46 @@ class ExecutionContext:
 
         return None
 
+    def _find_statement_catch(self, step: StepDefinition) -> dict | None:
+        """Find the catch clause for a step.
+
+        Checks three sources (mirrors _find_statement_body):
+        1. Workflow root → workflow_ast.get("catch")
+        2. Statement-level → stmt_ast.get("catch") from containing block
+        3. Facet-level → facet_def.get("catch")
+
+        Args:
+            step: The step to check for catch clause
+
+        Returns:
+            The catch clause dict, or None
+        """
+        # 1. Workflow root step
+        if step.container_id is None:
+            if self.workflow_ast:
+                return self.workflow_ast.get("catch")
+            return None
+
+        # 2. Statement-level catch
+        if step.statement_id:
+            containing_block_ast = self._find_containing_block_ast(step)
+            if containing_block_ast:
+                for stmt_ast in containing_block_ast.get("steps", []):
+                    if stmt_ast.get("id") == str(step.statement_id) or stmt_ast.get("name") == str(
+                        step.statement_id
+                    ):
+                        catch = stmt_ast.get("catch")
+                        if catch:
+                            return catch
+
+        # 3. Facet-level catch
+        if step.facet_name:
+            facet_def = self.get_facet_definition(step.facet_name)
+            if facet_def and "catch" in facet_def:
+                return facet_def["catch"]
+
+        return None
+
     def _find_containing_block_ast(self, step: StepDefinition) -> dict | None:
         """Find the AST for the block containing a step.
 

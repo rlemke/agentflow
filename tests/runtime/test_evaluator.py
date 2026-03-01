@@ -5854,3 +5854,364 @@ class TestWhenBlockExecution:
         ]
         assert len(when_blocks) == 1
         assert str(when_blocks[0].statement_id) == "when-case-0"
+
+
+# =========================================================================
+# Catch block execution tests
+# =========================================================================
+
+
+class TestCatchBlockExecution:
+    """Tests for catch block runtime execution."""
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    def _simple_catch_workflow_ast(self):
+        """AST for a workflow with statement-level catch."""
+        return {
+            "type": "WorkflowDecl",
+            "name": "CatchTest",
+            "params": [{"name": "input", "type": "String"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-s",
+                        "name": "s",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Risky",
+                            "args": [
+                                {
+                                    "name": "input",
+                                    "value": {"type": "InputRef", "path": ["input"]},
+                                }
+                            ],
+                        },
+                        "catch": {
+                            "type": "CatchClause",
+                            "steps": [
+                                {
+                                    "type": "StepStmt",
+                                    "id": "step-fallback",
+                                    "name": "fallback",
+                                    "call": {
+                                        "type": "CallExpr",
+                                        "target": "SafeDefault",
+                                        "args": [
+                                            {
+                                                "name": "reason",
+                                                "value": {
+                                                    "type": "InputRef",
+                                                    "path": ["input"],
+                                                },
+                                            }
+                                        ],
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+        }
+
+    def _workflow_level_catch_ast(self):
+        """AST for a workflow with declaration-level catch."""
+        return {
+            "type": "WorkflowDecl",
+            "name": "Deploy",
+            "params": [{"name": "service", "type": "String"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-build",
+                        "name": "build",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "BuildImage",
+                            "args": [
+                                {
+                                    "name": "service",
+                                    "value": {"type": "InputRef", "path": ["service"]},
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+            "catch": {
+                "type": "CatchClause",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-fallback",
+                        "name": "fallback",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "NotifyFailure",
+                            "args": [
+                                {
+                                    "name": "service",
+                                    "value": {"type": "InputRef", "path": ["service"]},
+                                }
+                            ],
+                        },
+                    }
+                ],
+            },
+        }
+
+    def test_catch_not_triggered_on_success(self, store, evaluator):
+        """When step succeeds, catch block is dormant."""
+        workflow_ast = self._simple_catch_workflow_ast()
+        result = evaluator.execute(workflow_ast, inputs={"input": "hello"})
+        assert result.success is True
+
+        # No catch sub-blocks should be created
+        all_steps = list(store.get_all_steps())
+        catch_blocks = [
+            s for s in all_steps if s.statement_id and str(s.statement_id).startswith("catch-")
+        ]
+        assert len(catch_blocks) == 0
+
+    def test_catch_error_data_accessible(self, store, evaluator):
+        """Error info (s.error, s.error_type) is stored as pseudo-returns."""
+        from afl.runtime.step import StepDefinition
+
+        step = StepDefinition.create(
+            workflow_id="wf-catch",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Risky",
+            statement_id="step-s",
+            statement_name="s",
+        )
+        step.transition.error = RuntimeError("connection timeout")
+
+        # Set error data as the CatchBeginHandler would
+        step.set_attribute("error", str(step.transition.error), is_return=True)
+        step.set_attribute("error_type", type(step.transition.error).__name__, is_return=True)
+
+        assert step.attributes.returns["error"].value == "connection timeout"
+        assert step.attributes.returns["error_type"].value == "RuntimeError"
+
+    def test_catch_failure_propagates(self, store, evaluator):
+        """When catch itself errors, step transitions to STATEMENT_ERROR."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.handlers.catch_execution import CatchContinueHandler
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        parent = StepDefinition.create(
+            workflow_id="wf-catch-fail",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Risky",
+            statement_id="step-s",
+        )
+        parent.change_state(StepState.CATCH_CONTINUE)
+        store.save_step(parent)
+
+        catch_block = StepDefinition.create(
+            workflow_id="wf-catch-fail",
+            object_type=ObjectType.AND_CATCH,
+            facet_name="",
+            statement_id="catch-block-0",
+            container_id=parent.id,
+        )
+        catch_block.mark_error(RuntimeError("catch handler also failed"))
+        store.save_step(catch_block)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=parent.workflow_id,
+            workflow_ast={"type": "WorkflowDecl", "name": "Test", "params": []},
+        )
+        handler = CatchContinueHandler(parent, context)
+        handler.process_state()
+
+        assert parent.is_error
+
+    def test_simple_catch_creates_sub_block(self, store, evaluator):
+        """CatchBeginHandler creates a catch sub-block with correct type."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.handlers.catch_execution import CatchBeginHandler
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        wf_id = "wf-catch-sub"
+
+        workflow_ast = self._simple_catch_workflow_ast()
+
+        # Create proper hierarchy: root → block → step
+        root = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.WORKFLOW,
+            facet_name="CatchTest",
+        )
+        store.save_step(root)
+
+        block = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.AND_THEN,
+            facet_name="",
+            statement_id="block-0",
+            container_id=root.id,
+        )
+        store.save_step(block)
+
+        step = StepDefinition.create(
+            workflow_id=wf_id,
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Risky",
+            statement_id="step-s",
+            statement_name="s",
+            block_id=block.id,
+            container_id=root.id,
+        )
+        step.transition.error = RuntimeError("oops")
+        step.change_state(StepState.CATCH_BEGIN)
+        store.save_step(step)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=wf_id,
+            workflow_ast=workflow_ast,
+        )
+
+        handler = CatchBeginHandler(step, context)
+        handler.process_state()
+
+        created = context.changes.created_steps
+        assert len(created) == 1
+        assert str(created[0].statement_id) == "catch-block-0"
+        assert created[0].object_type == ObjectType.AND_CATCH
+
+        assert step.attributes.returns["error"].value == "oops"
+        assert step.attributes.returns["error_type"].value == "RuntimeError"
+
+    def test_catch_continue_completes_on_success(self, store, evaluator):
+        """CatchContinueHandler transitions when sub-blocks complete."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.handlers.catch_execution import CatchContinueHandler
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        parent = StepDefinition.create(
+            workflow_id="wf-catch-ok",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Risky",
+            statement_id="step-s",
+        )
+        parent.change_state(StepState.CATCH_CONTINUE)
+        store.save_step(parent)
+
+        catch_block = StepDefinition.create(
+            workflow_id="wf-catch-ok",
+            object_type=ObjectType.AND_CATCH,
+            facet_name="",
+            statement_id="catch-block-0",
+            container_id=parent.id,
+        )
+        catch_block.state = StepState.STATEMENT_COMPLETE
+        catch_block.transition.current_state = StepState.STATEMENT_COMPLETE
+        store.save_step(catch_block)
+
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=parent.workflow_id,
+            workflow_ast={"type": "WorkflowDecl", "name": "Test", "params": []},
+        )
+        handler = CatchContinueHandler(parent, context)
+        handler.process_state()
+
+        assert parent.transition.request_transition is True
+        assert not parent.is_error
+
+    def test_workflow_level_catch_ast_found(self, store, evaluator):
+        """_find_statement_catch finds workflow-level catch."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+        from afl.runtime.step import StepDefinition
+
+        workflow_ast = self._workflow_level_catch_ast()
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-level",
+            workflow_ast=workflow_ast,
+        )
+
+        root = StepDefinition.create(
+            workflow_id="wf-level",
+            object_type=ObjectType.WORKFLOW,
+            facet_name="Deploy",
+        )
+        store.save_step(root)
+
+        catch = context._find_statement_catch(root)
+        assert catch is not None
+        assert catch["type"] == "CatchClause"
+        assert len(catch["steps"]) == 1
+
+    def test_statement_level_catch_ast_found(self, store, evaluator):
+        """_find_statement_catch finds statement-level catch."""
+        from afl.runtime.evaluator import ExecutionContext
+        from afl.runtime.persistence import IterationChanges
+
+        workflow_ast = self._simple_catch_workflow_ast()
+        context = ExecutionContext(
+            persistence=store,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id="wf-stmt",
+            workflow_ast=workflow_ast,
+        )
+
+        from afl.runtime.step import StepDefinition
+
+        root = StepDefinition.create(
+            workflow_id="wf-stmt",
+            object_type=ObjectType.WORKFLOW,
+            facet_name="CatchTest",
+        )
+        store.save_step(root)
+
+        block = StepDefinition.create(
+            workflow_id="wf-stmt",
+            object_type=ObjectType.AND_THEN,
+            facet_name="",
+            statement_id="block-0",
+            container_id=root.id,
+        )
+        store.save_step(block)
+
+        step = StepDefinition.create(
+            workflow_id="wf-stmt",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Risky",
+            statement_id="step-s",
+            statement_name="s",
+            block_id=block.id,
+            container_id=root.id,
+        )
+        store.save_step(step)
+
+        catch = context._find_statement_catch(step)
+        assert catch is not None
+        assert catch["type"] == "CatchClause"

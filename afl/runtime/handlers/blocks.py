@@ -183,6 +183,8 @@ class StatementBlocksContinueHandler(StateHandler):
 
     def process_state(self) -> StateChangeResult:
         """Continue statement blocks execution."""
+        from ..states import StepState
+
         # Load all blocks for this step
         blocks = list(self.context.persistence.get_blocks_by_step(self.step.id))
 
@@ -201,6 +203,19 @@ class StatementBlocksContinueHandler(StateHandler):
 
         if analysis.done:
             if analysis.has_errors:
+                # Check for catch clause before erroring
+                catch_ast = self.context._find_statement_catch(self.step)
+                if catch_ast:
+                    errors = [b.transition.error for b in analysis.errored if b.transition.error]
+                    error = (
+                        errors[0]
+                        if errors
+                        else RuntimeError(f"{len(analysis.errored)} block(s) errored")
+                    )
+                    self.step.transition.error = error
+                    self.step.change_state(StepState.CATCH_BEGIN)
+                    self.step.request_state_change(True)
+                    return StateChangeResult(step=self.step)
                 msg = f"{len(analysis.errored)} block(s) errored"
                 self.step.mark_error(RuntimeError(msg))
                 return StateChangeResult(step=self.step)

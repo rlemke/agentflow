@@ -25,9 +25,9 @@ uses_decl: ("uses" | "use") QNAME _stmt_end
 // Top-level declarations
 top_level_decl: facet_decl | event_facet_decl | workflow_decl | implicit_decl
 
-facet_decl: DOC_COMMENT? "facet" facet_sig facet_def_tail? _stmt_end
-event_facet_decl: DOC_COMMENT? "event" "facet" facet_sig facet_def_tail? _stmt_end
-workflow_decl: DOC_COMMENT? "workflow" facet_sig facet_def_tail? _stmt_end
+facet_decl: DOC_COMMENT? "facet" facet_sig facet_def_tail? catch_clause? _stmt_end
+event_facet_decl: DOC_COMMENT? "event" "facet" facet_sig facet_def_tail? catch_clause? _stmt_end
+workflow_decl: DOC_COMMENT? "workflow" facet_sig facet_def_tail? catch_clause? _stmt_end
 
 // Facet signature
 facet_sig: IDENT "(" [params] ")" [return_clause] mixin_sig*
@@ -72,9 +72,13 @@ when_block: "{" _NL* when_case+ "}" _NL*
 when_case: "case" when_condition "=>" block        -> when_case_expr
          | "case" "_" "=>" block                   -> when_case_default
 when_condition: expr
-step_stmt: IDENT "=" call_expr step_body?
+step_stmt: IDENT "=" call_expr step_body? catch_clause?
 step_body: "andThen" foreach_clause? block
          | "andThen" _NL* "when" when_block             -> step_body_when
+
+// Catch clauses for error recovery
+catch_clause: CATCH_KW block                    -> catch_simple
+            | CATCH_KW _NL* "when" when_block   -> catch_when
 
 yield_stmt: "yield" call_expr
 
@@ -126,6 +130,7 @@ _stmt_end: (_NL+ | ";" _NL* | )
 
 // Terminals - order matters for priority
 // Keywords and literals must come before IDENT
+CATCH_KW.2: "catch"
 BOOLEAN.2: "true" | "false"
 NULL.2: "null"
 TYPE_BUILTIN.2: "String" | "Long" | "Int" | "Double" | "Boolean" | "Json"

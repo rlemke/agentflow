@@ -177,11 +177,12 @@ class CallExpr(ASTNode):
 # Statements
 @dataclass
 class StepStmt(ASTNode):
-    """Step statement: name = CallExpr [andThen block]"""
+    """Step statement: name = CallExpr [andThen block] [catch block]"""
 
     name: str
     call: CallExpr
     body: "AndThenBlock | None" = None
+    catch: "CatchClause | None" = None
 
 
 @dataclass
@@ -230,6 +231,14 @@ class WhenBlock(ASTNode):
     """When block: when { case condition => { ... } ... }"""
 
     cases: list[WhenCase]
+
+
+@dataclass
+class CatchClause(ASTNode):
+    """Catch clause: catch { steps } or catch when { case ... }"""
+
+    block: Block | None = None  # Simple: catch { steps }
+    when: WhenBlock | None = None  # Conditional: catch when { case ... }
 
 
 @dataclass
@@ -319,6 +328,7 @@ class FacetDecl(ASTNode):
     sig: FacetSig
     pre_script: ScriptBlock | None = None
     body: "list[AndThenBlock] | AndThenBlock | None" = None
+    catch: "CatchClause | None" = field(default=None, kw_only=True)
     doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
@@ -329,6 +339,7 @@ class EventFacetDecl(ASTNode):
     sig: FacetSig
     pre_script: ScriptBlock | None = None
     body: "list[AndThenBlock] | AndThenBlock | PromptBlock | None" = None
+    catch: "CatchClause | None" = field(default=None, kw_only=True)
     doc: "DocComment | None" = field(default=None, kw_only=True)
 
 
@@ -339,6 +350,7 @@ class WorkflowDecl(ASTNode):
     sig: FacetSig
     pre_script: ScriptBlock | None = None
     body: "list[AndThenBlock] | AndThenBlock | None" = None
+    catch: "CatchClause | None" = field(default=None, kw_only=True)
     doc: "DocComment | None" = field(default=None, kw_only=True)
 
 

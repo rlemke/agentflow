@@ -103,6 +103,16 @@ class StateChanger(ABC):
                         self.step.current_state,
                         result.error,
                     )
+                    # Check for catch clause before erroring
+                    catch_ast = self.context._find_statement_catch(self.step)
+                    if catch_ast:
+                        from ..states import StepState
+
+                        self.step.transition.error = result.error
+                        self.step.change_state(StepState.CATCH_BEGIN)
+                        self.step.request_state_change(True)
+                        self.step = result.step
+                        continue  # Re-enter the loop to process CATCH_BEGIN
                     self.step.mark_error(result.error)
                     return StateChangeResult(
                         step=self.step,

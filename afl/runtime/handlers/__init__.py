@@ -47,6 +47,11 @@ from .capture import (
     StatementCaptureBeginHandler,
     StatementCaptureEndHandler,
 )
+from .catch_execution import (
+    CatchBeginHandler,
+    CatchContinueHandler,
+    CatchEndHandler,
+)
 from .completion import (
     EventTransmitHandler,
     StatementCompleteHandler,
@@ -96,6 +101,10 @@ __all__ = [
     "BlockExecutionBeginHandler",
     "BlockExecutionContinueHandler",
     "BlockExecutionEndHandler",
+    # Catch execution
+    "CatchBeginHandler",
+    "CatchContinueHandler",
+    "CatchEndHandler",
 ]
 
 
@@ -125,6 +134,10 @@ STATE_HANDLERS: dict[str, type[StateHandler]] = {
     StepState.BLOCK_EXECUTION_BEGIN: BlockExecutionBeginHandler,
     StepState.BLOCK_EXECUTION_CONTINUE: BlockExecutionContinueHandler,
     StepState.BLOCK_EXECUTION_END: BlockExecutionEndHandler,
+    # Catch execution states
+    StepState.CATCH_BEGIN: CatchBeginHandler,
+    StepState.CATCH_CONTINUE: CatchContinueHandler,
+    StepState.CATCH_END: CatchEndHandler,
 }
 
 

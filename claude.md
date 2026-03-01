@@ -44,6 +44,7 @@ AgentFlow separates workflow design from handler implementation:
 - **andThen / yield blocks**: compose multi-step internal logic. Facets/workflows support multiple concurrent `andThen` blocks.
 - **andThen foreach**: iterate over collections with parallel execution.
 - **Statement-level andThen body**: steps can have inline `andThen` blocks (`s = F(x = 1) andThen { ... }`).
+- **catch blocks**: `catch { ... }` or `catch when { ... }` for error recovery on steps, facets, and workflows.
 - **prompt blocks**: `prompt { system "..." template "..." model "..." }` for LLM-driven event facets.
 - **script blocks**: `script python "code..."` for inline sandboxed Python execution. Code receives `params` dict and writes to `result` dict.
 
@@ -55,6 +56,7 @@ AgentFlow separates workflow design from handler implementation:
 - **Precedence** (lowest→highest): `||` < `&&` < comparison < `++` < `+/-` < `*/%` < unary (`-`, `!`).
 - **Collection literals**: arrays `[1, 2, 3]`, maps `#{"key": "value"}`, indexing `arr[0]`, grouping `(expr)`.
 - **andThen when blocks**: `andThen when { case condition => { ... } case _ => { ... } }` — conditional branching. Non-exclusive: all matching cases execute concurrently. Default case (`case _ =>`) is **required** and runs only if no other case matched.
+- **catch blocks**: `catch { ... }` or `catch when { case ... }` — error recovery. Where `andThen` runs on success, `catch` runs on error. Available on steps, facets, and workflows. Error data accessible via `s.error` and `s.error_type`. Default case required for `catch when`.
 - **Type checking**: validator catches string+int and bool+arithmetic errors at compile time; unknown-type refs pass through.
 
 ---

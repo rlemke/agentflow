@@ -1,6 +1,49 @@
 # Implementation Changelog
 
-**Current version: v0.29.0**
+**Current version: v0.30.0**
+
+## Completed (v0.30.0) - Catch Blocks
+
+New language feature: `catch` blocks for error recovery. Where `andThen` runs
+on success, `catch` runs on error, allowing workflows to recover gracefully.
+
+### Syntax
+
+Two forms at both statement-level and workflow/facet declaration-level:
+
+- **Simple catch**: `s = RiskyCall() catch { fallback = SafeDefault(reason = s.error) }`
+- **Conditional catch**: `s = RiskyCall() catch when { case s.error_type == "timeout" => { ... } case _ => { ... } }`
+- **Workflow-level**: `workflow Deploy() andThen { ... } catch { ... }`
+
+### Rules
+
+- One `catch` per step / per declaration (at most)
+- Covers event facet errors AND all `andThen` children; at declaration-level covers entire body
+- `catch when` reuses existing when/case syntax (default case required)
+- Error data accessible via `s.error` (message) and `s.error_type` (exception class name)
+- At workflow level: `$.error` and `$.error_type`
+
+### Implementation
+
+**Grammar & AST** (3 files): `CATCH_KW.2` terminal, `catch_clause` rules
+(`catch_simple`, `catch_when`), `CatchClause` dataclass, `catch` field on
+`StepStmt`, `FacetDecl`, `EventFacetDecl`, `WorkflowDecl`.
+
+**Compiler** (3 files): Transformer methods (`catch_simple`, `catch_when`),
+emitter `_catch_clause()` method, validator `_validate_catch_clause()`.
+
+**Runtime** (6 files): 3 new states (`CATCH_BEGIN`, `CATCH_CONTINUE`, `CATCH_END`),
+`AND_CATCH` object type, 3 new handlers (`CatchBeginHandler`, `CatchContinueHandler`,
+`CatchEndHandler`), catch interception in `StatementBlocksContinueHandler` and
+`StateChanger`, `_find_statement_catch()` on `ExecutionContext`.
+
+**Tests**: 22 new (7 parser, 3 emitter, 5 validator, 7 runtime). Total: 3409 passed, 84 skipped.
+
+Files: `afl/grammar/afl.lark`, `afl/ast.py`, `afl/transformer.py`, `afl/emitter.py`,
+`afl/validator.py`, `afl/runtime/states.py`, `afl/runtime/types.py`,
+`afl/runtime/handlers/catch_execution.py` (new), `afl/runtime/handlers/__init__.py`,
+`afl/runtime/handlers/blocks.py`, `afl/runtime/changers/base.py`,
+`afl/runtime/evaluator.py`, spec files, `CLAUDE.md`
 
 ## Completed (v0.28.1) - DevOps Deploy Example
 

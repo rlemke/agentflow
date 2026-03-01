@@ -61,6 +61,7 @@ All AST nodes MUST have a unique UUID (v4) stored in the `node_id` field. This I
 | `ScriptBlock` | `script [python] "code..."` or `script { code }` for inline sandboxed Python execution |
 | `WhenBlock` | `when { cases }` — conditional branching within andThen |
 | `WhenCase` | `case expr => { block }` or `case _ => { block }` |
+| `CatchClause` | `catch { block }` or `catch when { cases }` — error recovery |
 
 ### Expression Nodes
 | Node | Description |
@@ -102,25 +103,29 @@ Program
 │   │   ├── returns: ReturnClause?
 │   │   └── mixins: list[MixinSig]
 │   ├── pre_script: ScriptBlock?       # pre-processing script (runs before event/begins)
-│   └── body: AndThenBlock? | PromptBlock?
-│       # AndThenBlock (regular):
-│       ├── foreach: ForeachClause?
-│       ├── block: Block?
-│       │   ├── steps: list[StepStmt]
-│       │   └── yield_stmt: YieldStmt?
-│       ├── script: ScriptBlock?       # andThen script variant (mutually exclusive with block/when)
-│       └── when: WhenBlock?          # andThen when variant (mutually exclusive with block/script)
-│           └── cases: list[WhenCase]
-│               ├── condition: expr?  # None for default case
-│               ├── block: Block
-│               └── is_default: bool
-│       # PromptBlock:
-│       ├── system: str?
-│       ├── template: str?
-│       └── model: str?
-│       # ScriptBlock:
-│       ├── language: str (default "python")
-│       └── code: str
+│   ├── body: AndThenBlock? | PromptBlock?
+│   │   # AndThenBlock (regular):
+│   │   ├── foreach: ForeachClause?
+│   │   ├── block: Block?
+│   │   │   ├── steps: list[StepStmt]
+│   │   │   │   └── catch: CatchClause?  # step-level catch
+│   │   │   └── yield_stmt: YieldStmt?
+│   │   ├── script: ScriptBlock?       # andThen script variant (mutually exclusive with block/when)
+│   │   └── when: WhenBlock?          # andThen when variant (mutually exclusive with block/script)
+│   │       └── cases: list[WhenCase]
+│   │           ├── condition: expr?  # None for default case
+│   │           ├── block: Block
+│   │           └── is_default: bool
+│   │   # PromptBlock:
+│   │   ├── system: str?
+│   │   ├── template: str?
+│   │   └── model: str?
+│   │   # ScriptBlock:
+│   │   ├── language: str (default "python")
+│   │   └── code: str
+│   └── catch: CatchClause?           # declaration-level catch (error recovery)
+│       ├── block: Block?             # simple catch { steps }
+│       └── when: WhenBlock?          # conditional catch when { cases }
 ├── event_facets: list[EventFacetDecl]
 ├── workflows: list[WorkflowDecl]
 ├── implicits: list[ImplicitDecl]

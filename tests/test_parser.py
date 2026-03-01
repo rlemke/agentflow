@@ -31,6 +31,7 @@ from afl import (
     WhenCase,
     parse,
 )
+from afl.ast import CatchClause
 
 
 @pytest.fixture
@@ -2155,5 +2156,130 @@ class TestWhenBlocks:
         """)
         wf = ast.workflows[0]
         cond = wf.body.when.cases[0].condition
+        assert isinstance(cond, BinaryExpr)
+        assert cond.operator == "&&"
+
+
+class TestCatchBlocks:
+    """Test catch block parsing."""
+
+    def test_simple_catch(self, parser):
+        """Parse a simple catch block on a step."""
+        ast = parser.parse("""
+        facet Transform(data: String) => (output: String)
+        facet SafeDefault(reason: String) => (output: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Transform(data = $.input) catch { fallback = SafeDefault(reason = $.input) }
+        }
+        """)
+        wf = ast.workflows[0]
+        step = wf.body.block.steps[0]
+        assert step.name == "s"
+        assert step.catch is not None
+        assert isinstance(step.catch, CatchClause)
+        assert step.catch.block is not None
+        assert step.catch.when is None
+        assert len(step.catch.block.steps) == 1
+        assert step.catch.block.steps[0].name == "fallback"
+
+    def test_catch_when(self, parser):
+        """Parse a catch when block with multiple cases."""
+        ast = parser.parse("""
+        facet Transform(data: String) => (output: String)
+        facet Retry(input: String) => (output: String)
+        facet LogAndSkip(error: String) => (output: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Transform(data = $.input) catch when {
+                case $.input == "bad" => { r = Retry(input = $.input) }
+                case _ => { r = LogAndSkip(error = $.input) }
+            }
+        }
+        """)
+        wf = ast.workflows[0]
+        step = wf.body.block.steps[0]
+        assert step.catch is not None
+        assert step.catch.when is not None
+        assert isinstance(step.catch.when, WhenBlock)
+        assert len(step.catch.when.cases) == 2
+        assert not step.catch.when.cases[0].is_default
+        assert step.catch.when.cases[1].is_default
+
+    def test_catch_with_default(self, parser):
+        """Parse catch when with default case."""
+        ast = parser.parse("""
+        facet F(x: String) => (out: String)
+        facet G(x: String) => (out: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case $.input == "a" => { r = G(x = $.input) }
+                case _ => { r = G(x = $.input) }
+            }
+        }
+        """)
+        catch = ast.workflows[0].body.block.steps[0].catch
+        assert catch.when is not None
+        defaults = [c for c in catch.when.cases if c.is_default]
+        assert len(defaults) == 1
+
+    def test_catch_with_andthen(self, parser):
+        """Parse step with both andThen and catch."""
+        ast = parser.parse("""
+        facet Transform(data: String) => (output: String)
+        facet Process(data: String) => (result: String)
+        facet SafeDefault(reason: String) => (result: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Transform(data = $.input) andThen { p = Process(data = s.output) } catch { fallback = SafeDefault(reason = $.input) }
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        assert step.body is not None  # andThen block
+        assert step.catch is not None  # catch block
+        assert len(step.body.block.steps) == 1
+        assert len(step.catch.block.steps) == 1
+
+    def test_catch_only_no_andthen(self, parser):
+        """Parse step with catch but no andThen."""
+        ast = parser.parse("""
+        facet Risky(input: String) => (output: String)
+        facet SafeDefault(reason: String) => (output: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Risky(input = $.input) catch { fallback = SafeDefault(reason = $.input) }
+        }
+        """)
+        step = ast.workflows[0].body.block.steps[0]
+        assert step.body is None  # no andThen
+        assert step.catch is not None  # has catch
+
+    def test_workflow_level_catch(self, parser):
+        """Parse catch at workflow declaration level."""
+        ast = parser.parse("""
+        facet BuildImage(service: String) => (image: String)
+        facet NotifyFailure(service: String) => (status: String)
+        workflow Deploy(service: String) => (status: String) andThen {
+            build = BuildImage(service = $.service)
+        } catch { fallback = NotifyFailure(service = $.service) }
+        """)
+        wf = ast.workflows[0]
+        assert wf.body is not None  # andThen block
+        assert wf.catch is not None  # catch clause
+        assert isinstance(wf.catch, CatchClause)
+        assert len(wf.catch.block.steps) == 1
+
+    def test_catch_when_complex_condition(self, parser):
+        """Parse catch when with boolean ops in conditions."""
+        ast = parser.parse("""
+        facet F(x: String) => (out: String)
+        facet G(x: String) => (out: String)
+        facet H(x: String) => (out: String)
+        workflow Test(input: String, retries: Int) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case $.input == "timeout" && $.retries > 0 => { r = G(x = $.input) }
+                case _ => { r = H(x = $.input) }
+            }
+        }
+        """)
+        catch = ast.workflows[0].body.block.steps[0].catch
+        assert catch.when is not None
+        cond = catch.when.cases[0].condition
         assert isinstance(cond, BinaryExpr)
         assert cond.operator == "&&"

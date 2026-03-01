@@ -66,6 +66,11 @@ class StepState:
     STATEMENT_CAPTURE_BEGIN = "state.statement.capture.Begin"
     STATEMENT_CAPTURE_END = "state.statement.capture.End"
 
+    # Catch phase
+    CATCH_BEGIN = "state.statement.catch.Begin"
+    CATCH_CONTINUE = "state.statement.catch.Continue"
+    CATCH_END = "state.statement.catch.End"
+
     # Terminal states
     STATEMENT_END = "state.statement.End"
     STATEMENT_COMPLETE = "state.statement.Complete"
@@ -106,6 +111,10 @@ STEP_TRANSITIONS: dict[str, str] = {
     StepState.STATEMENT_CAPTURE_BEGIN: StepState.STATEMENT_CAPTURE_END,
     StepState.STATEMENT_CAPTURE_END: StepState.STATEMENT_END,
     StepState.STATEMENT_END: StepState.STATEMENT_COMPLETE,
+    # Catch phase transitions (entered via explicit state change, not normal flow)
+    StepState.CATCH_BEGIN: StepState.CATCH_CONTINUE,
+    StepState.CATCH_CONTINUE: StepState.CATCH_END,
+    StepState.CATCH_END: StepState.STATEMENT_CAPTURE_BEGIN,
 }
 
 

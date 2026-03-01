@@ -1941,3 +1941,78 @@ class TestWhenBlockValidation:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestCatchBlockValidation:
+    """Test catch block validation."""
+
+    def test_valid_catch_block(self, validator):
+        """Valid catch block should pass validation."""
+        ast = parse("""
+        facet Transform(data: String) => (output: String)
+        facet SafeDefault(reason: String) => (output: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = Transform(data = $.input) catch { fallback = SafeDefault(reason = $.input) }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_catch_when_missing_default(self, validator):
+        """Catch when without default case should fail."""
+        ast = parse("""
+        facet F(x: String) => (out: String)
+        facet G(x: String) => (out: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case $.input == "a" => { r = G(x = $.input) }
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("default" in str(e).lower() for e in result.errors)
+
+    def test_catch_when_multiple_defaults(self, validator):
+        """Catch when with multiple defaults should fail."""
+        ast = parse("""
+        facet F(x: String) => (out: String)
+        facet G(x: String) => (out: String)
+        workflow Test(input: String) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case _ => { r = G(x = $.input) }
+                case _ => { r = G(x = $.input) }
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("at most one" in str(e).lower() for e in result.errors)
+
+    def test_catch_when_non_boolean_condition(self, validator):
+        """Catch when with non-boolean condition should fail."""
+        ast = parse("""
+        facet F(x: String) => (out: String)
+        facet G(x: String) => (out: String)
+        workflow Test(input: Int) => (output: String) andThen {
+            s = F(x = $.input) catch when {
+                case 42 => { r = G(x = $.input) }
+                case _ => { r = G(x = $.input) }
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("boolean" in str(e).lower() for e in result.errors)
+
+    def test_valid_workflow_catch(self, validator):
+        """Workflow-level catch should pass validation."""
+        ast = parse("""
+        facet Build(service: String) => (image: String)
+        facet Notify(service: String) => (status: String)
+        workflow Deploy(service: String) => (status: String) andThen {
+            build = Build(service = $.service)
+        } catch { fallback = Notify(service = $.service) }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

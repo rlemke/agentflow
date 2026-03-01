@@ -93,11 +93,11 @@ schema_field       := ident ":" type (stmt_sep)? ;
 
 stmt_sep           := ";" | NEWLINE+ ;
 
-facet_decl         := "facet" facet_sig facet_def_tail? (stmt_sep)? ;
+facet_decl         := "facet" facet_sig facet_def_tail? catch_clause? (stmt_sep)? ;
 
-event_facet_decl   := "event" "facet" facet_sig facet_def_tail? (stmt_sep)? ;
+event_facet_decl   := "event" "facet" facet_sig facet_def_tail? catch_clause? (stmt_sep)? ;
 
-workflow_decl      := "workflow" facet_sig facet_def_tail? (stmt_sep)? ;
+workflow_decl      := "workflow" facet_sig facet_def_tail? catch_clause? (stmt_sep)? ;
 
 facet_sig          := ident "(" params? ")" return_clause? mixin_sig* ;
 
@@ -113,13 +113,18 @@ mixin_sig          := "with" qname "(" named_args? ")" ;
 
 mixin_call         := "with" qname "(" named_args? ")" ("as" ident)? ;
 
-step_stmt          := ident "=" call_expr (stmt_sep)? ;
+step_stmt          := ident "=" call_expr step_body? catch_clause? (stmt_sep)? ;
+
+step_body          := andthen_clause+ ;
 
 call_expr          := qname "(" named_args? ")" mixin_call* ;
 
 facet_def_tail     := ("script" script_block andthen_clause*)
                    | andthen_clause+
                    | ("prompt" prompt_block) ;
+
+catch_clause       := "catch" block
+                   | "catch" "when" when_block ;
 
 andthen_clause     := "andThen" foreach_clause? block
                    | "andThen" "script" script_block
@@ -456,6 +461,50 @@ s1 = Classify(input = $.data) andThen when {
     }
 }
 ```
+
+### catch blocks
+
+Error recovery for steps, facets, and workflows. Where `andThen` runs on success, `catch` runs on error. Two forms: simple `catch { ... }` and conditional `catch when { case ... }`.
+
+Simple catch — single recovery block:
+```afl
+s = RiskyCall(input = $.data)
+    andThen { processed = Transform(data = s.output) }
+    catch {
+        fallback = SafeDefault(reason = s.error)
+    }
+```
+
+Conditional catch — reuses when/case syntax:
+```afl
+s = RiskyCall(input = $.data)
+    catch when {
+        case s.error_type == "timeout" => { r = Retry(input = $.data) }
+        case _ => { r = LogAndSkip(error = s.error) }
+    }
+```
+
+Workflow-level catch — catches any unhandled error from body:
+```afl
+workflow Deploy(service: String) => (status: String)
+    andThen {
+        build = BuildImage(service = $.service)
+        deploy = ApplyDeployment(image = build.image)
+    }
+    catch {
+        fallback = NotifyFailure(service = $.service, error = $.error)
+    }
+```
+
+Rules:
+- `catch` is a clause at the same level as `andThen` — on steps, facets, and workflows
+- One `catch` per step / per declaration (at most)
+- `catch` covers the step's event facet AND all its `andThen` children; at declaration-level it covers the entire body
+- `catch when` reuses existing when/case syntax — same validation rules (default case required)
+- On success: catch block is dormant, step completes normally
+- On error: catch block runs; if catch succeeds, step completes; if catch fails, step errors
+- Error data accessible via `s.error` (message) and `s.error_type` (exception class name)
+- At workflow level, error data is accessible via `$.error` and `$.error_type`
 
 ### Schema declaration and instantiation
 schema Config {

@@ -25,6 +25,7 @@ from .ast import (
     BinaryExpr,
     Block,
     CallExpr,
+    CatchClause,
     ConcatExpr,
     DocComment,
     EventFacetDecl,
@@ -198,6 +199,8 @@ class JSONEmitter:
             return self._when_block(node)
         if isinstance(node, WhenCase):
             return self._when_case(node)
+        if isinstance(node, CatchClause):
+            return self._catch_clause(node)
 
         raise ValueError(f"Unknown node type: {type(node)}")
 
@@ -342,6 +345,8 @@ class JSONEmitter:
             data["pre_script"] = self._convert(node.pre_script)
         if node.body:
             data["body"] = self._emit_body(node.body)
+        if node.catch:
+            data["catch"] = self._convert(node.catch)
 
         return self._add_metadata(data, node)
 
@@ -364,6 +369,8 @@ class JSONEmitter:
             data["pre_script"] = self._convert(node.pre_script)
         if node.body:
             data["body"] = self._emit_body(node.body)
+        if node.catch:
+            data["catch"] = self._convert(node.catch)
 
         return self._add_metadata(data, node)
 
@@ -386,6 +393,8 @@ class JSONEmitter:
             data["pre_script"] = self._convert(node.pre_script)
         if node.body:
             data["body"] = self._emit_body(node.body)
+        if node.catch:
+            data["catch"] = self._convert(node.catch)
 
         return self._add_metadata(data, node)
 
@@ -488,6 +497,8 @@ class JSONEmitter:
         }
         if node.body:
             data["body"] = self._convert(node.body)
+        if node.catch:
+            data["catch"] = self._convert(node.catch)
         return self._add_metadata(data, node)
 
     def _yield_stmt(self, node: YieldStmt) -> dict:
@@ -680,6 +691,21 @@ class JSONEmitter:
             else:
                 data["yields"] = self._convert(node.block.yield_stmts)
         return data
+
+    def _catch_clause(self, node: CatchClause) -> dict:
+        """Convert CatchClause node."""
+        data: dict = {"type": "CatchClause"}
+        if node.when:
+            data["when"] = self._convert(node.when)
+        elif node.block:
+            if node.block.steps:
+                data["steps"] = self._convert(node.block.steps)
+            if node.block.yield_stmts:
+                if len(node.block.yield_stmts) == 1:
+                    data["yield"] = self._convert(node.block.yield_stmts[0])
+                else:
+                    data["yields"] = self._convert(node.block.yield_stmts)
+        return self._add_metadata(data, node)
 
 
 def emit_json(ast: Program, include_locations: bool = True, indent: int | None = 2) -> str:

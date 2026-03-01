@@ -748,6 +748,9 @@ STEP_TRANSITIONS: dict[str, str] = {
     StepState.STATEMENT_BLOCKS_BEGIN:   StepState.STATEMENT_BLOCKS_CONTINUE,
     StepState.STATEMENT_BLOCKS_CONTINUE: StepState.STATEMENT_BLOCKS_END,
     StepState.STATEMENT_BLOCKS_END:     StepState.STATEMENT_CAPTURE_BEGIN,
+    StepState.CATCH_BEGIN:              StepState.CATCH_CONTINUE,
+    StepState.CATCH_CONTINUE:           StepState.CATCH_END,
+    StepState.CATCH_END:                StepState.STATEMENT_CAPTURE_BEGIN,
     StepState.STATEMENT_CAPTURE_BEGIN:  StepState.STATEMENT_CAPTURE_END,
     StepState.STATEMENT_CAPTURE_END:    StepState.STATEMENT_END,
     StepState.STATEMENT_END:            StepState.STATEMENT_COMPLETE,
@@ -1229,6 +1232,52 @@ Execute statement-level blocks (from `andThen` bodies):
 - **StatementBlocksBegin** - Creates block steps for each `AndThenBlock`
 - **StatementBlocksContinue** - Polls with `BlockAnalysis.load(step, blocks, mixins=False)`
 - **StatementBlocksEnd** - Advances to capture phase
+
+## Catch Execution
+
+When a step errors and has a `catch` clause, execution enters the catch phase instead of transitioning to `STATEMENT_ERROR`. This allows error recovery.
+
+**Location:** `afl/runtime/handlers/catch_execution.py`
+
+### State Flow
+
+```
+Error path without catch:
+  ... → error → STATEMENT_ERROR (terminal)
+
+Error path with catch:
+  ... → error → CATCH_BEGIN → CATCH_CONTINUE → CATCH_END → STATEMENT_CAPTURE_BEGIN
+                                    ↓ (catch fails)
+                               STATEMENT_ERROR
+```
+
+### Catch Interception Points
+
+Two places check for catch before calling `mark_error()`:
+
+1. **`StatementBlocksContinueHandler`** — when child blocks error
+2. **`StateChanger.process()`** — when event handler errors
+
+### CatchBeginHandler
+
+- Stores error info as pseudo-returns: `step.set_attribute("error", ...)` and `step.set_attribute("error_type", ...)`
+- Simple catch: creates a single sub-block (`object_type=AND_CATCH`, `statement_id="catch-block-0"`)
+- Catch when: evaluates conditions, creates sub-blocks per matching case (`statement_id="catch-case-{i}"`)
+
+### CatchContinueHandler
+
+- Polls catch sub-blocks (same pattern as `BlockExecutionContinueHandler`)
+- All complete → transition to `CATCH_END`
+- Any errored → `mark_error()` (catch itself failed, propagate)
+- Not done → `stay(push=True)`
+
+### CatchEndHandler
+
+- Pass-through: transitions to `STATEMENT_CAPTURE_BEGIN` to resume normal flow
+
+### Object Type
+
+Catch sub-blocks use `ObjectType.AND_CATCH = "AndCatch"` (included in `is_block()`).
 
 ## Capture/Yield System
 

@@ -31,6 +31,7 @@ from .ast import (
     ArrayType,
     BinaryExpr,
     CallExpr,
+    CatchClause,
     ConcatExpr,
     EventFacetDecl,
     FacetDecl,
@@ -565,6 +566,8 @@ class AFLValidator:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
             self._validate_body(decl.body, decl.sig)
+        if decl.catch:
+            self._validate_catch_clause(decl.catch, decl.sig)
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
@@ -580,6 +583,8 @@ class AFLValidator:
                 self._validate_prompt_block(decl.body, decl.sig)
             else:
                 self._validate_body(decl.body, decl.sig)
+        if decl.catch:
+            self._validate_catch_clause(decl.catch, decl.sig)
 
     def _validate_prompt_block(self, block: PromptBlock, sig: FacetSig) -> None:
         """Validate a prompt block.
@@ -647,6 +652,8 @@ class AFLValidator:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
             self._validate_body(decl.body, decl.sig)
+        if decl.catch:
+            self._validate_catch_clause(decl.catch, decl.sig)
 
     def _validate_and_then_block(
         self,
@@ -741,6 +748,10 @@ class AFLValidator:
                     step.body, containing_sig, extra_yield_targets={step_target}
                 )
 
+            # Validate inline catch clause if present
+            if step.catch:
+                self._validate_catch_clause(step.catch, containing_sig)
+
         # Validate yield statements and check for duplicate targets
         yield_targets_used: set[str] = set()
         for yield_stmt in body.block.yield_stmts:
@@ -829,6 +840,23 @@ class AFLValidator:
             if case.block:
                 synthetic = AndThenBlock(block=case.block)
                 self._validate_and_then_block(synthetic, containing_sig, extra_yield_targets)
+
+    def _validate_catch_clause(
+        self,
+        catch: CatchClause,
+        containing_sig: FacetSig,
+        extra_yield_targets: set[str] | None = None,
+    ) -> None:
+        """Validate a catch clause.
+
+        For catch when: delegates to _validate_when_block (default required, Boolean conditions).
+        For catch block: validates block contents using synthetic AndThenBlock.
+        """
+        if catch.when:
+            self._validate_when_block(catch.when, containing_sig, extra_yield_targets)
+        elif catch.block:
+            synthetic = AndThenBlock(block=catch.block)
+            self._validate_and_then_block(synthetic, containing_sig, extra_yield_targets)
 
     def _extract_references(self, expr) -> list[Reference]:
         """Recursively extract all Reference nodes from an expression tree."""

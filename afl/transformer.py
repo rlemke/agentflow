@@ -25,6 +25,7 @@ from .ast import (
     BinaryExpr,
     Block,
     CallExpr,
+    CatchClause,
     ConcatExpr,
     DocComment,
     DocParam,
@@ -392,8 +393,14 @@ class AFLTransformer(Transformer):
     def step_stmt(self, meta, items: list) -> StepStmt:
         name = items[0]
         call = items[1]
-        body = items[2] if len(items) > 2 else None
-        return StepStmt(name=name, call=call, body=body, location=self._loc(meta))
+        body = None
+        catch = None
+        for item in items[2:]:
+            if isinstance(item, CatchClause):
+                catch = item
+            elif isinstance(item, AndThenBlock):
+                body = item
+        return StepStmt(name=name, call=call, body=body, catch=catch, location=self._loc(meta))
 
     @v_args(meta=True)
     def step_body(self, meta, items: list) -> AndThenBlock:
@@ -500,6 +507,18 @@ class AFLTransformer(Transformer):
         return items[0]
 
     @v_args(meta=True)
+    def catch_simple(self, meta, items: list) -> CatchClause:
+        """Handle simple catch block: catch { steps }."""
+        block = next(item for item in items if isinstance(item, Block))
+        return CatchClause(block=block, location=self._loc(meta))
+
+    @v_args(meta=True)
+    def catch_when(self, meta, items: list) -> CatchClause:
+        """Handle conditional catch block: catch when { case ... }."""
+        when_blk = next(item for item in items if isinstance(item, WhenBlock))
+        return CatchClause(when=when_blk, location=self._loc(meta))
+
+    @v_args(meta=True)
     def facet_def_tail(self, meta, items: list):
         # Check for prompt block
         for item in items:
@@ -604,42 +623,75 @@ class AFLTransformer(Transformer):
     def facet_decl(self, meta, items: list) -> FacetDecl:
         doc = _extract_doc_comment(items)
         sig = items[0]
-        tail = items[1] if len(items) > 1 else None
+        tail = None
+        catch = None
+        for item in items[1:]:
+            if isinstance(item, CatchClause):
+                catch = item
+            elif tail is None:
+                tail = item
         pre_script, body = None, None
         if isinstance(tail, tuple):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
         return FacetDecl(
-            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+            sig=sig,
+            pre_script=pre_script,
+            body=body,
+            catch=catch,
+            doc=doc,
+            location=self._loc(meta),
         )
 
     @v_args(meta=True)
     def event_facet_decl(self, meta, items: list) -> EventFacetDecl:
         doc = _extract_doc_comment(items)
         sig = items[0]
-        tail = items[1] if len(items) > 1 else None
+        tail = None
+        catch = None
+        for item in items[1:]:
+            if isinstance(item, CatchClause):
+                catch = item
+            elif tail is None:
+                tail = item
         pre_script, body = None, None
         if isinstance(tail, tuple):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
         return EventFacetDecl(
-            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+            sig=sig,
+            pre_script=pre_script,
+            body=body,
+            catch=catch,
+            doc=doc,
+            location=self._loc(meta),
         )
 
     @v_args(meta=True)
     def workflow_decl(self, meta, items: list) -> WorkflowDecl:
         doc = _extract_doc_comment(items)
         sig = items[0]
-        tail = items[1] if len(items) > 1 else None
+        tail = None
+        catch = None
+        for item in items[1:]:
+            if isinstance(item, CatchClause):
+                catch = item
+            elif tail is None:
+                tail = item
         pre_script, body = None, None
         if isinstance(tail, tuple):
             pre_script, body = tail
         elif isinstance(tail, (PromptBlock, AndThenBlock, list)):
             body = tail
         return WorkflowDecl(
-            sig=sig, pre_script=pre_script, body=body, doc=doc, location=self._loc(meta)
+            sig=sig,
+            pre_script=pre_script,
+            body=body,
+            catch=catch,
+            doc=doc,
+            location=self._loc(meta),
         )
 
     @v_args(meta=True, inline=True)
