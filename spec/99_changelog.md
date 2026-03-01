@@ -1,6 +1,35 @@
 # Implementation Changelog
 
-**Current version: v0.30.0**
+**Current version: v0.30.1**
+
+## Completed (v0.30.1) - Transformer Refactoring
+
+Internal refactoring of `afl/transformer.py` to eliminate duplication and
+simplify maintenance. No behavioral changes — all 3,409 tests pass unchanged.
+
+### Changes
+
+**Item extraction helpers** (3 new static methods):
+- `_find_one(items, cls)` → first item of type, or None (replaces ad-hoc `next()`/loops)
+- `_find_all(items, cls)` → all items of type (replaces ad-hoc list comprehensions)
+- `_find_rest(items, *exclude)` → items not matching given types
+
+**Declaration consolidation** (`_build_declaration` helper):
+- `facet_decl()`, `event_facet_decl()`, `workflow_decl()` were 24 lines of identical
+  logic repeated 3 times. Now each is a one-liner delegating to `_build_declaration()`.
+
+**Segregation consolidation** (`_segregate_declarations` + `_DECL_TYPE_MAP`):
+- `namespace_body()` and `start()` both sorted items into 6+ typed lists with
+  identical isinstance loops. Now both delegate to `_segregate_declarations()`.
+
+**Methods simplified** (13 total): `map_literal`, `call_expr`, `step_stmt`,
+`step_body`, `block_body`, `andthen_clause`, `when_block`, `catch_simple`,
+`catch_when`, `facet_def_tail`, `facet_decl`, `event_facet_decl`, `workflow_decl`,
+`namespace_body`, `start`.
+
+**Net**: 72 fewer lines (165 deletions, 93 insertions). Single file change.
+
+Files: `afl/transformer.py`
 
 ## Completed (v0.30.0) - Catch Blocks
 
