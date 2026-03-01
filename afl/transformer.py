@@ -150,6 +150,14 @@ class AFLTransformer(Transformer):
         """Find items NOT matching any of the given types."""
         return [item for item in items if not isinstance(item, tuple(exclude))]
 
+    def _andthen_from_items(self, meta, items: list) -> AndThenBlock:
+        """Build an AndThenBlock from items containing optional ForeachClause and Block."""
+        return AndThenBlock(
+            block=self._find_one(items, Block),
+            foreach=self._find_one(items, ForeachClause),
+            location=self._loc(meta),
+        )
+
     # --- Declaration helpers ---
 
     _DECL_TYPE_MAP: dict[type, str] = {
@@ -458,9 +466,7 @@ class AFLTransformer(Transformer):
 
     @v_args(meta=True)
     def step_body(self, meta, items: list) -> AndThenBlock:
-        foreach = self._find_one(items, ForeachClause)
-        block = self._find_one(items, Block)
-        return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+        return self._andthen_from_items(meta, items)
 
     @v_args(meta=True, inline=True)
     def yield_stmt(self, meta, call: CallExpr) -> YieldStmt:
@@ -498,9 +504,7 @@ class AFLTransformer(Transformer):
     @v_args(meta=True)
     def andthen_clause(self, meta, items: list) -> AndThenBlock:
         """Handle regular andThen block clause."""
-        foreach = self._find_one(items, ForeachClause)
-        block = self._find_one(items, Block)
-        return AndThenBlock(block=block, foreach=foreach, location=self._loc(meta))
+        return self._andthen_from_items(meta, items)
 
     @v_args(meta=True)
     def andthen_script(self, meta, items: list) -> AndThenBlock:
