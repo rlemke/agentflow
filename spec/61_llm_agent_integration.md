@@ -220,6 +220,23 @@ The key value proposition is the **separation of workflow logic (AFL) from
 agent logic (Python handlers)**. A new agent is a handler function registered
 against an event facet name. The platform handles everything else.
 
+### 4.1 Authoring Roles
+
+AgentFlow's separation of concerns maps naturally to distinct authoring roles:
+
+| Role | Writes | Skills required |
+|------|--------|-----------------|
+| **Domain programmer** | AFL source (`.afl` files) — workflows, facets, schemas, composition | AFL syntax; no Python needed |
+| **Service provider programmer** | Handler implementations (Python modules) for event facets | Python; domain-specific APIs |
+| **Claude** | Both AFL definitions and handler implementations | Given a natural-language description of the desired workflow or service behavior |
+
+Domain programmers focus on *what* the workflow does — its steps, data flow,
+and composition. Service provider programmers focus on *how* each event facet
+is fulfilled — the actual computation, API call, or LLM inference. Claude can
+fill either or both roles, generating `.afl` files from requirements,
+scaffolding handler modules with correct signatures and registration, or
+building complete end-to-end examples including tests.
+
 Once prompt templates (§2.2) and an async LLM handler (§2.1) are added,
 defining an AI agent becomes: write the AFL workflow, write the prompt
 templates, deploy. No orchestration code required.

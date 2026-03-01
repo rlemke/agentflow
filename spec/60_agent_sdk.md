@@ -5,7 +5,13 @@ This document defines how external services (**AFL Agents**) interact with
 the AgentFlow runtime to process event facet tasks. It covers the three
 agent execution models, the task lifecycle, and the public API contract.
 
-This specification is the authoritative reference for agent implementors.
+This specification is the authoritative reference for **service provider
+programmers** who write handler implementations for event facets. Domain
+programmers who write AFL do not need this document — they define workflows
+in `.afl` files and the platform handles execution. Claude can also generate
+handler implementations from natural-language descriptions of the desired
+behavior.
+
 Cross-references to `spec/30_runtime.md` and `spec/50_event_system.md`
 are provided where relevant.
 

@@ -6,6 +6,14 @@
 - **AFL**: Agent Flow Language — the DSL for defining workflows (`.afl` files)
 - **AFL Agent**: A service that polls the task queue for event facet tasks, performs the required action (API call, data processing, etc.), writes the result back to the step, and signals the workflow to continue. Agents can be built using `AgentPoller` (callback-based), `RegistryRunner` (persistence-based auto-loading), or `RunnerService` (distributed orchestration). The **recommended approach** is `RegistryRunner`: register handler implementations in the database via `register_handler()` or the MCP `afl_manage_handlers` tool, then start the runner service — it dynamically loads and dispatches handlers without requiring custom agent code. Multiple agents can run concurrently, each handling different event facet types.
 
+### Authoring Roles
+
+AgentFlow separates workflow design from handler implementation into distinct authoring roles:
+
+- **Domain programmers** author AFL source (`.afl` files). They define namespaces, facets, event facets, workflows, schemas, and composition logic (mixins, andThen blocks, foreach, when blocks). No Python or handler code is required — the compiled JSON workflow definition is sufficient for the runtime to execute.
+- **Service provider programmers** author handler implementations (Python modules) for event facets. A handler receives typed parameters from the task queue, performs the required action (computation, API call, data processing, LLM inference), and returns typed results. Handlers are registered via `register_handler()` or the MCP `afl_manage_handlers` tool and executed by the RegistryRunner.
+- **Claude** (or other LLM agents) can author both AFL definitions and handler implementations when given a description of the desired workflow or service behavior. Claude can generate `.afl` files from natural-language requirements, scaffold handler modules with correct signatures and registration, or build complete end-to-end examples including tests.
+
 ### Language Requirements
 
 The AFL v1 reference implementation SHALL be written in **Python 3.11+**.

@@ -13,6 +13,14 @@ This repository contains the **AgentFlow** platform:
 - **AFL Agent**: A service that processes event facet tasks. The **recommended approach** is `RegistryRunner`: register handler implementations in the database, then start the runner — it dynamically loads and dispatches handlers without requiring custom agent code.
 - **RegistryRunner**: Universal runner that reads `HandlerRegistration` entries from persistence, dynamically loads Python modules, and dispatches event tasks. Handlers are registered via `register_handler()` or the MCP `afl_manage_handlers` tool.
 
+## Authoring roles
+
+AgentFlow separates workflow design from handler implementation:
+
+- **Domain programmers** write AFL (`.afl` files) to define workflows, facets, schemas, and composition logic. They do not need to write Python or any handler code.
+- **Service provider programmers** write handler implementations (Python modules) for event facets. They implement the actual computation, API calls, or LLM inference that event facets require.
+- **Claude** can author both AFL definitions and handler implementations when given a description of the desired workflow or service behavior. Use Claude to generate `.afl` files from requirements, scaffold handler modules, or build complete end-to-end examples.
+
 ---
 
 ## Conceptual model (use these terms consistently)
