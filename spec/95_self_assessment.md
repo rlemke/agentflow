@@ -1,6 +1,6 @@
 # AgentFlow Self-Assessment
 
-A self-assessment across all fundamental areas, drawing on the full arc from v0.11 through v0.30.
+A self-assessment across all fundamental areas, drawing on the full arc from v0.11 through v0.30.1.
 
 ---
 
@@ -16,9 +16,9 @@ Clean dataclass design with consistent patterns. New nodes like `CatchClause`, `
 
 ---
 
-## Transformer — B
+## Transformer — B+
 
-Works but has become brittle. The `items` list filtering by type (as we saw with `CATCH_KW` token leaking through) is a recurring pattern that's error-prone. Each new clause means updating multiple methods to iterate items and isinstance-check. It's functional but not elegant — a visitor pattern or explicit tree-walking might have scaled better.
+Improved in v0.30.1. The `items` list filtering by type was a recurring error-prone pattern — each new clause meant updating multiple methods with ad-hoc isinstance loops. The v0.30.1 refactoring extracted `_find_one`/`_find_all`/`_find_rest` helpers, consolidated the triplicated declaration logic into `_build_declaration`, and unified item segregation via `_segregate_declarations` with a type map. This removed 72 lines of duplication and means adding future grammar clauses touches fewer methods. The `CATCH_KW` token-leaking class of bug is still possible (items are untyped lists from Lark), but the helpers make the filtering consistent and less likely to diverge across methods.
 
 ---
 
@@ -95,4 +95,4 @@ Broad coverage — MCP server, 4 non-Python SDKs, Docker, CI pipeline. But depth
 
 ## Overall — B+
 
-The system is genuinely functional and has grown from a parser experiment to a full compiler + runtime + multi-language platform. The strongest areas are where discipline was highest (emitter, tests, examples). The weakest are where complexity accumulated organically (transformer, validator type inference, runtime edge cases). The biggest systemic gap is that the validator doesn't track types through references, which means the runtime catches errors that the compiler should.
+The system is genuinely functional and has grown from a parser experiment to a full compiler + runtime + multi-language platform. The strongest areas are where discipline was highest (emitter, tests, examples). The weakest are where complexity accumulated organically (validator type inference, runtime edge cases, dashboard). The v0.30.1 transformer refactoring addressed one of the original weak spots — the triplicated declaration logic and ad-hoc isinstance loops — demonstrating that targeted internal cleanup can meaningfully improve maintainability without any behavioral risk. The biggest systemic gap remains that the validator doesn't track types through references, which means the runtime catches errors that the compiler should.
