@@ -150,8 +150,10 @@ class AFLTransformer(Transformer):
         """Find items NOT matching any of the given types."""
         return [item for item in items if not isinstance(item, tuple(exclude))]
 
+    # --- AST construction helpers ---
+
     def _andthen_from_items(self, meta, items: list) -> AndThenBlock:
-        """Build an AndThenBlock from items containing optional ForeachClause and Block."""
+        """Build an AndThenBlock from a Block and optional ForeachClause."""
         return AndThenBlock(
             block=self._find_one(items, Block),
             foreach=self._find_one(items, ForeachClause),
