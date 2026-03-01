@@ -108,6 +108,7 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 | `examples/sensor-monitoring/` | Sensor monitoring — unary negation, null literals, computed map indexing, mixin alias, RegistryRunner-first |
 | `examples/site-selection-debate/` | Site-selection debate — spatial + research + debate combined (12 prompt-block event facets, composed facet, cross-round state, map literals, null/unary negation, mixin alias) |
 | `examples/event-driven-etl/` | Event-driven ETL — extract/transform/load pipeline (3 schemas, 6 event facets, 2 workflows, andThen chaining, foreach, schema instantiation, map literals, RegistryRunner-first) |
+| `examples/devops-deploy/` | DevOps deployment pipeline — first `andThen when` showcase (3 when blocks incl. nested, foreach, 3 schemas, 10 event facets, 2 workflows, prompt/script blocks, mixins+implicits, `++`/`==`/`&&`, RegistryRunner-first) |
 | `spec/` | Language and runtime specifications |
 | `docker/` | Dockerfiles for all services |
 | `scripts/` | Convenience scripts (setup, compile, runner, dashboard, etc.) |

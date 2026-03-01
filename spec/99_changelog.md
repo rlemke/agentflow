@@ -1,6 +1,32 @@
 # Implementation Changelog
 
-**Current version: v0.28.0**
+**Current version: v0.29.0**
+
+## Completed (v0.28.1) - DevOps Deploy Example
+
+New example: `examples/devops-deploy/` — Kubernetes deployment pipeline
+showcasing `andThen when` blocks as the primary feature.
+
+**AFL structure** (7 namespaces, single file `deploy.afl`):
+- `deploy.types`: 3 schemas (`DeploymentConfig`, `HealthCheckResult`, `RollbackReport`)
+- `deploy.mixins`: 3 mixins + 3 implicits (`RetryPolicy`, `Timeout`, `Credentials`)
+- `deploy.Build`: 3 event facets (`BuildImage`, `RunTests`, `AnalyzeDeployRisk`)
+- `deploy.Deploy`: 3 event facets (`NormalizeConfig` with script, `ApplyDeployment`, `WaitForRollout`)
+- `deploy.Monitor`: 2 event facets (`CheckHealth`, `TriageIncident` with prompt)
+- `deploy.Rollback`: 2 event facets (`RollbackDeployment`, `VerifyRollback`)
+- `deploy.workflows`: 2 workflows (`DeployService`, `BatchDeploy`)
+
+**Feature coverage**: 3 `andThen when` blocks (workflow-level + statement-level nested),
+`andThen foreach`, 3 schemas, 2 prompt blocks, 1 script block, 3 mixins + 3 implicits,
+string concat `++`, comparison/boolean ops (`==`, `&&`), array types `[String]`.
+
+**Handlers**: 4 categories (build, deploy, monitor, rollback), 10 handler functions,
+deterministic via hashlib (no external dependencies).
+
+**Tests**: 38 (8 shared utils, 4 build, 4 deploy, 3 monitor, 3 rollback, 5 dispatch,
+9 compilation, 2 agent integration).
+
+Files: `examples/devops-deploy/` (18 files), `CLAUDE.md`, `spec/99_changelog.md`
 
 ## Completed (v0.28.0) - Comparison/Boolean Operators & andThen When Blocks
 

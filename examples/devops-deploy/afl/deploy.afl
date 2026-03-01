@@ -1,0 +1,155 @@
+// DevOps Deployment Pipeline
+// Demonstrates andThen when blocks (conditional branching), foreach,
+// schemas, prompt blocks, script blocks, mixins+implicits, and
+// RegistryRunner-first approach.
+
+namespace deploy.types {
+    schema DeploymentConfig {
+        namespace_name: String,
+        replicas: Int,
+        cpu_limit: String,
+        memory_limit: String,
+        labels: Json,
+        image_pull_policy: String
+    }
+
+    schema HealthCheckResult {
+        healthy: Boolean,
+        results: Json,
+        checks_run: Int
+    }
+
+    schema RollbackReport {
+        rollback_id: String,
+        previous_version: String,
+        service: String,
+        reason: String,
+        status: String
+    }
+}
+
+namespace deploy.mixins {
+    facet RetryPolicy(max_retries: Int = 3, backoff_ms: Int = 1000) => (max_retries: Int, backoff_ms: Int)
+    facet Timeout(timeout_seconds: Int = 300) => (timeout_seconds: Int)
+    facet Credentials(registry_secret: String = "default-secret") => (registry_secret: String)
+
+    implicit default_retry = RetryPolicy()
+    implicit default_timeout = Timeout()
+    implicit default_credentials = Credentials()
+}
+
+namespace deploy.Build {
+    use deploy.types
+
+    /** Build a container image for the service. */
+    event facet BuildImage(service: String, version: String, registry: String = "gcr.io/myproject") => (image_tag: String, digest: String, size_mb: Int) with RetryPolicy() with Credentials() prompt {
+        system "You are a CI/CD build agent."
+        template "Build container image for {service}:{version} in registry {registry}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Run the test suite for a service. */
+    event facet RunTests(service: String, version: String) => (passed: Boolean, total_tests: Int, failed_count: Int) with Timeout() prompt {
+        system "You are a test execution agent."
+        template "Run test suite for {service}:{version}"
+        model "claude-sonnet-4-20250514"
+    }
+
+    /** Analyze deployment risk based on change size and environment. */
+    event facet AnalyzeDeployRisk(service: String, version: String, environment: String, change_size: Int) => (risk_level: String, risk_score: Int, risk_factors: Json) prompt {
+        system "You are a deployment risk analyst."
+        template "Analyze risk for deploying {service}:{version} to {environment} with {change_size} changed lines"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace deploy.Deploy {
+    use deploy.types
+
+    /** Normalize deployment configuration via script. */
+    event facet NormalizeConfig(service: String, environment: String, replicas: Int = 2, cpu_limit: String = "500m", memory_limit: String = "512Mi") => (config: DeploymentConfig) script python "
+config_ns = params.get('service', '') + '-' + params.get('environment', '')
+replicas = max(1, params.get('replicas', 2))
+env = params.get('environment', 'staging')
+result['config'] = {
+    'namespace_name': config_ns,
+    'replicas': replicas,
+    'cpu_limit': params.get('cpu_limit', '500m'),
+    'memory_limit': params.get('memory_limit', '512Mi'),
+    'labels': {'app': params.get('service', ''), 'env': env, 'managed-by': 'agentflow'},
+    'image_pull_policy': 'Always' if env == 'production' else 'IfNotPresent'
+}
+"
+
+    /** Apply the Kubernetes deployment. */
+    event facet ApplyDeployment(service: String, image_tag: String, config: DeploymentConfig) => (deployment_id: String, status: String) with RetryPolicy() with Credentials()
+
+    /** Wait for the deployment rollout to complete. */
+    event facet WaitForRollout(deployment_id: String, timeout_seconds: Int = 300) => (ready: Boolean, ready_replicas: Int, message: String) with Timeout()
+}
+
+namespace deploy.Monitor {
+    use deploy.types
+
+    /** Run health checks against a deployed service. */
+    event facet CheckHealth(service: String, deployment_id: String, checks: [String] = ["readiness", "liveness", "connectivity"]) => (result: HealthCheckResult) with Timeout()
+
+    /** Triage a health check failure using LLM analysis. */
+    event facet TriageIncident(service: String, health_results: Json, deployment_id: String) => (severity: String, recommendation: String, failed_checks: Json) prompt {
+        system "You are an incident response analyst."
+        template "Triage health check failure for {service} (deployment {deployment_id}): {health_results}"
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace deploy.Rollback {
+    use deploy.types
+
+    /** Roll back a deployment to the previous version. */
+    event facet RollbackDeployment(service: String, deployment_id: String, reason: String) => (report: RollbackReport) with RetryPolicy()
+
+    /** Verify that rollback completed successfully. */
+    event facet VerifyRollback(service: String, rollback_id: String) => (verified: Boolean, message: String)
+}
+
+namespace deploy.workflows {
+    use deploy.types
+
+    /** Deploy a single service: build, test, risk-check, conditional deploy+monitor. */
+    workflow DeployService(service: String, version: String, environment: String = "staging", replicas: Int = 2, change_size: Int = 50) => (status: String, detail: String) andThen {
+        build = BuildImage(service = $.service, version = $.version)
+        tests = RunTests(service = $.service, version = $.version)
+        risk = AnalyzeDeployRisk(service = $.service, version = $.version, environment = $.environment, change_size = $.change_size)
+    } andThen when {
+        case risk.risk_level == "critical" => {
+            yield DeployService(status = "blocked", detail = "Deployment blocked: critical risk score " ++ risk.risk_level)
+        }
+        case tests.passed == false => {
+            yield DeployService(status = "failed", detail = "Tests failed: " ++ tests.failed_count ++ " failures")
+        }
+        case _ => {
+            cfg = NormalizeConfig(service = $.service, environment = $.environment, replicas = $.replicas)
+            dep = ApplyDeployment(service = $.service, image_tag = build.image_tag, config = cfg.config)
+            wait = WaitForRollout(deployment_id = dep.deployment_id)
+            health = CheckHealth(service = $.service, deployment_id = dep.deployment_id) andThen when {
+                case health.result.healthy == true => {
+                    yield DeployService(status = "success", detail = "Deployed " ++ build.image_tag ++ " successfully")
+                }
+                case _ => {
+                    triage = TriageIncident(service = $.service, health_results = health.result.results, deployment_id = dep.deployment_id)
+                    rb = RollbackDeployment(service = $.service, deployment_id = dep.deployment_id, reason = triage.recommendation)
+                    vrfy = VerifyRollback(service = $.service, rollback_id = rb.report.rollback_id)
+                    yield DeployService(status = "rolled_back", detail = "Rolled back: " ++ triage.recommendation)
+                }
+            }
+        }
+    }
+
+    /** Deploy multiple services in parallel using foreach. */
+    workflow BatchDeploy(services: [String], version: String, environment: String = "staging") => (status: String) andThen foreach svc in $.services {
+        build = BuildImage(service = $.svc, version = $.version)
+        tests = RunTests(service = $.svc, version = $.version)
+        cfg = NormalizeConfig(service = $.svc, environment = $.environment)
+        dep = ApplyDeployment(service = $.svc, image_tag = build.image_tag, config = cfg.config)
+    }
+}
