@@ -70,7 +70,7 @@ from .source import (
 )
 from .validator import AFLValidator, ValidationError, ValidationResult, validate
 
-__version__ = "0.28.0"
+__version__ = "0.28.1"
 
 __all__ = [
     # AST utilities
