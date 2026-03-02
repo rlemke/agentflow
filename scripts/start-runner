@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Register handlers for examples, then start the runner and dashboard.
 #
-# Clears existing handler_registrations, registers handlers from one or more
-# examples, starts the dashboard (port 8080), and starts the runner service
-# in registry mode. Use --no-dashboard to skip the dashboard.
+# Local mode (default): clears existing handler_registrations, registers
+# handlers from one or more examples, starts the dashboard (port 8080),
+# and starts the runner service in registry mode.
+#
+# Remote mode: registers handlers locally (MongoDB), then SSHs to each
+# remote host to start runner processes, polling MongoDB for RUNNING state.
 #
 # Usage:
 #   scripts/start-runner                                        # register ALL examples
@@ -14,12 +17,24 @@
 #   scripts/start-runner --instances 3                          # 3 concurrent runner processes
 #   scripts/start-runner --example hiv-drug-resistance -- --log-format text --max-concurrent 10
 #
+# Remote mode:
+#   scripts/start-runner --all --example hiv-drug-resistance    # all AFL_RUNNER_HOSTS
+#   scripts/start-runner --host h1 --host h2 --example hiv-drug-resistance
+#
 # Options:
 #   --example NAME   Register handlers from examples/NAME only (repeatable)
-#   --instances N    Start N runner processes (default: 1)
+#   --instances N    Start N runner processes per host (default: 1)
 #   --no-dashboard   Do not start the dashboard
+#   --all            Start on all hosts from AFL_RUNNER_HOSTS
+#   --host HOST      Start on specific remote host (repeatable)
+#   --start-timeout N  Seconds to wait for remote runner startup (default: 30)
 #   --              Remaining args are passed to the runner service
 #   -h, --help      Show this help message
+#
+# Environment (remote mode):
+#   AFL_RUNNER_HOSTS   Space-separated hostnames
+#   AFL_REMOTE_PATH    Repo path on remote hosts (default: same as local)
+#   AFL_SSH_OPTS       Extra SSH options
 #
 set -euo pipefail
 
@@ -35,6 +50,9 @@ EXAMPLES=()
 RUNNER_ARGS=()
 INSTANCES=1
 DASHBOARD=true
+MODE="local"
+HOST_ARGS=()
+START_TIMEOUT=30
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -44,6 +62,12 @@ while [[ $# -gt 0 ]]; do
             INSTANCES="$2"; shift 2 ;;
         --no-dashboard)
             DASHBOARD=false; shift ;;
+        --all)
+            MODE="remote"; shift ;;
+        --host)
+            MODE="remote"; HOST_ARGS+=("$2"); shift 2 ;;
+        --start-timeout)
+            START_TIMEOUT="$2"; shift 2 ;;
         -h|--help)
             sed -n '2,/^[^#]/{ /^#/s/^# \{0,1\}//p; }' "$0"
             exit 0 ;;
@@ -51,7 +75,7 @@ while [[ $# -gt 0 ]]; do
             shift; RUNNER_ARGS=("$@"); break ;;
         *)
             echo "Unknown option: $1" >&2
-            echo "Usage: scripts/start-runner [--example NAME]... [--instances N] [--no-dashboard] [-- RUNNER_ARGS...]" >&2
+            echo "Usage: scripts/start-runner [--example NAME]... [--instances N] [--no-dashboard] [--all | --host HOST]... [-- RUNNER_ARGS...]" >&2
             exit 1 ;;
     esac
 done
@@ -74,6 +98,7 @@ echo ""
 echo "  Examples:  ${EXAMPLES[*]}"
 echo "  Instances: $INSTANCES"
 echo "  Dashboard: $DASHBOARD"
+echo "  Mode:      $MODE"
 echo ""
 
 # Register handlers via inline Python
@@ -138,32 +163,108 @@ print(f'Total: {total} handlers registered')
 print()
 "
 
-PIDS=()
+# =========================================================================
+# Local mode
+# =========================================================================
 
-# Start dashboard
-if [[ "$DASHBOARD" == "true" ]]; then
-    echo "Starting dashboard on port 8080..."
-    env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.dashboard &
-    PIDS+=($!)
-    echo "  Dashboard started (PID ${PIDS[-1]})"
+if [[ "$MODE" == "local" ]]; then
+    PIDS=()
+
+    # Start dashboard
+    if [[ "$DASHBOARD" == "true" ]]; then
+        echo "Starting dashboard on port 8080..."
+        env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.dashboard &
+        PIDS+=($!)
+        echo "  Dashboard started (PID ${PIDS[-1]})"
+    fi
+
+    # Start runner(s)
+    if [[ "$INSTANCES" -eq 1 && "$DASHBOARD" == "false" ]]; then
+        echo "Starting runner with --registry..."
+        exec env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}"
+    else
+        echo "Starting $INSTANCES runner instance(s) with --registry..."
+        for i in $(seq 1 "$INSTANCES"); do
+            env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}" &
+            PIDS+=($!)
+            echo "  Runner $i started (PID ${PIDS[-1]})"
+        done
+    fi
+
+    echo ""
+    echo "All processes started. PIDs: ${PIDS[*]}"
+    echo "Use scripts/stop-runners to stop them."
+
+    # Wait for all — if any exits, report it
+    wait "${PIDS[@]}"
+    exit 0
 fi
 
-# Start runner(s)
-if [[ "$INSTANCES" -eq 1 && "$DASHBOARD" == "false" ]]; then
-    echo "Starting runner with --registry..."
-    exec env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}"
-else
-    echo "Starting $INSTANCES runner instance(s) with --registry..."
-    for i in $(seq 1 "$INSTANCES"); do
-        env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}" &
-        PIDS+=($!)
-        echo "  Runner $i started (PID ${PIDS[-1]})"
+# =========================================================================
+# Remote mode
+# =========================================================================
+
+source "$(dirname "$0")/_remote.sh"
+_afl_resolve_remote_env
+
+HOSTS=()
+while IFS= read -r h; do
+    HOSTS+=("$h")
+done < <(_afl_resolve_hosts "${HOST_ARGS[@]}")
+
+echo "=== Starting Remote Runners ==="
+echo "  Hosts: ${HOSTS[*]}"
+echo "  Remote path: $AFL_REMOTE_PATH"
+echo ""
+
+# Build the runner args string for SSH
+RUNNER_ARGS_STR=""
+if [[ ${#RUNNER_ARGS[@]} -gt 0 ]]; then
+    # Quote each arg for remote shell
+    for arg in "${RUNNER_ARGS[@]}"; do
+        RUNNER_ARGS_STR="$RUNNER_ARGS_STR $(printf '%q' "$arg")"
     done
 fi
 
-echo ""
-echo "All processes started. PIDs: ${PIDS[*]}"
-echo "Use scripts/stop-runners to stop them."
+ALL_OK=true
 
-# Wait for all — if any exits, report it
-wait "${PIDS[@]}"
+for host in "${HOSTS[@]}"; do
+    echo "Starting runner on $host..."
+
+    # Record existing server UUIDs on this host so we can detect the new one
+    EXISTING_UUIDS=()
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        read -r srv_name srv_port srv_uuid <<< "$line"
+        if [[ "$srv_name" == "$host" ]]; then
+            EXISTING_UUIDS+=("$srv_uuid")
+        fi
+    done <<< "$(_afl_query_running_servers)"
+
+    # Start runner on remote host (detached via nohup)
+    for i in $(seq 1 "$INSTANCES"); do
+        _afl_ssh "$host" \
+            "cd $AFL_REMOTE_PATH && nohup scripts/runner --registry$RUNNER_ARGS_STR > /tmp/afl-runner-\$\$.log 2>&1 &" || {
+            echo "  ERROR: SSH to $host failed"
+            ALL_OK=false
+            continue 2
+        }
+    done
+
+    # Poll MongoDB until new server(s) appear with state=running
+    printf "  Waiting for runner on %s to register (timeout: %ss)... " "$host" "$START_TIMEOUT"
+    if _afl_poll_new_server "$host" "running" "$START_TIMEOUT" "${EXISTING_UUIDS[@]+"${EXISTING_UUIDS[@]}"}"; then
+        echo "done"
+    else
+        echo "TIMEOUT"
+        ALL_OK=false
+    fi
+done
+
+echo ""
+if [[ "$ALL_OK" == "true" ]]; then
+    echo "All remote runners started successfully."
+else
+    echo "Some runners failed to start. Check logs on the remote hosts."
+    exit 1
+fi

@@ -1152,6 +1152,7 @@ class MongoStore(PersistenceAPI):
             "handlers": server.handlers,
             "handled": [asdict(h) for h in server.handled],
             "state": server.state,
+            "http_port": server.http_port,
             "manager": server.manager,
             "error": server.error,
         }
@@ -1170,6 +1171,7 @@ class MongoStore(PersistenceAPI):
             handlers=doc.get("handlers", []),
             handled=[HandledCount(**h) for h in doc.get("handled", [])],
             state=doc.get("state", "startup"),
+            http_port=doc.get("http_port", 0),
             manager=doc.get("manager", ""),
             error=doc.get("error"),
         )

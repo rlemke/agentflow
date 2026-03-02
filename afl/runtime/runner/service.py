@@ -239,6 +239,7 @@ class RunnerService:
             handlers=handlers,
             handled=[],
             state=ServerState.RUNNING,
+            http_port=self.http_port or 0,
         )
         self._persistence.save_server(server)
 
