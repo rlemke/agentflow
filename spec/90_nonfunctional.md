@@ -252,6 +252,10 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | `AFL_POSTGIS` | `false` | Enable PostGIS overlay compose file and profile |
 | `AFL_JENKINS` | `false` | Enable Jenkins profile |
 | `AFL_GEOFABRIK_MIRROR` | *(empty)* | Path to local Geofabrik mirror; enables mirror overlay |
+| **OSM data paths** | | |
+| `AFL_CACHE_DIR` | `/tmp/osm-cache` | OSM cache directory (local path or HDFS URI) |
+| `AFL_OSM_OUTPUT_BASE` | `/tmp` | OSM extractor output base (local path or HDFS URI) |
+| `AFL_LOCAL_OUTPUT_DIR` | `/Volumes/afl_data/output` | Handler output files (HTML maps, stats, GeoJSON) |
 | **Remote runner management** | | |
 | `AFL_RUNNER_HOSTS` | *(empty)* | Space-separated hostnames for remote runner management |
 | `AFL_REMOTE_PATH` | *(same as local)* | Repo path on remote hosts |
