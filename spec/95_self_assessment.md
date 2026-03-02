@@ -1,6 +1,6 @@
 # AgentFlow Self-Assessment
 
-A self-assessment across all fundamental areas, drawing on the full arc from v0.11 through v0.32.0.
+A self-assessment across all fundamental areas, drawing on the full arc from v0.11 through v0.32.0+real.
 
 ---
 
@@ -34,15 +34,19 @@ Good coverage of structural rules (duplicates, reference validity, yield targets
 
 ---
 
-## Runtime — B
+## Runtime — B+
 
-The most ambitious and complex area. The iterative state machine with ~25 states, multiple changers, handler dispatch, dependency graphs, block hierarchies, and persistence abstraction is architecturally sound. But it's also where the hardest bugs have lived: step deduplication races (v0.12.72), dirty block tracking (v0.12.70), `resume_step` scaling (v0.12.64), yield deferral timing (v0.12.83), error propagation through block hierarchies (v0.12.75). Each fix was correct but reactive. The catch implementation this session went smoothly because the pattern was well-established by then — but that pattern itself took many iterations to stabilize.
+The most ambitious and complex area. The iterative state machine with ~25 states, multiple changers, handler dispatch, dependency graphs, block hierarchies, and persistence abstraction is architecturally sound. But it's also where the hardest bugs have lived: step deduplication races (v0.12.72), dirty block tracking (v0.12.70), `resume_step` scaling (v0.12.64), yield deferral timing (v0.12.83), error propagation through block hierarchies (v0.12.75). Each fix was correct but reactive. The catch implementation went smoothly because the pattern was well-established by then — but that pattern itself took many iterations to stabilize.
+
+The v0.32.0+real integration tests exposed and fixed three runtime issues that only manifested in full pipeline execution: (1) when-block deferred evaluation — when blocks referencing steps from prior `andThen` blocks must defer until those steps complete, fixed via `_step_not_ready` flag; (2) cross-block step reference resolution — `get_completed_step_by_name` now falls back to workflow-wide search with direct `statement_name` lookup; (3) runner terminal state propagation — `_resume_workflow` now updates the runner entity to COMPLETED/FAILED when the workflow finishes, so the dashboard reflects final status. These were real bugs that unit tests didn't catch because they span the compile→evaluate→dispatch→resume→completion cycle. The fact that the integration tests found them validates the approach. The B → B+ upgrade reflects both the fixes and the proof that the full pipeline now works end-to-end through MemoryStore (tests), MongoStore (direct), and the dashboard runner service.
 
 ---
 
-## Testing — A-
+## Testing — A
 
-3,470 tests with good discipline: every grammar construct has parser tests, emitter round-trips, validator error cases, and runtime behavior tests. Each example ships with a full test suite (8 classes per example is now standard: utils, per-category handlers, dispatch, compilation, agent integration). The structure is consistent. Knock: runtime tests sometimes don't match actual runtime patterns (the `_create_context` mistake earlier), suggesting the test infrastructure could use helper factories that mirror real execution more closely.
+3,483 tests (3,566 collected, 84 skipped) with good discipline: every grammar construct has parser tests, emitter round-trips, validator error cases, and runtime behavior tests. Each example ships with a full test suite (8 classes per example is now standard: utils, per-category handlers, dispatch, compilation, agent integration). The structure is consistent.
+
+The v0.32.0+real integration tests add a new tier: full-pipeline tests that exercise compile→evaluate→dispatch→resume→completion through MemoryStore. 13 tests across 3 classes (TestCompilation, TestAnalyzeSample, TestBatchAnalysis) cover: AFL compilation, workflow extraction, single-sample full pipeline, output verification, step counts, QC fail branching, downloaded reference data, batch with 3/5 samples, mixed QC outcomes, single-sample foreach, and 5-sample batch with real patient IDs. These found 3 runtime bugs that unit tests missed. The A- → A upgrade reflects this: the test suite now covers not just units and components but the full execution pipeline end-to-end, including `andThen when` branching, `catch` error recovery, and `andThen foreach` iteration — validated through the actual evaluator + poller loop, not mocked handlers.
 
 ---
 
@@ -54,7 +58,9 @@ Comprehensive — 10 spec files covering language, semantics, validation, runtim
 
 ## Examples — A
 
-13 examples forming a genuine progression from simple (`monte-carlo-risk`) to complex (`site-selection-debate`, `devops-deploy`, `hiv-drug-resistance`). Each showcases specific features and has full handler implementations plus tests. The RegistryRunner-first pattern in later examples is a good architectural evolution. The v0.32.0 HIV drug resistance example is the first to combine `andThen when`, `catch`, and `andThen foreach` in a single example — demonstrating that these features compose naturally for real-world bioinformatics pipelines (QC branching, per-sample error recovery, batch processing). The example pattern is now well-templated: 8 test classes, 4 handler categories, shared utils, dual agent entry points. These are probably the strongest proof that the system works end-to-end.
+13 examples forming a genuine progression from simple (`monte-carlo-risk`) to complex (`site-selection-debate`, `devops-deploy`, `hiv-drug-resistance`). Each showcases specific features and has full handler implementations plus tests. The RegistryRunner-first pattern in later examples is a good architectural evolution. The v0.32.0 HIV drug resistance example is the first to combine `andThen when`, `catch`, and `andThen foreach` in a single example — demonstrating that these features compose naturally for real-world bioinformatics pipelines (QC branching, per-sample error recovery, batch processing). The example pattern is now well-templated: 8 test classes, 4 handler categories, shared utils, dual agent entry points.
+
+The HIV example now has real integration tests (`tests/real/`) that run the full pipeline through the evaluator + poller loop, plus verified execution through the dashboard runner service with MongoStore persistence. BatchAnalysis with 3 patient samples completes in ~14 seconds through the dashboard (56 steps, all 9 handlers dispatched per sample). This is the first example validated end-to-end through the production execution path (seed → dashboard submit → runner service → handler dispatch → completion).
 
 ---
 
@@ -95,4 +101,6 @@ Broad coverage — MCP server, 4 non-Python SDKs, Docker, CI pipeline. But depth
 
 ## Overall — B+
 
-The system is genuinely functional and has grown from a parser experiment to a full compiler + runtime + multi-language platform. The strongest areas are where discipline was highest (emitter, tests, examples). The weakest are where complexity accumulated organically (runtime edge cases, dashboard frontend architecture). The v0.31.0 release addressed the two weakest areas identified in this assessment: the validator now infers parameter types (B- → B), and the dashboard has shared component partials (C+ → B-). The v0.32.0 HIV drug resistance example validates that the three most recent language features (`andThen when`, `catch`, `andThen foreach`) compose cleanly in a realistic domain. The remaining systemic gap is step reference type resolution — the validator still returns "Unknown" for `step.field`, deferring return-type errors to runtime.
+The system is genuinely functional and has grown from a parser experiment to a full compiler + runtime + multi-language platform. The strongest areas are where discipline was highest (emitter, tests, examples). The weakest are where complexity accumulated organically (runtime edge cases, dashboard frontend architecture). The v0.31.0 release addressed the two weakest areas identified in this assessment: the validator now infers parameter types (B- → B), and the dashboard has shared component partials (C+ → B-). The v0.32.0 HIV drug resistance example validates that the three most recent language features (`andThen when`, `catch`, `andThen foreach`) compose cleanly in a realistic domain.
+
+The v0.32.0+real work upgraded two grades: runtime B → B+ (3 cross-cutting bugs fixed by integration tests, full pipeline verified through MemoryStore, MongoStore, and dashboard runner) and testing A- → A (13 integration tests covering the compile→evaluate→dispatch→resume→completion cycle, plus script sandbox hardening with restricted `__import__`). The remaining systemic gap is step reference type resolution — the validator still returns "Unknown" for `step.field`, deferring return-type errors to runtime.
