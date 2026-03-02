@@ -81,6 +81,15 @@ python -m afl.dashboard             # web UI (port 8080)
 python -m afl.dashboard --log-format text  # plain-text logs
 python -m afl.runtime.runner        # runner service
 python -m afl.mcp                   # MCP server (stdio)
+
+# Local runner management
+scripts/start-runner --example hiv-drug-resistance -- --log-format text
+scripts/stop-runners
+
+# Remote runner management (requires AFL_RUNNER_HOSTS or --host)
+scripts/start-runner --all --example hiv-drug-resistance
+scripts/stop-runners --all
+scripts/rolling-deploy --example hiv-drug-resistance
 ```
 
 ### Environment configuration
@@ -114,7 +123,7 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 | `examples/hiv-drug-resistance/` | HIV drug resistance genotyping — bioinformatics pipeline (6 schemas, 9 event facets, 2 workflows, `andThen when` QC branching, `catch` per-sample error recovery, `andThen foreach` batch, 3 prompt blocks, 1 script block, mixins+implicits, RegistryRunner-first) |
 | `spec/` | Language and runtime specifications |
 | `docker/` | Dockerfiles for all services |
-| `scripts/` | Convenience scripts (setup, compile, runner, dashboard, etc.) |
+| `scripts/` | Convenience scripts (setup, compile, runner, dashboard, rolling-deploy, etc.) |
 
 ---
 
@@ -154,4 +163,4 @@ Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, 
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
 - `spec/95_self_assessment.md` — self-assessment across all fundamental areas
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.30.1)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.33.0)

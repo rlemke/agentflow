@@ -152,6 +152,7 @@ cd agents/scala/afl-agent && sbt package  # package JAR
 All scripts are in `scripts/` and are self-contained:
 ```bash
 scripts/_env.sh                                # shared env loader (sourced by other scripts)
+scripts/_remote.sh                             # shared SSH/MongoDB helpers for remote management
 scripts/easy.sh                                # one-command pipeline (teardown → rebuild → setup → seed)
 scripts/setup                                  # bootstrap Docker stack
 scripts/setup --runners 3 --agents 2           # start with scaling
@@ -165,6 +166,11 @@ scripts/runner                                 # start runner
 scripts/dashboard                              # start dashboard
 scripts/mcp-server                             # start MCP server
 scripts/db-stats                               # show DB statistics
+scripts/start-runner                           # register handlers + start runner locally
+scripts/start-runner --all                     # start runners on all remote hosts
+scripts/stop-runners                           # stop local runners
+scripts/stop-runners --all                     # stop runners on all remote hosts
+scripts/rolling-deploy                         # zero-downtime rolling restart
 ```
 
 ### Docker stack
@@ -243,6 +249,13 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | `AFL_POSTGIS` | `false` | Enable PostGIS overlay compose file and profile |
 | `AFL_JENKINS` | `false` | Enable Jenkins profile |
 | `AFL_GEOFABRIK_MIRROR` | *(empty)* | Path to local Geofabrik mirror; enables mirror overlay |
+| **Remote runner management** | | |
+| `AFL_RUNNER_HOSTS` | *(empty)* | Space-separated hostnames for remote runner management |
+| `AFL_REMOTE_PATH` | *(same as local)* | Repo path on remote hosts |
+| `AFL_SSH_OPTS` | *(empty)* | Extra SSH options (e.g. `-i ~/.ssh/deploy_key`) |
+| **Runner tuning** | | |
+| `AFL_MAX_CONCURRENT` | `2` | Max concurrent work items per runner |
+| `AFL_POLL_INTERVAL_MS` | `1000` | Runner poll interval in milliseconds |
 | **Data directories** | | |
 | `HDFS_NAMENODE_DIR` | *(Docker volume)* | Host path for HDFS NameNode data |
 | `HDFS_DATANODE_DIR` | *(Docker volume)* | Host path for HDFS DataNode data |
@@ -281,3 +294,128 @@ AFL uses a JSON config file (`afl.config.json`) for service connections. Resolut
 | `AFL_MONGODB_PASSWORD` | (empty) |
 | `AFL_MONGODB_AUTH_SOURCE` | `admin` |
 | `AFL_MONGODB_DATABASE` | `afl` |
+
+---
+
+## Deployment Operations
+
+AgentFlow runners can be managed locally (single machine) or remotely (multi-host production). All scripts support both modes — local is the default and remote is activated with `--all` or `--host`.
+
+### Prerequisites for remote management
+
+1. **SSH access**: current user must be able to `ssh <hostname>` to every runner host without a password prompt (SSH agent or key-based auth)
+2. **Same repo layout**: the AgentFlow repo must be checked out on every remote host at the same path (or set `AFL_REMOTE_PATH`)
+3. **MongoDB reachable**: every runner host must be able to reach the MongoDB instance specified by `AFL_MONGODB_URL`
+4. **Host inventory**: configure `AFL_RUNNER_HOSTS` in `.env` or pass `--host` flags
+
+```bash
+# .env
+AFL_RUNNER_HOSTS=prod-runner-01 prod-runner-02 prod-runner-03
+AFL_REMOTE_PATH=/opt/agentflow    # optional, defaults to local repo root
+AFL_SSH_OPTS=-i ~/.ssh/deploy_key  # optional extra SSH flags
+```
+
+### Local runner lifecycle
+
+```bash
+# Register handlers and start runner + dashboard on this machine
+scripts/start-runner --example hiv-drug-resistance -- --log-format text
+
+# Register ALL examples, start 3 runner instances, skip dashboard
+scripts/start-runner --instances 3 --no-dashboard
+
+# Stop all local runners and dashboard
+scripts/stop-runners
+```
+
+### Remote runner lifecycle
+
+```bash
+# Start runners on all configured hosts
+scripts/start-runner --all --example hiv-drug-resistance -- --log-format text
+
+# Start on specific hosts only
+scripts/start-runner --host prod-runner-01 --host prod-runner-02 --example hiv-drug-resistance
+
+# Stop all remote runners (queries MongoDB for running servers)
+scripts/stop-runners --all
+
+# Stop runners on specific hosts
+scripts/stop-runners --host prod-runner-01 --host prod-runner-02
+
+# Stop with longer drain timeout (default: 30s)
+scripts/stop-runners --all --drain-timeout 60
+```
+
+### Rolling deploy (zero-downtime)
+
+The `scripts/rolling-deploy` script performs a serial rolling restart: for each runner it drains the old process (SIGTERM → wait for SHUTDOWN), starts a new one, and waits for it to register in MongoDB before moving to the next. This ensures at least N-1 runners are always available.
+
+```bash
+# Rolling restart all servers, re-register all example handlers
+scripts/rolling-deploy
+
+# Rolling restart with specific handlers
+scripts/rolling-deploy --example hiv-drug-resistance --example devops-deploy
+
+# Target specific hosts
+scripts/rolling-deploy --host prod-runner-01 --host prod-runner-02
+
+# Custom timeouts
+scripts/rolling-deploy --drain-timeout 90 --start-timeout 90
+
+# Skip handler re-registration (code-only restart, handlers unchanged)
+scripts/rolling-deploy --skip-registration
+
+# Pass extra args to the runner service
+scripts/rolling-deploy --example hiv-drug-resistance -- --log-format text --max-concurrent 10
+```
+
+**Rolling deploy flow per server:**
+1. Send SIGTERM via SSH (triggers graceful drain — finishes current tasks, stops polling)
+2. Poll MongoDB until server state = `shutdown` (timeout: `--drain-timeout`, default 60s)
+3. If HTTP port is known (persisted in MongoDB), verify health endpoint is unreachable
+4. Start new runner via SSH (`nohup scripts/runner --registry ...`)
+5. Poll MongoDB until new server registers with state = `running` (timeout: `--start-timeout`, default 60s)
+6. If HTTP port is known, health-check `http://<host>:<port>/health` for 200 OK
+7. On **any failure**, the deploy aborts immediately — remaining servers are left untouched
+
+**Safety properties:**
+- Only one server is restarted at a time (serial, never parallel)
+- Abort-on-failure prevents cascading outages
+- SIGTERM triggers graceful drain: the runner finishes in-flight tasks before exiting
+- Handlers are re-registered once centrally (in MongoDB) before the rolling restart begins, so all restarted runners pick up the new handler code
+
+### Verifying runner state
+
+Each runner persists its HTTP status port in MongoDB (`ServerDefinition.http_port`), enabling remote health checks.
+
+```bash
+# List all running servers from MongoDB
+python3 -c "
+from afl.runtime.mongo_store import MongoStore
+store = MongoStore('mongodb://localhost:27018')
+for s in store.get_servers_by_state('running'):
+    print(f'{s.server_name}: port={s.http_port}, state={s.state}, id={s.uuid}')
+"
+
+# Health-check a specific runner
+curl http://prod-runner-01:8080/health
+
+# Detailed status (uptime, active work items, handled counts)
+curl http://prod-runner-01:8080/status
+```
+
+### Shared helpers (`scripts/_remote.sh`)
+
+The remote management scripts share a common helper library sourced after `_env.sh`:
+
+| Function | Purpose |
+|----------|---------|
+| `_afl_resolve_remote_env` | Resolves `AFL_RUNNER_HOSTS`, `AFL_REMOTE_PATH`, `AFL_SSH_OPTS` |
+| `_afl_ssh <host> <cmd>` | SSH wrapper with `BatchMode=yes`, `ConnectTimeout=5` |
+| `_afl_query_running_servers` | Queries MongoDB, outputs `server_name http_port uuid` per line |
+| `_afl_get_server_state <uuid>` | Returns current state of a server by UUID |
+| `_afl_poll_server_state <uuid> <state> <timeout>` | Polls until server reaches expected state |
+| `_afl_poll_new_server <host> <state> <timeout> [exclude...]` | Polls until a new server appears on hostname |
+| `_afl_resolve_hosts [hosts...]` | Resolves target hosts from args or `AFL_RUNNER_HOSTS` |
