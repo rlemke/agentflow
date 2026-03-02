@@ -12,6 +12,9 @@ import gzip
 import hashlib
 import os
 
+_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+_HIV_REPORTS_DIR = os.path.join(_LOCAL_OUTPUT, "hiv-reports")
+
 # ---------------------------------------------------------------------------
 # Hash helpers
 # ---------------------------------------------------------------------------
@@ -528,7 +531,7 @@ def generate_sample_report(
 
     Returns (report_path, report_summary).
     """
-    report_path = f"/tmp/hiv-reports/{sample_id}_resistance_report.html"
+    report_path = os.path.join(_HIV_REPORTS_DIR, f"{sample_id}_resistance_report.html")
     variant_count = len(variants) if isinstance(variants, list) else 0
     drm_count = sum(1 for v in (variants if isinstance(variants, list) else []) if v.get("is_drm"))
     qc_status = "PASS" if qc.get("passed", False) else "FAIL"
@@ -550,7 +553,7 @@ def generate_batch_report(
 
     Returns (report_path, passed_count, resistance_detected_count).
     """
-    report_path = f"/tmp/hiv-reports/batch_{batch_id}_summary.html"
+    report_path = os.path.join(_HIV_REPORTS_DIR, f"batch_{batch_id}_summary.html")
     passed = 0
     resistance_detected = 0
     for r in results if isinstance(results, list) else []:
