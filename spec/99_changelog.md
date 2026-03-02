@@ -1,6 +1,64 @@
 # Implementation Changelog
 
-**Current version: v0.32.0**
+**Current version: v0.33.0**
+
+## Completed (v0.33.0) - Remote Runner Management & Rolling Deploy
+
+Remote-aware runner lifecycle scripts for multi-host production deployments.
+Persists HTTP port in MongoDB so rolling deploy can health-check runners
+remotely. Adds `--all` / `--host` remote modes to existing scripts while
+keeping local mode unchanged.
+
+**HTTP port persistence:**
+- `ServerDefinition.http_port: int = 0` — new field in `afl/runtime/entities.py`
+- `RunnerService._register_server()` — sets `http_port` from the already-bound
+  HTTP status server (port auto-increments on `EADDRINUSE`)
+- `MongoStore._server_to_doc` / `_doc_to_server` — serialize/deserialize
+  `http_port` (backward-compatible: defaults to 0 if missing in existing docs)
+
+**Shared helpers (`scripts/_remote.sh`):**
+- `_afl_query_running_servers` — inline Python querying MongoDB `servers`
+  collection, outputs `server_name http_port uuid` per line
+- `_afl_ssh` — SSH wrapper with `BatchMode=yes`, `ConnectTimeout=5`,
+  `StrictHostKeyChecking=accept-new`, plus `AFL_SSH_OPTS` passthrough
+- `_afl_poll_server_state` — polls MongoDB until a server reaches expected state
+- `_afl_poll_new_server` — polls until a new server appears on a hostname
+  (excludes old UUIDs for rolling restart detection)
+- `_afl_resolve_hosts` — resolves `--host` flags or `AFL_RUNNER_HOSTS` env var
+
+**`scripts/stop-runners` — remote mode:**
+- `--all` — queries MongoDB for running servers, SSHs SIGTERM to each host
+- `--host HOST` (repeatable) — targets specific remote hosts
+- `--drain-timeout N` — seconds to wait for graceful drain (default: 30)
+- Polls MongoDB for SHUTDOWN state; force-kills via SSH on timeout
+- No-flag invocation = unchanged local pgrep/kill behavior
+
+**`scripts/start-runner` — remote mode:**
+- `--all` — starts runners on all `AFL_RUNNER_HOSTS`
+- `--host HOST` (repeatable) — targets specific remote hosts
+- `--start-timeout N` — seconds to wait for registration (default: 30)
+- Registers handlers locally (MongoDB), SSHs `nohup scripts/runner --registry`
+  to each host, polls MongoDB until new server appears with state=RUNNING
+- No-flag invocation = unchanged local behavior
+
+**`scripts/rolling-deploy` (new):**
+- Zero-downtime serial restart: drain → wait SHUTDOWN → start → wait RUNNING →
+  health-check HTTP `/health` → next server
+- `--example NAME` (repeatable) — re-register specific handler sets
+- `--skip-registration` — skip handler re-registration if already up to date
+- `--drain-timeout N` (default: 60s), `--start-timeout N` (default: 60s)
+- Aborts on first failure to protect remaining servers
+- HTTP health-check via `curl` when `http_port > 0` (non-fatal on failure)
+
+**Environment (`.env.example`):**
+- `AFL_RUNNER_HOSTS` — space-separated remote hostnames
+- `AFL_REMOTE_PATH` — repo path on remote hosts (default: same as local)
+- `AFL_SSH_OPTS` — extra SSH options
+
+Files: `afl/runtime/entities.py`, `afl/runtime/runner/service.py`,
+`afl/runtime/mongo_store.py`, `scripts/_remote.sh` (new),
+`scripts/stop-runners`, `scripts/start-runner`,
+`scripts/rolling-deploy` (new), `.env.example`
 
 ## Completed (v0.32.0) - HIV Drug Resistance Genotyping Example
 
