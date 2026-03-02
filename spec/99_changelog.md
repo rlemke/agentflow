@@ -55,10 +55,18 @@ keeping local mode unchanged.
 - `AFL_REMOTE_PATH` — repo path on remote hosts (default: same as local)
 - `AFL_SSH_OPTS` — extra SSH options
 
+**`scripts/list-runners` (new):**
+- Tree view of the runner fleet: servers → runner instances → handlers
+- Groups runner instances by hostname with IP addresses
+- Per-runner: state icon (`+`/`-`/`~`/`!`), UUID, state, HTTP port, uptime, last ping
+- Handlers grouped by namespace prefix with handled/skipped stats
+- `--state STATE` filter (running, shutdown, startup, error)
+- `--json` for machine-readable output
+
 Files: `afl/runtime/entities.py`, `afl/runtime/runner/service.py`,
 `afl/runtime/mongo_store.py`, `scripts/_remote.sh` (new),
 `scripts/stop-runners`, `scripts/start-runner`,
-`scripts/rolling-deploy` (new), `.env.example`
+`scripts/rolling-deploy` (new), `scripts/list-runners` (new), `.env.example`
 
 ## Completed (v0.32.0) - HIV Drug Resistance Genotyping Example
 

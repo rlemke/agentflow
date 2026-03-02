@@ -171,6 +171,9 @@ scripts/start-runner --all                     # start runners on all remote hos
 scripts/stop-runners                           # stop local runners
 scripts/stop-runners --all                     # stop runners on all remote hosts
 scripts/rolling-deploy                         # zero-downtime rolling restart
+scripts/list-runners                           # tree view: servers → runners → handlers
+scripts/list-runners --state running           # filter by state
+scripts/list-runners --json                    # machine-readable output
 ```
 
 ### Docker stack

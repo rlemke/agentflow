@@ -86,6 +86,11 @@ python -m afl.mcp                   # MCP server (stdio)
 scripts/start-runner --example hiv-drug-resistance -- --log-format text
 scripts/stop-runners
 
+# Inspect runner fleet
+scripts/list-runners                   # tree view: servers → runners → handlers
+scripts/list-runners --state running   # filter by state
+scripts/list-runners --json            # machine-readable output
+
 # Remote runner management (requires AFL_RUNNER_HOSTS or --host)
 scripts/start-runner --all --example hiv-drug-resistance
 scripts/stop-runners --all
