@@ -876,7 +876,9 @@ class RunnerService:
     def _resume_workflow(self, workflow_id: str) -> None:
         """Resume a paused workflow after step completion.
 
-        Uses a cached AST when available.
+        Uses a cached AST when available.  When the workflow reaches a
+        terminal state (COMPLETED or ERROR), updates the associated
+        runner entity so the dashboard reflects the final status.
         """
         workflow_ast = self._ast_cache.get(workflow_id)
         if workflow_ast is None:
@@ -893,7 +895,32 @@ class RunnerService:
             return
 
         program_ast = self._program_ast_cache.get(workflow_id)
-        self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+        result = self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+
+        # Update runner state on terminal status
+        if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):
+            self._update_runner_terminal_state(workflow_id, result.status)
+
+    def _update_runner_terminal_state(self, workflow_id: str, status: str) -> None:
+        """Update runner entity when workflow reaches a terminal state."""
+        if not hasattr(self._persistence, "get_runners_by_workflow"):
+            return
+        now = _current_time_ms()
+        target_state = (
+            RunnerState.COMPLETED if status == ExecutionStatus.COMPLETED else RunnerState.FAILED
+        )
+        for runner in self._persistence.get_runners_by_workflow(workflow_id):
+            if runner.state not in (RunnerState.COMPLETED, RunnerState.FAILED):
+                runner.state = target_state
+                runner.end_time = now
+                runner.duration = now - runner.start_time if runner.start_time else 0
+                self._persistence.save_runner(runner)
+                logger.info(
+                    "Runner %s updated to %s for workflow %s",
+                    runner.uuid,
+                    target_state,
+                    workflow_id,
+                )
 
     def _load_workflow_ast(self, workflow_id: str) -> dict | None:
         """Attempt to load the workflow AST from persistence.
