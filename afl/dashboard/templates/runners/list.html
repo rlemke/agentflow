@@ -13,7 +13,7 @@
 </nav>
 
 {% if filter_state %}
-<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+<p>Filtered by state: {% with state=filter_state %}{% include "partials/_state_badge.html" %}{% endwith %}</p>
 {% endif %}
 
 <button class="btn-refresh"

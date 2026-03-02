@@ -1,6 +1,68 @@
 # Implementation Changelog
 
-**Current version: v0.30.1**
+**Current version: v0.31.0**
+
+## Completed (v0.31.0) - Validator Parameter Type Inference + Dashboard Shared Components
+
+Two improvements targeting the weakest areas from self-assessment.
+
+### Stream 1: Validator Parameter Type Inference
+
+The validator now resolves input reference types (`$.param`) from signature
+parameters, enabling type checking for expressions like `$.text + 1` where
+`text: String`. Previously all `Reference` nodes returned `"Unknown"`.
+
+**Changes:**
+- Added `_param_scope: dict[str, str]` to `AFLValidator`
+- Added `_build_param_scope(sig)` — maps `TypeRef` names to inferred types
+  (`String`, `Int`, `Long`, `Double`, `Boolean` → direct; `Json`/schema → `Unknown`; `ArrayType` → `Array`)
+- Set/clear scope in `_validate_facet_decl`, `_validate_event_facet_decl`, `_validate_workflow_decl`
+- Modified `_infer_type`: `Reference(is_input=True)` now consults `_param_scope`
+- Step references (`step.field`) remain `"Unknown"` — resolving return types is Phase 2
+
+**Tests:** 14 new tests in `TestParameterTypeInference` (String/Bool arithmetic errors,
+Int/Double/Json arithmetic valid, step ref unknown, negate String, Bool ordered comparison,
+concat valid, schema/array typed params, when block conditions)
+
+Files: `afl/validator.py`, `tests/test_validator.py`, `spec/12_validation.md`
+
+### Stream 2: Dashboard Shared Components
+
+Extracted 3 reusable partials to eliminate template duplication.
+
+**`partials/_state_badge.html`** — replaces 24 inline state badge patterns across 17 templates:
+```html
+<span class="badge badge-{{ state|state_color }}">{{ label if label is defined else state }}</span>
+```
+
+**`partials/_empty_state.html`** — replaces 6 empty-state blocks across 6 templates:
+```html
+<div class="empty-state">
+    <div class="empty-state-icon">{{ empty_icon|default("&#x1F50D;") }}</div>
+    <p>{{ empty_message|default("No items found.") }}</p>
+</div>
+```
+
+**`partials/_attrs_table.html`** — reusable params/returns table with compact mode flag.
+
+**Tests:** 9 new tests in `tests/dashboard/test_partials.py` (5 state badge, 2 empty state,
+2 attrs table)
+
+Templates updated (state badge): `runners/list.html`, `runners/detail.html`,
+`tasks/list.html`, `tasks/detail.html`, `tasks/_table_content.html`, `events/list.html`,
+`events/detail.html`, `servers/list.html`, `servers/detail.html`, `flows/detail.html`,
+`steps/_detail_content.html`, `partials/step_row.html`, `partials/step_tree.html`,
+`partials/status_badge.html`, `v2/workflows/detail.html`, `v2/workflows/_step_detail.html`,
+`v2/workflows/_runner_groups.html`, `v2/workflows/_step_rows.html`,
+`v2/servers/_server_groups.html`, `v2/servers/detail.html`, `v2/servers/_detail_content.html`,
+`v2/handlers/_detail_content.html`
+
+Templates updated (empty state): `flows/list.html`, `flows/detail.html`,
+`v2/workflows/detail.html`, `v2/workflows/_runner_groups.html`,
+`v2/servers/_server_groups.html`, `v2/handlers/_handler_groups.html`
+
+New files: `partials/_state_badge.html`, `partials/_empty_state.html`,
+`partials/_attrs_table.html`, `tests/dashboard/test_partials.py`
 
 ## Completed (v0.30.1) - Transformer Refactoring
 

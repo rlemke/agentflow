@@ -2016,3 +2016,187 @@ class TestCatchBlockValidation:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestParameterTypeInference:
+    """Test that parameter types from signatures are used in type checking."""
+
+    def test_string_param_arithmetic_error(self, validator):
+        """$.string_param + 1 should error (String in arithmetic)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(text: String) andThen {
+            s = V(x = $.text + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_bool_param_arithmetic_error(self, validator):
+        """$.bool_param + 1 should error (Boolean in arithmetic)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(flag: Boolean) andThen {
+            s = V(x = $.flag + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Boolean" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_int_param_arithmetic_valid(self, validator):
+        """$.int_param + 1 should pass (Int + Int)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(count: Int) andThen {
+            s = V(x = $.count + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_int_param_boolean_op_error(self, validator):
+        """$.int_param && true should error (Int in boolean op)."""
+        ast = parse("""
+        facet V(x: Boolean)
+        workflow Test(count: Int) andThen {
+            s = V(x = $.count && true)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Boolean operands" in str(e) and "Int" in str(e) for e in result.errors)
+
+    def test_json_param_passes(self, validator):
+        """$.json_param + 1 should pass (Json -> Unknown, no error)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(data: Json) andThen {
+            s = V(x = $.data + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_step_ref_remains_unknown(self, validator):
+        """step.field + 1 should pass (step refs remain Unknown)."""
+        ast = parse("""
+        facet V(x: Long) => (output: Long)
+        workflow Test(a: Long) andThen {
+            s1 = V(x = $.a)
+            s2 = V(x = s1.output + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_negate_string_param_error(self, validator):
+        """-$.string_param should error (negate String)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(name: String) andThen {
+            s = V(x = -$.name)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) for e in result.errors)
+
+    def test_bool_param_ordered_comparison_error(self, validator):
+        """$.bool_param > 0 should error (ordered comparison with Boolean)."""
+        ast = parse("""
+        facet V(x: Boolean)
+        workflow Test(flag: Boolean) andThen {
+            s = V(x = $.flag > 0)
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("ordered comparison" in str(e) and "Boolean" in str(e) for e in result.errors)
+
+    def test_double_param_arithmetic_valid(self, validator):
+        """$.double_param * 100 should pass (Double * Int = Double)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(rate: Double) andThen {
+            s = V(x = $.rate * 100)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_string_param_concat_valid(self, validator):
+        """$.string_param ++ "suffix" should pass (concat always valid)."""
+        ast = parse("""
+        facet V(x: String)
+        workflow Test(name: String) andThen {
+            s = V(x = $.name ++ "_suffix")
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_schema_typed_param_unknown(self, validator):
+        """Schema-typed param should be Unknown (passes arithmetic)."""
+        ast = parse("""
+        namespace ns {
+            schema Config { value: Int }
+            facet V(x: Long)
+            workflow Test(cfg: Config) andThen {
+                s = V(x = $.cfg + 1)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_array_typed_param(self, validator):
+        """Array-typed param should be Array (passes arithmetic)."""
+        ast = parse("""
+        facet V(x: Long)
+        workflow Test(items: [Int]) andThen {
+            s = V(x = $.items + 1)
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_when_string_condition_error(self, validator):
+        """when { case $.string_param => ... } should error (non-Boolean condition)."""
+        ast = parse("""
+        facet DoA() => (value: String)
+        facet DoFallback() => (value: String)
+        workflow Test(name: String) => (output: String) andThen when {
+            case $.name => {
+                a = DoA()
+                yield Test(output = a.value)
+            }
+            case _ => {
+                f = DoFallback()
+                yield Test(output = f.value)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Boolean" in str(e) for e in result.errors)
+
+    def test_when_bool_condition_valid(self, validator):
+        """when { case $.bool_param => ... } should pass."""
+        ast = parse("""
+        facet DoA() => (value: String)
+        facet DoFallback() => (value: String)
+        workflow Test(active: Boolean) => (output: String) andThen when {
+            case $.active => {
+                a = DoA()
+                yield Test(output = a.value)
+            }
+            case _ => {
+                f = DoFallback()
+                yield Test(output = f.value)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]

@@ -9,7 +9,7 @@
                 <tr><th>Service</th><td>{{ server.service_name }}</td></tr>
                 <tr><th>Name</th><td>{{ server.server_name }}</td></tr>
                 <tr><th>IPs</th><td class="mono">{{ server.server_ips|join(", ") }}</td></tr>
-                <tr><th>State</th><td><span class="badge badge-{{ server.state|state_color }}">{{ server.state }}</span></td></tr>
+                <tr><th>State</th><td>{% with state=server.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td></tr>
                 <tr><th>Start Time</th><td>{{ server.start_time|timestamp }}</td></tr>
                 <tr><th>Last Ping</th><td>{{ server.ping_time|timestamp }}</td></tr>
                 <tr><th>Manager</th><td>{{ server.manager }}</td></tr>

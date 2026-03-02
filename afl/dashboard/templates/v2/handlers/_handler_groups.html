@@ -36,8 +36,5 @@
 </details>
 {% endfor %}
 {% else %}
-<div class="empty-state">
-    <div class="empty-state-icon">&#x26A1;</div>
-    <p>No handlers in this category.</p>
-</div>
+{% with empty_icon="&#x26A1;", empty_message="No handlers in this category." %}{% include "partials/_empty_state.html" %}{% endwith %}
 {% endif %}

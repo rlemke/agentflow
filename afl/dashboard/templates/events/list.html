@@ -12,7 +12,7 @@
 </nav>
 
 {% if filter_state %}
-<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+<p>Filtered by state: {% with state=filter_state %}{% include "partials/_state_badge.html" %}{% endwith %}</p>
 {% endif %}
 
 <figure>
@@ -34,7 +34,7 @@
             <td class="mono">{{ event.step_id[:12] }}...</td>
             <td>{{ step_names.get(event.step_id, '') or '—' }}</td>
             <td class="mono">{{ event.workflow_id[:12] }}...</td>
-            <td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td>
+            <td>{% with state=event.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td>
             <td>{{ event.name }}</td>
         </tr>
         {% endfor %}

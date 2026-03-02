@@ -2,7 +2,7 @@
 <td colspan="5" style="background: var(--card-background-color, #f8f9fa); padding: 1rem;">
     <h4 style="margin-top:0;">
         {{ step.statement_name or step.facet_name }}
-        <span class="badge badge-{{ step.state|state_color }}">{{ step.state|state_label }}</span>
+        {% with state=step.state, label=step.state|state_label %}{% include "partials/_state_badge.html" %}{% endwith %}
     </h4>
 
     {% if step.attributes and step.attributes.params %}
@@ -42,7 +42,7 @@
     <table style="font-size: 0.85em;">
         <tbody>
         <tr><td>Name</td><td>{{ task.name }}</td></tr>
-        <tr><td>State</td><td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td></tr>
+        <tr><td>State</td><td>{% with state=task.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td></tr>
         <tr><td>Created</td><td>{{ task.created|timestamp }}</td></tr>
         </tbody>
     </table>

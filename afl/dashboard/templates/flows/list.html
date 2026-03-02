@@ -43,9 +43,6 @@
 </figure>
 
 {% if not flows %}
-<div class="empty-state">
-    <div class="empty-state-icon">&#x2B22;</div>
-    <p>No flows found. Compile an AFL source to create one.</p>
-</div>
+{% with empty_icon="&#x2B22;", empty_message="No flows found. Compile an AFL source to create one." %}{% include "partials/_empty_state.html" %}{% endwith %}
 {% endif %}
 {% endblock %}

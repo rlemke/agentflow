@@ -19,10 +19,7 @@
 {% block content %}
 {% if not flow %}
 <h1>Flow not found</h1>
-<div class="empty-state">
-    <div class="empty-state-icon">&#x1F50D;</div>
-    <p>The requested flow could not be found.</p>
-</div>
+{% with empty_message="The requested flow could not be found." %}{% include "partials/_empty_state.html" %}{% endwith %}
 <p><a href="/flows">Back to flows</a></p>
 {% else %}
 <h1>{{ flow.name.name }}</h1>
@@ -113,7 +110,7 @@
         <tr>
             <td><a href="/v2/workflows/{{ runner.uuid }}" class="mono">{{ runner.uuid|truncate_uuid }}</a></td>
             <td>{{ runner.workflow.name }}</td>
-            <td><span class="badge badge-{{ runner.state|state_color }}">{{ runner.state }}</span></td>
+            <td>{% with state=runner.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td>
             <td>{{ runner.start_time|timestamp }}</td>
             <td>{{ runner.duration }}ms</td>
         </tr>

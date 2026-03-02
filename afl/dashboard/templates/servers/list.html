@@ -12,7 +12,7 @@
 </nav>
 
 {% if filter_state %}
-<p>Filtered by state: <span class="badge badge-{{ filter_state|state_color }}">{{ filter_state }}</span></p>
+<p>Filtered by state: {% with state=filter_state %}{% include "partials/_state_badge.html" %}{% endwith %}</p>
 {% endif %}
 
 <figure>
@@ -34,7 +34,7 @@
             <td><a href="/servers/{{ server.uuid }}">{{ server.server_name }}</a></td>
             <td>{{ server.server_group }}</td>
             <td>{{ server.service_name }}</td>
-            <td><span class="badge badge-{{ server.state|state_color }}">{{ server.state }}</span></td>
+            <td>{% with state=server.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td>
             <td class="mono">{{ server.server_ips|join(", ") }}</td>
             <td>{{ server.ping_time|timestamp }}</td>
             <td>{{ server.handlers|join(", ") }}</td>

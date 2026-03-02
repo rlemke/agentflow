@@ -26,9 +26,7 @@
                 </td>
                 <td>{{ server.service_name }}</td>
                 <td>
-                    <span class="badge badge-{{ server.state|state_color }}">
-                        {{ server.state }}
-                    </span>
+                    {% with state=server.state %}{% include "partials/_state_badge.html" %}{% endwith %}
                 </td>
                 <td class="mono">{{ server.server_ips|join(", ") }}</td>
                 <td>{{ server.ping_time|timestamp }}</td>
@@ -40,8 +38,5 @@
 </details>
 {% endfor %}
 {% else %}
-<div class="empty-state">
-    <div class="empty-state-icon">&#x2699;</div>
-    <p>No servers in this category.</p>
-</div>
+{% with empty_icon="&#x2699;", empty_message="No servers in this category." %}{% include "partials/_empty_state.html" %}{% endwith %}
 {% endif %}

@@ -16,7 +16,7 @@
                 <tr><th>Step ID</th><td class="mono">{{ event.step_id }}</td></tr>
                 <tr><th>Step Name</th><td>{{ step_name or "—" }}</td></tr>
                 <tr><th>Workflow ID</th><td class="mono">{{ event.workflow_id }}</td></tr>
-                <tr><th>State</th><td><span class="badge badge-{{ event.state|state_color }}">{{ event.state }}</span></td></tr>
+                <tr><th>State</th><td>{% with state=event.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td></tr>
                 <tr><th>Event Type</th><td>{{ event.name }}</td></tr>
             </table>
         </article>

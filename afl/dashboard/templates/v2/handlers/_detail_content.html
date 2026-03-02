@@ -63,7 +63,7 @@
         <tr>
             <td><a href="/steps/{{ task.step_id }}" class="mono">{{ task.step_id[:12] }}…</a></td>
             <td><a href="/v2/workflows/{{ task.runner_id }}" class="mono">{{ task.runner_id[:12] }}…</a></td>
-            <td><span class="badge badge-{{ task.state|state_color }}">{{ task.state }}</span></td>
+            <td>{% with state=task.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td>
             <td>{{ task.created|timestamp }}</td>
         </tr>
     {% endfor %}

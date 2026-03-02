@@ -30,9 +30,7 @@
                     </a>
                 </td>
                 <td>
-                    <span class="badge badge-{{ runner.state|state_color }}">
-                        {{ runner.state }}
-                    </span>
+                    {% with state=runner.state %}{% include "partials/_state_badge.html" %}{% endwith %}
                 </td>
                 <td>
                     {% if progress is defined and runner.uuid in progress %}
@@ -56,8 +54,5 @@
 </details>
 {% endfor %}
 {% else %}
-<div class="empty-state">
-    <div class="empty-state-icon">&#x1F4CB;</div>
-    <p>No workflows in this category.</p>
-</div>
+{% with empty_icon="&#x1F4CB;", empty_message="No workflows in this category." %}{% include "partials/_empty_state.html" %}{% endwith %}
 {% endif %}

@@ -130,6 +130,7 @@ class AFLValidator:
         self._schemas_by_short_name: dict[str, list[str]] = {}  # Short name -> [full names]
         self._current_namespace: str = ""
         self._current_imports: set[str] = set()  # Namespaces imported via 'use'
+        self._param_scope: dict[str, str] = {}  # Parameter name -> inferred type
 
     def validate(self, program: Program) -> ValidationResult:
         """Validate a program AST.
@@ -149,6 +150,7 @@ class AFLValidator:
         self._schemas_by_short_name = {}
         self._current_namespace = ""
         self._current_imports = set()
+        self._param_scope = {}
 
         # First pass: collect all namespace names and facet definitions
         self._collect_namespaces(program)
@@ -547,6 +549,25 @@ class AFLValidator:
         else:
             names[name] = location
 
+    def _build_param_scope(self, sig: FacetSig) -> dict[str, str]:
+        """Build a parameter name -> type mapping from a facet signature.
+
+        Maps TypeRef names to their inferred types for type checking.
+        Schema types, Json, and ArrayType map to Unknown/Array respectively.
+        """
+        scope: dict[str, str] = {}
+        for param in sig.params:
+            if isinstance(param.type, ArrayType):
+                scope[param.name] = "Array"
+            elif isinstance(param.type, TypeRef):
+                name = param.type.name
+                if name in ("String", "Int", "Long", "Double", "Boolean"):
+                    scope[param.name] = name
+                else:
+                    # Json, schema types, etc. — not enough info to check
+                    scope[param.name] = "Unknown"
+        return scope
+
     def _validate_body(self, body, sig: FacetSig) -> None:
         """Validate a body, handling single or list of AndThenBlocks."""
         if isinstance(body, list):
@@ -562,12 +583,14 @@ class AFLValidator:
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
+        self._param_scope = self._build_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
             self._validate_body(decl.body, decl.sig)
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
+        self._param_scope = {}
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
@@ -576,6 +599,7 @@ class AFLValidator:
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
+        self._param_scope = self._build_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
@@ -585,6 +609,7 @@ class AFLValidator:
                 self._validate_body(decl.body, decl.sig)
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
+        self._param_scope = {}
 
     def _validate_prompt_block(self, block: PromptBlock, sig: FacetSig) -> None:
         """Validate a prompt block.
@@ -648,12 +673,14 @@ class AFLValidator:
         # Validate mixin references in signature
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
+        self._param_scope = self._build_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
             self._validate_body(decl.body, decl.sig)
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
+        self._param_scope = {}
 
     def _validate_and_then_block(
         self,
@@ -909,6 +936,8 @@ class AFLValidator:
                 return "Null"
             return "Unknown"
         if isinstance(expr, Reference):
+            if expr.is_input and expr.path:
+                return self._param_scope.get(expr.path[0], "Unknown")
             return "Unknown"
         if isinstance(expr, ConcatExpr):
             return "String"

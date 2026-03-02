@@ -295,6 +295,31 @@ The validator infers expression types and rejects type-incompatible operations.
 - Reject `String` and `Boolean` operands
 - Unknown-type operands pass through (no error)
 
+#### Parameter Type Resolution
+
+The validator resolves input reference types (`$.param`) from the containing
+facet/workflow signature parameters. This enables type checking to catch errors
+like `$.text + 1` where `text: String`.
+
+**Resolution rules:**
+- `TypeRef("String"|"Int"|"Long"|"Double"|"Boolean")` → mapped directly
+- `TypeRef("Json")` and schema types → `"Unknown"` (runtime-only types)
+- `ArrayType(...)` → `"Array"`
+
+**Scope rules:**
+- Input references (`$.param`) resolve against the containing declaration's params
+- Step references (`step.field`) remain `"Unknown"` — resolving return types is future work
+- The param scope is set before validating each declaration body and cleared after
+
+**Examples:**
+```afl
+workflow Test(text: String, count: Int) andThen {
+    s = V(x = $.text + 1)      // ERROR: String in arithmetic
+    s = V(x = $.count + 1)     // OK: Int + Int
+    s = V(x = $.text ++ "!")   // OK: concat always valid
+}
+```
+
 ---
 
 ### 8. When Block Validation

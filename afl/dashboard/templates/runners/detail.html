@@ -14,7 +14,7 @@
             <table>
                 <tr><th>UUID</th><td class="mono">{{ runner.uuid }}</td></tr>
                 <tr><th>Workflow</th><td>{{ runner.workflow.name }}</td></tr>
-                <tr><th>State</th><td><span class="badge badge-{{ runner.state|state_color }}">{{ runner.state }}</span></td></tr>
+                <tr><th>State</th><td>{% with state=runner.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td></tr>
                 <tr><th>Started</th><td>{{ runner.start_time|timestamp }}</td></tr>
                 <tr><th>Ended</th><td>{{ runner.end_time|timestamp }}</td></tr>
                 <tr><th>Duration</th><td>{{ runner.duration|duration }}</td></tr>

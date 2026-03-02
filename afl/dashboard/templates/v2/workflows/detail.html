@@ -50,7 +50,7 @@
     <p>
         <span class="mono">{{ runner.workflow.name }}</span>
         &mdash;
-        <span class="badge badge-{{ runner.state|state_color }}">{{ runner.state }}</span>
+        {% with state=runner.state %}{% include "partials/_state_badge.html" %}{% endwith %}
     </p>
 </hgroup>
 
@@ -150,10 +150,7 @@
 
 {% else %}
 <h1>Workflow Not Found</h1>
-<div class="empty-state">
-    <div class="empty-state-icon">&#x1F50D;</div>
-    <p>The requested runner could not be found.</p>
-</div>
+{% with empty_message="The requested runner could not be found." %}{% include "partials/_empty_state.html" %}{% endwith %}
 <a href="/v2/workflows">Back to Workflows</a>
 {% endif %}
 {% endblock %}

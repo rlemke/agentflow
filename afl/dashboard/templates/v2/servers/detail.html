@@ -12,7 +12,7 @@
         <span class="mono">{{ server.server_group }}</span>
         &mdash; {{ server.service_name }}
         &mdash;
-        <span class="badge badge-{{ server.state|state_color }}">{{ server.state }}</span>
+        {% with state=server.state %}{% include "partials/_state_badge.html" %}{% endwith %}
     </p>
 </hgroup>
 
