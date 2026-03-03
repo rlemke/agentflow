@@ -157,11 +157,8 @@ emitter = JSONEmitter(include_locations=False)
 program_dict = json.loads(emitter.emit(ast))
 
 # Find matching workflow AST
-wf_ast = None
-for w in program_dict.get('workflows', []):
-    if w['name'] == wf.name:
-        wf_ast = w
-        break
+from afl.ast_utils import find_workflow
+wf_ast = find_workflow(program_dict, wf.name)
 
 if not wf_ast:
     print(f'Error: workflow {wf.name} not found in compiled AST', file=sys.stderr)
