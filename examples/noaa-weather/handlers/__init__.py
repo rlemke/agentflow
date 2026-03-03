@@ -1,18 +1,24 @@
-"""Handler registration for the noaa-weather example."""
+"""Handler registration for the noaa-weather example.
+
+Imports are deferred to function bodies to avoid import-lock deadlocks
+when the RegistryRunner concurrently imports handler modules from
+separate threads (each triggers handlers/__init__.py which would
+otherwise transitively import all siblings).
+"""
 
 from __future__ import annotations
-
-from .analysis.analysis_handlers import register_analysis_handlers
-from .discovery.discovery_handlers import register_discovery_handlers
-from .geocode.geocode_handlers import register_geocode_handlers
-from .ingest.ingest_handlers import register_ingest_handlers
-from .interpret.interpret_handlers import register_interpret_handlers
-from .qc.qc_handlers import register_qc_handlers
-from .report.report_handlers import register_report_handlers
 
 
 def register_all_handlers(poller) -> None:
     """Register all handlers with an AgentPoller."""
+    from .analysis.analysis_handlers import register_analysis_handlers
+    from .discovery.discovery_handlers import register_discovery_handlers
+    from .geocode.geocode_handlers import register_geocode_handlers
+    from .ingest.ingest_handlers import register_ingest_handlers
+    from .interpret.interpret_handlers import register_interpret_handlers
+    from .qc.qc_handlers import register_qc_handlers
+    from .report.report_handlers import register_report_handlers
+
     register_discovery_handlers(poller)
     register_ingest_handlers(poller)
     register_qc_handlers(poller)

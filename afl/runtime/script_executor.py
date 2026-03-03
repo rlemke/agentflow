@@ -131,7 +131,7 @@ _SAFE_IMPORT_MODULES: list[str] = [
 ]
 
 
-def _build_worker_script(code: str, params_json: str) -> str:
+def _build_worker_script(code: str, params_json: str | None = None) -> str:
     """Build the Python source for the subprocess worker.
 
     The worker reconstructs the safe-builtins sandbox, deserializes params,
@@ -139,9 +139,12 @@ def _build_worker_script(code: str, params_json: str) -> str:
     User ``print()`` calls are captured via ``io.StringIO`` so they don't
     corrupt the JSON output protocol.
 
+    When *params_json* is ``None`` the worker reads JSON from stdin,
+    avoiding OS ``ARG_MAX`` limits for large parameter payloads.
+
     Args:
         code: User script source code
-        params_json: JSON-serialized params dict
+        params_json: JSON-serialized params dict, or None to read from stdin
 
     Returns:
         Python source string suitable for ``python -c``
@@ -149,8 +152,11 @@ def _build_worker_script(code: str, params_json: str) -> str:
     code_b64 = base64.b64encode(code.encode()).decode()
     names_repr = repr(_SAFE_BUILTIN_NAMES)
     allowed_repr = repr(_SAFE_IMPORT_MODULES)
-    params_repr = repr(params_json)
     code_repr = repr(code_b64)
+    if params_json is not None:
+        params_line = f"_params = _json.loads({repr(params_json)})"
+    else:
+        params_line = "_params = _json.loads(_sys.stdin.read())"
     lines = [
         "import builtins as _b, base64 as _base64, io as _io, json as _json, sys as _sys",
         f"_names = {names_repr}",
@@ -165,7 +171,7 @@ def _build_worker_script(code: str, params_json: str) -> str:
         "_capture = _io.StringIO()",
         "_safe['print'] = lambda *a, **kw: print(*a, **kw, file=_capture)",
         "_result = {}",
-        f"_params = _json.loads({params_repr})",
+        params_line,
         "_sandbox = {'__builtins__': _safe, 'params': _params, 'result': _result, 'json': _json}",
         f"_code = _base64.b64decode({code_repr}).decode()",
         "try:",
@@ -291,11 +297,13 @@ class ScriptExecutor:
                 error=f"Script execution error: params not serializable: {e}",
             )
 
-        worker_code = _build_worker_script(code, params_json)
+        # Pass params via stdin to avoid OS ARG_MAX limits for large payloads
+        worker_code = _build_worker_script(code)
 
         try:
             proc = subprocess.run(
                 [sys.executable, "-c", worker_code],
+                input=params_json,
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,

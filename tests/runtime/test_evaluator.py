@@ -6215,3 +6215,177 @@ class TestCatchBlockExecution:
         catch = context._find_statement_catch(step)
         assert catch is not None
         assert catch["type"] == "CatchClause"
+
+
+# =========================================================================
+# Cross-block step reference deferral
+# =========================================================================
+
+
+class TestCrossBlockStepRefDeferral:
+    """Test that cross-block step references defer instead of error.
+
+    When sequential andThen blocks reference outputs from prior blocks
+    (e.g. block-1 step references block-0 step), the initialization
+    handler should defer until the referenced step completes rather
+    than permanently erroring.
+    """
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        telemetry = Telemetry(enabled=True)
+        return Evaluator(persistence=store, telemetry=telemetry)
+
+    def _make_workflow_ast(self):
+        """Build a workflow with two sequential andThen blocks.
+
+        block-0: dl = Fetch(url = $.url)
+        block-1: parsed = Parse(raw_path = dl.raw_path)
+
+        block-1's step references block-0's step output.
+        """
+        return {
+            "type": "WorkflowDecl",
+            "name": "TestCrossBlock",
+            "params": [{"name": "url", "type": "String"}],
+            "returns": [{"name": "status", "type": "String"}],
+            "body": [
+                {
+                    "type": "AndThenBlock",
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-dl",
+                            "name": "dl",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Fetch",
+                                "args": [
+                                    {
+                                        "name": "url",
+                                        "value": {
+                                            "type": "InputRef",
+                                            "path": ["url"],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+                {
+                    "type": "AndThenBlock",
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-parsed",
+                            "name": "parsed",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Parse",
+                                "args": [
+                                    {
+                                        "name": "raw_path",
+                                        "value": {
+                                            "type": "StepRef",
+                                            "path": ["dl", "raw_path"],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+
+    def _make_program_ast(self, workflow_ast):
+        return {
+            "declarations": [
+                {
+                    "type": "EventFacetDecl",
+                    "name": "Fetch",
+                    "event": True,
+                    "params": [{"name": "url", "type": "String"}],
+                    "returns": [{"name": "raw_path", "type": "String"}],
+                },
+                {
+                    "type": "EventFacetDecl",
+                    "name": "Parse",
+                    "event": True,
+                    "params": [{"name": "raw_path", "type": "String"}],
+                    "returns": [{"name": "data", "type": "Json"}],
+                },
+                workflow_ast,
+            ]
+        }
+
+    def test_cross_block_ref_defers_not_errors(self, store, evaluator):
+        """Step referencing prior block output should defer, not error."""
+        workflow_ast = self._make_workflow_ast()
+        program_ast = self._make_program_ast(workflow_ast)
+
+        result = evaluator.execute(
+            workflow_ast, program_ast=program_ast, inputs={"url": "http://example.com"}
+        )
+        # Should pause (event facets create tasks), not error
+        assert result.status in (ExecutionStatus.PAUSED, ExecutionStatus.COMPLETED)
+
+        all_steps = list(store.get_all_steps())
+
+        # Find the parsed step — it should NOT be in Error state
+        parsed_steps = [s for s in all_steps if s.statement_name == "parsed"]
+        assert len(parsed_steps) == 1
+        parsed = parsed_steps[0]
+
+        # parsed should be deferred at FacetInitializationBegin, not errored
+        assert parsed.state != StepState.STATEMENT_ERROR, (
+            f"Cross-block ref should defer, not error. State: {parsed.state}"
+        )
+        # It should still be at initialization (waiting for dl to complete)
+        assert parsed.state == StepState.FACET_INIT_BEGIN
+
+    def test_cross_block_ref_resolves_after_completion(self, store, evaluator):
+        """After the referenced step completes, deferred step should initialize."""
+        workflow_ast = self._make_workflow_ast()
+        program_ast = self._make_program_ast(workflow_ast)
+
+        # Initial execution — dl parks at EventTransmit, parsed defers
+        evaluator.execute(
+            workflow_ast, program_ast=program_ast, inputs={"url": "http://example.com"}
+        )
+
+        all_steps = list(store.get_all_steps())
+
+        # Find the dl step (should be at EventTransmit)
+        dl_steps = [s for s in all_steps if s.statement_name == "dl"]
+        assert len(dl_steps) == 1
+        dl = dl_steps[0]
+
+        # Simulate task completion: set dl returns and mark complete
+        dl.set_attribute("raw_path", "/tmp/data.gz", is_return=True)
+        dl.change_state(StepState.STATEMENT_COMPLETE)
+        store.save_step(dl)
+
+        # Resume — parsed should now initialize successfully
+        evaluator.resume(dl.workflow_id, workflow_ast, program_ast=program_ast)
+
+        all_steps = list(store.get_all_steps())
+        parsed_steps = [s for s in all_steps if s.statement_name == "parsed"]
+        assert len(parsed_steps) == 1
+        parsed = parsed_steps[0]
+
+        # parsed should have advanced past initialization
+        assert parsed.state != StepState.FACET_INIT_BEGIN, (
+            f"After dl completes, parsed should advance. State: {parsed.state}"
+        )
+        assert parsed.state != StepState.STATEMENT_ERROR
+
+        # parsed should have the correct raw_path param from dl
+        raw_path_attr = parsed.attributes.params.get("raw_path")
+        assert raw_path_attr is not None
+        assert raw_path_attr.value == "/tmp/data.gz"

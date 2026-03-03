@@ -20,6 +20,7 @@ Handles:
 - FacetInitializationEnd: Complete facet initialization
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
@@ -29,6 +30,15 @@ from .base import StateHandler
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
+
+
+class _StepNotReady(Exception):
+    """Raised when a cross-block step reference is not yet complete.
+
+    Signals FacetInitializationBeginHandler to defer rather than error.
+    """
 
 
 class StatementBeginHandler(StateHandler):
@@ -119,7 +129,25 @@ class FacetInitializationBeginHandler(StateHandler):
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
 
+        except _StepNotReady as snr:
+            # Direct _StepNotReady (before expression evaluator wrapping)
+            logger.debug(
+                "Facet initialization deferred: %s (step=%s)",
+                snr,
+                self.step.id,
+            )
+            return self.stay(push=True)
+
         except Exception as e:
+            # Check if the root cause is _StepNotReady wrapped by
+            # ExpressionEvaluator._eval_step_ref into a ReferenceError.
+            if isinstance(getattr(e, "__cause__", None), _StepNotReady):
+                logger.debug(
+                    "Facet initialization deferred: %s (step=%s)",
+                    e.__cause__,
+                    self.step.id,
+                )
+                return self.stay(push=True)
             return self.error(e)
 
     def _build_context(self) -> EvaluationContext:
@@ -141,11 +169,17 @@ class FacetInitializationBeginHandler(StateHandler):
                 foreach_var = block_step.foreach_var
                 foreach_value = block_step.foreach_value
 
-        # Build step output getter
+        # Build step output getter.
+        # When a referenced step exists but is not yet complete (common
+        # for cross-block references in sequential andThen blocks),
+        # raise _StepNotReady so the caller can defer instead of error.
         def get_step_output(step_name: str, attr_name: str) -> object:
             step = self.context.get_completed_step_by_name(step_name, self.step.block_id)
             if step is None:
-                raise ValueError(f"Step '{step_name}' not found or not complete")
+                raise _StepNotReady(
+                    f"Step '{step_name}' not found or not yet complete "
+                    f"(reference: {step_name}.{attr_name})"
+                )
             value = step.get_attribute(attr_name)
             if value is None:
                 raise ValueError(f"Attribute '{attr_name}' not found on step '{step_name}'")
