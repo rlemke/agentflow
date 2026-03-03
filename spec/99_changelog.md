@@ -1,6 +1,34 @@
 # Implementation Changelog
 
-**Current version: v0.34.0**
+**Current version: v0.34.1**
+
+## Completed (v0.34.1) - Cross-Block Step Reference Deferral & Script Stdin
+
+Three runtime fixes discovered during end-to-end NOAA weather pipeline execution
+through dashboard/MongoDB/RegistryRunner infrastructure:
+
+**Cross-block step reference deferral (`afl/runtime/handlers/initialization.py`):**
+- `FacetInitializationBeginHandler` now defers (via `stay(push=True)`) when a
+  cross-block step reference is not yet complete, instead of permanently erroring
+- New `_StepNotReady` exception caught both directly and through
+  `ExpressionEvaluator`'s `ReferenceError` wrapping (checks `__cause__`)
+- Mirrors the deferral pattern already used by `_process_when` in block_execution.py
+- Enables sequential `andThen` blocks where later blocks reference prior block outputs
+  (e.g. `parsed = Parse(raw_path = dl.raw_path)` across block boundaries)
+
+**Script executor stdin transport (`afl/runtime/script_executor.py`):**
+- Params passed via subprocess stdin instead of embedded in `-c` command line argument
+- Avoids OS `ARG_MAX` limit (~262KB on macOS) for large payloads like 8760+ hourly
+  observation records from ISD-Lite files
+
+**NOAA weather lazy imports (`examples/noaa-weather/handlers/__init__.py`):**
+- Handler imports deferred to function bodies to prevent Python import-lock deadlocks
+  when RegistryRunner's ThreadPoolExecutor concurrently imports handler modules
+
+**Tests:** 2 new tests (`TestCrossBlockStepRefDeferral`): deferral behavior and
+resolution after referenced step completes.
+
+**Files:** 4 modified
 
 ## Completed (v0.34.0) - NOAA Weather Station Example
 
