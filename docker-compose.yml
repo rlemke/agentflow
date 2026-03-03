@@ -58,6 +58,7 @@ services:
       - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
       - AFL_GEOFABRIK_MIRROR=${AFL_GEOFABRIK_MIRROR:-}
       - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
+      - PYTHONPATH=/app:/app/examples/noaa-weather:/app/examples/osm-geocoder
     volumes:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:/Volumes/afl_data/output
       - ./examples:/app/examples:ro

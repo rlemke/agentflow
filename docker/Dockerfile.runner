@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir -e ".[mongodb]" || \
 
 # HDFS support uses WebHDFS REST API via requests (no native libs needed)
 # pyshp needed for census-us TIGER shapefiles
-RUN pip install --no-cache-dir requests pyshp
+# folium needed for noaa-weather station maps
+RUN pip install --no-cache-dir requests pyshp folium
 
 # Copy application code
 COPY afl/ ./afl/
