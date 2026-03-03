@@ -108,13 +108,38 @@ class BlockExecutionBeginHandler(StateHandler):
 
         # Evaluate the iterable expression
         inputs = self._build_foreach_eval_inputs()
+
+        # Step ref resolver — sets a flag when a referenced step is not
+        # yet complete, signalling the foreach block to defer.
+        _step_not_ready = False
+
+        def get_step_output(step_name: str, attr_name: str):
+            nonlocal _step_not_ready
+            all_steps = list(self.context.persistence.get_steps_by_workflow(self.step.workflow_id))
+            for s in all_steps:
+                if s.statement_name == step_name and s.is_complete:
+                    ret = s.attributes.returns.get(attr_name)
+                    if ret:
+                        return ret.value
+            _step_not_ready = True
+            raise ValueError(f"{step_name}.{attr_name} not ready")
+
         eval_ctx = EvaluationContext(
             inputs=inputs,
-            get_step_output=lambda s, a: None,
+            get_step_output=get_step_output,
             step_id=self.step.id,
         )
         evaluator = ExpressionEvaluator()
-        iterable = evaluator.evaluate(iterable_expr, eval_ctx)
+        try:
+            iterable = evaluator.evaluate(iterable_expr, eval_ctx)
+        except Exception:
+            if _step_not_ready:
+                logger.debug(
+                    "Foreach block deferred: step dependency not ready (block=%s)",
+                    self.step.id,
+                )
+                return self.stay(push=True)
+            raise
 
         if not iterable:
             # Empty iterable — no sub-blocks to create, complete immediately

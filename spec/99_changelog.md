@@ -1,6 +1,33 @@
 # Implementation Changelog
 
-**Current version: v0.34.3**
+**Current version: v0.34.4**
+
+## Completed (v0.34.4) - Foreach Cross-Block Step Reference Resolution
+
+Fixes `andThen foreach` failing when the iterable expression references a step
+output from a prior `andThen` block. The foreach block resolved cross-block step
+refs as `None` (via a dummy lambda) and immediately completed with 0 iterations.
+
+**Root cause (`afl/runtime/handlers/block_execution.py`):**
+- `_process_foreach()` used `get_step_output=lambda s, a: None` — always returned
+  `None` for step references, causing the foreach to see an empty iterable
+- `_process_when()` already had a persistence-backed resolver (added in v0.34.1)
+  but the same fix was never applied to `_process_foreach()`
+
+**Fix:**
+- Replaced dummy lambda with the same persistence-backed resolver used by
+  `_process_when()`: queries workflow steps, finds completed step by name,
+  returns attribute value
+- Added deferral handling: when a referenced step is not yet complete, the
+  foreach block stays at `BlockExecutionBegin` (via `stay(push=True)`) and
+  retries on the next evaluation cycle
+- Pattern: `_step_not_ready` flag + `ValueError` raise → caught in `try/except`
+  around `evaluator.evaluate()` → `self.stay(push=True)` to defer
+
+**Tests:** 2 new tests (`TestForeachCrossBlockStepRef`): deferral when dependency
+not ready, and sub-block creation after dependency completes.
+
+**Files:** 2 modified
 
 ## Completed (v0.34.3) - NOAA Weather MongoDB Report Storage
 

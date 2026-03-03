@@ -6389,3 +6389,188 @@ class TestCrossBlockStepRefDeferral:
         raw_path_attr = parsed.attributes.params.get("raw_path")
         assert raw_path_attr is not None
         assert raw_path_attr.value == "/tmp/data.gz"
+
+
+class TestForeachCrossBlockStepRef:
+    """Test that foreach cross-block step references defer instead of error.
+
+    When a foreach block's iterable references a step output from a prior
+    andThen block (e.g. ``foreach station in discovery.stations``), the
+    foreach should defer until the referenced step completes rather than
+    resolving to None and completing with 0 iterations.
+    """
+
+    @pytest.fixture
+    def store(self):
+        return MemoryStore()
+
+    @pytest.fixture
+    def evaluator(self, store):
+        telemetry = Telemetry(enabled=True)
+        return Evaluator(persistence=store, telemetry=telemetry)
+
+    def _make_workflow_ast(self):
+        """Build a workflow with two sequential andThen blocks.
+
+        block-0: dl = Discover(query = $.query)        → event facet, returns {items: [...]}
+        block-1: foreach item in dl.items { v = Process(input = $.item) }
+        """
+        return {
+            "type": "WorkflowDecl",
+            "name": "TestForeachCrossBlock",
+            "params": [{"name": "query", "type": "String"}],
+            "returns": [{"name": "status", "type": "String"}],
+            "body": [
+                {
+                    "type": "AndThenBlock",
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-dl",
+                            "name": "dl",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Discover",
+                                "args": [
+                                    {
+                                        "name": "query",
+                                        "value": {
+                                            "type": "InputRef",
+                                            "path": ["query"],
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+                {
+                    "type": "AndThenBlock",
+                    "foreach": {
+                        "variable": "item",
+                        "iterable": {"type": "StepRef", "path": ["dl", "items"]},
+                    },
+                    "steps": [
+                        {
+                            "type": "StepStmt",
+                            "id": "step-v",
+                            "name": "v",
+                            "call": {
+                                "type": "CallExpr",
+                                "target": "Process",
+                                "args": [
+                                    {
+                                        "name": "input",
+                                        "value": {"type": "InputRef", "path": ["item"]},
+                                    }
+                                ],
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+
+    def _make_program_ast(self, workflow_ast):
+        return {
+            "declarations": [
+                {
+                    "type": "EventFacetDecl",
+                    "name": "Discover",
+                    "event": True,
+                    "params": [{"name": "query", "type": "String"}],
+                    "returns": [{"name": "items", "type": "Json"}],
+                },
+                {
+                    "type": "EventFacetDecl",
+                    "name": "Process",
+                    "event": True,
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "result", "type": "String"}],
+                },
+                workflow_ast,
+            ]
+        }
+
+    def test_foreach_cross_block_defers_when_not_ready(self, store, evaluator):
+        """Foreach referencing prior block output should defer, not complete with 0 iterations."""
+        workflow_ast = self._make_workflow_ast()
+        program_ast = self._make_program_ast(workflow_ast)
+
+        result = evaluator.execute(workflow_ast, program_ast=program_ast, inputs={"query": "test"})
+        # Should pause (event facets create tasks), not error
+        assert result.status in (ExecutionStatus.PAUSED, ExecutionStatus.COMPLETED)
+
+        all_steps = list(store.get_all_steps())
+
+        # Find the foreach block step — it should be deferred, not complete
+        foreach_blocks = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.AND_THEN
+            and s.statement_id
+            and str(s.statement_id).startswith("block-")
+        ]
+        # block-0 and block-1 should exist
+        assert len(foreach_blocks) >= 2
+
+        # The foreach block (block-1) should NOT be complete yet since
+        # dl hasn't returned its items
+        block1 = [s for s in foreach_blocks if str(s.statement_id) == "block-1"]
+        assert len(block1) == 1
+        assert block1[0].state == StepState.BLOCK_EXECUTION_BEGIN, (
+            f"Foreach block should defer at BlockExecutionBegin. State: {block1[0].state}"
+        )
+
+        # No foreach sub-blocks should have been created
+        sub_blocks = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.AND_THEN
+            and s.statement_id
+            and str(s.statement_id).startswith("foreach-")
+        ]
+        assert len(sub_blocks) == 0, (
+            f"No foreach sub-blocks should be created before dependency resolves. Found: {len(sub_blocks)}"
+        )
+
+    def test_foreach_cross_block_creates_sub_blocks(self, store, evaluator):
+        """After the referenced step completes, foreach should create sub-blocks."""
+        workflow_ast = self._make_workflow_ast()
+        program_ast = self._make_program_ast(workflow_ast)
+
+        # Initial execution — dl parks at EventTransmit, foreach defers
+        evaluator.execute(workflow_ast, program_ast=program_ast, inputs={"query": "test"})
+
+        all_steps = list(store.get_all_steps())
+
+        # Find the dl step (should be at EventTransmit)
+        dl_steps = [s for s in all_steps if s.statement_name == "dl"]
+        assert len(dl_steps) == 1
+        dl = dl_steps[0]
+
+        # Simulate task completion: set dl returns and mark complete
+        dl.set_attribute("items", [1, 2, 3], is_return=True)
+        dl.change_state(StepState.STATEMENT_COMPLETE)
+        store.save_step(dl)
+
+        # Resume — foreach should now evaluate and create sub-blocks
+        evaluator.resume(dl.workflow_id, workflow_ast, program_ast=program_ast)
+
+        all_steps = list(store.get_all_steps())
+
+        # Foreach sub-blocks should now exist
+        sub_blocks = [
+            s
+            for s in all_steps
+            if s.object_type == ObjectType.AND_THEN
+            and s.statement_id
+            and str(s.statement_id).startswith("foreach-")
+        ]
+        assert len(sub_blocks) == 3, (
+            f"Expected 3 foreach sub-blocks for [1, 2, 3]. Found: {len(sub_blocks)}"
+        )
+
+        # Verify foreach values
+        foreach_values = sorted([s.foreach_value for s in sub_blocks])
+        assert foreach_values == [1, 2, 3]
