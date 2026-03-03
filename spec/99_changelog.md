@@ -1,6 +1,32 @@
 # Implementation Changelog
 
-**Current version: v0.34.1**
+**Current version: v0.34.2**
+
+## Completed (v0.34.2) - NOAA Weather HTML Report & Station Map
+
+Adds visualization outputs to the NOAA weather pipeline: an HTML table report
+of daily statistics and an interactive folium map with the station pinpointed.
+
+**AFL definition (`examples/noaa-weather/afl/weather.afl`):**
+- New `weather.Visualize` namespace with 2 event facets: `RenderHTMLReport`,
+  `RenderStationMap` (11 namespaces, 12 event facets total)
+- `AnalyzeStation` workflow updated: calls both visualization facets after
+  `GenerateStationReport`; yield detail now references `html_report.html_path`
+
+**Utility functions (`examples/noaa-weather/handlers/shared/weather_utils.py`):**
+- `render_html_report()`: self-contained HTML with summary card, narrative,
+  and daily stats table (date, temps, precip, wind, obs count); inline CSS
+- `render_station_map()`: folium interactive map centered on station lat/lon
+  with labeled marker popup; `HAS_FOLIUM` guard for graceful degradation
+
+**Handler module (`examples/noaa-weather/handlers/visualize/`):**
+- `visualize_handlers.py`: standard `_DISPATCH` / `handle()` / `register_handlers()`
+  pattern; 2 handlers with step_log support
+
+**Tests:** 7 new tests (6 in `TestVisualizeHandlers` + 1 dispatch count);
+58 NOAA weather tests total.
+
+**Files:** 2 created, 4 modified
 
 ## Completed (v0.34.1) - Cross-Block Step Reference Deferral & Script Stdin
 

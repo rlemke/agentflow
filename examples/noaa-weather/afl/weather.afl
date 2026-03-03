@@ -153,6 +153,16 @@ namespace weather.Report {
     event facet GenerateBatchSummary(batch_id: String, station_count: Int, results: Json) => (report_path: String, completed: Int, failed: Int, summary: String)
 }
 
+namespace weather.Visualize {
+    use weather.types
+
+    /** Render an HTML table report of daily weather statistics. */
+    event facet RenderHTMLReport(station_id: String, station_name: String, year: Int, location: String, daily_stats: Json, annual_precip: Double, temp_range: String, narrative: String) => (html_path: String)
+
+    /** Render an interactive map with the station pin-pointed. */
+    event facet RenderStationMap(station_id: String, station_name: String, lat: Double, lon: Double, year: Int, temp_range: String) => (map_path: String)
+}
+
 namespace weather.workflows {
     use weather.types
 
@@ -174,7 +184,9 @@ namespace weather.workflows {
             stats = ComputeDailyStats(observations = parsed.observations, station_id = dl.station_id)
             narr = GenerateNarrative(station_name = $.station_name, year = $.year, daily_stats = stats.daily_stats, geo_context = #{"city": geo.geo.city, "state": geo.geo.state, "country": geo.geo.country})
             report = GenerateStationReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, narrative = narr.narrative)
-            yield AnalyzeStation(status = "completed", detail = "Report: " ++ report.report.report_path)
+            html_report = RenderHTMLReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, temp_range = report.report.temp_range, narrative = narr.narrative)
+            station_map = RenderStationMap(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, lat = $.lat, lon = $.lon, year = $.year, temp_range = report.report.temp_range)
+            yield AnalyzeStation(status = "completed", detail = "Report: " ++ html_report.html_path)
         }
     }
 

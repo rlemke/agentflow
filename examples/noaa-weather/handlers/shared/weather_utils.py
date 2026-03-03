@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import html as _html_mod
 import io
 import json
 import os
@@ -27,6 +28,13 @@ try:
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
+
+try:
+    import folium
+
+    HAS_FOLIUM = True
+except ImportError:
+    HAS_FOLIUM = False
 
 # Per-path download locks
 _download_locks: dict[str, threading.Lock] = {}
@@ -588,3 +596,122 @@ def generate_narrative_fallback(
         )
 
     return " ".join(parts), highlights
+
+
+# ---------------------------------------------------------------------------
+# HTML report
+# ---------------------------------------------------------------------------
+
+
+def render_html_report(
+    station_id: str,
+    station_name: str,
+    year: int,
+    location: str,
+    daily_stats: list[dict[str, Any]],
+    annual_precip: float,
+    temp_range: str,
+    narrative: str,
+) -> str:
+    """Generate a self-contained HTML report with a daily statistics table.
+
+    Returns the output file path.
+    """
+    total_days = len(daily_stats)
+    esc = _html_mod.escape
+
+    rows = ""
+    for d in daily_stats:
+        rows += (
+            "<tr>"
+            f"<td>{esc(str(d.get('date', '')))}</td>"
+            f"<td>{d.get('temp_min', '')}</td>"
+            f"<td>{d.get('temp_max', '')}</td>"
+            f"<td>{d.get('temp_mean', '')}</td>"
+            f"<td>{d.get('precip_total', '')}</td>"
+            f"<td>{d.get('wind_max', '')}</td>"
+            f"<td>{d.get('obs_count', '')}</td>"
+            "</tr>\n"
+        )
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>{esc(station_name)} — {year} Weather Report</title>
+<style>
+body {{ font-family: Arial, sans-serif; margin: 2em; color: #333; }}
+h1 {{ color: #1a5276; }}
+.summary {{ background: #eaf2f8; padding: 1em; border-radius: 6px; margin-bottom: 1em; }}
+.summary span {{ margin-right: 2em; }}
+table {{ border-collapse: collapse; width: 100%; margin-top: 1em; }}
+th, td {{ border: 1px solid #bbb; padding: 6px 10px; text-align: right; }}
+th {{ background: #2980b9; color: #fff; }}
+tr:nth-child(even) {{ background: #f2f2f2; }}
+td:first-child, th:first-child {{ text-align: left; }}
+.narrative {{ margin-top: 1.5em; line-height: 1.6; }}
+</style></head><body>
+<h1>{esc(station_name)} — {year} Weather Report</h1>
+<p><em>{esc(location)}</em> | Station {esc(station_id)}</p>
+<div class="summary">
+<span><strong>Annual Precip:</strong> {annual_precip} mm</span>
+<span><strong>Temp Range:</strong> {esc(temp_range)}</span>
+<span><strong>Days:</strong> {total_days}</span>
+</div>
+<div class="narrative"><p>{esc(narrative)}</p></div>
+<table>
+<tr><th>Date</th><th>Min °C</th><th>Max °C</th><th>Mean °C</th><th>Precip mm</th><th>Wind Max m/s</th><th>Obs</th></tr>
+{rows}</table>
+</body></html>"""
+
+    os.makedirs(_WEATHER_REPORTS_DIR, exist_ok=True)
+    out_path = os.path.join(_WEATHER_REPORTS_DIR, f"{station_id}-{year}.html")
+    with open(out_path, "w") as f:
+        f.write(html)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Station map
+# ---------------------------------------------------------------------------
+
+
+def render_station_map(
+    station_id: str,
+    station_name: str,
+    lat: float,
+    lon: float,
+    year: int,
+    temp_range: str,
+) -> str:
+    """Generate an interactive folium map with the station pinned.
+
+    Returns the output file path, or empty string if folium is unavailable.
+    """
+    if not HAS_FOLIUM:
+        return ""
+
+    m = folium.Map(location=[lat, lon], zoom_start=10)
+
+    popup_html = (
+        f"<b>{_html_mod.escape(station_name)}</b><br>"
+        f"ID: {_html_mod.escape(station_id)}<br>"
+        f"Year: {year}<br>"
+        f"Temp range: {_html_mod.escape(temp_range)}"
+    )
+    folium.Marker(
+        location=[lat, lon],
+        popup=folium.Popup(popup_html, max_width=250),
+        tooltip=station_name,
+    ).add_to(m)
+
+    title_html = (
+        f'<div style="position:fixed;top:10px;left:60px;z-index:9999;'
+        f"background:white;padding:8px 14px;border-radius:6px;"
+        f'box-shadow:0 2px 6px rgba(0,0,0,.3);font-family:Arial,sans-serif;">'
+        f"<b>{_html_mod.escape(station_name)}</b> — {year}</div>"
+    )
+    m.get_root().html.add_child(folium.Element(title_html))
+
+    os.makedirs(_WEATHER_REPORTS_DIR, exist_ok=True)
+    out_path = os.path.join(_WEATHER_REPORTS_DIR, f"{station_id}-{year}-map.html")
+    m.save(out_path)
+    return out_path

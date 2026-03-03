@@ -18,6 +18,7 @@ def register_all_handlers(poller) -> None:
     from .interpret.interpret_handlers import register_interpret_handlers
     from .qc.qc_handlers import register_qc_handlers
     from .report.report_handlers import register_report_handlers
+    from .visualize.visualize_handlers import register_visualize_handlers
 
     register_discovery_handlers(poller)
     register_ingest_handlers(poller)
@@ -26,6 +27,7 @@ def register_all_handlers(poller) -> None:
     register_geocode_handlers(poller)
     register_interpret_handlers(poller)
     register_report_handlers(poller)
+    register_visualize_handlers(poller)
 
 
 def register_all_registry_handlers(runner) -> None:
@@ -37,6 +39,7 @@ def register_all_registry_handlers(runner) -> None:
     from .interpret.interpret_handlers import register_handlers as reg_interpret
     from .qc.qc_handlers import register_handlers as reg_qc
     from .report.report_handlers import register_handlers as reg_report
+    from .visualize.visualize_handlers import register_handlers as reg_visualize
 
     reg_discovery(runner)
     reg_ingest(runner)
@@ -45,3 +48,4 @@ def register_all_registry_handlers(runner) -> None:
     reg_geocode(runner)
     reg_interpret(runner)
     reg_report(runner)
+    reg_visualize(runner)

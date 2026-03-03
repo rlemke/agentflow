@@ -487,6 +487,135 @@ class TestReportHandlers:
 
 
 # ---------------------------------------------------------------------------
+# TestVisualizeHandlers — HTML report and map handler tests
+# ---------------------------------------------------------------------------
+class TestVisualizeHandlers:
+    def test_render_html_report(self):
+        from handlers.visualize.visualize_handlers import handle_render_html_report
+
+        daily = [
+            {
+                "date": "2023-01-01",
+                "temp_min": -5,
+                "temp_max": 5,
+                "temp_mean": 0.0,
+                "precip_total": 2,
+                "wind_max": 10,
+                "obs_count": 8,
+            },
+            {
+                "date": "2023-01-02",
+                "temp_min": -3,
+                "temp_max": 7,
+                "temp_mean": 2.0,
+                "precip_total": 0,
+                "wind_max": 5,
+                "obs_count": 8,
+            },
+        ]
+        result = handle_render_html_report(
+            {
+                "station_id": "TEST-001",
+                "station_name": "TEST STATION",
+                "year": 2023,
+                "location": "Somewhere, USA",
+                "daily_stats": daily,
+                "annual_precip": 1100.0,
+                "temp_range": "-5°C to 5°C",
+                "narrative": "A cold start to the year.",
+            }
+        )
+        assert "html_path" in result
+        path = result["html_path"]
+        assert path.endswith(".html")
+        assert os.path.exists(path)
+        with open(path) as f:
+            content = f.read()
+        assert "<table>" in content
+        assert "TEST STATION" in content
+        assert "2023-01-01" in content
+
+    def test_render_html_report_empty_stats(self):
+        from handlers.visualize.visualize_handlers import handle_render_html_report
+
+        result = handle_render_html_report(
+            {
+                "station_id": "EMPTY-001",
+                "station_name": "EMPTY",
+                "year": 2023,
+                "location": "",
+                "daily_stats": [],
+                "annual_precip": 0,
+                "temp_range": "N/A",
+                "narrative": "",
+            }
+        )
+        assert "html_path" in result
+        assert os.path.exists(result["html_path"])
+
+    def test_render_html_report_step_log(self):
+        from handlers.visualize.visualize_handlers import handle_render_html_report
+
+        messages: list[tuple[str, str]] = []
+        handle_render_html_report(
+            {
+                "station_id": "LOG-001",
+                "station_name": "LOG",
+                "year": 2023,
+                "location": "",
+                "daily_stats": [],
+                "annual_precip": 0,
+                "temp_range": "N/A",
+                "narrative": "",
+                "_step_log": lambda msg, level: messages.append((msg, level)),
+            }
+        )
+        assert len(messages) == 1
+        assert "HTML report" in messages[0][0]
+
+    def test_render_station_map(self):
+        from handlers.visualize.visualize_handlers import handle_render_station_map
+
+        result = handle_render_station_map(
+            {
+                "station_id": "MAP-001",
+                "station_name": "MAP STATION",
+                "lat": 40.779,
+                "lon": -73.88,
+                "year": 2023,
+                "temp_range": "-10°C to 35°C",
+            }
+        )
+        assert "map_path" in result
+        # map_path is either a real path (folium available) or ""
+        if result["map_path"]:
+            assert result["map_path"].endswith("-map.html")
+            assert os.path.exists(result["map_path"])
+
+    def test_render_station_map_step_log(self):
+        from handlers.visualize.visualize_handlers import handle_render_station_map
+
+        messages: list[tuple[str, str]] = []
+        handle_render_station_map(
+            {
+                "station_id": "MAP-002",
+                "station_name": "MAP LOG",
+                "lat": 40.0,
+                "lon": -74.0,
+                "year": 2023,
+                "temp_range": "N/A",
+                "_step_log": lambda msg, level: messages.append((msg, level)),
+            }
+        )
+        assert len(messages) == 1
+
+    def test_visualize_dispatch_count(self):
+        from handlers.visualize.visualize_handlers import _DISPATCH
+
+        assert len(_DISPATCH) == 2
+
+
+# ---------------------------------------------------------------------------
 # TestDispatch — dispatch table structure and routing
 # ---------------------------------------------------------------------------
 class TestDispatch:
@@ -525,6 +654,11 @@ class TestDispatch:
 
         assert len(_DISPATCH) == 2
 
+    def test_visualize_dispatch_count(self):
+        from handlers.visualize.visualize_handlers import _DISPATCH
+
+        assert len(_DISPATCH) == 2
+
     def test_all_dispatch_names_have_namespace_prefix(self):
         from handlers.analysis.analysis_handlers import _DISPATCH as d1
         from handlers.discovery.discovery_handlers import _DISPATCH as d2
@@ -533,6 +667,7 @@ class TestDispatch:
         from handlers.interpret.interpret_handlers import _DISPATCH as d5
         from handlers.qc.qc_handlers import _DISPATCH as d6
         from handlers.report.report_handlers import _DISPATCH as d7
+        from handlers.visualize.visualize_handlers import _DISPATCH as d8
 
         all_names = (
             list(d1.keys())
@@ -542,8 +677,9 @@ class TestDispatch:
             + list(d5.keys())
             + list(d6.keys())
             + list(d7.keys())
+            + list(d8.keys())
         )
-        assert len(all_names) == 10
+        assert len(all_names) == 12
         assert all(n.startswith("weather.") for n in all_names)
 
 
@@ -573,7 +709,7 @@ class TestCompilation:
         event_facets = []
         for ns in parsed_ast.namespaces:
             event_facets.extend(ns.event_facets)
-        assert len(event_facets) == 10
+        assert len(event_facets) == 12
 
     def test_workflow_count(self, parsed_ast):
         workflows = []
@@ -582,7 +718,7 @@ class TestCompilation:
         assert len(workflows) == 3
 
     def test_namespace_count(self, parsed_ast):
-        assert len(parsed_ast.namespaces) == 10
+        assert len(parsed_ast.namespaces) == 11
 
     def test_prompt_block_present(self, parsed_ast):
         """Verify prompt block appears on GenerateNarrative."""
@@ -647,11 +783,12 @@ class TestAgentIntegration:
         from handlers.interpret.interpret_handlers import _DISPATCH as d5
         from handlers.qc.qc_handlers import _DISPATCH as d6
         from handlers.report.report_handlers import _DISPATCH as d7
+        from handlers.visualize.visualize_handlers import _DISPATCH as d8
 
         from afl.runtime.agent import ToolRegistry
 
         registry = ToolRegistry()
-        for dispatch in [d1, d2, d3, d4, d5, d6, d7]:
+        for dispatch in [d1, d2, d3, d4, d5, d6, d7, d8]:
             for facet_name, handler in dispatch.items():
                 tool_name = facet_name.split(".")[-1]
                 registry.register(tool_name, handler)
@@ -667,6 +804,8 @@ class TestAgentIntegration:
             "GenerateNarrative",
             "GenerateStationReport",
             "GenerateBatchSummary",
+            "RenderHTMLReport",
+            "RenderStationMap",
         ]
         for name in tool_names:
             assert registry.has_handler(name), f"Missing handler: {name}"
@@ -680,6 +819,7 @@ class TestAgentIntegration:
         from handlers.interpret.interpret_handlers import _DISPATCH as d5
         from handlers.qc.qc_handlers import _DISPATCH as d6
         from handlers.report.report_handlers import _DISPATCH as d7
+        from handlers.visualize.visualize_handlers import _DISPATCH as d8
 
         all_names = (
             list(d1.keys())
@@ -689,6 +829,7 @@ class TestAgentIntegration:
             + list(d5.keys())
             + list(d6.keys())
             + list(d7.keys())
+            + list(d8.keys())
         )
-        assert len(all_names) == 10
+        assert len(all_names) == 12
         assert all(n.startswith("weather.") for n in all_names)
