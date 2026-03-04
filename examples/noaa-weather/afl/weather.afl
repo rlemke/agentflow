@@ -217,3 +217,64 @@ namespace weather.workflows {
         batch = BatchWeatherAnalysis(country = $.country, state = $.state, max_stations = $.max_stations, year = $.year)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Climate Trends — 80-year state-level aggregation and trend analysis
+// ---------------------------------------------------------------------------
+
+namespace climate.types {
+    schema YearlyClimate {
+        state: String,
+        year: Int,
+        station_count: Int,
+        temp_mean: Double,
+        temp_min_avg: Double,
+        temp_max_avg: Double,
+        precip_annual: Double,
+        hot_days: Int,
+        frost_days: Int,
+        precip_days: Int
+    }
+
+    schema ClimateTrend {
+        state: String,
+        start_year: Int,
+        end_year: Int,
+        warming_rate_per_decade: Double,
+        precip_change_pct: Double,
+        decades: Json
+    }
+}
+
+namespace climate.Aggregate {
+    use climate.types
+
+    /** Aggregate station reports for a state+year into a single climate summary. */
+    event facet AggregateStateYear(state: String, year: Int) => (yearly: YearlyClimate)
+
+    /** Compute linear climate trend over a range of yearly summaries. */
+    event facet ComputeClimateTrend(state: String, start_year: Int, end_year: Int) => (trend: ClimateTrend)
+
+    /** Generate a narrative summary of climate trends for a state. */
+    event facet GenerateClimateNarrative(state: String, trend: Json) => (narrative: String, highlights: Json) prompt {
+        system "You are a climate scientist writing a concise trend summary for a US state."
+        template "Summarize the climate trends for {state}. Trend data: {trend}. Highlight the warming rate per decade, precipitation changes, and notable decade-over-decade shifts."
+        model "claude-sonnet-4-20250514"
+    }
+}
+
+namespace climate.workflows {
+    use climate.types
+    use weather.types
+
+    /** Analyze 80 years of climate trends for a state: aggregate per-year, compute trend, narrate. */
+    workflow AnalyzeStateTrends(country: String = "US", state: String = "NY", max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) script python "result['years'] = list(range(int(params['start_year']), int(params['end_year'])+1))" andThen foreach year in $.years {
+        batch = BatchWeatherAnalysis(country = $.country, state = $.state, max_stations = $.max_stations, year = $.year) catch {
+            fallback = AggregateStateYear(state = $.state, year = $.year)
+        }
+    } andThen {
+        trend = ComputeClimateTrend(state = $.state, start_year = $.start_year, end_year = $.end_year)
+        narr = GenerateClimateNarrative(state = $.state, trend = trend.trend)
+        yield AnalyzeStateTrends(status = "completed")
+    }
+}

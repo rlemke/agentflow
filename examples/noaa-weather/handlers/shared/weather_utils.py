@@ -846,3 +846,95 @@ def render_station_map(
 
     store = WeatherReportStore(get_weather_db(db))
     return store.upsert_map(station_id, year, map_content)
+
+
+# ---------------------------------------------------------------------------
+# Linear regression (pure Python, no numpy)
+# ---------------------------------------------------------------------------
+
+
+def simple_linear_regression(xs: list[float], ys: list[float]) -> tuple[float, float]:
+    """Ordinary least-squares regression.  Returns (slope, intercept).
+
+    With fewer than 2 points, returns (0.0, ys[0]) or (0.0, 0.0).
+    """
+    n = len(xs)
+    if n == 0:
+        return 0.0, 0.0
+    if n == 1:
+        return 0.0, ys[0]
+
+    sum_x = sum(xs)
+    sum_y = sum(ys)
+    sum_xy = sum(x * y for x, y in zip(xs, ys))
+    sum_xx = sum(x * x for x in xs)
+
+    denom = n * sum_xx - sum_x * sum_x
+    if abs(denom) < 1e-12:
+        return 0.0, sum_y / n
+
+    slope = (n * sum_xy - sum_x * sum_y) / denom
+    intercept = (sum_y - slope * sum_x) / n
+    return slope, intercept
+
+
+# ---------------------------------------------------------------------------
+# Climate store (state-year summaries and trends)
+# ---------------------------------------------------------------------------
+
+
+class ClimateStore:
+    """MongoDB wrapper for climate_state_years and climate_trends collections."""
+
+    def __init__(self, db: Any) -> None:
+        self.state_years = db["climate_state_years"]
+        self.trends = db["climate_trends"]
+        self._ensure_indexes()
+
+    def _ensure_indexes(self) -> None:
+        self.state_years.create_index([("state", 1), ("year", 1)], unique=True)
+        self.trends.create_index([("state", 1)], unique=True)
+
+    def upsert_state_year(self, data: dict[str, Any]) -> None:
+        """Upsert a yearly climate summary."""
+        now = datetime.datetime.now(datetime.UTC)
+        self.state_years.update_one(
+            {"state": data["state"], "year": data["year"]},
+            {"$set": {**data, "updated_at": now}, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
+    def upsert_trend(self, data: dict[str, Any]) -> None:
+        """Upsert a climate trend document."""
+        now = datetime.datetime.now(datetime.UTC)
+        self.trends.update_one(
+            {"state": data["state"]},
+            {"$set": {**data, "updated_at": now}, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
+    def get_state_years(
+        self, state: str, start_year: int = 0, end_year: int = 9999
+    ) -> list[dict[str, Any]]:
+        """Query yearly climate data for a state within a year range."""
+        return list(
+            self.state_years.find(
+                {"state": state, "year": {"$gte": start_year, "$lte": end_year}},
+                {"_id": 0},
+            ).sort("year", 1)
+        )
+
+    def get_trend(self, state: str) -> dict[str, Any] | None:
+        """Retrieve the trend document for a state."""
+        return self.trends.find_one({"state": state}, {"_id": 0})
+
+    def list_states(self) -> list[str]:
+        """Return distinct state codes that have trend data."""
+        return sorted(self.trends.distinct("state"))
+
+    def get_narrative(self, state: str) -> str | None:
+        """Retrieve the narrative from the trend document."""
+        doc = self.trends.find_one({"state": state}, {"_id": 0, "narrative": 1})
+        if doc:
+            return doc.get("narrative")
+        return None

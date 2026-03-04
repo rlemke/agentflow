@@ -26,6 +26,7 @@ def register_routes(app: FastAPI) -> None:
     """Include all route modules."""
     from .api import router as api_router
     from .census_maps import router as census_maps_router
+    from .climate_trends import router as climate_trends_router
     from .dashboard_v2 import router as dashboard_v2_router
     from .events import router as events_router
     from .flows import router as flows_router
@@ -63,3 +64,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(output_router)
     app.include_router(census_maps_router)
     app.include_router(site_selection_router)
+    app.include_router(climate_trends_router)

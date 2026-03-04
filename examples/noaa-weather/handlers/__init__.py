@@ -12,6 +12,7 @@ from __future__ import annotations
 def register_all_handlers(poller) -> None:
     """Register all handlers with an AgentPoller."""
     from .analysis.analysis_handlers import register_analysis_handlers
+    from .climate.climate_handlers import register_climate_handlers
     from .discovery.discovery_handlers import register_discovery_handlers
     from .geocode.geocode_handlers import register_geocode_handlers
     from .ingest.ingest_handlers import register_ingest_handlers
@@ -28,11 +29,13 @@ def register_all_handlers(poller) -> None:
     register_interpret_handlers(poller)
     register_report_handlers(poller)
     register_visualize_handlers(poller)
+    register_climate_handlers(poller)
 
 
 def register_all_registry_handlers(runner) -> None:
     """Register all handlers with a RegistryRunner."""
     from .analysis.analysis_handlers import register_handlers as reg_analysis
+    from .climate.climate_handlers import register_handlers as reg_climate
     from .discovery.discovery_handlers import register_handlers as reg_discovery
     from .geocode.geocode_handlers import register_handlers as reg_geocode
     from .ingest.ingest_handlers import register_handlers as reg_ingest
@@ -49,3 +52,4 @@ def register_all_registry_handlers(runner) -> None:
     reg_interpret(runner)
     reg_report(runner)
     reg_visualize(runner)
+    reg_climate(runner)

@@ -829,22 +829,22 @@ class TestCompilation:
         schemas = []
         for ns in parsed_ast.namespaces:
             schemas.extend(ns.schemas)
-        assert len(schemas) == 6
+        assert len(schemas) == 8
 
     def test_event_facet_count(self, parsed_ast):
         event_facets = []
         for ns in parsed_ast.namespaces:
             event_facets.extend(ns.event_facets)
-        assert len(event_facets) == 12
+        assert len(event_facets) == 15
 
     def test_workflow_count(self, parsed_ast):
         workflows = []
         for ns in parsed_ast.namespaces:
             workflows.extend(ns.workflows)
-        assert len(workflows) == 5
+        assert len(workflows) == 6
 
     def test_namespace_count(self, parsed_ast):
-        assert len(parsed_ast.namespaces) == 11
+        assert len(parsed_ast.namespaces) == 14
 
     def test_prompt_block_present(self, parsed_ast):
         """Verify prompt block appears on GenerateNarrative."""
@@ -856,7 +856,7 @@ class TestCompilation:
                 body = ef.body
                 if isinstance(body, PromptBlock):
                     prompt_count += 1
-        assert prompt_count == 1, f"Expected 1 prompt block, got {prompt_count}"
+        assert prompt_count == 2, f"Expected 2 prompt blocks, got {prompt_count}"
 
     def test_script_block_present(self, parsed_ast):
         """Verify script block appears on ValidateQuality."""
