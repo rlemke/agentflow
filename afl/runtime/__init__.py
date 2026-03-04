@@ -17,7 +17,14 @@
 Executes compiled AFL workflows through iterative evaluation.
 """
 
-from .agent import ClaudeAgentRunner, ToolDefinition, ToolRegistry
+from .agent import (
+    ClaudeAgentRunner,
+    LLMHandler,
+    LLMHandlerConfig,
+    TokenUsage,
+    ToolDefinition,
+    ToolRegistry,
+)
 from .agent_poller import AgentPoller, AgentPollerConfig
 from .agent_runner import AgentConfig, make_store, run_agent
 from .block import BlockAnalysis, StatementDefinition, StepAnalysis
@@ -100,6 +107,7 @@ from .errors import (
     ReferenceError,
     RuntimeError,
     StepNotFoundError,
+    TokenBudgetExceededError,
     VersionMismatchError,
 )
 from .evaluator import Evaluator, ExecutionContext, ExecutionResult, ExecutionStatus
@@ -186,6 +194,9 @@ __all__ = [
     "ClaudeAgentRunner",
     "ToolRegistry",
     "ToolDefinition",
+    "TokenUsage",
+    "LLMHandler",
+    "LLMHandlerConfig",
     # Runner
     "RunnerService",
     "RunnerConfig",
@@ -217,6 +228,7 @@ __all__ = [
     "InvalidTransitionError",
     "ConcurrencyError",
     "VersionMismatchError",
+    "TokenBudgetExceededError",
     # Entity types
     "Parameter",
     "UserDefinition",

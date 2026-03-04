@@ -263,6 +263,8 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | **Runner tuning** | | |
 | `AFL_MAX_CONCURRENT` | `2` | Max concurrent work items per runner |
 | `AFL_POLL_INTERVAL_MS` | `1000` | Runner poll interval in milliseconds |
+| **LLM / Claude API** | | |
+| `ANTHROPIC_API_KEY` | *(empty)* | Anthropic API key for Claude-powered prompt blocks. When unset, LLM handlers fall back to deterministic stubs. Required by: `ClaudeAgentRunner`, `LLMHandler`, and example handlers like `noaa-weather` GenerateNarrative. |
 | **Data directories** | | |
 | `HDFS_NAMENODE_DIR` | *(Docker volume)* | Host path for HDFS NameNode data |
 | `HDFS_DATANODE_DIR` | *(Docker volume)* | Host path for HDFS DataNode data |

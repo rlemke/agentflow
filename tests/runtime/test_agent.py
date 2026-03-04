@@ -487,6 +487,14 @@ class TestClaudeAgentRunnerWithCustomHandlers:
 # =========================================================================
 
 
+class MockUsage:
+    """Mock usage object from Anthropic API response."""
+
+    def __init__(self, input_tokens: int = 100, output_tokens: int = 50):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
 class MockToolUseBlock:
     """Mock tool_use content block from Anthropic API."""
 
@@ -508,7 +516,7 @@ class MockTextBlock:
 class MockResponse:
     """Mock Anthropic messages.create() response."""
 
-    def __init__(self, content: list):
+    def __init__(self, content: list, usage: "MockUsage | None" = None):
         self.content = content
         self.model = "claude-sonnet-4-20250514"
         self.role = "assistant"
@@ -517,6 +525,7 @@ class MockResponse:
             if any(getattr(b, "type", None) == "tool_use" for b in content)
             else "end_turn"
         )
+        self.usage = usage if usage is not None else MockUsage()
 
 
 class MockMessages:
@@ -1369,3 +1378,392 @@ class TestLLMHandler:
 
         result = asyncio.run(handler.handle_async({"input": "test"}))
         assert result == {"result": "async_done"}
+
+
+# =========================================================================
+# TokenUsage unit tests
+# =========================================================================
+
+from afl.runtime.agent import TokenUsage
+from afl.runtime.errors import TokenBudgetExceededError
+
+
+class TestTokenUsage:
+    """Unit tests for the TokenUsage dataclass."""
+
+    def test_defaults(self):
+        """All fields default to zero."""
+        usage = TokenUsage()
+        assert usage.input_tokens == 0
+        assert usage.output_tokens == 0
+        assert usage.total_tokens == 0
+        assert usage.api_calls == 0
+
+    def test_add_single(self):
+        """Single add accumulates correctly."""
+        usage = TokenUsage()
+        usage.add(100, 50)
+        assert usage.input_tokens == 100
+        assert usage.output_tokens == 50
+        assert usage.total_tokens == 150
+        assert usage.api_calls == 1
+
+    def test_add_multiple(self):
+        """Multiple adds accumulate correctly."""
+        usage = TokenUsage()
+        usage.add(100, 50)
+        usage.add(200, 80)
+        assert usage.input_tokens == 300
+        assert usage.output_tokens == 130
+        assert usage.total_tokens == 430
+        assert usage.api_calls == 2
+
+    def test_to_dict(self):
+        """to_dict returns correct serialization."""
+        usage = TokenUsage()
+        usage.add(100, 50)
+        d = usage.to_dict()
+        assert d == {
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "total_tokens": 150,
+            "api_calls": 1,
+        }
+
+
+# =========================================================================
+# Token usage tracking integration tests
+# =========================================================================
+
+
+class TestTokenUsageTracking:
+    """Tests for token usage tracking in ClaudeAgentRunner and LLMHandler."""
+
+    def test_usage_tracked_from_single_call(self, example4_workflow_ast, example4_program_ast):
+        """Token usage captured from a single API call."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse(
+                [MockToolUseBlock("CountDocuments", {"output": 42})],
+                usage=MockUsage(input_tokens=200, output_tokens=80),
+            )
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert result.token_usage is not None
+        assert result.token_usage["input_tokens"] == 200
+        assert result.token_usage["output_tokens"] == 80
+        assert result.token_usage["total_tokens"] == 280
+        assert result.token_usage["api_calls"] == 1
+
+    def test_usage_accumulated_multi_turn(self):
+        """Token usage accumulated across multi-turn conversation in LLMHandler."""
+        client = MockAnthropicClient()
+
+        # First response: intermediate tool call
+        intermediate = MockToolUseBlock("lookup", {"key": "abc"})
+        intermediate.id = "toolu_lookup"
+        resp1 = MockResponse(
+            [intermediate],
+            usage=MockUsage(input_tokens=100, output_tokens=30),
+        )
+        resp1.stop_reason = "tool_use"
+
+        # Second response: final answer
+        resp2 = MockResponse(
+            [MockToolUseBlock("answer", {"result": "42"})],
+            usage=MockUsage(input_tokens=150, output_tokens=40),
+        )
+
+        client.messages.add_response(resp1)
+        client.messages.add_response(resp2)
+
+        registry = ToolRegistry()
+        registry.register("lookup", lambda p: {"value": "found"})
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            tool_registry=registry,
+            tool_definitions=[
+                {
+                    "name": "lookup",
+                    "description": "Lookup",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        )
+
+        handler.handle({"input": "test"})
+
+        assert handler.token_usage.input_tokens == 250
+        assert handler.token_usage.output_tokens == 70
+        assert handler.token_usage.total_tokens == 320
+        assert handler.token_usage.api_calls == 2
+
+    def test_usage_reset_between_runs(self, example4_workflow_ast, example4_program_ast):
+        """Token usage resets at the start of each run()."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse(
+                [MockToolUseBlock("CountDocuments", {"output": 42})],
+                usage=MockUsage(input_tokens=200, output_tokens=80),
+            )
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        # First run
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+        assert runner.token_usage.total_tokens == 280
+
+        # Second run resets
+        result2 = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+        assert result2.token_usage["total_tokens"] == 280  # fresh, not 560
+
+    def test_max_tokens_passed_to_api(self, example4_workflow_ast, example4_program_ast):
+        """Custom max_tokens forwarded to API call."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse([MockToolUseBlock("CountDocuments", {"output": 42})])
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            max_tokens=8192,
+        )
+
+        runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert client.messages.calls[0]["max_tokens"] == 8192
+
+    def test_budget_enforcement(self, example4_workflow_ast, example4_program_ast):
+        """Budget exceeded stops execution and returns error result."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        # Usage of 150 per call exceeds budget of 100
+        client.messages.set_response(
+            MockResponse(
+                [MockToolUseBlock("CountDocuments", {"output": 42})],
+                usage=MockUsage(input_tokens=100, output_tokens=50),
+            )
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            token_budget=100,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        # First call succeeds (check is before call), but the result still has token_usage
+        # The budget check happens before the NEXT call, so the first call goes through
+        assert result.token_usage is not None
+        assert result.token_usage["total_tokens"] == 150
+
+    def test_no_budget_unlimited(self, example4_workflow_ast, example4_program_ast):
+        """No budget means unlimited calls."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse(
+                [MockToolUseBlock("CountDocuments", {"output": 42})],
+                usage=MockUsage(input_tokens=5000, output_tokens=3000),
+            )
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            token_budget=None,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert result.token_usage["total_tokens"] == 8000
+
+    def test_graceful_when_usage_missing(self, example4_workflow_ast, example4_program_ast):
+        """No crash when response has no usage attribute."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        resp = MockResponse([MockToolUseBlock("CountDocuments", {"output": 42})])
+        del resp.usage  # simulate missing usage
+        client.messages.set_response(resp)
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.success is True
+        assert result.token_usage["total_tokens"] == 0
+        assert result.token_usage["api_calls"] == 0
+
+    def test_token_usage_on_error_result(self, example4_workflow_ast, example4_program_ast):
+        """Token usage attached even on budget-exceeded error."""
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+        client = MockAnthropicClient()
+        # First call: responds with text (no target tool), triggers retry
+        # Each call uses 80 tokens total
+        resp_text = MockResponse(
+            [MockTextBlock("thinking...")],
+            usage=MockUsage(input_tokens=50, output_tokens=30),
+        )
+        resp_text.stop_reason = "end_turn"
+
+        # Budget of 50 — first call uses 80, exceeds budget before second call
+        client.messages.add_response(resp_text)
+        # Queue a second response that should be blocked by budget
+        client.messages.add_response(
+            MockResponse(
+                [MockToolUseBlock("CountDocuments", {"output": 42})],
+                usage=MockUsage(input_tokens=50, output_tokens=30),
+            )
+        )
+
+        runner = ClaudeAgentRunner(
+            evaluator=evaluator,
+            persistence=store,
+            anthropic_client=client,
+            token_budget=50,
+        )
+
+        result = runner.run(
+            example4_workflow_ast,
+            inputs={"x": 1, "y": 2},
+            program_ast=example4_program_ast,
+        )
+
+        assert result.token_usage is not None
+        assert result.token_usage["api_calls"] >= 1
+
+    def test_llm_handler_budget_enforcement(self):
+        """LLMHandler raises TokenBudgetExceededError when budget exceeded."""
+        client = MockAnthropicClient()
+
+        # First response: intermediate tool call (continues loop)
+        intermediate = MockToolUseBlock("lookup", {"key": "abc"})
+        intermediate.id = "toolu_int"
+        resp1 = MockResponse(
+            [intermediate],
+            usage=MockUsage(input_tokens=60, output_tokens=40),
+        )
+        resp1.stop_reason = "tool_use"
+
+        client.messages.add_response(resp1)
+
+        registry = ToolRegistry()
+        registry.register("lookup", lambda p: {"value": "found"})
+
+        config = LLMHandlerConfig(token_budget=50, max_turns=5, max_retries=0)
+        handler = LLMHandler(
+            anthropic_client=client,
+            config=config,
+            tool_registry=registry,
+            tool_definitions=[
+                {
+                    "name": "lookup",
+                    "description": "Lookup",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        )
+
+        with pytest.raises(TokenBudgetExceededError) as exc_info:
+            handler.handle({"input": "test"})
+
+        assert exc_info.value.budget == 50
+        assert exc_info.value.used == 100
+
+    def test_llm_handler_token_usage_property(self):
+        """LLMHandler exposes token_usage property."""
+        client = MockAnthropicClient()
+        client.messages.set_response(
+            MockResponse(
+                [MockToolUseBlock("process", {"result": "done"})],
+                usage=MockUsage(input_tokens=120, output_tokens=60),
+            )
+        )
+
+        handler = LLMHandler(
+            anthropic_client=client,
+            tool_definitions=[
+                {
+                    "name": "process",
+                    "description": "Process",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        )
+
+        handler.handle({"input": "test"})
+
+        assert handler.token_usage.input_tokens == 120
+        assert handler.token_usage.output_tokens == 60
+        assert handler.token_usage.total_tokens == 180
+        assert handler.token_usage.api_calls == 1

@@ -141,6 +141,58 @@ needs:
 - Fallback to a different model.
 - Human escalation when confidence is low.
 
+### 2.7 Implementation Status
+
+Many features described above are now implemented and used in production examples.
+
+| Feature | Status | Reference |
+|---------|--------|-----------|
+| **Prompt blocks** (§2.2) | Done | Grammar (`afl/grammar/afl.lark`), AST (`PromptBlock`), emitter, runtime evaluation |
+| **LLMHandler + ClaudeAgentRunner** (§2.1, §2.3) | Done | Multi-turn tool use, retry, prompt template interpolation (`afl/runtime/agent.py`) |
+| **Token tracking** (§2.1) | Done | `TokenUsage` dataclass, `token_budget` param, `TokenBudgetExceededError` |
+| **List/map types** (§2.4) | Done | Array literals `[1, 2]`, map literals `#{"k": "v"}`, array indexing `a[0]`, array type annotations `[Type]` |
+| **Streaming** (§2.5) | Not started | |
+| **Intelligent retry** (§2.6) | Partial | `catch` blocks provide error recovery; prompt-level retry not yet automatic |
+
+#### ANTHROPIC_API_KEY
+
+The `ANTHROPIC_API_KEY` environment variable enables live Claude API calls for prompt-block event facets. When unset, LLM handlers fall back to deterministic stubs, keeping tests and CI green without API access.
+
+#### Token Usage Tracking
+
+`TokenUsage` (`afl/runtime/agent.py`) accumulates input/output tokens across API calls:
+
+```python
+@dataclass
+class TokenUsage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    api_calls: int = 0
+
+    def add(self, input_tokens: int, output_tokens: int) -> None: ...
+    def to_dict(self) -> dict: ...
+```
+
+`ClaudeAgentRunner` and `LLMHandler` accept an optional `token_budget` parameter. When set, a `TokenBudgetExceededError` is raised before any API call that would exceed the budget:
+
+```python
+runner = ClaudeAgentRunner(evaluator=ev, persistence=store, token_budget=50000)
+```
+
+#### Real Example: JFK Airport Narrative (NOAA Weather)
+
+The `noaa-weather` example's `GenerateNarrative` event facet uses a prompt block to produce meteorologist-style summaries. When run with `ANTHROPIC_API_KEY` set, Claude generates prose like:
+
+> *JFK International Airport experienced a year of notable weather contrasts in 2023.
+> Temperatures ranged from a bone-chilling -10.2°C in late January to a sweltering 35.6°C
+> during a mid-July heat wave. The station recorded 127 rainy days totaling 1,142mm of
+> precipitation, with the wettest single day dropping 62mm during a nor'easter in October.
+> Spring arrived gradually with temperatures climbing through March and April, while autumn
+> brought an extended warm spell before winter set in during December.*
+
+Without the API key, the handler returns a deterministic fallback narrative built from the computed statistics.
+
 ---
 
 ## 3. Prompt and Task Categories

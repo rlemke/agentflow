@@ -143,10 +143,28 @@ result["c"] = params["x"] + params["y"]
         assert "Unsupported script language" in result.error
 
     def test_no_import(self, executor):
-        """Import should not be available."""
+        """Import of disallowed modules should fail."""
         result = executor.execute("import os")
         assert not result.success
         # Either NameError (no __import__) or ImportError
+
+    def test_anthropic_import_allowed(self, executor):
+        """anthropic is in the allowed import list (not blocked by sandbox)."""
+        from afl.runtime.script_executor import _SAFE_IMPORT_MODULES
+
+        assert "anthropic" in _SAFE_IMPORT_MODULES
+
+        # If package is installed, verify it actually imports in sandbox
+        try:
+            import anthropic  # noqa: F401
+
+            result = executor.execute(
+                'import anthropic\nresult["imported"] = hasattr(anthropic, "Anthropic")'
+            )
+            assert result.success
+            assert result.result["imported"] is True
+        except ImportError:
+            pytest.skip("anthropic package not installed")
 
     def test_no_open(self, executor):
         """open() should not be available."""

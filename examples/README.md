@@ -21,6 +21,11 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [tool-use-agent](tool-use-agent/) | Tool-use agent — tool-as-event-facet pattern (6 tools as event facets, planning facet, `++` and `%`/`/` arithmetic) |
 | [data-quality-pipeline](data-quality-pipeline/) | Data quality pipeline — schema instantiation as steps, array type annotations `[Type]`, parenthesized expression grouping `(a+b)*c` |
 | [sensor-monitoring](sensor-monitoring/) | Sensor monitoring — unary negation, null literals, computed map indexing, mixin alias, RegistryRunner-first |
+| [site-selection-debate](site-selection-debate/) | Site-selection debate — spatial + research + debate combined (12 prompt-block event facets, composed facet, cross-round state) |
+| [event-driven-etl](event-driven-etl/) | Event-driven ETL — extract/transform/load pipeline (3 schemas, 6 event facets, 2 workflows, foreach, schema instantiation) |
+| [devops-deploy](devops-deploy/) | DevOps deployment pipeline — first `andThen when` showcase (nested when, foreach, prompt/script blocks, mixins+implicits) |
+| [hiv-drug-resistance](hiv-drug-resistance/) | HIV drug resistance genotyping — bioinformatics pipeline (`andThen when` QC, `catch` error recovery, `foreach` batch, prompt+script blocks) |
+| [noaa-weather](noaa-weather/) | NOAA weather station analysis — real-data pipeline (ISD-Lite downloads, OSM geocoding, prompt block LLM narrative, `andThen when`/`catch`/`foreach`) |
 
 ## User Documentation
 
@@ -47,6 +52,11 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | tool-use-agent | [USER_GUIDE.md](tool-use-agent/USER_GUIDE.md) |
 | data-quality-pipeline | [USER_GUIDE.md](data-quality-pipeline/USER_GUIDE.md) |
 | sensor-monitoring | [USER_GUIDE.md](sensor-monitoring/USER_GUIDE.md) |
+| site-selection-debate | [USER_GUIDE.md](site-selection-debate/USER_GUIDE.md) |
+| event-driven-etl | *(coming soon)* |
+| devops-deploy | *(coming soon)* |
+| hiv-drug-resistance | *(coming soon)* |
+| noaa-weather | [USER_GUIDE.md](noaa-weather/USER_GUIDE.md) |
 
 ## Running an Example
 

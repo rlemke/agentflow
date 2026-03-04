@@ -115,8 +115,9 @@ _SAFE_BUILTIN_NAMES: list[str] = [
 # Allowed builtins for sandboxed execution (used by tests and reference)
 _SAFE_BUILTINS = {name: getattr(_builtins_mod, name) for name in _SAFE_BUILTIN_NAMES}
 
-# Standard library modules allowed in script blocks via `import`
+# Modules allowed in script blocks via `import`
 _SAFE_IMPORT_MODULES: list[str] = [
+    # Standard library
     "json",
     "math",
     "re",
@@ -128,6 +129,8 @@ _SAFE_IMPORT_MODULES: list[str] = [
     "datetime",
     "statistics",
     "string",
+    # Third-party (optional — ImportError if not installed)
+    "anthropic",
 ]
 
 

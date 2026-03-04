@@ -22,6 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from .errors import TokenBudgetExceededError
 from .evaluator import Evaluator, ExecutionResult, ExecutionStatus
 from .persistence import PersistenceAPI
 from .states import StepState
@@ -33,6 +34,32 @@ try:
     HAS_ANTHROPIC = True
 except ImportError:
     HAS_ANTHROPIC = False
+
+
+@dataclass
+class TokenUsage:
+    """Tracks cumulative token usage across API calls."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    api_calls: int = 0
+
+    def add(self, input_tokens: int, output_tokens: int) -> None:
+        """Accumulate usage from a single API call."""
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+        self.total_tokens += input_tokens + output_tokens
+        self.api_calls += 1
+
+    def to_dict(self) -> dict:
+        """Serialize for telemetry/logging."""
+        return {
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+            "api_calls": self.api_calls,
+        }
 
 
 # Mapping from AFL type names to JSON Schema types
@@ -138,6 +165,8 @@ class ClaudeAgentRunner:
         max_dispatches: int = 100,
         max_turns: int = 10,
         max_retries: int = 2,
+        max_tokens: int = 4096,
+        token_budget: int | None = None,
     ) -> None:
         self.evaluator = evaluator
         self.persistence = persistence
@@ -148,6 +177,14 @@ class ClaudeAgentRunner:
         self.max_dispatches = max_dispatches
         self.max_turns = max_turns
         self.max_retries = max_retries
+        self.max_tokens = max_tokens
+        self.token_budget = token_budget
+        self._token_usage = TokenUsage()
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        """Read-only access to cumulative token usage."""
+        return self._token_usage
 
     def run(
         self,
@@ -168,6 +205,9 @@ class ClaudeAgentRunner:
         Returns:
             ExecutionResult with outputs or error
         """
+        # Reset token usage for this run
+        self._token_usage = TokenUsage()
+
         # Extract tool definitions from program AST
         tool_defs = self._extract_tool_definitions(program_ast)
         claude_tools = [self._to_anthropic_tool(td) for td in tool_defs]
@@ -178,34 +218,46 @@ class ClaudeAgentRunner:
         dispatch_count = 0
         workflow_name = workflow_ast.get("name", "unknown")
 
-        while result.status == ExecutionStatus.PAUSED and dispatch_count < self.max_dispatches:
-            # Find steps blocked at EVENT_TRANSMIT
-            blocked_steps = self._find_blocked_steps(result.workflow_id)
-            if not blocked_steps:
-                break
-
-            for step in blocked_steps:
-                dispatch_count += 1
-                if dispatch_count > self.max_dispatches:
+        try:
+            while result.status == ExecutionStatus.PAUSED and dispatch_count < self.max_dispatches:
+                # Find steps blocked at EVENT_TRANSMIT
+                blocked_steps = self._find_blocked_steps(result.workflow_id)
+                if not blocked_steps:
                     break
 
-                step_result = self._dispatch_single_step(
-                    step,
-                    claude_tools=claude_tools,
-                    tool_defs=tool_defs,
-                    workflow_name=workflow_name,
-                    task_description=task_description,
-                )
-                self.evaluator.continue_step(step.id, step_result)
+                for step in blocked_steps:
+                    dispatch_count += 1
+                    if dispatch_count > self.max_dispatches:
+                        break
 
-            # Resume evaluation
-            result = self.evaluator.resume(
-                result.workflow_id,
-                workflow_ast,
-                program_ast,
-                inputs,
+                    step_result = self._dispatch_single_step(
+                        step,
+                        claude_tools=claude_tools,
+                        tool_defs=tool_defs,
+                        workflow_name=workflow_name,
+                        task_description=task_description,
+                    )
+                    self.evaluator.continue_step(step.id, step_result)
+
+                # Resume evaluation
+                result = self.evaluator.resume(
+                    result.workflow_id,
+                    workflow_ast,
+                    program_ast,
+                    inputs,
+                )
+        except TokenBudgetExceededError:
+            result = ExecutionResult(
+                success=False,
+                workflow_id=result.workflow_id,
+                status=ExecutionStatus.ERROR,
+                error=TokenBudgetExceededError(
+                    budget=self.token_budget or 0,
+                    used=self._token_usage.total_tokens,
+                ),
             )
 
+        result.token_usage = self._token_usage.to_dict()
         return result
 
     def _find_blocked_steps(self, workflow_id: str) -> list[StepDefinition]:
@@ -369,13 +421,32 @@ class ClaudeAgentRunner:
             Result dict if target tool_use found, None if loop exhausted
         """
         for _turn in range(self.max_turns):
+            # Budget check before API call
+            if (
+                self.token_budget is not None
+                and self._token_usage.total_tokens >= self.token_budget
+            ):
+                raise TokenBudgetExceededError(
+                    budget=self.token_budget,
+                    used=self._token_usage.total_tokens,
+                    step_id=step.id,
+                )
+
             response = self.anthropic_client.messages.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=self.max_tokens,
                 system=system,
                 messages=messages,
                 tools=claude_tools,
             )
+
+            # Capture token usage
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                self._token_usage.add(
+                    getattr(usage, "input_tokens", 0),
+                    getattr(usage, "output_tokens", 0),
+                )
 
             # Check for target facet tool_use (the final answer)
             for block in response.content:
@@ -564,6 +635,7 @@ class LLMHandlerConfig:
         max_tokens: Maximum tokens for the response
         max_turns: Maximum multi-turn conversation rounds
         max_retries: Maximum retry attempts
+        token_budget: Optional cumulative token budget (None = unlimited)
     """
 
     model: str = "claude-sonnet-4-20250514"
@@ -571,6 +643,7 @@ class LLMHandlerConfig:
     max_tokens: int = 4096
     max_turns: int = 10
     max_retries: int = 2
+    token_budget: int | None = None
 
 
 class LLMHandler:
@@ -603,6 +676,12 @@ class LLMHandler:
         self.tool_definitions = tool_definitions or []
         self.tool_registry = tool_registry or ToolRegistry()
         self.prompt_template = prompt_template
+        self._token_usage = TokenUsage()
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        """Read-only access to cumulative token usage."""
+        return self._token_usage
 
     def handle(self, payload: dict) -> dict:
         """Handle a payload by dispatching to Claude.
@@ -650,6 +729,16 @@ class LLMHandler:
             Result dict from first tool_use block, or None if exhausted
         """
         for _turn in range(self.config.max_turns):
+            # Budget check before API call
+            if (
+                self.config.token_budget is not None
+                and self._token_usage.total_tokens >= self.config.token_budget
+            ):
+                raise TokenBudgetExceededError(
+                    budget=self.config.token_budget,
+                    used=self._token_usage.total_tokens,
+                )
+
             response = self.anthropic_client.messages.create(
                 model=self.config.model,
                 max_tokens=self.config.max_tokens,
@@ -657,6 +746,14 @@ class LLMHandler:
                 messages=messages,
                 tools=self.tool_definitions,
             )
+
+            # Capture token usage
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                self._token_usage.add(
+                    getattr(usage, "input_tokens", 0),
+                    getattr(usage, "output_tokens", 0),
+                )
 
             # Check for tool_use blocks
             tool_use_blocks = [

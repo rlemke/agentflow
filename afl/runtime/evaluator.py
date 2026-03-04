@@ -58,6 +58,7 @@ class ExecutionResult:
     error: Exception | None = None
     iterations: int = 0
     status: str = ExecutionStatus.COMPLETED
+    token_usage: dict | None = None
 
 
 @dataclass

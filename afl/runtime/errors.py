@@ -137,3 +137,16 @@ class VersionMismatchError(RuntimeError):
             f"Version mismatch for {self.component}: "
             f"expected {self.expected_version}, got {self.actual_version}"
         )
+
+
+@dataclass
+class TokenBudgetExceededError(RuntimeError):
+    """Raised when cumulative token usage exceeds the configured budget."""
+
+    budget: int
+    used: int
+    step_id: StepId | None = None
+
+    def __str__(self) -> str:
+        loc = f" at step {self.step_id}" if self.step_id else ""
+        return f"Token budget exceeded{loc}: used {self.used} of {self.budget} tokens"
