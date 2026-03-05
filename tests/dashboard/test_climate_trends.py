@@ -159,3 +159,31 @@ class TestClimateTrendsAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert data["states"] == []
+
+
+class TestStateNames:
+    def test_state_names_in_page(self, client):
+        tc, store = client
+        _seed_trend(store, "NY")
+        _seed_trend(store, "CA")
+        resp = tc.get("/climate-trends/")
+        assert resp.status_code == 200
+        assert "New York" in resp.text
+        assert "California" in resp.text
+
+    def test_state_names_in_api(self, client):
+        tc, store = client
+        _seed_trend(store, "NY")
+        _seed_trend(store, "FL")
+        resp = tc.get("/climate-trends/api/states")
+        data = resp.json()
+        names = {s["code"]: s["name"] for s in data["states"]}
+        assert names["NY"] == "New York"
+        assert names["FL"] == "Florida"
+
+    def test_unknown_state_code_uses_code(self, client):
+        tc, store = client
+        _seed_trend(store, "ZZ")
+        resp = tc.get("/climate-trends/api/states")
+        data = resp.json()
+        assert data["states"][0]["name"] == "ZZ"

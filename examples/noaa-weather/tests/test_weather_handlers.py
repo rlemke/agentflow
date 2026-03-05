@@ -176,8 +176,9 @@ class TestDiscoveryHandlers:
                 "_step_log": lambda msg, level: messages.append((msg, level)),
             }
         )
-        assert len(messages) == 1
-        assert "Discovered" in messages[0][0]
+        assert len(messages) == 2
+        assert "Discovering" in messages[0][0]
+        assert "Discovered" in messages[1][0]
 
 
 # ---------------------------------------------------------------------------
@@ -841,10 +842,10 @@ class TestCompilation:
         workflows = []
         for ns in parsed_ast.namespaces:
             workflows.extend(ns.workflows)
-        assert len(workflows) == 6
+        assert len(workflows) == 10
 
     def test_namespace_count(self, parsed_ast):
-        assert len(parsed_ast.namespaces) == 14
+        assert len(parsed_ast.namespaces) == 15
 
     def test_prompt_block_present(self, parsed_ast):
         """Verify prompt block appears on GenerateNarrative."""

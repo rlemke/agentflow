@@ -24,6 +24,7 @@ RUNNERS="${AFL_RUNNERS:-1}"
 AGENTS="${AFL_AGENTS:-1}"
 OSM_AGENTS="${AFL_OSM_AGENTS:-0}"
 OSM_LITE_AGENTS="${AFL_OSM_LITE_AGENTS:-0}"
+WEATHER_AGENTS="${AFL_WEATHER_AGENTS:-0}"
 HDFS="${AFL_HDFS:-false}"
 JENKINS="${AFL_JENKINS:-false}"
 POSTGIS="${AFL_POSTGIS:-false}"
@@ -48,6 +49,7 @@ Options:
                        Java/GraphHopper (default: 0)
   --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
                        (default: 0)
+  --weather-agents N   Number of NOAA Weather agents (default: 0)
   --hdfs               Start HDFS namenode + datanode services
   --hdfs-namenode-dir PATH  Use external directory for HDFS NameNode data
   --hdfs-datanode-dir PATH  Use external directory for HDFS DataNode data
@@ -74,6 +76,7 @@ while [[ $# -gt 0 ]]; do
         --agents)        AGENTS="$2";           shift 2 ;;
         --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
         --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
+        --weather-agents) WEATHER_AGENTS="$2";  shift 2 ;;
         --hdfs)          HDFS=true;             shift ;;
         --hdfs-namenode-dir) export HDFS_NAMENODE_DIR="$2"; HDFS=true; shift 2 ;;
         --hdfs-datanode-dir) export HDFS_DATANODE_DIR="$2"; HDFS=true; shift 2 ;;
@@ -248,6 +251,9 @@ fi
 if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
     SERVICES="$SERVICES agent-osm-geocoder-lite"
 fi
+if [ "$WEATHER_AGENTS" -gt 0 ]; then
+    SERVICES="$SERVICES agent-noaa-weather"
+fi
 
 PROFILE_ARGS=""
 COMPOSE_FILES="-f docker-compose.yml"
@@ -310,6 +316,7 @@ AFL_RUNNERS=$RUNNERS
 AFL_AGENTS=$AGENTS
 AFL_OSM_AGENTS=$OSM_AGENTS
 AFL_OSM_LITE_AGENTS=$OSM_LITE_AGENTS
+AFL_WEATHER_AGENTS=$WEATHER_AGENTS
 CFGEOF
 
 if [ "$FORCE_BUILD" = true ]; then
@@ -330,12 +337,16 @@ fi
 if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
     SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder-lite=$OSM_LITE_AGENTS"
 fi
+if [ "$WEATHER_AGENTS" -gt 0 ]; then
+    SCALE_ARGS="$SCALE_ARGS --scale agent-noaa-weather=$WEATHER_AGENTS"
+fi
 
 echo "Starting AgentFlow stack..."
 echo "  Runners:          $RUNNERS"
 echo "  AddOne agents:    $AGENTS"
 echo "  OSM agents:       $OSM_AGENTS"
 echo "  OSM lite agents:  $OSM_LITE_AGENTS"
+echo "  Weather agents:   $WEATHER_AGENTS"
 echo "  HDFS:             $HDFS"
 echo "  Jenkins:          $JENKINS"
 echo "  PostGIS:          $POSTGIS"

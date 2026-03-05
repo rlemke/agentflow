@@ -323,13 +323,28 @@ class BlockExecutionBeginHandler(StateHandler):
         return StateChangeResult(step=self.step)
 
     def _build_foreach_eval_inputs(self) -> dict:
-        """Build input dict for evaluating the foreach iterable expression."""
-        # Get workflow root params
-        workflow_root = self.context.get_workflow_root()
+        """Build input dict for evaluating the foreach iterable expression.
+
+        For nested workflow/facet calls, the container step's params take
+        precedence over the workflow root's params.  A nested workflow's
+        pre_script results live on the container step, not the top-level
+        workflow root.
+        """
         inputs = {}
+
+        # Start with workflow root params
+        workflow_root = self.context.get_workflow_root()
         if workflow_root:
             for name, attr in workflow_root.attributes.params.items():
                 inputs[name] = attr.value
+
+        # Override with container step params (for nested workflow/facet calls)
+        if self.step.container_id:
+            container = self.context._find_step(self.step.container_id)
+            if container:
+                for name, attr in container.attributes.params.items():
+                    inputs[name] = attr.value
+
         return inputs
 
     def _get_workflow_inputs(self) -> set[str]:

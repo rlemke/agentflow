@@ -12,6 +12,59 @@ from ..dependencies import get_store
 
 router = APIRouter(prefix="/climate-trends")
 
+_STATE_NAMES: dict[str, str] = {
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+}
+
 
 def _get_climate_db(store):
     """Return the raw MongoDB database from the store."""
@@ -26,7 +79,7 @@ def _strip_dates(doc: dict[str, Any]) -> dict[str, Any]:
 def _list_states(db) -> list[dict[str, str]]:
     """Return states that have climate trend data."""
     states = db["climate_trends"].distinct("state")
-    return [{"code": s, "name": s} for s in sorted(states)]
+    return [{"code": s, "name": _STATE_NAMES.get(s, s)} for s in sorted(states)]
 
 
 def _get_yearly_data(db, state: str) -> list[dict[str, Any]]:

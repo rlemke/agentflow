@@ -1,0 +1,25 @@
+# AgentFlow NOAA Weather Agent
+# RegistryRunner-based agent for weather station analysis and cache warmup.
+# Lightweight image: requests for NOAA HTTP downloads, folium for maps.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install AFL with MongoDB support
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[mongodb]" || \
+    pip install --no-cache-dir lark pymongo
+
+# Install requests for NOAA ISD-Lite and Nominatim downloads
+# Install folium for station map rendering
+RUN pip install --no-cache-dir requests folium
+
+# Copy application code
+COPY afl/ ./afl/
+COPY examples/noaa-weather/ ./examples/noaa-weather/
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app/examples/noaa-weather
+
+CMD ["python", "agent_registry.py"]

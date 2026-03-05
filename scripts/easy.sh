@@ -20,6 +20,7 @@ RUNNERS="${AFL_RUNNERS:-1}"
 AGENTS="${AFL_AGENTS:-1}"
 OSM_AGENTS="${AFL_OSM_AGENTS:-0}"
 OSM_LITE_AGENTS="${AFL_OSM_LITE_AGENTS:-0}"
+WEATHER_AGENTS="${AFL_WEATHER_AGENTS:-0}"
 
 SETUP_ARGS+=(--runners "$RUNNERS" --agents "$AGENTS")
 
@@ -28,6 +29,9 @@ if [ "$OSM_AGENTS" -gt 0 ]; then
 fi
 if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
     SETUP_ARGS+=(--osm-lite-agents "$OSM_LITE_AGENTS")
+fi
+if [ "$WEATHER_AGENTS" -gt 0 ]; then
+    SETUP_ARGS+=(--weather-agents "$WEATHER_AGENTS")
 fi
 if [ "${AFL_HDFS:-false}" = true ]; then
     SETUP_ARGS+=(--hdfs)

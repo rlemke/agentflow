@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from typing import Any
 
 from handlers.shared.weather_utils import (
@@ -11,7 +13,18 @@ from handlers.shared.weather_utils import (
     parse_station_inventory,
 )
 
+logger = logging.getLogger("noaa.discovery")
 NAMESPACE = "weather.Discovery"
+
+
+def _step_log_append(step_log, msg: str, level: str = "info") -> None:
+    """Write a message to the step log (callable or list form)."""
+    if step_log is None:
+        return
+    if callable(step_log):
+        step_log(msg, level)
+    else:
+        step_log.append({"message": msg, "level": level})
 
 
 def handle_discover_stations(params: dict[str, Any]) -> dict[str, Any]:
@@ -22,17 +35,22 @@ def handle_discover_stations(params: dict[str, Any]) -> dict[str, Any]:
     if isinstance(max_stations, str):
         max_stations = int(max_stations)
 
+    step_log = params.get("_step_log")
+    region = f"{country}/{state}" if state else country
+
+    _step_log_append(step_log, f"Discovering stations for {region} (max {max_stations})")
+    logger.info("Discovering stations for %s (max %d)", region, max_stations)
+    t0 = time.monotonic()
+
     csv_text = download_station_inventory()
     all_stations = parse_station_inventory(csv_text)
     filtered = filter_active_stations(all_stations, country, state, max_stations)
 
-    step_log = params.get("_step_log")
-    if step_log is not None:
-        msg = f"Discovered {len(filtered)} stations for {country}" + (f"/{state}" if state else "")
-        if callable(step_log):
-            step_log(msg, "success")
-        else:
-            step_log.append({"message": msg, "level": "success"})
+    elapsed = time.monotonic() - t0
+    names = ", ".join(s.get("station_name", s.get("usaf", "?")) for s in filtered[:5])
+    msg = f"Discovered {len(filtered)} stations for {region} in {elapsed:.1f}s: {names}"
+    logger.info(msg)
+    _step_log_append(step_log, msg, "success")
 
     return {
         "stations": filtered,

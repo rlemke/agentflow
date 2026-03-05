@@ -14,13 +14,21 @@ import hashlib
 import html as _html_mod
 import io
 import json
+import logging
 import os
 import threading
+import time
 from typing import Any
+
+logger = logging.getLogger("noaa.download")
 
 _LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
 _WEATHER_CACHE_DIR = os.path.join(_LOCAL_OUTPUT, "weather-cache")
 _GEOCODE_CACHE_DIR = os.path.join(_LOCAL_OUTPUT, "weather-geocode-cache")
+
+ISD_LITE_URL_TEMPLATE = (
+    "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/{year}/{usaf}-{wban}-{year}.gz"
+)
 
 try:
     import requests
@@ -532,21 +540,49 @@ def download_isd_lite(usaf: str, wban: str, year: int, cache_dir: str | None = N
     lock = _get_lock(local_path)
     with lock:
         if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+            size = os.path.getsize(local_path)
+            logger.info("Cache hit %s-%d (%s bytes)", station_id, year, f"{size:,}")
             return local_path
 
         if HAS_REQUESTS:
+            url = ISD_LITE_URL_TEMPLATE.format(year=year, usaf=usaf, wban=wban)
+            logger.info("Downloading %s-%d from %s", station_id, year, url)
+            t0 = time.monotonic()
             try:
-                url = f"https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/{year}/{filename}"
                 resp = requests.get(url, timeout=30)
+                elapsed = time.monotonic() - t0
                 if resp.status_code == 200:
+                    size = len(resp.content)
                     os.makedirs(cache_dir, exist_ok=True)
                     with open(local_path, "wb") as f:
                         f.write(resp.content)
+                    logger.info(
+                        "Download complete %s-%d: %s bytes in %.1fs",
+                        station_id,
+                        year,
+                        f"{size:,}",
+                        elapsed,
+                    )
                     return local_path
-            except Exception:
-                pass
+                logger.warning(
+                    "Download failed %s-%d: HTTP %d in %.1fs",
+                    station_id,
+                    year,
+                    resp.status_code,
+                    elapsed,
+                )
+            except Exception as exc:
+                elapsed = time.monotonic() - t0
+                logger.warning(
+                    "Download error %s-%d: %s in %.1fs",
+                    station_id,
+                    year,
+                    exc,
+                    elapsed,
+                )
 
     # Mock fallback — write a small gzipped ISD-Lite file
+    logger.info("Using mock data for %s-%d", station_id, year)
     mock_path = os.path.join(cache_dir, f"{station_id}-{year}-mock.txt")
     os.makedirs(cache_dir, exist_ok=True)
     with open(mock_path, "w") as f:

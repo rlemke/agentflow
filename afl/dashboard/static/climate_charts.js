@@ -4,6 +4,9 @@
  * ES module that renders 4 charts (temperature, precipitation,
  * extreme events, decadal comparison) from /climate-trends/api/data.
  *
+ * Supports °C/°F toggle — data is stored in Celsius in MongoDB;
+ * conversion happens purely client-side.
+ *
  * @license Apache-2.0
  */
 
@@ -11,6 +14,24 @@ let tempChart = null;
 let precipChart = null;
 let extremeChart = null;
 let decadeChart = null;
+
+// Module-level cached data for re-render on unit toggle
+let currentUnit = "F";
+let currentYearly = [];
+let currentTrend = {};
+let currentNarrative = "";
+
+function cToF(c) {
+    return c * 9 / 5 + 32;
+}
+
+function convertTemp(c) {
+    return currentUnit === "F" ? Math.round(cToF(c) * 100) / 100 : c;
+}
+
+function tempLabel() {
+    return currentUnit === "F" ? "°F" : "°C";
+}
 
 function destroyCharts() {
     if (tempChart)   { tempChart.destroy();   tempChart = null; }
@@ -21,13 +42,14 @@ function destroyCharts() {
 
 function renderTemperatureChart(yearly) {
     const ctx = document.getElementById("chart-temperature").getContext("2d");
+    const unit = tempLabel();
     tempChart = new Chart(ctx, {
         type: "line",
         data: {
             labels: yearly.map(d => d.year),
             datasets: [{
-                label: "Mean Temp (°C)",
-                data: yearly.map(d => d.temp_mean),
+                label: `Mean Temp (${unit})`,
+                data: yearly.map(d => convertTemp(d.temp_mean)),
                 borderColor: "#e74c3c",
                 backgroundColor: "rgba(231,76,60,0.1)",
                 fill: true,
@@ -40,7 +62,7 @@ function renderTemperatureChart(yearly) {
             plugins: { legend: { display: true } },
             scales: {
                 x: { title: { display: true, text: "Year" } },
-                y: { title: { display: true, text: "°C" } },
+                y: { title: { display: true, text: unit } },
             },
         },
     });
@@ -72,6 +94,8 @@ function renderPrecipitationChart(yearly) {
 }
 
 function renderExtremesChart(yearly) {
+    const hotLabel = currentUnit === "F" ? "Hot Days (>95°F)" : "Hot Days (>35°C)";
+    const frostLabel = currentUnit === "F" ? "Frost Days (<32°F)" : "Frost Days (<0°C)";
     const ctx = document.getElementById("chart-extremes").getContext("2d");
     extremeChart = new Chart(ctx, {
         type: "line",
@@ -79,7 +103,7 @@ function renderExtremesChart(yearly) {
             labels: yearly.map(d => d.year),
             datasets: [
                 {
-                    label: "Hot Days (>35°C)",
+                    label: hotLabel,
                     data: yearly.map(d => d.hot_days),
                     borderColor: "#e67e22",
                     backgroundColor: "rgba(230,126,34,0.1)",
@@ -88,7 +112,7 @@ function renderExtremesChart(yearly) {
                     pointRadius: 1,
                 },
                 {
-                    label: "Frost Days (<0°C)",
+                    label: frostLabel,
                     data: yearly.map(d => d.frost_days),
                     borderColor: "#3498db",
                     backgroundColor: "rgba(52,152,219,0.1)",
@@ -111,8 +135,9 @@ function renderExtremesChart(yearly) {
 
 function renderDecadeChart(decades) {
     const labels = Object.keys(decades).sort();
-    const temps = labels.map(d => decades[d].avg_temp);
+    const temps = labels.map(d => convertTemp(decades[d].avg_temp));
     const precips = labels.map(d => decades[d].avg_precip);
+    const unit = tempLabel();
 
     const ctx = document.getElementById("chart-decades").getContext("2d");
     decadeChart = new Chart(ctx, {
@@ -121,7 +146,7 @@ function renderDecadeChart(decades) {
             labels: labels,
             datasets: [
                 {
-                    label: "Avg Temp (°C)",
+                    label: `Avg Temp (${unit})`,
                     data: temps,
                     backgroundColor: "rgba(231,76,60,0.6)",
                     borderColor: "#e74c3c",
@@ -143,7 +168,7 @@ function renderDecadeChart(decades) {
             plugins: { legend: { display: true } },
             scales: {
                 x: { title: { display: true, text: "Decade" } },
-                y: { type: "linear", position: "left", title: { display: true, text: "°C" } },
+                y: { type: "linear", position: "left", title: { display: true, text: unit } },
                 y1: { type: "linear", position: "right", title: { display: true, text: "mm" }, grid: { drawOnChartArea: false } },
             },
         },
@@ -158,13 +183,19 @@ function updateSummary(trend) {
     }
     panel.style.display = "block";
 
-    const warming = trend.warming_rate_per_decade || 0;
+    const warmingC = trend.warming_rate_per_decade || 0;
     const precip = trend.precip_change_pct || 0;
     const start = trend.start_year || "?";
     const end = trend.end_year || "?";
 
+    const unit = tempLabel();
+    // Warming rate is a delta — multiply by 9/5 for °F
+    const warming = currentUnit === "F"
+        ? Math.round(warmingC * 9 / 5 * 10000) / 10000
+        : warmingC;
+
     document.getElementById("summary-warming").textContent =
-        `Warming: ${warming >= 0 ? "+" : ""}${warming}°C per decade`;
+        `Warming: ${warming >= 0 ? "+" : ""}${warming}${unit} per decade`;
     document.getElementById("summary-precip").textContent =
         `Precipitation change: ${precip >= 0 ? "+" : ""}${precip}%`;
     document.getElementById("summary-years").textContent =
@@ -181,22 +212,11 @@ function updateNarrative(narrative) {
     document.getElementById("narrative-text").textContent = narrative;
 }
 
-async function loadState(state) {
-    if (!state) {
-        document.getElementById("no-data-msg").style.display = "block";
-        document.getElementById("charts-container").style.display = "none";
-        document.getElementById("summary-panel").style.display = "none";
-        document.getElementById("narrative-panel").style.display = "none";
-        return;
-    }
-
-    const resp = await fetch(`/climate-trends/api/data?state=${encodeURIComponent(state)}`);
-    const data = await resp.json();
-
+function renderAll() {
     destroyCharts();
 
-    const yearly = data.yearly || [];
-    const trend = data.trend || {};
+    const yearly = currentYearly;
+    const trend = currentTrend;
     const decades = trend.decades || {};
 
     document.getElementById("no-data-msg").style.display = yearly.length ? "none" : "block";
@@ -212,11 +232,43 @@ async function loadState(state) {
     }
 
     updateSummary(trend);
-    updateNarrative(data.narrative);
+    updateNarrative(currentNarrative);
+}
+
+async function loadState(state) {
+    if (!state) {
+        document.getElementById("no-data-msg").style.display = "block";
+        document.getElementById("charts-container").style.display = "none";
+        document.getElementById("summary-panel").style.display = "none";
+        document.getElementById("narrative-panel").style.display = "none";
+        currentYearly = [];
+        currentTrend = {};
+        currentNarrative = "";
+        return;
+    }
+
+    const resp = await fetch(`/climate-trends/api/data?state=${encodeURIComponent(state)}`);
+    const data = await resp.json();
+
+    currentYearly = data.yearly || [];
+    currentTrend = data.trend || {};
+    currentNarrative = data.narrative || "";
+
+    renderAll();
 }
 
 export function initClimateCharts() {
     const select = document.getElementById("state-select");
     if (!select) return;
     select.addEventListener("change", () => loadState(select.value));
+
+    const unitSelect = document.getElementById("unit-select");
+    if (unitSelect) {
+        unitSelect.addEventListener("change", () => {
+            currentUnit = unitSelect.value;
+            if (currentYearly.length || currentTrend.state) {
+                renderAll();
+            }
+        });
+    }
 }

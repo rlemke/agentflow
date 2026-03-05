@@ -110,7 +110,25 @@ class ExecutionContext:
         return self.workflow_ast
 
     def get_workflow_root(self) -> StepDefinition | None:
-        """Get the workflow root step."""
+        """Get the workflow root step.
+
+        Checks in-memory changes first (updated_steps, then created_steps)
+        so that pre_script results are visible within the same iteration.
+        """
+        for step in self.changes.updated_steps:
+            if (
+                step.root_id is None
+                and step.container_id is None
+                and step.workflow_id == self.workflow_id
+            ):
+                return step
+        for step in self.changes.created_steps:
+            if (
+                step.root_id is None
+                and step.container_id is None
+                and step.workflow_id == self.workflow_id
+            ):
+                return step
         return self.persistence.get_workflow_root(self.workflow_id)
 
     def get_statement_definition(self, step: StepDefinition) -> StatementDefinition | None:

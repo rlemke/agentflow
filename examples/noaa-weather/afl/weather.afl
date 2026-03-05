@@ -277,4 +277,50 @@ namespace climate.workflows {
         narr = GenerateClimateNarrative(state = $.state, trend = trend.trend)
         yield AnalyzeStateTrends(status = "completed")
     }
+
+    /** Analyze climate trends for all 50 US states in parallel. */
+    workflow AnalyzeAllStates(states: [String] = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach state in $.states {
+        analysis = AnalyzeStateTrends(country = "US", state = $.state, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeAllStates(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeAllStates(status = "completed")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cache Warmup — pre-download ISD-Lite files without running analysis
+// ---------------------------------------------------------------------------
+
+namespace weather.Cache {
+    use weather.types
+
+    /** Download ISD-Lite files for all stations in a single year. */
+    workflow CacheBatchForYear(stations: Json, year: Int) => (status: String) andThen foreach station in $.stations {
+        dl = DownloadObservations(usaf = $.station.usaf, wban = $.station.wban, year = $.year) catch {
+            yield CacheBatchForYear(status = "partial")
+        }
+    } andThen {
+        yield CacheBatchForYear(status = "completed")
+    }
+
+    /** Cache all NOAA data for one state: discover stations, download 80 years. */
+    workflow CacheStateData(country: String = "US", state: String, max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) script python "result['years'] = list(range(int(params['start_year']), int(params['end_year'])+1))" andThen {
+        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations)
+    } andThen foreach year in $.years {
+        batch = CacheBatchForYear(stations = discovery.stations, year = $.year) catch {
+            yield CacheStateData(status = "partial")
+        }
+    } andThen {
+        yield CacheStateData(status = "completed")
+    }
+
+    /** Cache NOAA ISD-Lite data for all 50 US states across 80 years. */
+    workflow CacheAllUSData(states: [String] = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach state in $.states {
+        cache = CacheStateData(country = "US", state = $.state, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheAllUSData(status = "partial")
+        }
+    } andThen {
+        yield CacheAllUSData(status = "completed")
+    }
 }

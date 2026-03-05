@@ -97,6 +97,23 @@ services:
     profiles:
       - seed
 
+  # NOAA Weather agent — RegistryRunner with weather handlers (scalable)
+  agent-noaa-weather:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.noaa-weather
+    environment:
+      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_DATABASE=afl
+      - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:/Volumes/afl_data/output
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
   # OSM Geocoder agent — full image with Java/GraphHopper (scalable)
   agent-osm-geocoder:
     build:

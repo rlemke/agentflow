@@ -3,11 +3,26 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
-from handlers.shared.weather_utils import download_isd_lite, parse_isd_lite_file
+from handlers.shared.weather_utils import (
+    ISD_LITE_URL_TEMPLATE,
+    download_isd_lite,
+    parse_isd_lite_file,
+)
 
 NAMESPACE = "weather.Ingest"
+
+
+def _step_log_append(step_log, msg: str, level: str = "info") -> None:
+    """Write a message to the step log (callable or list form)."""
+    if step_log is None:
+        return
+    if callable(step_log):
+        step_log(msg, level)
+    else:
+        step_log.append({"message": msg, "level": level})
 
 
 def handle_download_observations(params: dict[str, Any]) -> dict[str, Any]:
@@ -19,19 +34,23 @@ def handle_download_observations(params: dict[str, Any]) -> dict[str, Any]:
         year = int(year)
 
     station_id = f"{usaf}-{wban}"
+    step_log = params.get("_step_log")
+
+    url = ISD_LITE_URL_TEMPLATE.format(year=year, usaf=usaf, wban=wban)
+    _step_log_append(step_log, f"Starting download {station_id}-{year} from {url}")
+    t0 = time.monotonic()
     raw_path = download_isd_lite(usaf, wban, year)
+    elapsed = time.monotonic() - t0
 
     file_size = 0
     if os.path.exists(raw_path):
         file_size = os.path.getsize(raw_path)
 
-    step_log = params.get("_step_log")
-    if step_log is not None:
-        msg = f"Downloaded {station_id}-{year}: {file_size} bytes at {raw_path}"
-        if callable(step_log):
-            step_log(msg, "success")
-        else:
-            step_log.append({"message": msg, "level": "success"})
+    _step_log_append(
+        step_log,
+        f"Completed {station_id}-{year}: {file_size:,} bytes in {elapsed:.1f}s — {raw_path}",
+        "success",
+    )
 
     return {
         "raw_path": raw_path,

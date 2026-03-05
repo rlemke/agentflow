@@ -1,0 +1,5016 @@
+{
+  "type": "Program",
+  "declarations": [
+    {
+      "type": "Namespace",
+      "name": "weather.types",
+      "declarations": [
+        {
+          "type": "SchemaDecl",
+          "name": "StationMeta",
+          "fields": [
+            {
+              "name": "usaf",
+              "type": "String"
+            },
+            {
+              "name": "wban",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "country",
+              "type": "String"
+            },
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            },
+            {
+              "name": "elevation",
+              "type": "Double"
+            },
+            {
+              "name": "begin_date",
+              "type": "String"
+            },
+            {
+              "name": "end_date",
+              "type": "String"
+            }
+          ],
+          "id": "94d03431-1159-4f2c-9036-b3af61acb3df",
+          "location": {
+            "line": 8,
+            "column": 5,
+            "endLine": 21,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "HourlyObs",
+          "fields": [
+            {
+              "name": "date",
+              "type": "String"
+            },
+            {
+              "name": "hour",
+              "type": "Int"
+            },
+            {
+              "name": "air_temp",
+              "type": "Double"
+            },
+            {
+              "name": "dew_point",
+              "type": "Double"
+            },
+            {
+              "name": "sea_level_pressure",
+              "type": "Double"
+            },
+            {
+              "name": "wind_direction",
+              "type": "Int"
+            },
+            {
+              "name": "wind_speed",
+              "type": "Double"
+            },
+            {
+              "name": "precipitation",
+              "type": "Double"
+            },
+            {
+              "name": "sky_condition",
+              "type": "Int"
+            }
+          ],
+          "id": "a61817f5-abc6-423b-a792-b9b29c3ad350",
+          "location": {
+            "line": 21,
+            "column": 5,
+            "endLine": 33,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "QCResult",
+          "fields": [
+            {
+              "name": "plausible",
+              "type": "Boolean"
+            },
+            {
+              "name": "total_records",
+              "type": "Int"
+            },
+            {
+              "name": "missing_pct",
+              "type": "Double"
+            },
+            {
+              "name": "temp_range_ok",
+              "type": "Boolean"
+            },
+            {
+              "name": "message",
+              "type": "String"
+            }
+          ],
+          "id": "0960b060-6e6b-430a-82aa-a1874c674b61",
+          "location": {
+            "line": 33,
+            "column": 5,
+            "endLine": 41,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "DailyStats",
+          "fields": [
+            {
+              "name": "date",
+              "type": "String"
+            },
+            {
+              "name": "temp_min",
+              "type": "Double"
+            },
+            {
+              "name": "temp_max",
+              "type": "Double"
+            },
+            {
+              "name": "temp_mean",
+              "type": "Double"
+            },
+            {
+              "name": "precip_total",
+              "type": "Double"
+            },
+            {
+              "name": "wind_max",
+              "type": "Double"
+            },
+            {
+              "name": "obs_count",
+              "type": "Int"
+            }
+          ],
+          "id": "5407df5c-d703-4dcd-be74-531260214a47",
+          "location": {
+            "line": 41,
+            "column": 5,
+            "endLine": 51,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "GeoContext",
+          "fields": [
+            {
+              "name": "display_name",
+              "type": "String"
+            },
+            {
+              "name": "city",
+              "type": "String"
+            },
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "country",
+              "type": "String"
+            },
+            {
+              "name": "county",
+              "type": "String"
+            }
+          ],
+          "id": "8ef50393-1d1e-4781-8dbb-540a48205ff6",
+          "location": {
+            "line": 51,
+            "column": 5,
+            "endLine": 59,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "StationReport",
+          "fields": [
+            {
+              "name": "station_id",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "location",
+              "type": "String"
+            },
+            {
+              "name": "total_days",
+              "type": "Int"
+            },
+            {
+              "name": "annual_precip",
+              "type": "Double"
+            },
+            {
+              "name": "temp_range",
+              "type": "String"
+            },
+            {
+              "name": "narrative",
+              "type": "String"
+            },
+            {
+              "name": "report_id",
+              "type": "String"
+            }
+          ],
+          "id": "2023834f-1929-4918-9dfc-493b6371398b",
+          "location": {
+            "line": 59,
+            "column": 5,
+            "endLine": 70,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "1f8f8a89-add5-4178-96d6-2b30fd2bbfd2",
+      "location": {
+        "line": 7,
+        "column": 1,
+        "endLine": 72,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.mixins",
+      "declarations": [
+        {
+          "type": "FacetDecl",
+          "name": "RetryPolicy",
+          "params": [
+            {
+              "name": "max_retries",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 3
+              }
+            },
+            {
+              "name": "backoff_ms",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2000
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "max_retries",
+              "type": "Int"
+            },
+            {
+              "name": "backoff_ms",
+              "type": "Int"
+            }
+          ],
+          "id": "9f173d6c-7c65-4427-812a-6cdb74905f1d",
+          "location": {
+            "line": 73,
+            "column": 5,
+            "endLine": 74,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "FacetDecl",
+          "name": "RateLimit",
+          "params": [
+            {
+              "name": "requests_per_sec",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1
+              }
+            },
+            {
+              "name": "burst",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "requests_per_sec",
+              "type": "Int"
+            },
+            {
+              "name": "burst",
+              "type": "Int"
+            }
+          ],
+          "id": "f1abe92d-342a-4b71-9406-b66faad0195d",
+          "location": {
+            "line": 74,
+            "column": 5,
+            "endLine": 76,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "ImplicitDecl",
+          "name": "default_retry",
+          "call": {
+            "type": "CallExpr",
+            "target": "RetryPolicy",
+            "id": "fcd93797-0b44-466c-86a0-afc2790fbc94",
+            "location": {
+              "line": 76,
+              "column": 30,
+              "endLine": 76,
+              "endColumn": 43
+            }
+          },
+          "id": "268fd5f1-f692-4652-b41d-60b10b140f1c",
+          "location": {
+            "line": 76,
+            "column": 5,
+            "endLine": 77,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "ImplicitDecl",
+          "name": "default_rate",
+          "call": {
+            "type": "CallExpr",
+            "target": "RateLimit",
+            "id": "0a40a409-7250-4cab-a2bd-acd568239289",
+            "location": {
+              "line": 77,
+              "column": 29,
+              "endLine": 77,
+              "endColumn": 40
+            }
+          },
+          "id": "30fa8477-0c68-413b-8396-71a67b9c3513",
+          "location": {
+            "line": 77,
+            "column": 5,
+            "endLine": 78,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "1b885ec0-289a-4ba4-8383-cb99ca235652",
+      "location": {
+        "line": 72,
+        "column": 1,
+        "endLine": 80,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Discovery",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "DiscoverStations",
+          "doc": {
+            "description": "Discover active weather stations by country and optional state filter.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "country",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "US"
+              }
+            },
+            {
+              "name": "state",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": ""
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 10
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "stations",
+              "type": "Json"
+            },
+            {
+              "name": "station_count",
+              "type": "Int"
+            }
+          ],
+          "mixins": [
+            {
+              "type": "MixinSig",
+              "target": "RetryPolicy"
+            }
+          ],
+          "id": "bd757de2-e690-494a-8fca-7c4de2f4d878",
+          "location": {
+            "line": 83,
+            "column": 5,
+            "endLine": 85,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "9f2ef622-1b1b-4f33-bc0c-914d1b54d3f7",
+      "location": {
+        "line": 80,
+        "column": 1,
+        "endLine": 87,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Ingest",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "DownloadObservations",
+          "doc": {
+            "description": "Download ISD-Lite hourly observation file for a station-year.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "usaf",
+              "type": "String"
+            },
+            {
+              "name": "wban",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "raw_path",
+              "type": "String"
+            },
+            {
+              "name": "file_size",
+              "type": "Int"
+            },
+            {
+              "name": "station_id",
+              "type": "String"
+            }
+          ],
+          "mixins": [
+            {
+              "type": "MixinSig",
+              "target": "RetryPolicy"
+            }
+          ],
+          "id": "8222b032-76de-4b9f-b551-b9b632cd717a",
+          "location": {
+            "line": 90,
+            "column": 5,
+            "endLine": 93,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ParseObservations",
+          "doc": {
+            "description": "Parse ISD-Lite fixed-width file into structured observations.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "raw_path",
+              "type": "String"
+            },
+            {
+              "name": "station_id",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "observations",
+              "type": "Json"
+            },
+            {
+              "name": "record_count",
+              "type": "Int"
+            }
+          ],
+          "id": "256c016b-80b7-450e-9f0f-cf60fbadf7c6",
+          "location": {
+            "line": 93,
+            "column": 5,
+            "endLine": 95,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "289f5587-cfe5-47c8-9d26-dee7c16d9570",
+      "location": {
+        "line": 87,
+        "column": 1,
+        "endLine": 97,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.QC",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "ValidateQuality",
+          "doc": {
+            "description": "Validate observation quality: missing data percentage and temperature plausibility.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "observations",
+              "type": "Json"
+            },
+            {
+              "name": "station_id",
+              "type": "String"
+            },
+            {
+              "name": "max_missing_pct",
+              "type": "Double",
+              "default": {
+                "type": "Double",
+                "value": 20.0
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "qc",
+              "type": "QCResult"
+            }
+          ],
+          "pre_script": {
+            "type": "ScriptBlock",
+            "language": "python",
+            "code": "\nimport json\nobs = params.get('observations', [])\nif isinstance(obs, str):\n    obs = json.loads(obs)\ntotal = len(obs)\nmissing = sum(1 for o in obs if o.get('air_temp') is None)\nmissing_pct = (missing / total * 100) if total > 0 else 100.0\ntemps = [o['air_temp'] for o in obs if o.get('air_temp') is not None]\ntemp_ok = all(-90 <= t <= 60 for t in temps) if temps else False\nmax_miss = float(params.get('max_missing_pct', 20.0))\nplausible = missing_pct <= max_miss and temp_ok\nmsg = 'QC passed' if plausible else f'QC failed: missing={missing_pct:.1f}%, temp_ok={temp_ok}'\nresult['qc'] = json.dumps({'plausible': plausible, 'total_records': total, 'missing_pct': round(missing_pct, 2), 'temp_range_ok': temp_ok, 'message': msg})\n",
+            "id": "6efe5060-240c-415b-abf4-1c69f69792b8",
+            "location": {
+              "line": 101,
+              "column": 130,
+              "endLine": 115,
+              "endColumn": 2
+            }
+          },
+          "id": "300b719f-51d7-4e58-80e0-d09e44394858",
+          "location": {
+            "line": 100,
+            "column": 5,
+            "endLine": 116,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "1846f3ba-3a3b-4b3a-bf5c-0a1e4f02fd18",
+      "location": {
+        "line": 97,
+        "column": 1,
+        "endLine": 118,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Analysis",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "ComputeDailyStats",
+          "doc": {
+            "description": "Compute daily aggregate statistics from hourly observations.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "observations",
+              "type": "Json"
+            },
+            {
+              "name": "station_id",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "daily_stats",
+              "type": "Json"
+            },
+            {
+              "name": "total_days",
+              "type": "Int"
+            },
+            {
+              "name": "annual_precip",
+              "type": "Double"
+            }
+          ],
+          "id": "03288e00-f425-4fbf-b9db-b247cd2c9a02",
+          "location": {
+            "line": 121,
+            "column": 5,
+            "endLine": 124,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "SparseAnalysis",
+          "doc": {
+            "description": "Lightweight analysis for sparse/low-quality observation sets.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "observations",
+              "type": "Json"
+            },
+            {
+              "name": "station_id",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "summary",
+              "type": "String"
+            },
+            {
+              "name": "record_count",
+              "type": "Int"
+            },
+            {
+              "name": "coverage_pct",
+              "type": "Double"
+            }
+          ],
+          "id": "16de59f6-aea0-4245-8f63-172956fda0dc",
+          "location": {
+            "line": 124,
+            "column": 5,
+            "endLine": 126,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "b763d826-587e-4177-abdf-efd584121ded",
+      "location": {
+        "line": 118,
+        "column": 1,
+        "endLine": 128,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Geocode",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "ReverseGeocode",
+          "doc": {
+            "description": "Reverse geocode station coordinates via OSM Nominatim.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            }
+          ],
+          "returns": [
+            {
+              "name": "geo",
+              "type": "GeoContext"
+            }
+          ],
+          "mixins": [
+            {
+              "type": "MixinSig",
+              "target": "RateLimit"
+            }
+          ],
+          "id": "5fdd0600-38d2-4f57-9163-ad31060a94ac",
+          "location": {
+            "line": 131,
+            "column": 5,
+            "endLine": 133,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "3707a48f-d005-4f77-8efc-f2d6eee2cfd7",
+      "location": {
+        "line": 128,
+        "column": 1,
+        "endLine": 135,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Interpret",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "GenerateNarrative",
+          "doc": {
+            "description": "Generate a meteorologist-style narrative summary of station weather.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "daily_stats",
+              "type": "Json"
+            },
+            {
+              "name": "geo_context",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "narrative",
+              "type": "String"
+            },
+            {
+              "name": "highlights",
+              "type": "Json"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a meteorologist writing a concise annual weather summary for a station.",
+            "template": "Write a narrative summary for {station_name} in {year}. Daily statistics: {daily_stats}. Location context: {geo_context}. Highlight extremes (hottest day, coldest day, wettest day) and seasonal patterns.",
+            "model": "claude-sonnet-4-20250514",
+            "id": "06d801f3-33fd-41a4-98d7-3d73268028bf",
+            "location": {
+              "line": 139,
+              "column": 154,
+              "endLine": 143,
+              "endColumn": 6
+            }
+          },
+          "id": "29251045-c326-4276-a2d9-7f0ee9dca12a",
+          "location": {
+            "line": 138,
+            "column": 5,
+            "endLine": 144,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "0ac1131f-c238-481b-b7f7-86c70c46a143",
+      "location": {
+        "line": 135,
+        "column": 1,
+        "endLine": 146,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Report",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "GenerateStationReport",
+          "doc": {
+            "description": "Generate a JSON station report combining all analysis results.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "station_id",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "location",
+              "type": "String"
+            },
+            {
+              "name": "daily_stats",
+              "type": "Json"
+            },
+            {
+              "name": "annual_precip",
+              "type": "Double"
+            },
+            {
+              "name": "narrative",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "report",
+              "type": "StationReport"
+            }
+          ],
+          "id": "688c4f8e-53ca-453e-acf6-12318d4efd02",
+          "location": {
+            "line": 149,
+            "column": 5,
+            "endLine": 152,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "GenerateBatchSummary",
+          "doc": {
+            "description": "Generate a batch summary across multiple station analyses.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "batch_id",
+              "type": "String"
+            },
+            {
+              "name": "station_count",
+              "type": "Int"
+            },
+            {
+              "name": "results",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "report_id",
+              "type": "String"
+            },
+            {
+              "name": "completed",
+              "type": "Int"
+            },
+            {
+              "name": "failed",
+              "type": "Int"
+            },
+            {
+              "name": "summary",
+              "type": "String"
+            }
+          ],
+          "id": "a42c45ed-d421-4c65-9529-78b99ffeebe1",
+          "location": {
+            "line": 152,
+            "column": 5,
+            "endLine": 154,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "e9da826f-27ba-4306-9894-726a87ca4afc",
+      "location": {
+        "line": 146,
+        "column": 1,
+        "endLine": 156,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Visualize",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "RenderHTMLReport",
+          "doc": {
+            "description": "Render an HTML table report of daily weather statistics.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "station_id",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "location",
+              "type": "String"
+            },
+            {
+              "name": "daily_stats",
+              "type": "Json"
+            },
+            {
+              "name": "annual_precip",
+              "type": "Double"
+            },
+            {
+              "name": "temp_range",
+              "type": "String"
+            },
+            {
+              "name": "narrative",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "report_id",
+              "type": "String"
+            }
+          ],
+          "id": "3b020677-d45a-4f18-9511-3a222a36b84b",
+          "location": {
+            "line": 159,
+            "column": 5,
+            "endLine": 162,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "RenderStationMap",
+          "doc": {
+            "description": "Render an interactive map with the station pin-pointed.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "station_id",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "temp_range",
+              "type": "String"
+            }
+          ],
+          "returns": [
+            {
+              "name": "report_id",
+              "type": "String"
+            }
+          ],
+          "id": "382a04ab-f4a8-4bc2-b99b-7453a4e20064",
+          "location": {
+            "line": 162,
+            "column": 5,
+            "endLine": 164,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "95ef9009-737f-4ed2-9b94-4e177a2096a1",
+      "location": {
+        "line": 156,
+        "column": 1,
+        "endLine": 166,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.workflows",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeStation",
+          "doc": {
+            "description": "Analyze a single weather station: download, parse, QC, stats, geocode, narrative, report.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "usaf",
+              "type": "String"
+            },
+            {
+              "name": "wban",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            },
+            {
+              "name": "detail",
+              "type": "String"
+            }
+          ],
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "dl",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "DownloadObservations",
+                    "args": [
+                      {
+                        "name": "usaf",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "usaf"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "wban",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "wban"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "9ccddcb0-adcc-4a7a-9a51-e4bfb8847597",
+                    "location": {
+                      "line": 171,
+                      "column": 14,
+                      "endLine": 171,
+                      "endColumn": 79
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "AnalyzeStation",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "download_failed"
+                            }
+                          },
+                          {
+                            "name": "detail",
+                            "value": {
+                              "type": "ConcatExpr",
+                              "operands": [
+                                {
+                                  "type": "String",
+                                  "value": "Download failed for "
+                                },
+                                {
+                                  "type": "InputRef",
+                                  "path": [
+                                    "usaf"
+                                  ]
+                                },
+                                {
+                                  "type": "String",
+                                  "value": "-"
+                                },
+                                {
+                                  "type": "InputRef",
+                                  "path": [
+                                    "wban"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "id": "3ffd136c-a956-477e-90ff-ed43b39c5d62",
+                        "location": {
+                          "line": 172,
+                          "column": 19,
+                          "endLine": 172,
+                          "endColumn": 121
+                        }
+                      },
+                      "id": "f187c349-1639-46da-a00a-1bdb7d7c79cb",
+                      "location": {
+                        "line": 172,
+                        "column": 13,
+                        "endLine": 172,
+                        "endColumn": 121
+                      }
+                    },
+                    "id": "153eb6de-86b9-4c84-bdbd-de06f83adce8",
+                    "location": {
+                      "line": 171,
+                      "column": 80,
+                      "endLine": 174,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "f7684ab5-6763-49d4-aa97-e325001cac1b",
+                  "location": {
+                    "line": 171,
+                    "column": 9,
+                    "endLine": 174,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "cdbf1eda-cadf-4ad6-9900-afb0100ab4e8",
+              "location": {
+                "line": 170,
+                "column": 152,
+                "endLine": 174,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "parsed",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ParseObservations",
+                    "args": [
+                      {
+                        "name": "raw_path",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "dl",
+                            "raw_path"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "station_id",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "dl",
+                            "station_id"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "bdf69617-e239-44fa-aa9b-cd0f889fcaca",
+                    "location": {
+                      "line": 175,
+                      "column": 18,
+                      "endLine": 175,
+                      "endColumn": 87
+                    }
+                  },
+                  "id": "53fdeb5f-8f04-45ac-9fb7-bd404ae51adb",
+                  "location": {
+                    "line": 175,
+                    "column": 9,
+                    "endLine": 175,
+                    "endColumn": 87
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "geo",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ReverseGeocode",
+                    "args": [
+                      {
+                        "name": "lat",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "lat"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "lon",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "lon"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "e537864a-e776-41bd-af98-8ed911272a69",
+                    "location": {
+                      "line": 176,
+                      "column": 15,
+                      "endLine": 176,
+                      "endColumn": 55
+                    }
+                  },
+                  "id": "12c1552a-27ac-4d9a-9cc7-5453c799aed4",
+                  "location": {
+                    "line": 176,
+                    "column": 9,
+                    "endLine": 176,
+                    "endColumn": 55
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "qc_check",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ValidateQuality",
+                    "args": [
+                      {
+                        "name": "observations",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "parsed",
+                            "observations"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "station_id",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "dl",
+                            "station_id"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "f4693006-314b-4627-83b7-24128fe1f24e",
+                    "location": {
+                      "line": 177,
+                      "column": 20,
+                      "endLine": 177,
+                      "endColumn": 99
+                    }
+                  },
+                  "id": "b638fb9a-32e7-4f1c-b223-c9f0ffcc33a8",
+                  "location": {
+                    "line": 177,
+                    "column": 9,
+                    "endLine": 177,
+                    "endColumn": 99
+                  }
+                }
+              ],
+              "id": "edf16985-e278-4222-bfe5-358b9bfaf018",
+              "location": {
+                "line": 174,
+                "column": 7,
+                "endLine": 178,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "when": {
+                "type": "WhenBlock",
+                "cases": [
+                  {
+                    "type": "WhenCase",
+                    "condition": {
+                      "type": "BinaryExpr",
+                      "operator": "==",
+                      "left": {
+                        "type": "StepRef",
+                        "path": [
+                          "qc_check",
+                          "qc",
+                          "plausible"
+                        ]
+                      },
+                      "right": {
+                        "type": "Boolean",
+                        "value": false
+                      }
+                    },
+                    "steps": [
+                      {
+                        "type": "StepStmt",
+                        "name": "sparse",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "SparseAnalysis",
+                          "args": [
+                            {
+                              "name": "observations",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "parsed",
+                                  "observations"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_id",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "dl",
+                                  "station_id"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "1031f53e-fe69-4fa1-ada3-10feea4a7709",
+                          "location": {
+                            "line": 180,
+                            "column": 22,
+                            "endLine": 180,
+                            "endColumn": 100
+                          }
+                        },
+                        "id": "c34f56a9-8949-4e5f-9a27-b447db6a60f2",
+                        "location": {
+                          "line": 180,
+                          "column": 13,
+                          "endLine": 180,
+                          "endColumn": 100
+                        }
+                      }
+                    ],
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "AnalyzeStation",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "sparse"
+                            }
+                          },
+                          {
+                            "name": "detail",
+                            "value": {
+                              "type": "ConcatExpr",
+                              "operands": [
+                                {
+                                  "type": "String",
+                                  "value": "Sparse analysis: "
+                                },
+                                {
+                                  "type": "StepRef",
+                                  "path": [
+                                    "sparse",
+                                    "summary"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "id": "f38c6661-f08c-4734-b266-b54d2e4d1f79",
+                        "location": {
+                          "line": 181,
+                          "column": 19,
+                          "endLine": 181,
+                          "endColumn": 100
+                        }
+                      },
+                      "id": "5e70701f-7f77-4360-8c4f-61343486b013",
+                      "location": {
+                        "line": 181,
+                        "column": 13,
+                        "endLine": 181,
+                        "endColumn": 100
+                      }
+                    }
+                  },
+                  {
+                    "type": "WhenCase",
+                    "default": true,
+                    "steps": [
+                      {
+                        "type": "StepStmt",
+                        "name": "stats",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "ComputeDailyStats",
+                          "args": [
+                            {
+                              "name": "observations",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "parsed",
+                                  "observations"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_id",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "dl",
+                                  "station_id"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "6274b690-b702-48e3-b9dc-3dba684ba215",
+                          "location": {
+                            "line": 184,
+                            "column": 21,
+                            "endLine": 184,
+                            "endColumn": 102
+                          }
+                        },
+                        "id": "e408fe4e-8dca-49bc-9b1b-82b4bad09808",
+                        "location": {
+                          "line": 184,
+                          "column": 13,
+                          "endLine": 184,
+                          "endColumn": 102
+                        }
+                      },
+                      {
+                        "type": "StepStmt",
+                        "name": "narr",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "GenerateNarrative",
+                          "args": [
+                            {
+                              "name": "station_name",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "station_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "year",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "year"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "daily_stats",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "stats",
+                                  "daily_stats"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "geo_context",
+                              "value": {
+                                "type": "MapLiteral",
+                                "entries": [
+                                  {
+                                    "key": "city",
+                                    "value": {
+                                      "type": "StepRef",
+                                      "path": [
+                                        "geo",
+                                        "geo",
+                                        "city"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "key": "state",
+                                    "value": {
+                                      "type": "StepRef",
+                                      "path": [
+                                        "geo",
+                                        "geo",
+                                        "state"
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "key": "country",
+                                    "value": {
+                                      "type": "StepRef",
+                                      "path": [
+                                        "geo",
+                                        "geo",
+                                        "country"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "5fc44d8d-2078-406d-8631-f6b911f868a1",
+                          "location": {
+                            "line": 185,
+                            "column": 20,
+                            "endLine": 185,
+                            "endColumn": 207
+                          }
+                        },
+                        "id": "228941a9-b5cd-456f-9720-8944c5e20dbe",
+                        "location": {
+                          "line": 185,
+                          "column": 13,
+                          "endLine": 185,
+                          "endColumn": 207
+                        }
+                      },
+                      {
+                        "type": "StepStmt",
+                        "name": "report",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "GenerateStationReport",
+                          "args": [
+                            {
+                              "name": "station_id",
+                              "value": {
+                                "type": "ConcatExpr",
+                                "operands": [
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "usaf"
+                                    ]
+                                  },
+                                  {
+                                    "type": "String",
+                                    "value": "-"
+                                  },
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "wban"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_name",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "station_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "year",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "year"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "location",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "geo",
+                                  "geo",
+                                  "display_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "daily_stats",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "stats",
+                                  "daily_stats"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "annual_precip",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "stats",
+                                  "annual_precip"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "narrative",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "narr",
+                                  "narrative"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "fcf2d0b5-3b43-4aa9-9faa-670bcaa39a50",
+                          "location": {
+                            "line": 186,
+                            "column": 22,
+                            "endLine": 186,
+                            "endColumn": 258
+                          }
+                        },
+                        "id": "8e2fda90-e202-4daf-95d6-6e6a620a67ef",
+                        "location": {
+                          "line": 186,
+                          "column": 13,
+                          "endLine": 186,
+                          "endColumn": 258
+                        }
+                      },
+                      {
+                        "type": "StepStmt",
+                        "name": "html_report",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "RenderHTMLReport",
+                          "args": [
+                            {
+                              "name": "station_id",
+                              "value": {
+                                "type": "ConcatExpr",
+                                "operands": [
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "usaf"
+                                    ]
+                                  },
+                                  {
+                                    "type": "String",
+                                    "value": "-"
+                                  },
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "wban"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_name",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "station_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "year",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "year"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "location",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "geo",
+                                  "geo",
+                                  "display_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "daily_stats",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "stats",
+                                  "daily_stats"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "annual_precip",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "stats",
+                                  "annual_precip"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "temp_range",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "report",
+                                  "report",
+                                  "temp_range"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "narrative",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "narr",
+                                  "narrative"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "22b0873b-c69c-4226-b727-7c2b1421e306",
+                          "location": {
+                            "line": 187,
+                            "column": 27,
+                            "endLine": 187,
+                            "endColumn": 297
+                          }
+                        },
+                        "id": "f4e007ae-e7d7-40e9-8595-60fe6a73a006",
+                        "location": {
+                          "line": 187,
+                          "column": 13,
+                          "endLine": 187,
+                          "endColumn": 297
+                        }
+                      },
+                      {
+                        "type": "StepStmt",
+                        "name": "station_map",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "RenderStationMap",
+                          "args": [
+                            {
+                              "name": "station_id",
+                              "value": {
+                                "type": "ConcatExpr",
+                                "operands": [
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "usaf"
+                                    ]
+                                  },
+                                  {
+                                    "type": "String",
+                                    "value": "-"
+                                  },
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "wban"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_name",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "station_name"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "lat",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "lat"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "lon",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "lon"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "year",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "year"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "temp_range",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "report",
+                                  "report",
+                                  "temp_range"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "ade2d2a6-7e72-49c7-8999-f6e47a77bfdf",
+                          "location": {
+                            "line": 188,
+                            "column": 27,
+                            "endLine": 188,
+                            "endColumn": 192
+                          }
+                        },
+                        "id": "e80737ad-5a41-4254-af93-c1ff880db926",
+                        "location": {
+                          "line": 188,
+                          "column": 13,
+                          "endLine": 188,
+                          "endColumn": 192
+                        }
+                      }
+                    ],
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "AnalyzeStation",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "completed"
+                            }
+                          },
+                          {
+                            "name": "detail",
+                            "value": {
+                              "type": "ConcatExpr",
+                              "operands": [
+                                {
+                                  "type": "String",
+                                  "value": "Report: "
+                                },
+                                {
+                                  "type": "StepRef",
+                                  "path": [
+                                    "report",
+                                    "report",
+                                    "report_id"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "id": "691d4bee-5216-4584-9017-a7f2f1f1f986",
+                        "location": {
+                          "line": 189,
+                          "column": 19,
+                          "endLine": 189,
+                          "endColumn": 103
+                        }
+                      },
+                      "id": "9a12854f-0dac-4387-a607-535e16163cc9",
+                      "location": {
+                        "line": 189,
+                        "column": 13,
+                        "endLine": 189,
+                        "endColumn": 103
+                      }
+                    }
+                  }
+                ]
+              },
+              "id": "48883529-d6ec-46a3-8841-1f104a4a91ae",
+              "location": {
+                "line": 178,
+                "column": 7,
+                "endLine": 193,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "21aac46c-ead6-4745-b28d-898e24c26a61",
+          "location": {
+            "line": 169,
+            "column": 5,
+            "endLine": 193,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "BatchWeatherAnalysis",
+          "doc": {
+            "description": "Analyze a batch of weather stations with per-station error recovery.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "country",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "US"
+              }
+            },
+            {
+              "name": "state",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": ""
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 10
+              }
+            },
+            {
+              "name": "year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2023
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "discovery",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "DiscoverStations",
+                    "args": [
+                      {
+                        "name": "country",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "country"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "max_stations",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "max_stations"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "6893c854-f51a-4571-8c20-ec27272ed7c7",
+                    "location": {
+                      "line": 195,
+                      "column": 21,
+                      "endLine": 195,
+                      "endColumn": 106
+                    }
+                  },
+                  "id": "6dad3765-f1c2-40a0-8b80-767922573602",
+                  "location": {
+                    "line": 195,
+                    "column": 9,
+                    "endLine": 195,
+                    "endColumn": 106
+                  }
+                }
+              ],
+              "id": "5f7942e9-b260-4662-8871-046f24afd7eb",
+              "location": {
+                "line": 194,
+                "column": 141,
+                "endLine": 196,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "station",
+                "iterable": {
+                  "type": "StepRef",
+                  "path": [
+                    "discovery",
+                    "stations"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "analysis",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "AnalyzeStation",
+                    "args": [
+                      {
+                        "name": "usaf",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "usaf"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "wban",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "wban"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "station_name",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "station_name"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "lat",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "lat"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "lon",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "lon"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "47fa284b-a379-4634-94e4-29cd0c24d8bc",
+                    "location": {
+                      "line": 197,
+                      "column": 20,
+                      "endLine": 197,
+                      "endColumn": 176
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "steps": [
+                      {
+                        "type": "StepStmt",
+                        "name": "err",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "GenerateBatchSummary",
+                          "args": [
+                            {
+                              "name": "batch_id",
+                              "value": {
+                                "type": "ConcatExpr",
+                                "operands": [
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "country"
+                                    ]
+                                  },
+                                  {
+                                    "type": "String",
+                                    "value": "-"
+                                  },
+                                  {
+                                    "type": "InputRef",
+                                    "path": [
+                                      "state"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "name": "station_count",
+                              "value": {
+                                "type": "Int",
+                                "value": 1
+                              }
+                            },
+                            {
+                              "name": "results",
+                              "value": {
+                                "type": "ArrayLiteral",
+                                "elements": [
+                                  {
+                                    "type": "MapLiteral",
+                                    "entries": [
+                                      {
+                                        "key": "station_id",
+                                        "value": {
+                                          "type": "ConcatExpr",
+                                          "operands": [
+                                            {
+                                              "type": "InputRef",
+                                              "path": [
+                                                "station",
+                                                "usaf"
+                                              ]
+                                            },
+                                            {
+                                              "type": "String",
+                                              "value": "-"
+                                            },
+                                            {
+                                              "type": "InputRef",
+                                              "path": [
+                                                "station",
+                                                "wban"
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "key": "status",
+                                        "value": {
+                                          "type": "String",
+                                          "value": "error"
+                                        }
+                                      },
+                                      {
+                                        "key": "error",
+                                        "value": {
+                                          "type": "StepRef",
+                                          "path": [
+                                            "analysis",
+                                            "error"
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "f120141f-98a4-4994-b9f2-61c81609ce31",
+                          "location": {
+                            "line": 198,
+                            "column": 19,
+                            "endLine": 198,
+                            "endColumn": 212
+                          }
+                        },
+                        "id": "a469e293-0e8b-4e8c-a6cf-19cdc3f0755c",
+                        "location": {
+                          "line": 198,
+                          "column": 13,
+                          "endLine": 198,
+                          "endColumn": 212
+                        }
+                      }
+                    ],
+                    "id": "3d9a427a-eb2b-411f-9e07-be0694818872",
+                    "location": {
+                      "line": 197,
+                      "column": 177,
+                      "endLine": 200,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "a02af316-b51d-4dec-87e2-b2494f20df45",
+                  "location": {
+                    "line": 197,
+                    "column": 9,
+                    "endLine": 200,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "b44ab8af-c11a-4949-98c0-7bc35b91f198",
+              "location": {
+                "line": 196,
+                "column": 7,
+                "endLine": 202,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "7ef9ae54-6e5d-4db0-b52c-7022c596454b",
+          "location": {
+            "line": 193,
+            "column": 5,
+            "endLine": 202,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeKnownStation",
+          "doc": {
+            "description": "Analyze a single known station (convenience for dashboard use \u2014 skip discovery).",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "usaf",
+              "type": "String"
+            },
+            {
+              "name": "wban",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            },
+            {
+              "name": "detail",
+              "type": "String"
+            }
+          ],
+          "body": {
+            "type": "AndThenBlock",
+            "steps": [
+              {
+                "type": "StepStmt",
+                "name": "result",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "AnalyzeStation",
+                  "args": [
+                    {
+                      "name": "usaf",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "usaf"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "wban",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "wban"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "station_name",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "station_name"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "lat",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "lat"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "lon",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "lon"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "year",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "year"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "41a9c412-fb1e-4bf5-ab49-96724185259a",
+                  "location": {
+                    "line": 204,
+                    "column": 18,
+                    "endLine": 204,
+                    "endColumn": 134
+                  }
+                },
+                "id": "c1fe10e9-1d46-43a1-b973-1a9665a01657",
+                "location": {
+                  "line": 204,
+                  "column": 9,
+                  "endLine": 204,
+                  "endColumn": 134
+                }
+              }
+            ],
+            "yield": {
+              "type": "YieldStmt",
+              "call": {
+                "type": "CallExpr",
+                "target": "AnalyzeKnownStation",
+                "args": [
+                  {
+                    "name": "status",
+                    "value": {
+                      "type": "StepRef",
+                      "path": [
+                        "result",
+                        "status"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "detail",
+                    "value": {
+                      "type": "StepRef",
+                      "path": [
+                        "result",
+                        "detail"
+                      ]
+                    }
+                  }
+                ],
+                "id": "677e1990-3dc6-4f6d-9520-bd0ddaacb8bc",
+                "location": {
+                  "line": 205,
+                  "column": 15,
+                  "endLine": 205,
+                  "endColumn": 82
+                }
+              },
+              "id": "c8748bfb-58df-4b93-86ce-142e1988f3eb",
+              "location": {
+                "line": 205,
+                "column": 9,
+                "endLine": 205,
+                "endColumn": 82
+              }
+            },
+            "id": "1aae53f6-9804-4f90-a9d4-8e5ecb25e3a1",
+            "location": {
+              "line": 203,
+              "column": 157,
+              "endLine": 208,
+              "endColumn": 1
+            }
+          },
+          "id": "23e407f5-c625-430c-8420-dcae430b9869",
+          "location": {
+            "line": 202,
+            "column": 5,
+            "endLine": 208,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeStationHistory",
+          "doc": {
+            "description": "Analyze a single station across multiple years.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "usaf",
+              "type": "String"
+            },
+            {
+              "name": "wban",
+              "type": "String"
+            },
+            {
+              "name": "station_name",
+              "type": "String"
+            },
+            {
+              "name": "lat",
+              "type": "Double"
+            },
+            {
+              "name": "lon",
+              "type": "Double"
+            },
+            {
+              "name": "years",
+              "type": {
+                "type": "ArrayType",
+                "elementType": "Int"
+              },
+              "default": {
+                "type": "ArrayLiteral",
+                "elements": [
+                  {
+                    "type": "Int",
+                    "value": 2022
+                  },
+                  {
+                    "type": "Int",
+                    "value": 2023
+                  }
+                ]
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": {
+            "type": "AndThenBlock",
+            "foreach": {
+              "type": "ForeachClause",
+              "variable": "year",
+              "iterable": {
+                "type": "InputRef",
+                "path": [
+                  "years"
+                ]
+              }
+            },
+            "steps": [
+              {
+                "type": "StepStmt",
+                "name": "analysis",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "AnalyzeStation",
+                  "args": [
+                    {
+                      "name": "usaf",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "usaf"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "wban",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "wban"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "station_name",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "station_name"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "lat",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "lat"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "lon",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "lon"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "year",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "year"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "204c72ac-13c5-4bdc-b855-edc6a61f61c8",
+                  "location": {
+                    "line": 210,
+                    "column": 20,
+                    "endLine": 210,
+                    "endColumn": 136
+                  }
+                },
+                "catch": {
+                  "type": "CatchClause",
+                  "steps": [
+                    {
+                      "type": "StepStmt",
+                      "name": "err",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "GenerateBatchSummary",
+                        "args": [
+                          {
+                            "name": "batch_id",
+                            "value": {
+                              "type": "ConcatExpr",
+                              "operands": [
+                                {
+                                  "type": "InputRef",
+                                  "path": [
+                                    "usaf"
+                                  ]
+                                },
+                                {
+                                  "type": "String",
+                                  "value": "-"
+                                },
+                                {
+                                  "type": "InputRef",
+                                  "path": [
+                                    "wban"
+                                  ]
+                                },
+                                {
+                                  "type": "String",
+                                  "value": "-history"
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "name": "station_count",
+                            "value": {
+                              "type": "Int",
+                              "value": 1
+                            }
+                          },
+                          {
+                            "name": "results",
+                            "value": {
+                              "type": "ArrayLiteral",
+                              "elements": [
+                                {
+                                  "type": "MapLiteral",
+                                  "entries": [
+                                    {
+                                      "key": "station_id",
+                                      "value": {
+                                        "type": "ConcatExpr",
+                                        "operands": [
+                                          {
+                                            "type": "InputRef",
+                                            "path": [
+                                              "usaf"
+                                            ]
+                                          },
+                                          {
+                                            "type": "String",
+                                            "value": "-"
+                                          },
+                                          {
+                                            "type": "InputRef",
+                                            "path": [
+                                              "wban"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "key": "status",
+                                      "value": {
+                                        "type": "String",
+                                        "value": "error"
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "id": "8dc1351f-649e-4b10-9de0-f91597016799",
+                        "location": {
+                          "line": 211,
+                          "column": 19,
+                          "endLine": 211,
+                          "endColumn": 181
+                        }
+                      },
+                      "id": "f0ba58ee-8d44-47b1-aadf-19709394ba7b",
+                      "location": {
+                        "line": 211,
+                        "column": 13,
+                        "endLine": 211,
+                        "endColumn": 181
+                      }
+                    }
+                  ],
+                  "id": "d253adb7-346f-440e-97c9-2c3aa9487782",
+                  "location": {
+                    "line": 210,
+                    "column": 137,
+                    "endLine": 213,
+                    "endColumn": 1
+                  }
+                },
+                "id": "0c40fa0c-95e1-40b2-bd2e-0591cc1e11cb",
+                "location": {
+                  "line": 210,
+                  "column": 9,
+                  "endLine": 213,
+                  "endColumn": 1
+                }
+              }
+            ],
+            "id": "ac3a9139-4994-4a45-a615-7961ec3fd5b3",
+            "location": {
+              "line": 209,
+              "column": 161,
+              "endLine": 215,
+              "endColumn": 1
+            }
+          },
+          "id": "ef766fac-8786-4eca-ba22-b80f77631385",
+          "location": {
+            "line": 208,
+            "column": 5,
+            "endLine": 215,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeRegion",
+          "doc": {
+            "description": "Analyze a region across multiple years (foreach over years, each calling BatchWeatherAnalysis).",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "country",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "US"
+              }
+            },
+            {
+              "name": "state",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": ""
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 5
+              }
+            },
+            {
+              "name": "years",
+              "type": {
+                "type": "ArrayType",
+                "elementType": "Int"
+              },
+              "default": {
+                "type": "ArrayLiteral",
+                "elements": [
+                  {
+                    "type": "Int",
+                    "value": 2022
+                  },
+                  {
+                    "type": "Int",
+                    "value": 2023
+                  }
+                ]
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": {
+            "type": "AndThenBlock",
+            "foreach": {
+              "type": "ForeachClause",
+              "variable": "year",
+              "iterable": {
+                "type": "InputRef",
+                "path": [
+                  "years"
+                ]
+              }
+            },
+            "steps": [
+              {
+                "type": "StepStmt",
+                "name": "batch",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "BatchWeatherAnalysis",
+                  "args": [
+                    {
+                      "name": "country",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "country"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "state",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "state"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "max_stations",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "max_stations"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "year",
+                      "value": {
+                        "type": "InputRef",
+                        "path": [
+                          "year"
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "928481fb-8e57-4574-8b06-313d738dfa28",
+                  "location": {
+                    "line": 217,
+                    "column": 17,
+                    "endLine": 217,
+                    "endColumn": 121
+                  }
+                },
+                "id": "528c3f87-6815-4749-a912-ba5f3255d9d4",
+                "location": {
+                  "line": 217,
+                  "column": 9,
+                  "endLine": 217,
+                  "endColumn": 121
+                }
+              }
+            ],
+            "id": "bbd26fab-a4da-4897-a9a4-6d0337187a77",
+            "location": {
+              "line": 216,
+              "column": 144,
+              "endLine": 219,
+              "endColumn": 1
+            }
+          },
+          "id": "3e0ff76c-47e9-4d4a-a229-0cddbe7991cb",
+          "location": {
+            "line": 215,
+            "column": 5,
+            "endLine": 219,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "f7011e2b-905b-4228-b3dd-6895ca295f8e",
+      "location": {
+        "line": 166,
+        "column": 1,
+        "endLine": 225,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "climate.types",
+      "declarations": [
+        {
+          "type": "SchemaDecl",
+          "name": "YearlyClimate",
+          "fields": [
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            },
+            {
+              "name": "station_count",
+              "type": "Int"
+            },
+            {
+              "name": "temp_mean",
+              "type": "Double"
+            },
+            {
+              "name": "temp_min_avg",
+              "type": "Double"
+            },
+            {
+              "name": "temp_max_avg",
+              "type": "Double"
+            },
+            {
+              "name": "precip_annual",
+              "type": "Double"
+            },
+            {
+              "name": "hot_days",
+              "type": "Int"
+            },
+            {
+              "name": "frost_days",
+              "type": "Int"
+            },
+            {
+              "name": "precip_days",
+              "type": "Int"
+            }
+          ],
+          "id": "2e92659c-cb46-43a9-a6ce-f4555afb6ce1",
+          "location": {
+            "line": 226,
+            "column": 5,
+            "endLine": 239,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "ClimateTrend",
+          "fields": [
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "start_year",
+              "type": "Int"
+            },
+            {
+              "name": "end_year",
+              "type": "Int"
+            },
+            {
+              "name": "warming_rate_per_decade",
+              "type": "Double"
+            },
+            {
+              "name": "precip_change_pct",
+              "type": "Double"
+            },
+            {
+              "name": "decades",
+              "type": "Json"
+            }
+          ],
+          "id": "7ead35d5-d542-4e71-91a3-12526905a019",
+          "location": {
+            "line": 239,
+            "column": 5,
+            "endLine": 247,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "a3f810ae-f15d-4c71-9200-fbb146f13728",
+      "location": {
+        "line": 225,
+        "column": 1,
+        "endLine": 249,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "climate.Aggregate",
+      "uses": [
+        "climate.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "AggregateStateYear",
+          "doc": {
+            "description": "Aggregate station reports for a state+year into a single climate summary.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "yearly",
+              "type": "YearlyClimate"
+            }
+          ],
+          "id": "fa114083-cf01-4a05-9e39-9cfa6aa2ad49",
+          "location": {
+            "line": 252,
+            "column": 5,
+            "endLine": 255,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ComputeClimateTrend",
+          "doc": {
+            "description": "Compute linear climate trend over a range of yearly summaries.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "start_year",
+              "type": "Int"
+            },
+            {
+              "name": "end_year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "trend",
+              "type": "ClimateTrend"
+            }
+          ],
+          "id": "72cbeba6-6a32-4a6b-9835-55d514f4f4c3",
+          "location": {
+            "line": 255,
+            "column": 5,
+            "endLine": 258,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "GenerateClimateNarrative",
+          "doc": {
+            "description": "Generate a narrative summary of climate trends for a state.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "trend",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "narrative",
+              "type": "String"
+            },
+            {
+              "name": "highlights",
+              "type": "Json"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a climate scientist writing a concise trend summary for a US state.",
+            "template": "Summarize the climate trends for {state}. Trend data: {trend}. Highlight the warming rate per decade, precipitation changes, and notable decade-over-decade shifts.",
+            "model": "claude-sonnet-4-20250514",
+            "id": "d0ff3774-497e-4033-8650-82414b9b8bf3",
+            "location": {
+              "line": 259,
+              "column": 118,
+              "endLine": 263,
+              "endColumn": 6
+            }
+          },
+          "id": "b5497eb5-8a9a-43c2-a20e-15d5fa52a0b2",
+          "location": {
+            "line": 258,
+            "column": 5,
+            "endLine": 264,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "54085fab-08a1-4f8d-a61f-0c49c2b8915f",
+      "location": {
+        "line": 249,
+        "column": 1,
+        "endLine": 266,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "climate.workflows",
+      "uses": [
+        "climate.types",
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeStateTrends",
+          "doc": {
+            "description": "Analyze 80 years of climate trends for a state: aggregate per-year, compute trend, narrate.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "country",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "US"
+              }
+            },
+            {
+              "name": "state",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "NY"
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 5
+              }
+            },
+            {
+              "name": "start_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1944
+              }
+            },
+            {
+              "name": "end_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2024
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "pre_script": {
+            "type": "ScriptBlock",
+            "language": "python",
+            "code": "result['years'] = list(range(int(params['start_year']), int(params['end_year'])+1))",
+            "id": "1ad919ec-9cdb-4cd4-a275-546210c0b72e",
+            "location": {
+              "line": 271,
+              "column": 175,
+              "endLine": 271,
+              "endColumn": 267
+            }
+          },
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "year",
+                "iterable": {
+                  "type": "InputRef",
+                  "path": [
+                    "years"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "batch",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "BatchWeatherAnalysis",
+                    "args": [
+                      {
+                        "name": "country",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "country"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "max_stations",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "max_stations"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "cc09ae6a-bac8-4025-a6b7-6687c8cea114",
+                    "location": {
+                      "line": 272,
+                      "column": 17,
+                      "endLine": 272,
+                      "endColumn": 121
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "steps": [
+                      {
+                        "type": "StepStmt",
+                        "name": "fallback",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "AggregateStateYear",
+                          "args": [
+                            {
+                              "name": "state",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "state"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "year",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "year"
+                                ]
+                              }
+                            }
+                          ],
+                          "id": "8f33f2fe-e382-4720-bf93-c7eb7c6dae7d",
+                          "location": {
+                            "line": 273,
+                            "column": 24,
+                            "endLine": 273,
+                            "endColumn": 74
+                          }
+                        },
+                        "id": "01d1a6c9-c848-47a4-b85e-ed90cdb431c6",
+                        "location": {
+                          "line": 273,
+                          "column": 13,
+                          "endLine": 273,
+                          "endColumn": 74
+                        }
+                      }
+                    ],
+                    "id": "814b4b56-029a-4e53-9556-765a16e253da",
+                    "location": {
+                      "line": 272,
+                      "column": 122,
+                      "endLine": 275,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "4168416b-26ce-4d07-b0fa-ffe93bebda08",
+                  "location": {
+                    "line": 272,
+                    "column": 9,
+                    "endLine": 275,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "22ed94e0-6d94-459a-8a37-3fff2d8dedc9",
+              "location": {
+                "line": 271,
+                "column": 268,
+                "endLine": 275,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "trend",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ComputeClimateTrend",
+                    "args": [
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "start_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "start_year"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "end_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "end_year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "df5a2be4-c1af-45d8-9bc3-cfea6463f5ce",
+                    "location": {
+                      "line": 276,
+                      "column": 17,
+                      "endLine": 276,
+                      "endColumn": 103
+                    }
+                  },
+                  "id": "9a1a86bf-bd0c-4964-86a3-d9c6fc02d91e",
+                  "location": {
+                    "line": 276,
+                    "column": 9,
+                    "endLine": 276,
+                    "endColumn": 103
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "narr",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "GenerateClimateNarrative",
+                    "args": [
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "trend",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "trend",
+                            "trend"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "2c6dc3c7-759c-4be0-aad0-01145a45d6c2",
+                    "location": {
+                      "line": 277,
+                      "column": 16,
+                      "endLine": 277,
+                      "endColumn": 78
+                    }
+                  },
+                  "id": "06db064d-8fc2-4126-bf6c-1ba729b0d4a8",
+                  "location": {
+                    "line": 277,
+                    "column": 9,
+                    "endLine": 277,
+                    "endColumn": 78
+                  }
+                }
+              ],
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "AnalyzeStateTrends",
+                  "args": [
+                    {
+                      "name": "status",
+                      "value": {
+                        "type": "String",
+                        "value": "completed"
+                      }
+                    }
+                  ],
+                  "id": "6f36db95-a328-4809-9caa-35fcff73ce6f",
+                  "location": {
+                    "line": 278,
+                    "column": 15,
+                    "endLine": 278,
+                    "endColumn": 55
+                  }
+                },
+                "id": "a17b1b20-7d00-4674-82df-239732c66e9e",
+                "location": {
+                  "line": 278,
+                  "column": 9,
+                  "endLine": 278,
+                  "endColumn": 55
+                }
+              },
+              "id": "5c608101-b0c1-41d9-bd2c-a480737e369b",
+              "location": {
+                "line": 275,
+                "column": 7,
+                "endLine": 281,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "3d02d7f4-5a76-4a6d-a202-dacbadb22a3f",
+          "location": {
+            "line": 270,
+            "column": 5,
+            "endLine": 281,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "AnalyzeAllStates",
+          "doc": {
+            "description": "Analyze climate trends for all 50 US states in parallel.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "states",
+              "type": {
+                "type": "ArrayType",
+                "elementType": "String"
+              },
+              "default": {
+                "type": "ArrayLiteral",
+                "elements": [
+                  {
+                    "type": "String",
+                    "value": "AL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AK"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AZ"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AR"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CO"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "DE"
+                  },
+                  {
+                    "type": "String",
+                    "value": "FL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "GA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "HI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ID"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "KS"
+                  },
+                  {
+                    "type": "String",
+                    "value": "KY"
+                  },
+                  {
+                    "type": "String",
+                    "value": "LA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ME"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MD"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MS"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MO"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NE"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NV"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NH"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NJ"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NM"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NY"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NC"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ND"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OH"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OK"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OR"
+                  },
+                  {
+                    "type": "String",
+                    "value": "PA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "RI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "SC"
+                  },
+                  {
+                    "type": "String",
+                    "value": "SD"
+                  },
+                  {
+                    "type": "String",
+                    "value": "TN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "TX"
+                  },
+                  {
+                    "type": "String",
+                    "value": "UT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "VT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "VA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WV"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WY"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 5
+              }
+            },
+            {
+              "name": "start_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1944
+              }
+            },
+            {
+              "name": "end_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2024
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "state",
+                "iterable": {
+                  "type": "InputRef",
+                  "path": [
+                    "states"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "analysis",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "AnalyzeStateTrends",
+                    "args": [
+                      {
+                        "name": "country",
+                        "value": {
+                          "type": "String",
+                          "value": "US"
+                        }
+                      },
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "max_stations",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "max_stations"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "start_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "start_year"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "end_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "end_year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "b971200e-95ec-4757-ba1b-32afcbfbe7c4",
+                    "location": {
+                      "line": 283,
+                      "column": 20,
+                      "endLine": 283,
+                      "endColumn": 152
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "AnalyzeAllStates",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "partial_failure"
+                            }
+                          }
+                        ],
+                        "id": "6b804c28-0d0a-437a-bd92-2c2b2ab40924",
+                        "location": {
+                          "line": 284,
+                          "column": 19,
+                          "endLine": 284,
+                          "endColumn": 63
+                        }
+                      },
+                      "id": "64d41686-0111-4a74-8cc9-226a7a331c87",
+                      "location": {
+                        "line": 284,
+                        "column": 13,
+                        "endLine": 284,
+                        "endColumn": 63
+                      }
+                    },
+                    "id": "5dd604d9-5a5b-4c2a-9eaa-17f4a5ffc0a9",
+                    "location": {
+                      "line": 283,
+                      "column": 153,
+                      "endLine": 286,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "12cfac05-0394-44ab-956b-627e644aade5",
+                  "location": {
+                    "line": 283,
+                    "column": 9,
+                    "endLine": 286,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "6319b871-2ee4-4fed-87e9-a954988598a6",
+              "location": {
+                "line": 282,
+                "column": 392,
+                "endLine": 286,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "AnalyzeAllStates",
+                  "args": [
+                    {
+                      "name": "status",
+                      "value": {
+                        "type": "String",
+                        "value": "completed"
+                      }
+                    }
+                  ],
+                  "id": "3c4ca8b6-333f-409b-b91a-45d9008a5dc1",
+                  "location": {
+                    "line": 287,
+                    "column": 15,
+                    "endLine": 287,
+                    "endColumn": 53
+                  }
+                },
+                "id": "f9a81683-f435-4a2f-944f-c83e9ac86923",
+                "location": {
+                  "line": 287,
+                  "column": 9,
+                  "endLine": 287,
+                  "endColumn": 53
+                }
+              },
+              "id": "cccbee55-4bc0-4fee-a430-4124a767b329",
+              "location": {
+                "line": 286,
+                "column": 7,
+                "endLine": 289,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "0e5e3bff-5f7e-4528-bc65-144f83d954d0",
+          "location": {
+            "line": 281,
+            "column": 5,
+            "endLine": 289,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "ed0df7f1-e01a-4314-bb73-992f07a84899",
+      "location": {
+        "line": 266,
+        "column": 1,
+        "endLine": 295,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "weather.Cache",
+      "uses": [
+        "weather.types"
+      ],
+      "declarations": [
+        {
+          "type": "WorkflowDecl",
+          "name": "CacheBatchForYear",
+          "doc": {
+            "description": "Download ISD-Lite files for all stations in a single year.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "stations",
+              "type": "Json"
+            },
+            {
+              "name": "year",
+              "type": "Int"
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "station",
+                "iterable": {
+                  "type": "InputRef",
+                  "path": [
+                    "stations"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "dl",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "DownloadObservations",
+                    "args": [
+                      {
+                        "name": "usaf",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "usaf"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "wban",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "station",
+                            "wban"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "068649dd-273e-4a04-adf8-9ecdfa6e6642",
+                    "location": {
+                      "line": 300,
+                      "column": 14,
+                      "endLine": 300,
+                      "endColumn": 95
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "CacheBatchForYear",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "partial"
+                            }
+                          }
+                        ],
+                        "id": "60266763-d500-45dd-b6bb-357e8c2fe070",
+                        "location": {
+                          "line": 301,
+                          "column": 19,
+                          "endLine": 301,
+                          "endColumn": 56
+                        }
+                      },
+                      "id": "b5399089-d625-4efd-9ae8-b7506ebf4c2f",
+                      "location": {
+                        "line": 301,
+                        "column": 13,
+                        "endLine": 301,
+                        "endColumn": 56
+                      }
+                    },
+                    "id": "7c3e339b-ab84-466f-bb20-4f8b734d0621",
+                    "location": {
+                      "line": 300,
+                      "column": 96,
+                      "endLine": 303,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "7573b9af-f3b0-4b41-9ee5-6a28b2ca2661",
+                  "location": {
+                    "line": 300,
+                    "column": 9,
+                    "endLine": 303,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "b1bfd49d-b11a-4663-b62d-56b262b434ca",
+              "location": {
+                "line": 299,
+                "column": 79,
+                "endLine": 303,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "CacheBatchForYear",
+                  "args": [
+                    {
+                      "name": "status",
+                      "value": {
+                        "type": "String",
+                        "value": "completed"
+                      }
+                    }
+                  ],
+                  "id": "ea6138c4-37bf-4eb8-86a8-e06a65bf7e51",
+                  "location": {
+                    "line": 304,
+                    "column": 15,
+                    "endLine": 304,
+                    "endColumn": 54
+                  }
+                },
+                "id": "a377d825-ae67-4f56-ba66-16ae74836582",
+                "location": {
+                  "line": 304,
+                  "column": 9,
+                  "endLine": 304,
+                  "endColumn": 54
+                }
+              },
+              "id": "6c622f01-d65c-49a2-9732-b503284bfb2e",
+              "location": {
+                "line": 303,
+                "column": 7,
+                "endLine": 307,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "1686acba-294f-4e31-95c3-eb0fd74e1b36",
+          "location": {
+            "line": 298,
+            "column": 5,
+            "endLine": 307,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "CacheStateData",
+          "doc": {
+            "description": "Cache all NOAA data for one state: discover stations, download 80 years.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "country",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "US"
+              }
+            },
+            {
+              "name": "state",
+              "type": "String"
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 5
+              }
+            },
+            {
+              "name": "start_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1944
+              }
+            },
+            {
+              "name": "end_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2024
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "pre_script": {
+            "type": "ScriptBlock",
+            "language": "python",
+            "code": "result['years'] = list(range(int(params['start_year']), int(params['end_year'])+1))",
+            "id": "d9a6bbde-163c-40fe-9a1d-933024798444",
+            "location": {
+              "line": 308,
+              "column": 164,
+              "endLine": 308,
+              "endColumn": 256
+            }
+          },
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "discovery",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "DiscoverStations",
+                    "args": [
+                      {
+                        "name": "country",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "country"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "max_stations",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "max_stations"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "d19c3cca-6e16-4333-81de-3b8517580fa5",
+                    "location": {
+                      "line": 309,
+                      "column": 21,
+                      "endLine": 309,
+                      "endColumn": 106
+                    }
+                  },
+                  "id": "393d793c-e905-430a-850d-523bb571945e",
+                  "location": {
+                    "line": 309,
+                    "column": 9,
+                    "endLine": 309,
+                    "endColumn": 106
+                  }
+                }
+              ],
+              "id": "e12a30b4-aece-45cf-8a88-dd5294f2d266",
+              "location": {
+                "line": 308,
+                "column": 257,
+                "endLine": 310,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "year",
+                "iterable": {
+                  "type": "InputRef",
+                  "path": [
+                    "years"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "batch",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "CacheBatchForYear",
+                    "args": [
+                      {
+                        "name": "stations",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "discovery",
+                            "stations"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "4d1ff2ad-41ce-4173-ad0e-3bf4aa366d30",
+                    "location": {
+                      "line": 311,
+                      "column": 17,
+                      "endLine": 311,
+                      "endColumn": 80
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "CacheStateData",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "partial"
+                            }
+                          }
+                        ],
+                        "id": "80be8af0-6cb6-43cd-a9ef-9a66e16c18a5",
+                        "location": {
+                          "line": 312,
+                          "column": 19,
+                          "endLine": 312,
+                          "endColumn": 53
+                        }
+                      },
+                      "id": "6a56af41-775d-4ad0-8bbe-463b500bd9f5",
+                      "location": {
+                        "line": 312,
+                        "column": 13,
+                        "endLine": 312,
+                        "endColumn": 53
+                      }
+                    },
+                    "id": "a92760e0-2ca3-4237-8912-1f184959fe0e",
+                    "location": {
+                      "line": 311,
+                      "column": 81,
+                      "endLine": 314,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "e502192e-c6fc-4008-82d1-198f198a8e1a",
+                  "location": {
+                    "line": 311,
+                    "column": 9,
+                    "endLine": 314,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "ee83d269-b69b-44c7-9182-8bb9aee8cd78",
+              "location": {
+                "line": 310,
+                "column": 7,
+                "endLine": 314,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "CacheStateData",
+                  "args": [
+                    {
+                      "name": "status",
+                      "value": {
+                        "type": "String",
+                        "value": "completed"
+                      }
+                    }
+                  ],
+                  "id": "e4beb5b3-39a4-4803-82d1-33926d0e7588",
+                  "location": {
+                    "line": 315,
+                    "column": 15,
+                    "endLine": 315,
+                    "endColumn": 51
+                  }
+                },
+                "id": "a86b8d42-421e-4e5a-b4ad-34cdb07abd02",
+                "location": {
+                  "line": 315,
+                  "column": 9,
+                  "endLine": 315,
+                  "endColumn": 51
+                }
+              },
+              "id": "69ee3a44-4a20-494d-a7f1-1004edfdeced",
+              "location": {
+                "line": 314,
+                "column": 7,
+                "endLine": 318,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "e06fa043-970a-4165-8446-8bff5104aa65",
+          "location": {
+            "line": 307,
+            "column": 5,
+            "endLine": 318,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "CacheAllUSData",
+          "doc": {
+            "description": "Cache NOAA ISD-Lite data for all 50 US states across 80 years.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "states",
+              "type": {
+                "type": "ArrayType",
+                "elementType": "String"
+              },
+              "default": {
+                "type": "ArrayLiteral",
+                "elements": [
+                  {
+                    "type": "String",
+                    "value": "AL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AK"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AZ"
+                  },
+                  {
+                    "type": "String",
+                    "value": "AR"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CO"
+                  },
+                  {
+                    "type": "String",
+                    "value": "CT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "DE"
+                  },
+                  {
+                    "type": "String",
+                    "value": "FL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "GA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "HI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ID"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IL"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "IA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "KS"
+                  },
+                  {
+                    "type": "String",
+                    "value": "KY"
+                  },
+                  {
+                    "type": "String",
+                    "value": "LA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ME"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MD"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MS"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MO"
+                  },
+                  {
+                    "type": "String",
+                    "value": "MT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NE"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NV"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NH"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NJ"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NM"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NY"
+                  },
+                  {
+                    "type": "String",
+                    "value": "NC"
+                  },
+                  {
+                    "type": "String",
+                    "value": "ND"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OH"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OK"
+                  },
+                  {
+                    "type": "String",
+                    "value": "OR"
+                  },
+                  {
+                    "type": "String",
+                    "value": "PA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "RI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "SC"
+                  },
+                  {
+                    "type": "String",
+                    "value": "SD"
+                  },
+                  {
+                    "type": "String",
+                    "value": "TN"
+                  },
+                  {
+                    "type": "String",
+                    "value": "TX"
+                  },
+                  {
+                    "type": "String",
+                    "value": "UT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "VT"
+                  },
+                  {
+                    "type": "String",
+                    "value": "VA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WA"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WV"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WI"
+                  },
+                  {
+                    "type": "String",
+                    "value": "WY"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "max_stations",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 5
+              }
+            },
+            {
+              "name": "start_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1944
+              }
+            },
+            {
+              "name": "end_year",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 2024
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "status",
+              "type": "String"
+            }
+          ],
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "foreach": {
+                "type": "ForeachClause",
+                "variable": "state",
+                "iterable": {
+                  "type": "InputRef",
+                  "path": [
+                    "states"
+                  ]
+                }
+              },
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "cache",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "CacheStateData",
+                    "args": [
+                      {
+                        "name": "country",
+                        "value": {
+                          "type": "String",
+                          "value": "US"
+                        }
+                      },
+                      {
+                        "name": "state",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "state"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "max_stations",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "max_stations"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "start_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "start_year"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "end_year",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "end_year"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "01b153a5-f416-4c4c-a4cc-cb97bc87d0d1",
+                    "location": {
+                      "line": 320,
+                      "column": 17,
+                      "endLine": 320,
+                      "endColumn": 145
+                    }
+                  },
+                  "catch": {
+                    "type": "CatchClause",
+                    "yield": {
+                      "type": "YieldStmt",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "CacheAllUSData",
+                        "args": [
+                          {
+                            "name": "status",
+                            "value": {
+                              "type": "String",
+                              "value": "partial"
+                            }
+                          }
+                        ],
+                        "id": "72321c9d-beb8-452e-a414-869ccbfa264e",
+                        "location": {
+                          "line": 321,
+                          "column": 19,
+                          "endLine": 321,
+                          "endColumn": 53
+                        }
+                      },
+                      "id": "ec113520-2764-4fcb-8a9d-1f53e3927646",
+                      "location": {
+                        "line": 321,
+                        "column": 13,
+                        "endLine": 321,
+                        "endColumn": 53
+                      }
+                    },
+                    "id": "bd6e2ccb-611c-4b57-9bee-76e507093b85",
+                    "location": {
+                      "line": 320,
+                      "column": 146,
+                      "endLine": 323,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "482ea68e-d47e-493b-b5c5-cb30cfcc9a7b",
+                  "location": {
+                    "line": 320,
+                    "column": 9,
+                    "endLine": 323,
+                    "endColumn": 1
+                  }
+                }
+              ],
+              "id": "2f323363-e85d-49d8-83ba-9915324da336",
+              "location": {
+                "line": 319,
+                "column": 390,
+                "endLine": 323,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "CacheAllUSData",
+                  "args": [
+                    {
+                      "name": "status",
+                      "value": {
+                        "type": "String",
+                        "value": "completed"
+                      }
+                    }
+                  ],
+                  "id": "38a41a5c-a1b2-4c1d-aa78-c4a6aa4ad999",
+                  "location": {
+                    "line": 324,
+                    "column": 15,
+                    "endLine": 324,
+                    "endColumn": 51
+                  }
+                },
+                "id": "7414088a-adb2-44f9-a063-d6107a9784c8",
+                "location": {
+                  "line": 324,
+                  "column": 9,
+                  "endLine": 324,
+                  "endColumn": 51
+                }
+              },
+              "id": "b97a566f-6027-45ee-8c11-49c4b8cb4375",
+              "location": {
+                "line": 323,
+                "column": 7,
+                "endLine": 326,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "91056b00-f43b-4698-a055-43100dc4130f",
+          "location": {
+            "line": 318,
+            "column": 5,
+            "endLine": 326,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "a743826d-b546-4c4e-a6ee-48ce34c15e3b",
+      "location": {
+        "line": 295,
+        "column": 1,
+        "endLine": 327,
+        "endColumn": 1
+      }
+    }
+  ],
+  "id": "dc6f5506-3ded-4de0-a481-a94a67580736"
+}
