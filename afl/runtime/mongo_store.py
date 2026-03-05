@@ -868,6 +868,10 @@ class MongoStore(PersistenceAPI):
             else {},
         }
 
+        if step.foreach_var is not None:
+            doc["foreach_var"] = step.foreach_var
+            doc["foreach_value"] = step.foreach_value
+
         if step.attributes:
             doc["attributes"] = {
                 "params": {
@@ -944,6 +948,9 @@ class MongoStore(PersistenceAPI):
                 step.attributes.returns[k] = AttributeValue(
                     v["name"], v["value"], v.get("type_hint", "Any")
                 )
+
+        step.foreach_var = doc.get("foreach_var")
+        step.foreach_value = doc.get("foreach_value")
 
         step.start_time = doc.get("start_time", 0)
         step.last_modified = doc.get("last_modified", 0)

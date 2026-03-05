@@ -125,6 +125,8 @@ class RegistryRunner:
         self._program_ast_cache: dict[str, dict] = {}
         self._resume_locks: dict[str, threading.Lock] = {}
         self._resume_locks_lock = threading.Lock()
+        self._resume_pending: set[str] = set()
+        self._resume_pending_lock = threading.Lock()
 
         # Shared dispatcher for inline execution and _process_event
         self._dispatcher = RegistryDispatcher(
@@ -716,39 +718,56 @@ class RegistryRunner:
             lock = self._resume_locks[workflow_id]
 
         if not lock.acquire(blocking=False):
-            logger.debug("Resume already in progress for workflow %s, skipping", workflow_id)
+            # Another thread is already resuming — mark pending so
+            # the holder re-runs after its current iteration.
+            with self._resume_pending_lock:
+                self._resume_pending.add(workflow_id)
+            logger.debug("Resume already in progress for workflow %s, marked pending", workflow_id)
             return
 
         try:
-            workflow_ast = self._ast_cache.get(workflow_id)
-            if workflow_ast is None:
-                workflow_ast = self._load_workflow_ast(workflow_id)
-                if workflow_ast:
-                    self._ast_cache[workflow_id] = workflow_ast
+            self._do_resume(workflow_id, runner_id)
 
-            if workflow_ast is None:
-                logger.warning(
-                    "No AST available for workflow %s, skipping resume",
-                    workflow_id,
-                )
-                return
-
-            program_ast = self._program_ast_cache.get(workflow_id)
-            result = self._evaluator.resume(
-                workflow_id,
-                workflow_ast,
-                program_ast=program_ast,
-                runner_id=runner_id,
-                dispatcher=self._dispatcher,
-            )
-
-            if runner_id and result.status in (
-                ExecutionStatus.COMPLETED,
-                ExecutionStatus.ERROR,
-            ):
-                self._update_runner_state(runner_id, result)
+            # Re-run if other threads flagged a pending resume while
+            # we held the lock.
+            while True:
+                with self._resume_pending_lock:
+                    if workflow_id not in self._resume_pending:
+                        break
+                    self._resume_pending.discard(workflow_id)
+                self._do_resume(workflow_id, runner_id)
         finally:
             lock.release()
+
+    def _do_resume(self, workflow_id: str, runner_id: str) -> None:
+        """Execute a single resume cycle for a workflow."""
+        workflow_ast = self._ast_cache.get(workflow_id)
+        if workflow_ast is None:
+            workflow_ast = self._load_workflow_ast(workflow_id)
+            if workflow_ast:
+                self._ast_cache[workflow_id] = workflow_ast
+
+        if workflow_ast is None:
+            logger.warning(
+                "No AST available for workflow %s, skipping resume",
+                workflow_id,
+            )
+            return
+
+        program_ast = self._program_ast_cache.get(workflow_id)
+        result = self._evaluator.resume(
+            workflow_id,
+            workflow_ast,
+            program_ast=program_ast,
+            runner_id=runner_id,
+            dispatcher=self._dispatcher,
+        )
+
+        if runner_id and result.status in (
+            ExecutionStatus.COMPLETED,
+            ExecutionStatus.ERROR,
+        ):
+            self._update_runner_state(runner_id, result)
 
     def _update_runner_state(self, runner_id: str, result: ExecutionResult) -> None:
         """Update runner state based on execution result."""
