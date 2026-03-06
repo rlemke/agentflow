@@ -16,8 +16,19 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from afl.config import _reset_config_cache
 from afl.runtime.agent_runner import AgentConfig, make_store, run_agent
 from afl.runtime.memory_store import MemoryStore
+
+
+@pytest.fixture(autouse=True)
+def _reset_config():
+    """Reset the config singleton so monkeypatched env vars take effect."""
+    _reset_config_cache()
+    yield
+    _reset_config_cache()
 
 
 class TestMakeStore:

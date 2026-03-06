@@ -3,6 +3,16 @@
 import signal
 from unittest.mock import MagicMock, patch
 
+from afl.config import RunnerConfig
+
+
+def _make_mock_config():
+    """Create a mock AFL config with real runner defaults."""
+    mock_cfg = MagicMock()
+    runner = RunnerConfig()
+    mock_cfg.runner = runner
+    return mock_cfg
+
 
 class TestRunnerMain:
     """Test the runner service __main__.py entry point."""
@@ -11,8 +21,7 @@ class TestRunnerMain:
         """Helper to run main with mocked dependencies."""
         from afl.runtime.runner.__main__ import main
 
-        mock_cfg = MagicMock()
-        mock_config.return_value = mock_cfg
+        mock_config.return_value = _make_mock_config()
         mock_store = MagicMock()
         mock_mongo.from_config.return_value = mock_store
 
@@ -27,8 +36,7 @@ class TestRunnerMain:
     def test_default_args(self, mock_config, mock_mongo, mock_signal):
         from afl.runtime.runner.__main__ import main
 
-        mock_cfg = MagicMock()
-        mock_config.return_value = mock_cfg
+        mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
 
         with (
@@ -54,7 +62,7 @@ class TestRunnerMain:
     def test_custom_args(self, mock_config, mock_mongo, mock_signal):
         from afl.runtime.runner.__main__ import main
 
-        mock_config.return_value = MagicMock()
+        mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
 
         with (
@@ -98,7 +106,7 @@ class TestRunnerMain:
     def test_keyboard_interrupt_calls_stop(self, mock_config, mock_mongo, mock_signal):
         from afl.runtime.runner.__main__ import main
 
-        mock_config.return_value = MagicMock()
+        mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
 
         with (
@@ -116,7 +124,7 @@ class TestRunnerMain:
     def test_signal_handlers_registered(self, mock_config, mock_mongo, mock_signal):
         from afl.runtime.runner.__main__ import main
 
-        mock_config.return_value = MagicMock()
+        mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
 
         with patch("sys.argv", ["afl-runner"]), patch("afl.runtime.runner.__main__.RunnerService"):
@@ -132,7 +140,7 @@ class TestRunnerMain:
     def test_log_file_option(self, mock_config, mock_mongo, mock_signal, tmp_path):
         from afl.runtime.runner.__main__ import main
 
-        mock_config.return_value = MagicMock()
+        mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
         log_file = tmp_path / "runner.log"
 

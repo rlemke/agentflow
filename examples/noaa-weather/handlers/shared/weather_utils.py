@@ -521,6 +521,22 @@ def _mock_station_csv() -> str:
         '"726580","14922","MINNEAPOLIS ST PAUL INTL AP","US","MN","44.883","-93.229","255.1","19380101","20231231"',
         '"722190","13874","ATLANTA HARTSFIELD INTL AP","US","GA","33.630","-84.442","315.2","19730101","20231231"',
         '"725090","14735","BOSTON LOGAN INTL AP","US","MA","42.361","-71.010","9.1","19360101","20231231"',
+        # International stations
+        '"712000","99999","TORONTO PEARSON INTL","CA","ON","43.677","-79.631","173.4","19530101","20231231"',
+        '"035270","99999","LONDON HEATHROW","UK","","51.478","-0.461","25.0","19480101","20231231"',
+        '"103910","99999","FRANKFURT MAIN","GM","","50.050","8.600","112.0","19490101","20231231"',
+        '"071490","99999","PARIS CHARLES DE GAULLE","FR","","49.013","2.549","119.0","19740101","20231231"',
+        '"260390","99999","MOSCOW SHEREMETYEVO","RS","","55.972","37.415","167.0","19600101","20231231"',
+        '"428270","99999","NEW DELHI SAFDARJUNG","IN","","28.585","77.206","216.0","19440101","20231231"',
+        '"837490","99999","BRASILIA","BR","","15.869","-47.921","1061.0","19620101","20231231"',
+        '"476620","99999","TOKYO INTL","JA","","35.553","139.781","8.0","19560101","20231231"',
+        '"042180","99999","NUUK","GL","","64.175","-51.748","80.0","19580101","20231231"',
+        '"890010","99999","MCMURDO STATION","AY","","77.850","166.667","24.0","19560101","20231231"',
+        '"766920","99999","MEXICO CITY INTL","MX","","19.436","-99.072","2238.0","19440101","20231231"',
+        '"688160","99999","JOHANNESBURG INTL","SF","","26.139","28.246","1694.0","19520101","20231231"',
+        '"545110","99999","BEIJING","CH","","39.933","116.283","55.0","19450101","20231231"',
+        '"875760","99999","BUENOS AIRES","AR","","34.822","-58.536","20.0","19470101","20231231"',
+        '"082210","99999","MADRID BARAJAS","SP","","40.472","-3.561","609.0","19510101","20231231"',
     ]
     return header + "\n" + "\n".join(rows) + "\n"
 
@@ -581,8 +597,16 @@ def download_isd_lite(usaf: str, wban: str, year: int, cache_dir: str | None = N
                     elapsed,
                 )
 
-    # Mock fallback — write a small gzipped ISD-Lite file
-    logger.info("Using mock data for %s-%d", station_id, year)
+    if HAS_REQUESTS:
+        # Real download was attempted but failed — raise instead of
+        # silently returning mock data in production.
+        raise RuntimeError(
+            f"Failed to download ISD-Lite data for {station_id}-{year} "
+            f"from {ISD_LITE_URL_TEMPLATE.format(year=year, usaf=usaf, wban=wban)}"
+        )
+
+    # Mock fallback — only when requests is not installed (test/dev)
+    logger.info("Using mock data for %s-%d (requests not installed)", station_id, year)
     mock_path = os.path.join(cache_dir, f"{station_id}-{year}-mock.txt")
     os.makedirs(cache_dir, exist_ok=True)
     with open(mock_path, "w") as f:

@@ -57,13 +57,30 @@ class EventTransmitHandler(StateHandler):
             if dispatcher and dispatcher.can_dispatch(self.step.facet_name):
                 try:
                     payload = self._build_payload()
-                    result = dispatcher.dispatch(self.step.facet_name, payload)
+                    payload["_step_log"] = self._make_step_log_callback()
+
+                    facet_name = self.step.facet_name
+                    self._emit_step_log(f"Dispatching handler: {facet_name}")
+                    dispatch_start = _current_time_ms()
+
+                    result = dispatcher.dispatch(facet_name, payload)
+
+                    dispatch_duration = _current_time_ms() - dispatch_start
+
                     if result is not None:
+                        self._emit_step_log(
+                            f"Handler completed: {facet_name} ({dispatch_duration}ms)",
+                            level="success",
+                        )
                         for name, value in result.items():
                             self.step.set_attribute(name, value, is_return=True)
                         self.step.request_state_change(True)
                         return StateChangeResult(step=self.step)
                 except Exception as e:
+                    self._emit_step_log(
+                        f"Handler error: {e}",
+                        level="error",
+                    )
                     return self.error(e)
 
             # Fallback: create task and block
@@ -82,6 +99,53 @@ class EventTransmitHandler(StateHandler):
         for name, attr in self.step.attributes.params.items():
             payload[name] = attr.value
         return payload
+
+    def _emit_step_log(self, message: str, level: str = "info") -> None:
+        """Emit a framework step log entry for inline dispatch."""
+        from ..entities import StepLogEntry, StepLogSource
+
+        entry = StepLogEntry(
+            uuid=generate_id(),
+            step_id=self.step.id,
+            workflow_id=self.step.workflow_id,
+            runner_id=self.context.runner_id,
+            facet_name=self.step.facet_name,
+            source=StepLogSource.FRAMEWORK,
+            level=level,
+            message=message,
+            time=_current_time_ms(),
+        )
+        try:
+            self.context.persistence.save_step_log(entry)
+        except Exception:
+            pass
+
+    def _make_step_log_callback(self):
+        """Create a step log callback for handler-level logging."""
+        from ..entities import StepLogEntry, StepLogSource
+
+        step = self.step
+        context = self.context
+
+        def _step_log_callback(message, level="info", details=None):
+            entry = StepLogEntry(
+                uuid=generate_id(),
+                step_id=step.id,
+                workflow_id=step.workflow_id,
+                runner_id=context.runner_id,
+                facet_name=step.facet_name,
+                source=StepLogSource.HANDLER,
+                level=level,
+                message=message,
+                details=details or {},
+                time=_current_time_ms(),
+            )
+            try:
+                context.persistence.save_step_log(entry)
+            except Exception:
+                pass
+
+        return _step_log_callback
 
     def _create_event_task(self) -> None:
         """Create a TaskDefinition for the event and add to iteration changes."""

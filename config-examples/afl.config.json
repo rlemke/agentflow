@@ -1,0 +1,27 @@
+{
+  "mongodb": {
+    "url": "mongodb://localhost:27017",
+    "database": "afl"
+  },
+  "runner": {
+    "pollIntervalMs": 1000,
+    "maxConcurrent": 2,
+    "heartbeatIntervalMs": 10000,
+    "lockDurationMs": 60000,
+    "sweepIntervalMs": 5000,
+    "useRegistry": false,
+    "topics": []
+  },
+  "storage": {
+    "localOutputDir": "/tmp",
+    "hdfsWebhdfsPort": 9870,
+    "hdfsMaxRetries": 3,
+    "hdfsRetryDelay": 1.0,
+    "hdfsUser": "root"
+  },
+  "resolver": {
+    "source_paths": [],
+    "auto_resolve": false,
+    "mongodb_resolve": false
+  }
+}

@@ -302,3 +302,290 @@ class TestDecadeGrouping:
         data = [{"year": 2020, "temp_mean": 15.0, "precip_annual": 1000.0}]
         result = _group_by_decade(data)
         assert list(result.keys()) == ["2020s"]
+
+
+# ---------------------------------------------------------------------------
+# AnalyzeStationClimate handler tests
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyzeStationClimateHandler:
+    """Tests for the consolidated AnalyzeStationClimate handler."""
+
+    def test_basic_analysis(self, tmp_path, monkeypatch):
+        """Successfully analyzes a small year range."""
+
+        import mongomock
+        from handlers.climate.climate_handlers import handle_analyze_station_climate
+
+        mock_client = mongomock.MongoClient()
+        db = mock_client["test_station_climate"]
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.get_weather_db",
+            lambda: db,
+        )
+
+        # Create mock ISD-Lite files for 2 years
+        def mock_download(usaf, wban, year, cache_dir=None):
+            path = str(tmp_path / f"{usaf}-{wban}-{year}.txt")
+            with open(path, "w") as f:
+                for month in [1, 7]:
+                    for hour in [0, 12]:
+                        temp = int((-5 + 25 * (1 - abs(month - 7) / 6)) * 10)
+                        f.write(
+                            f"{year:4d} {month:02d} 15 {hour:02d}{temp:6d}   -50 10100   180    30     2    10 -9999\n"
+                        )
+            return path
+
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.download_isd_lite",
+            mock_download,
+        )
+
+        result = handle_analyze_station_climate(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "station_name": "LA GUARDIA",
+                "lat": 40.779,
+                "lon": -73.88,
+                "start_year": 2022,
+                "end_year": 2023,
+            }
+        )
+
+        assert result["station_id"] == "725030-14732"
+        assert result["years_analyzed"] == 2
+        assert len(result["yearly_summaries"]) == 2
+        assert all(s["status"] == "ok" for s in result["yearly_summaries"])
+
+    def test_empty_range(self, monkeypatch):
+        """Empty year range (start > end) returns zero results."""
+        import mongomock
+        from handlers.climate.climate_handlers import handle_analyze_station_climate
+
+        mock_client = mongomock.MongoClient()
+        db = mock_client["test_empty"]
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.get_weather_db",
+            lambda: db,
+        )
+
+        result = handle_analyze_station_climate(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "station_name": "TEST",
+                "lat": 0,
+                "lon": 0,
+                "start_year": 2025,
+                "end_year": 2020,
+            }
+        )
+
+        assert result["years_analyzed"] == 0
+        assert result["yearly_summaries"] == []
+
+    def test_download_error_caught(self, monkeypatch):
+        """Download errors are caught per-year and don't fail the whole call."""
+        import mongomock
+        from handlers.climate.climate_handlers import handle_analyze_station_climate
+
+        mock_client = mongomock.MongoClient()
+        db = mock_client["test_errors"]
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.get_weather_db",
+            lambda: db,
+        )
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.download_isd_lite",
+            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("download failed")),
+        )
+
+        result = handle_analyze_station_climate(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "station_name": "TEST",
+                "lat": 0,
+                "lon": 0,
+                "start_year": 2022,
+                "end_year": 2023,
+            }
+        )
+
+        assert result["years_analyzed"] == 0
+        assert len(result["yearly_summaries"]) == 2
+        assert all(s["status"] == "error" for s in result["yearly_summaries"])
+
+
+# ---------------------------------------------------------------------------
+# ComputeRegionTrend handler tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not HAS_MONGOMOCK, reason="mongomock not installed")
+class TestComputeRegionTrendHandler:
+    """Tests for the consolidated ComputeRegionTrend handler."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_db(self, monkeypatch):
+        self.mock_client = mongomock.MongoClient()
+        self.db = self.mock_client["test_region_trend"]
+        monkeypatch.setattr(
+            "handlers.climate.climate_handlers.get_weather_db",
+            lambda: self.db,
+        )
+
+    def test_trend_with_data(self):
+        from handlers.climate.climate_handlers import handle_compute_region_trend
+
+        # Seed reports for a few years
+        for year in range(2018, 2023):
+            self.db["weather_reports"].insert_one(
+                {
+                    "station_id": "725030-14732",
+                    "year": year,
+                    "location": "New York",
+                    "report": {"state": "NY"},
+                    "daily_stats": [
+                        {
+                            "date": f"{year}-07-01",
+                            "temp_mean": 25.0 + (year - 2018) * 0.2,
+                            "temp_min": 18.0,
+                            "temp_max": 32.0,
+                            "precip_total": 5.0,
+                        },
+                    ],
+                }
+            )
+
+        result = handle_compute_region_trend(
+            {
+                "country": "US",
+                "state": "NY",
+                "start_year": 2018,
+                "end_year": 2022,
+            }
+        )
+
+        assert "trend" in result
+        assert "narrative" in result
+        assert result["trend"]["state"] == "NY"
+        assert result["trend"]["warming_rate_per_decade"] != 0
+
+    def test_trend_empty_data(self):
+        from handlers.climate.climate_handlers import handle_compute_region_trend
+
+        result = handle_compute_region_trend(
+            {
+                "country": "US",
+                "state": "ZZ",
+                "start_year": 2018,
+                "end_year": 2022,
+            }
+        )
+
+        assert result["trend"]["warming_rate_per_decade"] == 0.0
+        assert result["narrative"] != ""
+
+
+# ---------------------------------------------------------------------------
+# CacheBulkStationData handler tests
+# ---------------------------------------------------------------------------
+
+
+class TestBulkCacheHandler:
+    """Tests for the CacheBulkStationData ingest handler."""
+
+    def test_basic_cache(self, monkeypatch):
+        from handlers.ingest.ingest_handlers import handle_cache_bulk_station_data
+
+        downloads: list[tuple[str, str, int]] = []
+
+        def mock_download(usaf, wban, year, cache_dir=None):
+            downloads.append((usaf, wban, year))
+            return f"/tmp/{usaf}-{wban}-{year}.gz"
+
+        monkeypatch.setattr(
+            "handlers.ingest.ingest_handlers.download_isd_lite",
+            mock_download,
+        )
+
+        result = handle_cache_bulk_station_data(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "start_year": 2020,
+                "end_year": 2023,
+                "begin_date": "19730101",
+                "end_date": "20231231",
+            }
+        )
+
+        assert result["files_cached"] == 4
+        assert result["station_id"] == "725030-14732"
+        assert len(downloads) == 4
+        assert downloads[0] == ("725030", "14732", 2020)
+        assert downloads[-1] == ("725030", "14732", 2023)
+
+    def test_year_clipping(self, monkeypatch):
+        """Year range is clipped to station's active dates."""
+        from handlers.ingest.ingest_handlers import handle_cache_bulk_station_data
+
+        downloads: list[int] = []
+
+        def mock_download(usaf, wban, year, cache_dir=None):
+            downloads.append(year)
+            return f"/tmp/{usaf}-{wban}-{year}.gz"
+
+        monkeypatch.setattr(
+            "handlers.ingest.ingest_handlers.download_isd_lite",
+            mock_download,
+        )
+
+        result = handle_cache_bulk_station_data(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "start_year": 1944,
+                "end_year": 2024,
+                "begin_date": "20200101",  # Station only active from 2020
+                "end_date": "20221231",  # ... to 2022
+            }
+        )
+
+        assert result["files_cached"] == 3
+        assert downloads == [2020, 2021, 2022]
+
+    def test_download_error_handled(self, monkeypatch):
+        """Download errors are caught per-year."""
+        from handlers.ingest.ingest_handlers import handle_cache_bulk_station_data
+
+        call_count = 0
+
+        def mock_download(usaf, wban, year, cache_dir=None):
+            nonlocal call_count
+            call_count += 1
+            if year == 2021:
+                raise RuntimeError("download error")
+            return f"/tmp/{usaf}-{wban}-{year}.gz"
+
+        monkeypatch.setattr(
+            "handlers.ingest.ingest_handlers.download_isd_lite",
+            mock_download,
+        )
+
+        result = handle_cache_bulk_station_data(
+            {
+                "usaf": "725030",
+                "wban": "14732",
+                "start_year": 2020,
+                "end_year": 2022,
+                "begin_date": "19440101",
+                "end_date": "20241231",
+            }
+        )
+
+        assert result["files_cached"] == 2  # 2020 and 2022 succeed, 2021 fails
+        assert call_count == 3

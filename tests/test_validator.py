@@ -1314,6 +1314,68 @@ class TestMultipleBlockValidation:
         assert not result.is_valid
         assert any("nonexistent" in str(e) for e in result.errors)
 
+    def test_cross_block_step_reference_error(self, validator):
+        """Reference to step from a sibling andThen block should error."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s1 = V(input = $.input)
+                yield Test(a = s1.output)
+            } andThen {
+                s2 = V(input = s1.output)
+                yield Test(b = s2.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Cross-block step reference" in str(e) for e in result.errors)
+        assert any("s1" in str(e) for e in result.errors)
+
+    def test_cross_block_yield_reference_error(self, validator):
+        """Yield referencing step from a sibling block should error."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s1 = V(input = $.input)
+                yield Test(a = s1.output)
+            } andThen {
+                s2 = V(input = $.input)
+                yield Test(b = s1.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Cross-block step reference" in str(e) for e in result.errors)
+
+    def test_step_body_within_block_ok(self, validator):
+        """Step body (step = Call() andThen { ... }) is NOT cross-block."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (result: Long) andThen {
+            s1 = V(input = $.input) andThen {
+                s2 = V(input = s1.output)
+                yield Test(result = s2.output)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_same_step_name_different_blocks_ok(self, validator):
+        """Same step name in different blocks is allowed (no cross-ref)."""
+        ast = parse("""
+        facet V(input: Long) => (output: Long)
+        workflow Test(input: Long) => (a: Long, b: Long) andThen {
+                s = V(input = $.input)
+                yield Test(a = s.output)
+            } andThen {
+                s = V(input = $.input)
+                yield Test(b = s.output)
+            }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
 
 class TestCollectionLiteralValidation:
     """Test validation of references inside collection literals."""

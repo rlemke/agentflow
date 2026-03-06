@@ -1,5 +1,5 @@
 {% for node in tree %}
-<details class="step-tree-node" data-state-category="{{ node.step.state|step_category }}" data-step-name="{{ node.step.statement_name or '' }}" data-facet-name="{{ node.step.facet_name or '' }}" {% if node.depth < 2 %}open{% endif %}>
+<details class="step-tree-node" data-state-category="{{ node.step.state|step_category }}" data-step-name="{{ node.step.statement_name or '' }}" data-facet-name="{{ node.step.facet_name or '' }}" {% if node.depth < 4 %}open{% endif %}>
     <summary class="{{ node.step.state|step_state_bg }}">
         {% with state=node.step.state, label=node.step.state|state_label %}{% include "partials/_state_badge.html" %}{% endwith %}
         <a href="/steps/{{ node.step.id }}">{% if node.step.statement_name %}{{ node.step.statement_name }}{% elif node.step.object_type|block_label %}<span class="tree-block-type">{{ node.step.object_type|block_label }}</span> {{ node.step.id|truncate_uuid }}{% else %}{{ node.step.id|truncate_uuid }}{% endif %}</a>

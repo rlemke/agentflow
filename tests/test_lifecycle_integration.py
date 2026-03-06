@@ -376,23 +376,23 @@ class TestMultiAndThenBlocks:
         for i, block in enumerate(wf["body"]):
             assert len(block["steps"]) == 6, f"block {i} should have 6 steps"
 
-    def test_default_parameter_all_outputs_25(self, store, evaluator):
+    def test_default_parameter_all_outputs_89(self, store, evaluator):
         compiled = _compile(AFL_MULTI_ANDTHEN)
         wf = _find_workflow(compiled, "MultiAndThenEventTest")
         result = evaluator.execute(wf, inputs={"parameter": 1}, program_ast=compiled)
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
         for i in range(1, 6):
-            assert result.outputs[f"output{i}"] == 25
+            assert result.outputs[f"output{i}"] == 89
 
-    def test_parameter_5_all_outputs_37(self, store, evaluator):
+    def test_parameter_5_all_outputs_149(self, store, evaluator):
         compiled = _compile(AFL_MULTI_ANDTHEN)
         wf = _find_workflow(compiled, "MultiAndThenEventTest")
         result = evaluator.execute(wf, inputs={"parameter": 5}, program_ast=compiled)
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
         for i in range(1, 6):
-            assert result.outputs[f"output{i}"] == 37
+            assert result.outputs[f"output{i}"] == 149
 
 
 AFL_MULTI_ANDTHEN_NESTED = """\
@@ -478,23 +478,23 @@ class TestMultiAndThenNestedFacets:
                         return
         pytest.fail("Value facet not found")
 
-    def test_default_parameter_all_outputs_2470(self, store, evaluator):
+    def test_default_parameter_all_outputs_3962(self, store, evaluator):
         compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
         wf = _find_workflow(compiled, "MultiAndThenTest2")
         result = evaluator.execute(wf, inputs={"parameter": 1}, program_ast=compiled)
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
         for i in range(1, 6):
-            assert result.outputs[f"output{i}"] == 2470
+            assert result.outputs[f"output{i}"] == 3962
 
-    def test_parameter_5_all_outputs_3814(self, store, evaluator):
+    def test_parameter_5_all_outputs_6266(self, store, evaluator):
         compiled = _compile(AFL_MULTI_ANDTHEN_NESTED)
         wf = _find_workflow(compiled, "MultiAndThenTest2")
         result = evaluator.execute(wf, inputs={"parameter": 5}, program_ast=compiled)
         assert result.success
         assert result.status == ExecutionStatus.COMPLETED
         for i in range(1, 6):
-            assert result.outputs[f"output{i}"] == 3814
+            assert result.outputs[f"output{i}"] == 6266
 
 
 AFL_TOP_LEVEL_WORKFLOW = """\

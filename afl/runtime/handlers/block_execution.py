@@ -117,10 +117,16 @@ class BlockExecutionBeginHandler(StateHandler):
             nonlocal _step_not_ready
             all_steps = list(self.context.persistence.get_steps_by_workflow(self.step.workflow_id))
             for s in all_steps:
-                if s.statement_name == step_name and s.is_complete:
-                    ret = s.attributes.returns.get(attr_name)
-                    if ret:
-                        return ret.value
+                if s.statement_name == step_name:
+                    if s.is_complete:
+                        ret = s.attributes.returns.get(attr_name)
+                        if ret:
+                            return ret.value
+                    # Accept steps in blocks.Continue — they have event
+                    # returns available even though step_body children
+                    # are still running.
+                    elif s.attributes.returns.get(attr_name):
+                        return s.attributes.returns[attr_name].value
             _step_not_ready = True
             raise ValueError(f"{step_name}.{attr_name} not ready")
 
@@ -225,10 +231,16 @@ class BlockExecutionBeginHandler(StateHandler):
             nonlocal _step_not_ready
             all_steps = list(self.context.persistence.get_steps_by_workflow(self.step.workflow_id))
             for s in all_steps:
-                if s.statement_name == step_name and s.is_complete:
-                    ret = s.attributes.returns.get(attr_name)
-                    if ret:
-                        return ret.value
+                if s.statement_name == step_name:
+                    if s.is_complete:
+                        ret = s.attributes.returns.get(attr_name)
+                        if ret:
+                            return ret.value
+                    # Accept steps in blocks.Continue — they have event
+                    # returns available even though step_body children
+                    # are still running.
+                    elif s.attributes.returns.get(attr_name):
+                        return s.attributes.returns[attr_name].value
             _step_not_ready = True
             raise ValueError(f"{step_name}.{attr_name} not ready")
 

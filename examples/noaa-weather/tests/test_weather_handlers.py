@@ -165,6 +165,23 @@ class TestDiscoveryHandlers:
         for s in result["stations"]:
             assert s["state"] == "NY"
 
+    def test_handle_discover_stations_canada(self):
+        from handlers.discovery.discovery_handlers import handle_discover_stations
+
+        result = handle_discover_stations({"country": "CA", "state": "ON", "max_stations": 5})
+        assert result["station_count"] >= 1
+        for s in result["stations"]:
+            assert s["country"] == "CA"
+            assert s["state"] == "ON"
+
+    def test_handle_discover_stations_international(self):
+        from handlers.discovery.discovery_handlers import handle_discover_stations
+
+        for country in ["UK", "RS", "IN", "JA", "AY"]:
+            result = handle_discover_stations({"country": country, "max_stations": 5})
+            assert result["station_count"] >= 1, f"No stations found for country={country}"
+            assert result["stations"][0]["country"] == country
+
     def test_handle_discover_stations_step_log(self):
         from handlers.discovery.discovery_handlers import handle_discover_stations
 
@@ -754,7 +771,7 @@ class TestDispatch:
     def test_ingest_dispatch_count(self):
         from handlers.ingest.ingest_handlers import _DISPATCH
 
-        assert len(_DISPATCH) == 2
+        assert len(_DISPATCH) == 3
 
     def test_qc_dispatch_count(self):
         from handlers.qc.qc_handlers import _DISPATCH
@@ -788,6 +805,7 @@ class TestDispatch:
 
     def test_all_dispatch_names_have_namespace_prefix(self):
         from handlers.analysis.analysis_handlers import _DISPATCH as d1
+        from handlers.climate.climate_handlers import _DISPATCH as d9
         from handlers.discovery.discovery_handlers import _DISPATCH as d2
         from handlers.geocode.geocode_handlers import _DISPATCH as d3
         from handlers.ingest.ingest_handlers import _DISPATCH as d4
@@ -805,9 +823,15 @@ class TestDispatch:
             + list(d6.keys())
             + list(d7.keys())
             + list(d8.keys())
+            + list(d9.keys())
         )
-        assert len(all_names) == 12
-        assert all(n.startswith("weather.") for n in all_names)
+        assert len(all_names) == 18
+        # All handlers start with weather. or climate.
+        assert all(n.startswith("weather.") or n.startswith("climate.") for n in all_names)
+        # Verify the new consolidated handlers are present
+        assert any(n.startswith("climate.Station.") for n in all_names)
+        assert any(n.startswith("climate.Aggregate.ComputeRegionTrend") for n in all_names)
+        assert any(n.startswith("weather.BulkCache.") for n in all_names)
 
 
 # ---------------------------------------------------------------------------
@@ -836,16 +860,16 @@ class TestCompilation:
         event_facets = []
         for ns in parsed_ast.namespaces:
             event_facets.extend(ns.event_facets)
-        assert len(event_facets) == 15
+        assert len(event_facets) == 18
 
     def test_workflow_count(self, parsed_ast):
         workflows = []
         for ns in parsed_ast.namespaces:
             workflows.extend(ns.workflows)
-        assert len(workflows) == 10
+        assert len(workflows) == 34
 
     def test_namespace_count(self, parsed_ast):
-        assert len(parsed_ast.namespaces) == 15
+        assert len(parsed_ast.namespaces) == 21
 
     def test_prompt_block_present(self, parsed_ast):
         """Verify prompt block appears on GenerateNarrative."""
@@ -873,27 +897,40 @@ class TestCompilation:
         assert script_count >= 1, "Expected at least 1 script block"
 
     def test_when_block_present(self, parsed_ast):
-        """Verify andThen when block appears in AnalyzeStation workflow."""
-        from afl.ast import WhenBlock
+        """Verify andThen when block appears as step_body on qc_check in AnalyzeStation."""
+        from afl.ast import AndThenBlock, WhenBlock
 
         wf_ns = [ns for ns in parsed_ast.namespaces if ns.name == "weather.workflows"]
         analyze_wf = [w for w in wf_ns[0].workflows if w.sig.name == "AnalyzeStation"][0]
         body = analyze_wf.body
-        assert isinstance(body, list)
-        # Third block should be the when block (after download and parse+geo+qc)
-        when_body = [b for b in body if b.when is not None]
-        assert len(when_body) == 1
-        assert isinstance(when_body[0].when, WhenBlock)
-        assert len(when_body[0].when.cases) == 2
+        # Now a single AndThenBlock (not a list of sibling blocks)
+        if isinstance(body, list):
+            block = body[0]
+        else:
+            block = body
+        assert isinstance(block, AndThenBlock)
+        # qc_check step has andThen when as step_body
+        qc_step = [s for s in block.block.steps if s.name == "qc_check"][0]
+        assert qc_step.body is not None
+        assert isinstance(qc_step.body, AndThenBlock)
+        assert qc_step.body.when is not None
+        assert isinstance(qc_step.body.when, WhenBlock)
+        assert len(qc_step.body.when.cases) == 2
 
     def test_catch_present(self, parsed_ast):
         """Verify catch block appears in AnalyzeStation (download step)."""
+        from afl.ast import AndThenBlock
+
         wf_ns = [ns for ns in parsed_ast.namespaces if ns.name == "weather.workflows"]
         analyze_wf = [w for w in wf_ns[0].workflows if w.sig.name == "AnalyzeStation"][0]
         body = analyze_wf.body
-        # First andThen block → .block → steps[0] has catch
-        first_block = body[0]
-        step = first_block.block.steps[0]
+        # Single andThen block → .block → steps[0] has catch
+        if isinstance(body, list):
+            block = body[0]
+        else:
+            block = body
+        assert isinstance(block, AndThenBlock)
+        step = block.block.steps[0]
         assert step.catch is not None
 
     def test_analyze_station_history_foreach(self, parsed_ast):
@@ -941,6 +978,48 @@ class TestCompilation:
         steps = atb.block.steps
         analysis_step = [s for s in steps if s.name == "analysis"][0]
         assert analysis_step.catch is not None
+
+    def test_international_workflow_count(self, parsed_ast):
+        """Verify 10 international analysis workflows are present."""
+        climate_wf_ns = [ns for ns in parsed_ast.namespaces if ns.name == "climate.workflows"]
+        all_wfs = []
+        for ns in climate_wf_ns:
+            all_wfs.extend(ns.workflows)
+        intl_names = {
+            "AnalyzeCanada",
+            "AnalyzeRussia",
+            "AnalyzeIndia",
+            "AnalyzeMexico",
+            "AnalyzeAntarctica",
+            "AnalyzeSouthAmerica",
+            "AnalyzeEurope",
+            "AnalyzeAfrica",
+            "AnalyzeAsia",
+            "AnalyzeArctic",
+        }
+        found = {w.sig.name for w in all_wfs} & intl_names
+        assert found == intl_names, f"Missing: {intl_names - found}"
+
+    def test_international_cache_workflow_count(self, parsed_ast):
+        """Verify 10 international cache workflows are present."""
+        cache_ns = [ns for ns in parsed_ast.namespaces if ns.name == "weather.Cache"]
+        all_wfs = []
+        for ns in cache_ns:
+            all_wfs.extend(ns.workflows)
+        intl_names = {
+            "CacheCanadaData",
+            "CacheRussiaData",
+            "CacheIndiaData",
+            "CacheMexicoData",
+            "CacheAntarcticaData",
+            "CacheSouthAmericaData",
+            "CacheEuropeData",
+            "CacheAfricaData",
+            "CacheAsiaData",
+            "CacheArcticData",
+        }
+        found = {w.sig.name for w in all_wfs} & intl_names
+        assert found == intl_names, f"Missing: {intl_names - found}"
 
 
 # ---------------------------------------------------------------------------
@@ -1004,7 +1083,7 @@ class TestAgentIntegration:
             + list(d7.keys())
             + list(d8.keys())
         )
-        assert len(all_names) == 12
+        assert len(all_names) == 13
         assert all(n.startswith("weather.") for n in all_names)
 
 
@@ -1218,6 +1297,86 @@ def _make_dispatcher():
         },
     )
 
+    # Consolidated fast-path handlers
+    dispatcher.register(
+        "climate.Station.AnalyzeStationClimate",
+        lambda p: {
+            "yearly_summaries": [
+                {"year": y, "status": "ok", "total_days": 365}
+                for y in range(int(p.get("start_year", 1944)), int(p.get("end_year", 2024)) + 1)
+            ],
+            "years_analyzed": int(p.get("end_year", 2024)) - int(p.get("start_year", 1944)) + 1,
+            "station_id": f"{p.get('usaf', '')}-{p.get('wban', '')}",
+        },
+    )
+
+    dispatcher.register(
+        "climate.Aggregate.ComputeRegionTrend",
+        lambda p: {
+            "trend": {
+                "state": p.get("state", ""),
+                "start_year": int(p.get("start_year", 1944)),
+                "end_year": int(p.get("end_year", 2024)),
+                "warming_rate_per_decade": 0.15,
+                "precip_change_pct": 5.0,
+                "decades": {},
+            },
+            "narrative": f"Climate trend for {p.get('state', '')}.",
+            "highlights": [],
+        },
+    )
+
+    dispatcher.register(
+        "weather.BulkCache.CacheBulkStationData",
+        lambda p: {
+            "files_cached": max(
+                0, int(p.get("end_year", 2024)) - int(p.get("start_year", 1944)) + 1
+            ),
+            "station_id": f"{p.get('usaf', '')}-{p.get('wban', '')}",
+        },
+    )
+
+    # Climate Aggregate handlers (existing fine-grained path also needed for some tests)
+    dispatcher.register(
+        "climate.Aggregate.AggregateStateYear",
+        lambda p: {
+            "yearly": {
+                "state": p.get("state", ""),
+                "year": int(p.get("year", 2023)),
+                "station_count": 3,
+                "temp_mean": 15.0,
+                "temp_min_avg": 5.0,
+                "temp_max_avg": 25.0,
+                "precip_annual": 1000.0,
+                "hot_days": 10,
+                "frost_days": 50,
+                "precip_days": 100,
+            },
+        },
+    )
+
+    dispatcher.register(
+        "climate.Aggregate.ComputeClimateTrend",
+        lambda p: {
+            "trend": {
+                "state": p.get("state", ""),
+                "start_year": int(p.get("start_year", 1944)),
+                "end_year": int(p.get("end_year", 2024)),
+                "warming_rate_per_decade": 0.15,
+                "precip_change_pct": 5.0,
+                "decades": {},
+            },
+        },
+    )
+
+    dispatcher.register(
+        "climate.Aggregate.GenerateClimateNarrative",
+        lambda p: {
+            "narrative": f"Climate trend for {p.get('state', '')}.",
+            "highlights": [],
+        },
+    )
+
     return dispatcher
 
 
@@ -1373,3 +1532,115 @@ class TestBatchWeatherAnalysisIntegration:
         assert len(foreach_steps) >= 3, (
             f"Expected >= 3 foreach sub-blocks, got {len(foreach_steps)}"
         )
+
+
+class TestAnalyzeStateTrendsFastIntegration:
+    """Integration tests for the fast-path AnalyzeStateTrendsFast workflow."""
+
+    @pytest.fixture()
+    def compiled(self):
+        return _compile_weather_afl()
+
+    @pytest.fixture()
+    def store(self):
+        from afl.runtime import MemoryStore
+
+        return MemoryStore()
+
+    @pytest.fixture()
+    def evaluator(self, store):
+        from afl.runtime import Evaluator, Telemetry
+
+        return Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+
+    @pytest.fixture()
+    def dispatcher(self):
+        return _make_dispatcher()
+
+    def test_fast_completes(self, compiled, store, evaluator, dispatcher):
+        """AnalyzeStateTrendsFast completes with mock dispatch."""
+        from afl.ast_utils import find_workflow
+        from afl.runtime import ExecutionStatus
+
+        wf_ast = find_workflow(compiled, "AnalyzeStateTrendsFast")
+        assert wf_ast is not None
+
+        result = evaluator.execute(
+            wf_ast,
+            inputs={
+                "country": "US",
+                "state": "NY",
+                "max_stations": 3,
+                "start_year": 2020,
+                "end_year": 2023,
+            },
+            program_ast=compiled,
+            dispatcher=dispatcher,
+        )
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED
+
+    def test_fast_step_count(self, compiled, store, evaluator, dispatcher):
+        """AnalyzeStateTrendsFast creates far fewer steps than AnalyzeStateTrends."""
+        from afl.ast_utils import find_workflow
+
+        wf_ast = find_workflow(compiled, "AnalyzeStateTrendsFast")
+        result = evaluator.execute(
+            wf_ast,
+            inputs={
+                "country": "US",
+                "state": "NY",
+                "max_stations": 3,
+                "start_year": 2020,
+                "end_year": 2023,
+            },
+            program_ast=compiled,
+            dispatcher=dispatcher,
+        )
+        assert result.success
+        steps = store.get_steps_by_workflow(result.workflow_id)
+        # Should be ~12 steps (1 discover + 3×2 foreach + 1 trend + root/blocks)
+        # Much less than the old path's ~3,240 per state
+        assert len(steps) <= 30, f"Expected <= 30 steps, got {len(steps)}"
+
+    def test_fast_outputs(self, compiled, store, evaluator, dispatcher):
+        """AnalyzeStateTrendsFast yields status and narrative."""
+        from afl.ast_utils import find_workflow
+
+        wf_ast = find_workflow(compiled, "AnalyzeStateTrendsFast")
+        result = evaluator.execute(
+            wf_ast,
+            inputs={
+                "country": "US",
+                "state": "NY",
+                "max_stations": 3,
+                "start_year": 2020,
+                "end_year": 2023,
+            },
+            program_ast=compiled,
+            dispatcher=dispatcher,
+        )
+        assert result.outputs["status"] == "completed"
+        assert "NY" in result.outputs["narrative"]
+
+    def test_fast_all_states_completes(self, compiled, store, evaluator, dispatcher):
+        """AnalyzeAllStatesFast with 2 mock states completes."""
+        from afl.ast_utils import find_workflow
+        from afl.runtime import ExecutionStatus
+
+        wf_ast = find_workflow(compiled, "AnalyzeAllStatesFast")
+        assert wf_ast is not None
+
+        result = evaluator.execute(
+            wf_ast,
+            inputs={
+                "states": ["NY", "CA"],
+                "max_stations": 2,
+                "start_year": 2022,
+                "end_year": 2023,
+            },
+            program_ast=compiled,
+            dispatcher=dispatcher,
+        )
+        assert result.success
+        assert result.status == ExecutionStatus.COMPLETED

@@ -51,7 +51,6 @@ For async handlers (e.g., LLM-based handlers)::
 import asyncio
 import inspect
 import logging
-import os
 import socket
 import threading
 import time
@@ -86,6 +85,9 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
+_SENTINEL = -1
+
+
 @dataclass
 class AgentPollerConfig:
     """Configuration for the AgentPoller."""
@@ -94,13 +96,25 @@ class AgentPollerConfig:
     server_group: str = "default"
     server_name: str = ""
     task_list: str = "default"
-    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
-    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
-    heartbeat_interval_ms: int = 10000
+    poll_interval_ms: int = _SENTINEL
+    max_concurrent: int = _SENTINEL
+    heartbeat_interval_ms: int = _SENTINEL
 
     def __post_init__(self) -> None:
         if not self.server_name:
             self.server_name = socket.gethostname()
+        if self.poll_interval_ms == _SENTINEL:
+            from ..config import get_config
+
+            self.poll_interval_ms = get_config().runner.poll_interval_ms
+        if self.max_concurrent == _SENTINEL:
+            from ..config import get_config
+
+            self.max_concurrent = get_config().runner.max_concurrent
+        if self.heartbeat_interval_ms == _SENTINEL:
+            from ..config import get_config
+
+            self.heartbeat_interval_ms = get_config().runner.heartbeat_interval_ms
 
 
 class AgentPoller:

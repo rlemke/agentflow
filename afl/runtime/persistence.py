@@ -168,6 +168,25 @@ class PersistenceAPI(Protocol):
             )
         ]
 
+    def get_pending_resume_workflow_ids(self) -> list[str]:
+        """Get workflow IDs that have EventTransmit steps with pending transitions.
+
+        These are steps where an external handler has completed (via
+        continue_step) but the subsequent resume failed to advance
+        the step.  The default implementation scans all steps; subclasses
+        should override with an efficient database query.
+
+        Returns:
+            Distinct workflow IDs needing resume
+        """
+        from .states import StepState
+
+        seen: set[str] = set()
+        for step in self.get_steps_by_state(StepState.EVENT_TRANSMIT):
+            if step.transition.is_requesting_state_change and step.workflow_id not in seen:
+                seen.add(step.workflow_id)
+        return list(seen)
+
     @abstractmethod
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a given state.

@@ -83,9 +83,44 @@ def handle_parse_observations(params: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def handle_cache_bulk_station_data(params: dict[str, Any]) -> dict[str, Any]:
+    """Download ISD-Lite files for one station across its active date range.
+
+    Clips [start_year, end_year] to the station's begin_date/end_date so
+    we never request years that NOAA cannot have data for.
+    """
+    usaf = params.get("usaf", "")
+    wban = params.get("wban", "")
+    start_year = int(params.get("start_year", 1944))
+    end_year = int(params.get("end_year", 2024))
+    begin_date = str(params.get("begin_date", "19440101"))
+    end_date = str(params.get("end_date", "20241231"))
+
+    # Clip year range to station's active period
+    lo = max(start_year, int(begin_date[:4]))
+    hi = min(end_year, int(end_date[:4]))
+
+    station_id = f"{usaf}-{wban}"
+    step_log = params.get("_step_log")
+    files_cached = 0
+
+    for year in range(lo, hi + 1):
+        try:
+            download_isd_lite(usaf, wban, year)
+            files_cached += 1
+        except Exception as exc:
+            _step_log_append(step_log, f"Cache error {station_id}-{year}: {exc}", "warning")
+
+    _step_log_append(
+        step_log, f"Cached {files_cached} files for {station_id} ({lo}-{hi})", "success"
+    )
+    return {"files_cached": files_cached, "station_id": station_id}
+
+
 _DISPATCH: dict[str, Any] = {
     f"{NAMESPACE}.DownloadObservations": handle_download_observations,
     f"{NAMESPACE}.ParseObservations": handle_parse_observations,
+    "weather.BulkCache.CacheBulkStationData": handle_cache_bulk_station_data,
 }
 
 

@@ -95,15 +95,28 @@ class LocalStorageBackend:
         return os.path.basename(path)
 
 
-# Retry configuration for transient HDFS/WebHDFS errors
-_HDFS_MAX_RETRIES = int(os.environ.get("AFL_HDFS_MAX_RETRIES", "3"))
-_HDFS_RETRY_BASE_DELAY = float(os.environ.get("AFL_HDFS_RETRY_DELAY", "1.0"))
+# Retry configuration for transient HDFS/WebHDFS errors — resolved lazily
+# from the centralized config so that env vars and config files are respected.
 
 
-def _hdfs_retry(
-    func, *, max_retries: int = _HDFS_MAX_RETRIES, base_delay: float = _HDFS_RETRY_BASE_DELAY
-):
+def _hdfs_max_retries() -> int:
+    from afl.config import get_config
+
+    return get_config().storage.hdfs_max_retries
+
+
+def _hdfs_retry_base_delay() -> float:
+    from afl.config import get_config
+
+    return get_config().storage.hdfs_retry_delay
+
+
+def _hdfs_retry(func, *, max_retries: int | None = None, base_delay: float | None = None):
     """Execute *func* with retries on transient HTTP errors (404, 502, 503, 504, ConnectionError)."""
+    if max_retries is None:
+        max_retries = _hdfs_max_retries()
+    if base_delay is None:
+        base_delay = _hdfs_retry_base_delay()
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
         try:
@@ -148,9 +161,12 @@ class HDFSStorageBackend:
             )
         # WebHDFS runs on port 9870 (HTTP) by default; the RPC port (8020)
         # is what callers typically pass, so we convert.
-        webhdfs_port = int(os.environ.get("AFL_WEBHDFS_PORT", "9870"))
+        from afl.config import get_config
+
+        storage_cfg = get_config().storage
+        webhdfs_port = storage_cfg.hdfs_webhdfs_port
         self._base_url = f"http://{host}:{webhdfs_port}/webhdfs/v1"
-        self._user = user or os.environ.get("HADOOP_USER_NAME", "root")
+        self._user = user or storage_cfg.hdfs_user
         self._host = host
         self._port = port
 

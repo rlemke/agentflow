@@ -57,6 +57,9 @@ def make_store(database: str = "") -> PersistenceAPI:
     return MemoryStore()
 
 
+_SENTINEL = -1
+
+
 @dataclass
 class AgentConfig:
     """Lightweight configuration for ``run_agent()``.
@@ -68,9 +71,19 @@ class AgentConfig:
 
     service_name: str
     server_group: str
-    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
-    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
+    poll_interval_ms: int = _SENTINEL
+    max_concurrent: int = _SENTINEL
     mongodb_database: str = ""
+
+    def __post_init__(self) -> None:
+        if self.poll_interval_ms == _SENTINEL:
+            from ..config import get_config
+
+            self.poll_interval_ms = get_config().runner.poll_interval_ms
+        if self.max_concurrent == _SENTINEL:
+            from ..config import get_config
+
+            self.max_concurrent = get_config().runner.max_concurrent
 
 
 def run_agent(
@@ -93,16 +106,17 @@ def run_agent(
         register: Callback invoked with either ``poller=`` or ``runner=``
             keyword argument so the caller can wire up handlers.
     """
+    from ..config import get_config
     from .evaluator import Evaluator
     from .telemetry import Telemetry
 
     store = make_store(database=config.mongodb_database)
     evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=True))
 
-    use_registry = os.environ.get("AFL_USE_REGISTRY", "").strip() == "1"
+    global_cfg = get_config()
+    use_registry = global_cfg.runner.use_registry
 
-    topics_env = os.environ.get("AFL_RUNNER_TOPICS", "")
-    topics = [t.strip() for t in topics_env.split(",") if t.strip()] if topics_env else []
+    topics = list(global_cfg.runner.topics)
 
     if use_registry:
         _run_registry(config, store, evaluator, topics, register)

@@ -37,6 +37,14 @@ class FacetScriptsBeginHandler(StateHandler):
 
     def process_state(self) -> StateChangeResult:
         """Begin facet scripts execution."""
+        from ..types import ObjectType
+
+        # Yield steps should not run the target facet's pre_script —
+        # they only set return values, not invoke the facet.
+        if self.step.object_type == ObjectType.YIELD_ASSIGNMENT:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
         # Look up facet definition
         facet_def = self.context.get_facet_definition(self.step.facet_name)
         if facet_def is None:

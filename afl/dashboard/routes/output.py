@@ -15,7 +15,9 @@ _DEFAULT_OUTPUT_DIR = "/Volumes/afl_data/output"
 
 def _output_base() -> Path:
     """Return the configured output base directory."""
-    return Path(os.environ.get("AFL_LOCAL_OUTPUT_DIR", _DEFAULT_OUTPUT_DIR))
+    from afl.config import get_config
+
+    return Path(get_config().storage.local_output_dir or _DEFAULT_OUTPUT_DIR)
 
 
 def _safe_path(subpath: str) -> Path | None:

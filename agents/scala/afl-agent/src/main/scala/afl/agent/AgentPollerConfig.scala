@@ -34,14 +34,36 @@ object AgentPollerConfig:
 
   /** Load config from an afl.config.json file.
     *
-    * Reads the mongodb.url and mongodb.database fields. Falls back to
-    * environment variables and then built-in defaults.
+    * Reads the mongodb.url, mongodb.database, and runner section fields.
+    * Applies AFL_ENV overlay if set. Falls back to environment variables
+    * and then built-in defaults.
     */
   def fromConfig(path: String): AgentPollerConfig =
     val content = Using(Source.fromFile(path))(_.mkString).getOrElse(
       throw new IllegalArgumentException(s"Cannot read config file: $path")
     )
-    fromJsonString(content)
+    val base = fromJsonString(content)
+
+    // AFL_ENV overlay
+    sys.env.get("AFL_ENV").filter(_.nonEmpty) match
+      case Some(envName) =>
+        val dir = new java.io.File(path).getParent
+        val overlayPath = s"$dir/afl.config.$envName.json"
+        if new java.io.File(overlayPath).isFile then
+          val overlayContent = Using(Source.fromFile(overlayPath))(_.mkString).getOrElse("")
+          if overlayContent.nonEmpty then
+            val overlay = fromJsonString(overlayContent)
+            // Overlay values win over base when they differ from defaults
+            base.copy(
+              mongoUrl = if overlay.mongoUrl != "mongodb://localhost:27017" then overlay.mongoUrl else base.mongoUrl,
+              database = if overlay.database != "afl" then overlay.database else base.database,
+              pollIntervalMs = if overlay.pollIntervalMs != 2000L then overlay.pollIntervalMs else base.pollIntervalMs,
+              maxConcurrent = if overlay.maxConcurrent != 5 then overlay.maxConcurrent else base.maxConcurrent,
+              heartbeatIntervalMs = if overlay.heartbeatIntervalMs != 10000L then overlay.heartbeatIntervalMs else base.heartbeatIntervalMs
+            )
+          else base
+        else base
+      case None => base
 
   /** Parse config from a JSON string (afl.config.json content). */
   def fromJsonString(json: String): AgentPollerConfig =
@@ -52,7 +74,26 @@ object AgentPollerConfig:
     val database = extractField(json, "database")
       .orElse(sys.env.get("AFL_MONGODB_DATABASE"))
       .getOrElse("afl")
-    AgentPollerConfig(mongoUrl = url, database = database)
+
+    // Runner section fields
+    val pollMs = extractIntField(json, "pollIntervalMs")
+      .orElse(sys.env.get("AFL_POLL_INTERVAL_MS").flatMap(s => scala.util.Try(s.toLong).toOption))
+      .getOrElse(2000L)
+    val maxConc = extractIntField(json, "maxConcurrent")
+      .orElse(sys.env.get("AFL_MAX_CONCURRENT").flatMap(s => scala.util.Try(s.toInt).toOption))
+      .map(_.toInt)
+      .getOrElse(5)
+    val hbMs = extractIntField(json, "heartbeatIntervalMs")
+      .orElse(sys.env.get("AFL_HEARTBEAT_INTERVAL_MS").flatMap(s => scala.util.Try(s.toLong).toOption))
+      .getOrElse(10000L)
+
+    AgentPollerConfig(
+      mongoUrl = url,
+      database = database,
+      pollIntervalMs = pollMs,
+      maxConcurrent = maxConc,
+      heartbeatIntervalMs = hbMs
+    )
 
   /** Resolve config using the standard search order from the protocol spec. */
   def resolve(explicitPath: Option[String] = None): AgentPollerConfig =
@@ -84,3 +125,7 @@ object AgentPollerConfig:
   private[agent] def extractField(json: String, field: String): Option[String] =
     val pattern = s""""$field"\\s*:\\s*"([^"]+)"""".r
     pattern.findFirstMatchIn(json).map(_.group(1))
+
+  private[agent] def extractIntField(json: String, field: String): Option[Long] =
+    val pattern = s""""$field"\\s*:\\s*(\\d+)""".r
+    pattern.findFirstMatchIn(json).flatMap(m => scala.util.Try(m.group(1).toLong).toOption)

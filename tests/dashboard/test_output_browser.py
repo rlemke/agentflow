@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from afl.config import _reset_config_cache
 from afl.dashboard.app import create_app
 from afl.dashboard.filters import file_timestamp, filesizeformat
 from afl.dashboard.routes.output import (
@@ -12,6 +13,15 @@ from afl.dashboard.routes.output import (
     _build_tree,
     _safe_path,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_config(monkeypatch):
+    """Reset the config singleton before each test so env var changes take effect."""
+    _reset_config_cache()
+    yield
+    _reset_config_cache()
+
 
 # ---- Helper unit tests ----
 

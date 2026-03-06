@@ -110,8 +110,11 @@ class FacetInitializationBeginHandler(StateHandler):
                         if name not in evaluated:
                             evaluated[name] = expr_eval.evaluate(value_expr, ctx)
 
-            # Apply facet defaults for any params not provided in the call
-            if self.step.facet_name:
+            # Apply facet defaults for any params not provided in the call.
+            # Skip for yield assignments — yields only carry explicitly
+            # set values; applying the target facet's defaults would leak
+            # unwanted params into the capture merge.
+            if self.step.facet_name and self.step.object_type != ObjectType.YIELD_ASSIGNMENT:
                 facet_def = self.context.get_facet_definition(self.step.facet_name)
                 if facet_def:
                     expr_eval = ExpressionEvaluator()
@@ -197,31 +200,59 @@ class FacetInitializationBeginHandler(StateHandler):
         """Resolve the InputRef ($.) scope for this step.
 
         For steps in the workflow root block, inputs come from the
-        workflow root step's params. For steps in nested blocks,
-        inputs come from the container step that owns the block.
+        workflow root step's params. For steps in nested blocks
+        (e.g. inside a called sub-workflow), inputs come from the
+        container step that owns the block.
+
+        For steps deeply nested via step_body (andThen when/foreach on
+        a step), we walk up the container chain to find the nearest
+        workflow or sub-workflow scope, always starting with the
+        workflow root params as a base.
 
         Returns:
             Dict of input name -> value
         """
-        # Find the block containing this step
-        if self.step.block_id:
-            block_step = self.context._find_step(self.step.block_id)
-            if block_step and block_step.container_id:
-                # Get the container of the block
-                container = self.context._find_step(block_step.container_id)
-                if container and container.container_id is not None:
-                    # This is a nested block — use container's params as inputs
-                    inputs = {}
-                    for name, attr in container.attributes.params.items():
-                        inputs[name] = attr.value
-                    return inputs
-
-        # Default: workflow root params
+        # Always start with workflow root params as the base
         workflow_root = self.context.get_workflow_root()
         inputs = {}
         if workflow_root:
             for name, attr in workflow_root.attributes.params.items():
                 inputs[name] = attr.value
+
+        # Walk up from this step's block to find a nested facet/workflow
+        # call that defines a new $. scope.  FacetDecl and WorkflowDecl
+        # calls define scopes; EventFacetDecl calls do NOT.
+        if self.step.block_id:
+            block_step = self.context._find_step(self.step.block_id)
+            if block_step and block_step.container_id:
+                container = self.context._find_step(block_step.container_id)
+                if container and container.container_id is not None:
+                    cursor = container
+                    while cursor:
+                        if (
+                            cursor.object_type == ObjectType.VARIABLE_ASSIGNMENT
+                            and cursor.facet_name
+                            and cursor.container_id is not None
+                        ):
+                            # Skip event facet calls — they don't create
+                            # a new $. scope.
+                            is_event = False
+                            if self.context.program_ast:
+                                fdef = self.context.get_facet_definition(cursor.facet_name)
+                                if fdef and fdef.get("type") == "EventFacetDecl":
+                                    is_event = True
+                            if not is_event:
+                                # FacetDecl or WorkflowDecl — overlay params
+                                for name, attr in cursor.attributes.params.items():
+                                    inputs[name] = attr.value
+                                break
+                        if cursor.container_id is None:
+                            break
+                        next_step = self.context._find_step(cursor.container_id)
+                        if next_step is None:
+                            break
+                        cursor = next_step
+
         return inputs
 
     def _get_default_value(self, param_name: str, workflow_ast: dict) -> object:

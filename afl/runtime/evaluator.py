@@ -1135,14 +1135,26 @@ class Evaluator:
         # Save directly to persistence
         self.persistence.save_step(step)
 
-    def fail_step(self, step_id: str, error_message: str) -> None:
+    def fail_step(
+        self,
+        step_id: str,
+        error_message: str,
+        *,
+        workflow_ast: dict | None = None,
+        program_ast: dict | None = None,
+    ) -> None:
         """Fail an event-blocked step with an error.
 
-        Sets the step to STATEMENT_ERROR and records the error.
+        If *workflow_ast* / *program_ast* are supplied and the step has a
+        ``catch`` clause, the step transitions to CATCH_BEGIN instead of
+        STATEMENT_ERROR so that the normal catch-recovery path executes on
+        the next ``resume()`` call.
 
         Args:
             step_id: The step ID to fail
             error_message: Human-readable error description
+            workflow_ast: Optional workflow AST for catch-clause lookup
+            program_ast: Optional full program AST for facet lookups
         """
         logger.warning(
             "Fail step: step_id=%s error_message=%s",
@@ -1156,8 +1168,47 @@ class Evaluator:
             raise ValueError(
                 f"Step {step_id} is at {step.state}, expected {StepState.EVENT_TRANSMIT}"
             )
-        step.mark_error(RuntimeError(error_message))
+
+        error = RuntimeError(error_message)
+
+        # Check for a catch clause using a temporary execution context.
+        if workflow_ast or program_ast:
+            catch_ast = self._check_catch_for_step(step, workflow_ast, program_ast)
+            if catch_ast:
+                logger.info(
+                    "Catch clause found for step %s — transitioning to CATCH_BEGIN",
+                    step_id,
+                )
+                step.transition.error = error
+                step.change_state(StepState.CATCH_BEGIN)
+                # Do NOT request state change — let the CatchBeginHandler
+                # execute at CATCH_BEGIN when resume() processes this step.
+                self.persistence.save_step(step)
+                return
+
+        step.mark_error(error)
         self.persistence.save_step(step)
+
+    def _check_catch_for_step(
+        self,
+        step: "StepDefinition",
+        workflow_ast: dict | None,
+        program_ast: dict | None,
+    ) -> dict | None:
+        """Build a temporary ExecutionContext and look up the catch clause.
+
+        Returns the catch AST dict if found, or None.
+        """
+        ctx = ExecutionContext(
+            persistence=self.persistence,
+            telemetry=Telemetry(enabled=False),
+            changes=IterationChanges(),
+            workflow_id=step.workflow_id,
+            workflow_ast=workflow_ast,
+            program_ast=program_ast,
+            runner_id="",
+        )
+        return ctx._find_statement_catch(step)
 
     def retry_step(self, step_id: StepId) -> None:
         """Retry a failed step by resetting it to EVENT_TRANSMIT.

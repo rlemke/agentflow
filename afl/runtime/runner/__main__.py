@@ -19,7 +19,6 @@ Usage:
 """
 
 import argparse
-import os
 import signal
 
 from .service import RunnerConfig, RunnerService
@@ -65,26 +64,26 @@ def main() -> None:
     parser.add_argument(
         "--poll-interval",
         type=int,
-        default=int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000")),
-        help="Poll interval in ms (default: AFL_POLL_INTERVAL_MS or 1000)",
+        default=None,
+        help="Poll interval in ms (default: from config or 1000)",
     )
     parser.add_argument(
         "--heartbeat-interval",
         type=int,
-        default=10000,
-        help="Heartbeat interval in ms (default: 10000)",
+        default=None,
+        help="Heartbeat interval in ms (default: from config or 10000)",
     )
     parser.add_argument(
         "--max-concurrent",
         type=int,
-        default=int(os.environ.get("AFL_MAX_CONCURRENT", "2")),
-        help="Max concurrent work items (default: AFL_MAX_CONCURRENT or 2)",
+        default=None,
+        help="Max concurrent work items (default: from config or 2)",
     )
     parser.add_argument(
         "--lock-duration",
         type=int,
-        default=60000,
-        help="Lock TTL in ms (default: 60000)",
+        default=None,
+        help="Lock TTL in ms (default: from config or 60000)",
     )
     parser.add_argument(
         "--port",
@@ -113,7 +112,7 @@ def main() -> None:
     parser.add_argument(
         "--registry",
         action="store_true",
-        default=os.environ.get("AFL_USE_REGISTRY", "").strip() == "1",
+        default=None,
         help="Load handler registrations from MongoDB (env: AFL_USE_REGISTRY=1)",
     )
 
@@ -135,6 +134,19 @@ def main() -> None:
     from afl.runtime.mongo_store import MongoStore
 
     config = load_config(args.config)
+
+    # Resolve argparse defaults from config
+    if args.poll_interval is None:
+        args.poll_interval = config.runner.poll_interval_ms
+    if args.heartbeat_interval is None:
+        args.heartbeat_interval = config.runner.heartbeat_interval_ms
+    if args.max_concurrent is None:
+        args.max_concurrent = config.runner.max_concurrent
+    if args.lock_duration is None:
+        args.lock_duration = config.runner.lock_duration_ms
+    if args.registry is None:
+        args.registry = config.runner.use_registry
+
     store = MongoStore.from_config(config.mongodb)
     telemetry = Telemetry(enabled=True)
     evaluator = Evaluator(persistence=store, telemetry=telemetry)

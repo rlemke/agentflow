@@ -1,0 +1,1751 @@
+{
+  "type": "Program",
+  "declarations": [
+    {
+      "type": "Namespace",
+      "name": "monitor.types",
+      "declarations": [
+        {
+          "type": "SchemaDecl",
+          "name": "SensorReading",
+          "fields": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "timestamp",
+              "type": "Long"
+            },
+            {
+              "name": "value",
+              "type": "Double"
+            },
+            {
+              "name": "unit",
+              "type": "String"
+            }
+          ],
+          "id": "1b1413e9-43d7-4e5c-b3ae-feae7532ea0d",
+          "location": {
+            "line": 15,
+            "column": 5,
+            "endLine": 22,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "ThresholdConfig",
+          "fields": [
+            {
+              "name": "low",
+              "type": "Double"
+            },
+            {
+              "name": "high",
+              "type": "Double"
+            },
+            {
+              "name": "critical_low",
+              "type": "Double"
+            },
+            {
+              "name": "critical_high",
+              "type": "Double"
+            }
+          ],
+          "id": "131ab464-1cdd-467c-a862-a5d26d3f664f",
+          "location": {
+            "line": 22,
+            "column": 5,
+            "endLine": 29,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "AnomalyResult",
+          "fields": [
+            {
+              "name": "is_anomaly",
+              "type": "Boolean"
+            },
+            {
+              "name": "severity",
+              "type": "String"
+            },
+            {
+              "name": "deviation",
+              "type": "Double"
+            },
+            {
+              "name": "threshold_breached",
+              "type": "String"
+            }
+          ],
+          "id": "131ac176-d3bf-47c5-9565-651f1c2a8edb",
+          "location": {
+            "line": 29,
+            "column": 5,
+            "endLine": 36,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "AlertPayload",
+          "fields": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "anomaly",
+              "type": "Json"
+            },
+            {
+              "name": "priority",
+              "type": "Int"
+            },
+            {
+              "name": "channel",
+              "type": "String"
+            }
+          ],
+          "id": "c8200763-d386-45ca-85a5-7d34ebeaf3c9",
+          "location": {
+            "line": 36,
+            "column": 5,
+            "endLine": 43,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "DiagnosticReport",
+          "fields": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "readings_checked",
+              "type": "Int"
+            },
+            {
+              "name": "anomalies_found",
+              "type": "Int"
+            },
+            {
+              "name": "health_status",
+              "type": "String"
+            }
+          ],
+          "id": "28b048ef-ca71-48ad-b9b2-0de67ee9e791",
+          "location": {
+            "line": 43,
+            "column": 5,
+            "endLine": 50,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "SchemaDecl",
+          "name": "MonitoringSummary",
+          "fields": [
+            {
+              "name": "total_sensors",
+              "type": "Int"
+            },
+            {
+              "name": "total_anomalies",
+              "type": "Int"
+            },
+            {
+              "name": "critical_count",
+              "type": "Int"
+            },
+            {
+              "name": "report",
+              "type": "String"
+            }
+          ],
+          "id": "f3c2cd3e-b382-44d8-a54e-ed2cfa43b5d3",
+          "location": {
+            "line": 50,
+            "column": 5,
+            "endLine": 56,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "f0b43a52-6add-49d5-aeb2-988ce9109f37",
+      "location": {
+        "line": 14,
+        "column": 1,
+        "endLine": 61,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "monitor.mixins",
+      "declarations": [
+        {
+          "type": "FacetDecl",
+          "name": "RetryPolicy",
+          "params": [
+            {
+              "name": "max_retries",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 3
+              }
+            },
+            {
+              "name": "backoff_ms",
+              "type": "Int",
+              "default": {
+                "type": "Int",
+                "value": 1000
+              }
+            }
+          ],
+          "id": "3f5d5b9d-cff3-4083-9d57-2c0cb447fb37",
+          "location": {
+            "line": 62,
+            "column": 5,
+            "endLine": 63,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "FacetDecl",
+          "name": "AlertConfig",
+          "params": [
+            {
+              "name": "channel",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "default"
+              }
+            },
+            {
+              "name": "escalate",
+              "type": "Boolean",
+              "default": {
+                "type": "Boolean",
+                "value": false
+              }
+            }
+          ],
+          "id": "3a4fe605-aae8-44b3-bc21-cf8cb405147f",
+          "location": {
+            "line": 63,
+            "column": 5,
+            "endLine": 65,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "ImplicitDecl",
+          "name": "defaultRetry",
+          "call": {
+            "type": "CallExpr",
+            "target": "RetryPolicy",
+            "args": [
+              {
+                "name": "max_retries",
+                "value": {
+                  "type": "Int",
+                  "value": 3
+                }
+              },
+              {
+                "name": "backoff_ms",
+                "value": {
+                  "type": "Int",
+                  "value": 1000
+                }
+              }
+            ],
+            "id": "221ca988-6aaf-4d2e-a5bb-f76283e34980",
+            "location": {
+              "line": 65,
+              "column": 29,
+              "endLine": 65,
+              "endColumn": 76
+            }
+          },
+          "id": "c2324420-2614-42c7-a07c-46d73f55f0c9",
+          "location": {
+            "line": 65,
+            "column": 5,
+            "endLine": 66,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "ImplicitDecl",
+          "name": "defaultAlert",
+          "call": {
+            "type": "CallExpr",
+            "target": "AlertConfig",
+            "args": [
+              {
+                "name": "channel",
+                "value": {
+                  "type": "String",
+                  "value": "default"
+                }
+              },
+              {
+                "name": "escalate",
+                "value": {
+                  "type": "Boolean",
+                  "value": false
+                }
+              }
+            ],
+            "id": "e7ac81a9-abf3-44ce-8fe8-c6f5d4f4a14a",
+            "location": {
+              "line": 66,
+              "column": 29,
+              "endLine": 66,
+              "endColumn": 79
+            }
+          },
+          "id": "870e1ae8-5eb2-4124-b5d6-2d222947daa3",
+          "location": {
+            "line": 66,
+            "column": 5,
+            "endLine": 67,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "8002313a-5987-4028-b87f-4feb3a6bbdc2",
+      "location": {
+        "line": 61,
+        "column": 1,
+        "endLine": 72,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "monitor.Ingestion",
+      "uses": [
+        "monitor.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "IngestReading",
+          "doc": {
+            "description": "Ingest a raw sensor reading with optional last known value.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "value",
+              "type": "Double"
+            },
+            {
+              "name": "unit",
+              "type": "String"
+            },
+            {
+              "name": "last_reading",
+              "type": "Json",
+              "default": {
+                "type": "Null"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "reading",
+              "type": "SensorReading"
+            },
+            {
+              "name": "quality",
+              "type": "String"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a sensor ingestion agent that processes raw readings.",
+            "template": "Ingest reading from sensor {sensor_id}: value={value} {unit}, last={last_reading}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "7e6b670e-25aa-4983-8fec-201a720a9c50",
+            "location": {
+              "line": 81,
+              "column": 59,
+              "endLine": 85,
+              "endColumn": 6
+            }
+          },
+          "id": "0e56388a-e340-4d25-bfec-7ce745809739",
+          "location": {
+            "line": 75,
+            "column": 5,
+            "endLine": 87,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ValidateReading",
+          "doc": {
+            "description": "Validate a reading against sensor-specific configuration.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "reading",
+              "type": "Json"
+            },
+            {
+              "name": "sensor_config",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "valid",
+              "type": "Boolean"
+            },
+            {
+              "name": "calibrated_value",
+              "type": "Double"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a sensor validation agent that checks readings against config.",
+            "template": "Validate reading {reading} against config {sensor_config}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "f9365cfa-5571-47fb-876e-9f09ad392509",
+            "location": {
+              "line": 91,
+              "column": 60,
+              "endLine": 95,
+              "endColumn": 6
+            }
+          },
+          "id": "4624f56c-edde-4f3d-aa16-bfcce1bc0b0f",
+          "location": {
+            "line": 87,
+            "column": 5,
+            "endLine": 96,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "1ce9b367-1438-48a2-ba69-64b8897d8f5f",
+      "location": {
+        "line": 72,
+        "column": 1,
+        "endLine": 101,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "monitor.Analysis",
+      "uses": [
+        "monitor.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "DetectAnomaly",
+          "doc": {
+            "description": "Detect anomalies using threshold values including negative thresholds.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "reading",
+              "type": "Json"
+            },
+            {
+              "name": "threshold_low",
+              "type": "Double"
+            },
+            {
+              "name": "threshold_high",
+              "type": "Double"
+            },
+            {
+              "name": "critical_low",
+              "type": "Double"
+            },
+            {
+              "name": "critical_high",
+              "type": "Double"
+            }
+          ],
+          "returns": [
+            {
+              "name": "result",
+              "type": "AnomalyResult"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are an anomaly detection agent that checks readings against thresholds.",
+            "template": "Detect anomaly for {reading} with thresholds low={threshold_low} high={threshold_high} crit_low={critical_low} crit_high={critical_high}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "e72dc065-38b8-42cf-a95f-08168983387b",
+            "location": {
+              "line": 111,
+              "column": 41,
+              "endLine": 115,
+              "endColumn": 6
+            }
+          },
+          "id": "5ea451e0-0f47-43e4-94b2-a7b8f113f5b2",
+          "location": {
+            "line": 104,
+            "column": 5,
+            "endLine": 117,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "ClassifyAlert",
+          "doc": {
+            "description": "Classify alert severity; null override_config uses default priority.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "anomaly",
+              "type": "Json"
+            },
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "override_config",
+              "type": "Json",
+              "default": {
+                "type": "Null"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "alert",
+              "type": "AlertPayload"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are an alert classification agent that assigns priority and channel.",
+            "template": "Classify alert for sensor {sensor_id}: anomaly={anomaly}, override={override_config}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "0c1f05c8-9b90-478e-9fec-319e1bdaf1ff",
+            "location": {
+              "line": 122,
+              "column": 39,
+              "endLine": 126,
+              "endColumn": 6
+            }
+          },
+          "id": "07f9bbf4-be91-421e-b594-7ae0b2f94d60",
+          "location": {
+            "line": 117,
+            "column": 5,
+            "endLine": 127,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "948e7ab5-b346-4368-9854-915b2d6aa31d",
+      "location": {
+        "line": 101,
+        "column": 1,
+        "endLine": 132,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "monitor.Reporting",
+      "uses": [
+        "monitor.types"
+      ],
+      "declarations": [
+        {
+          "type": "EventFacetDecl",
+          "name": "RunDiagnostics",
+          "doc": {
+            "description": "Run diagnostics on a sensor's anomaly history.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "anomaly_result",
+              "type": "Json"
+            },
+            {
+              "name": "reading",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "report",
+              "type": "DiagnosticReport"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a diagnostic agent that assesses sensor health.",
+            "template": "Run diagnostics for sensor {sensor_id}: anomaly={anomaly_result}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "220426a2-ac0a-408d-994c-04fac5bcf5a8",
+            "location": {
+              "line": 140,
+              "column": 44,
+              "endLine": 144,
+              "endColumn": 6
+            }
+          },
+          "id": "bac3901a-d5d3-4e31-a94c-34d0680edff0",
+          "location": {
+            "line": 135,
+            "column": 5,
+            "endLine": 146,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "EventFacetDecl",
+          "name": "GenerateSummary",
+          "doc": {
+            "description": "Generate monitoring summary across all processed readings.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "diagnostic",
+              "type": "Json"
+            },
+            {
+              "name": "alert",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "summary",
+              "type": "MonitoringSummary"
+            }
+          ],
+          "body": {
+            "type": "PromptBlock",
+            "system": "You are a summary agent that aggregates monitoring results.",
+            "template": "Summarize monitoring for sensor {sensor_id}: diagnostic={diagnostic}, alert={alert}",
+            "model": "claude-sonnet-4-20250514",
+            "id": "960b2d93-b3a1-4cf0-abbc-54409b1f73e3",
+            "location": {
+              "line": 151,
+              "column": 46,
+              "endLine": 155,
+              "endColumn": 6
+            }
+          },
+          "id": "06fa3c43-d131-430b-a9b4-f412867be376",
+          "location": {
+            "line": 146,
+            "column": 5,
+            "endLine": 156,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "d88fe096-28db-4e20-bd93-aea6eeb49a68",
+      "location": {
+        "line": 132,
+        "column": 1,
+        "endLine": 161,
+        "endColumn": 1
+      }
+    },
+    {
+      "type": "Namespace",
+      "name": "monitor.workflows",
+      "uses": [
+        "monitor.types",
+        "monitor.mixins",
+        "monitor.Ingestion",
+        "monitor.Analysis",
+        "monitor.Reporting"
+      ],
+      "declarations": [
+        {
+          "type": "WorkflowDecl",
+          "name": "MonitorSensors",
+          "doc": {
+            "description": "Monitor a single sensor reading end-to-end.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "sensor_id",
+              "type": "String"
+            },
+            {
+              "name": "value",
+              "type": "Double"
+            },
+            {
+              "name": "unit",
+              "type": "String"
+            },
+            {
+              "name": "sensor_configs",
+              "type": "Json"
+            }
+          ],
+          "returns": [
+            {
+              "name": "summary",
+              "type": "MonitoringSummary"
+            },
+            {
+              "name": "report",
+              "type": "String"
+            }
+          ],
+          "pre_script": {
+            "type": "ScriptBlock",
+            "language": "python",
+            "code": "result[\"status\"] = \"Starting monitor for sensor \" + params.get(\"sensor_id\", \"unknown\")\n    ",
+            "id": "0cbd9491-af0f-47e8-a6c7-348f313621c3",
+            "location": {
+              "line": 177,
+              "column": 14,
+              "endLine": 177,
+              "endColumn": 116
+            }
+          },
+          "body": [
+            {
+              "type": "AndThenBlock",
+              "steps": [
+                {
+                  "type": "StepStmt",
+                  "name": "cfg",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ThresholdConfig",
+                    "args": [
+                      {
+                        "name": "low",
+                        "value": {
+                          "type": "UnaryExpr",
+                          "operator": "-",
+                          "operand": {
+                            "type": "Double",
+                            "value": 10.0
+                          }
+                        }
+                      },
+                      {
+                        "name": "high",
+                        "value": {
+                          "type": "Double",
+                          "value": 50.0
+                        }
+                      },
+                      {
+                        "name": "critical_low",
+                        "value": {
+                          "type": "UnaryExpr",
+                          "operator": "-",
+                          "operand": {
+                            "type": "Double",
+                            "value": 40.0
+                          }
+                        }
+                      },
+                      {
+                        "name": "critical_high",
+                        "value": {
+                          "type": "Double",
+                          "value": 80.0
+                        }
+                      }
+                    ],
+                    "id": "6c77402d-7b42-45f7-9983-735f9f27feb4",
+                    "location": {
+                      "line": 180,
+                      "column": 15,
+                      "endLine": 180,
+                      "endColumn": 100
+                    }
+                  },
+                  "id": "01649b38-b941-4390-b142-aaacd455f468",
+                  "location": {
+                    "line": 180,
+                    "column": 9,
+                    "endLine": 180,
+                    "endColumn": 100
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "ingest",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "IngestReading",
+                    "args": [
+                      {
+                        "name": "sensor_id",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "sensor_id"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "value",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "value"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "unit",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "unit"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "last_reading",
+                        "value": {
+                          "type": "Null"
+                        }
+                      }
+                    ],
+                    "mixins": [
+                      {
+                        "type": "MixinCall",
+                        "target": "RetryPolicy",
+                        "args": [
+                          {
+                            "name": "max_retries",
+                            "value": {
+                              "type": "Int",
+                              "value": 5
+                            }
+                          },
+                          {
+                            "name": "backoff_ms",
+                            "value": {
+                              "type": "Int",
+                              "value": 2000
+                            }
+                          }
+                        ],
+                        "alias": "retry"
+                      }
+                    ],
+                    "id": "4fc473ed-843a-4788-9416-54ccbf038e1b",
+                    "location": {
+                      "line": 181,
+                      "column": 18,
+                      "endLine": 181,
+                      "endColumn": 171
+                    }
+                  },
+                  "id": "f4a79343-9cf2-4bdd-a18c-873ae29b07b3",
+                  "location": {
+                    "line": 181,
+                    "column": 9,
+                    "endLine": 181,
+                    "endColumn": 171
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "validate",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "ValidateReading",
+                    "args": [
+                      {
+                        "name": "reading",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "ingest",
+                            "reading"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "sensor_config",
+                        "value": {
+                          "type": "IndexExpr",
+                          "target": {
+                            "type": "InputRef",
+                            "path": [
+                              "sensor_configs"
+                            ]
+                          },
+                          "index": {
+                            "type": "StepRef",
+                            "path": [
+                              "ingest",
+                              "reading",
+                              "sensor_id"
+                            ]
+                          }
+                        }
+                      }
+                    ],
+                    "id": "220f37bc-a433-4b0d-877c-5c8be4ba3531",
+                    "location": {
+                      "line": 182,
+                      "column": 20,
+                      "endLine": 182,
+                      "endColumn": 121
+                    }
+                  },
+                  "id": "9c323c21-3861-47cc-a316-44d18eb9c40e",
+                  "location": {
+                    "line": 182,
+                    "column": 9,
+                    "endLine": 182,
+                    "endColumn": 121
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "detect",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "DetectAnomaly",
+                    "args": [
+                      {
+                        "name": "reading",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "ingest",
+                            "reading"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "threshold_low",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "cfg",
+                            "low"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "threshold_high",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "cfg",
+                            "high"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "critical_low",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "cfg",
+                            "critical_low"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "critical_high",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "cfg",
+                            "critical_high"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "85ce087f-6cde-4136-b944-5d29a877225b",
+                    "location": {
+                      "line": 183,
+                      "column": 18,
+                      "endLine": 183,
+                      "endColumn": 177
+                    }
+                  },
+                  "body": {
+                    "type": "AndThenBlock",
+                    "steps": [
+                      {
+                        "type": "StepStmt",
+                        "name": "classify",
+                        "call": {
+                          "type": "CallExpr",
+                          "target": "ClassifyAlert",
+                          "args": [
+                            {
+                              "name": "anomaly",
+                              "value": {
+                                "type": "StepRef",
+                                "path": [
+                                  "detect",
+                                  "result"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "sensor_id",
+                              "value": {
+                                "type": "InputRef",
+                                "path": [
+                                  "sensor_id"
+                                ]
+                              }
+                            },
+                            {
+                              "name": "override_config",
+                              "value": {
+                                "type": "Null"
+                              }
+                            }
+                          ],
+                          "mixins": [
+                            {
+                              "type": "MixinCall",
+                              "target": "AlertConfig",
+                              "args": [
+                                {
+                                  "name": "channel",
+                                  "value": {
+                                    "type": "String",
+                                    "value": "alerts"
+                                  }
+                                },
+                                {
+                                  "name": "escalate",
+                                  "value": {
+                                    "type": "Boolean",
+                                    "value": true
+                                  }
+                                }
+                              ],
+                              "alias": "alertcfg"
+                            }
+                          ],
+                          "id": "93acd9fc-c5d1-4c4e-b70f-482e97cdb175",
+                          "location": {
+                            "line": 184,
+                            "column": 24,
+                            "endLine": 184,
+                            "endColumn": 177
+                          }
+                        },
+                        "id": "8baa6d0e-ad84-4452-bf89-1f1010e5e525",
+                        "location": {
+                          "line": 184,
+                          "column": 13,
+                          "endLine": 184,
+                          "endColumn": 177
+                        }
+                      }
+                    ],
+                    "id": "83dd5f66-57b0-4c37-bdcc-fa458c41c70b",
+                    "location": {
+                      "line": 183,
+                      "column": 178,
+                      "endLine": 186,
+                      "endColumn": 1
+                    }
+                  },
+                  "id": "3175f4e8-340e-4aaa-86ad-280179234910",
+                  "location": {
+                    "line": 183,
+                    "column": 9,
+                    "endLine": 186,
+                    "endColumn": 1
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "diag",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "RunDiagnostics",
+                    "args": [
+                      {
+                        "name": "sensor_id",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "sensor_id"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "anomaly_result",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "detect",
+                            "result"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "reading",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "ingest",
+                            "reading"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "22a9abf4-1bb2-4f44-a683-b104eb777c15",
+                    "location": {
+                      "line": 186,
+                      "column": 16,
+                      "endLine": 186,
+                      "endColumn": 113
+                    }
+                  },
+                  "id": "b5577d0d-cdc7-4615-9b5b-490d407f9a0b",
+                  "location": {
+                    "line": 186,
+                    "column": 9,
+                    "endLine": 186,
+                    "endColumn": 113
+                  }
+                },
+                {
+                  "type": "StepStmt",
+                  "name": "summ",
+                  "call": {
+                    "type": "CallExpr",
+                    "target": "GenerateSummary",
+                    "args": [
+                      {
+                        "name": "sensor_id",
+                        "value": {
+                          "type": "InputRef",
+                          "path": [
+                            "sensor_id"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "diagnostic",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "diag",
+                            "report"
+                          ]
+                        }
+                      },
+                      {
+                        "name": "alert",
+                        "value": {
+                          "type": "StepRef",
+                          "path": [
+                            "classify",
+                            "alert"
+                          ]
+                        }
+                      }
+                    ],
+                    "id": "17fe1d3d-fd28-4257-b675-bc4c44eb5e94",
+                    "location": {
+                      "line": 187,
+                      "column": 16,
+                      "endLine": 187,
+                      "endColumn": 106
+                    }
+                  },
+                  "id": "eff5089c-d931-4179-8cda-194533462a5d",
+                  "location": {
+                    "line": 187,
+                    "column": 9,
+                    "endLine": 187,
+                    "endColumn": 106
+                  }
+                }
+              ],
+              "yield": {
+                "type": "YieldStmt",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "MonitorSensors",
+                  "args": [
+                    {
+                      "name": "summary",
+                      "value": {
+                        "type": "StepRef",
+                        "path": [
+                          "summ",
+                          "summary"
+                        ]
+                      }
+                    },
+                    {
+                      "name": "report",
+                      "value": {
+                        "type": "ConcatExpr",
+                        "operands": [
+                          {
+                            "type": "String",
+                            "value": "Sensor "
+                          },
+                          {
+                            "type": "InputRef",
+                            "path": [
+                              "sensor_id"
+                            ]
+                          },
+                          {
+                            "type": "String",
+                            "value": " status: "
+                          },
+                          {
+                            "type": "StepRef",
+                            "path": [
+                              "diag",
+                              "report",
+                              "health_status"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "id": "b3329e3f-5540-4e74-aff8-5f34f8c90db1",
+                  "location": {
+                    "line": 188,
+                    "column": 15,
+                    "endLine": 188,
+                    "endColumn": 132
+                  }
+                },
+                "id": "a81f81b4-5600-4238-aa30-4cea937075bc",
+                "location": {
+                  "line": 188,
+                  "column": 9,
+                  "endLine": 188,
+                  "endColumn": 132
+                }
+              },
+              "id": "ba24bbec-35c9-452e-b271-f6f3bee069fb",
+              "location": {
+                "line": 179,
+                "column": 2,
+                "endLine": 189,
+                "endColumn": 6
+              }
+            },
+            {
+              "type": "AndThenBlock",
+              "script": {
+                "type": "ScriptBlock",
+                "language": "python",
+                "code": "result[\"report\"] = (\n    \"Completed monitoring for sensor \" + params.get(\"sensor_id\", \"unknown\")\n    + \" status=\" + params.get(\"report\", \"?\")\n)\n    ",
+                "id": "6671675c-6153-46de-9152-a94b46767fa7",
+                "location": {
+                  "line": 189,
+                  "column": 22,
+                  "endLine": 189,
+                  "endColumn": 190
+                }
+              },
+              "id": "3b95ea36-876a-4648-a317-130c2f3d87f5",
+              "location": {
+                "line": 189,
+                "column": 7,
+                "endLine": 196,
+                "endColumn": 1
+              }
+            }
+          ],
+          "id": "de046300-5258-4db3-9523-f05dca587622",
+          "location": {
+            "line": 168,
+            "column": 5,
+            "endLine": 196,
+            "endColumn": 1
+          }
+        },
+        {
+          "type": "WorkflowDecl",
+          "name": "BatchMonitor",
+          "doc": {
+            "description": "Batch monitor multiple sensors using foreach.",
+            "params": [],
+            "returns": []
+          },
+          "params": [
+            {
+              "name": "sensor_ids",
+              "type": "Json"
+            },
+            {
+              "name": "default_value",
+              "type": "Double",
+              "default": {
+                "type": "Double",
+                "value": 25.0
+              }
+            },
+            {
+              "name": "unit",
+              "type": "String",
+              "default": {
+                "type": "String",
+                "value": "celsius"
+              }
+            }
+          ],
+          "returns": [
+            {
+              "name": "report",
+              "type": "String"
+            },
+            {
+              "name": "summary",
+              "type": "String"
+            }
+          ],
+          "body": {
+            "type": "AndThenBlock",
+            "steps": [
+              {
+                "type": "StepStmt",
+                "name": "batch_cfg",
+                "call": {
+                  "type": "CallExpr",
+                  "target": "ThresholdConfig",
+                  "args": [
+                    {
+                      "name": "low",
+                      "value": {
+                        "type": "UnaryExpr",
+                        "operator": "-",
+                        "operand": {
+                          "type": "Double",
+                          "value": 10.0
+                        }
+                      }
+                    },
+                    {
+                      "name": "high",
+                      "value": {
+                        "type": "Double",
+                        "value": 50.0
+                      }
+                    },
+                    {
+                      "name": "critical_low",
+                      "value": {
+                        "type": "UnaryExpr",
+                        "operator": "-",
+                        "operand": {
+                          "type": "Double",
+                          "value": 40.0
+                        }
+                      }
+                    },
+                    {
+                      "name": "critical_high",
+                      "value": {
+                        "type": "Double",
+                        "value": 80.0
+                      }
+                    }
+                  ],
+                  "id": "894aa98d-c63d-47d6-928e-4b1d4029fe5a",
+                  "location": {
+                    "line": 205,
+                    "column": 21,
+                    "endLine": 205,
+                    "endColumn": 106
+                  }
+                },
+                "body": {
+                  "type": "AndThenBlock",
+                  "foreach": {
+                    "type": "ForeachClause",
+                    "variable": "sid",
+                    "iterable": {
+                      "type": "InputRef",
+                      "path": [
+                        "sensor_ids"
+                      ]
+                    }
+                  },
+                  "steps": [
+                    {
+                      "type": "StepStmt",
+                      "name": "reading",
+                      "call": {
+                        "type": "CallExpr",
+                        "target": "IngestReading",
+                        "args": [
+                          {
+                            "name": "sensor_id",
+                            "value": {
+                              "type": "InputRef",
+                              "path": [
+                                "sid"
+                              ]
+                            }
+                          },
+                          {
+                            "name": "value",
+                            "value": {
+                              "type": "InputRef",
+                              "path": [
+                                "default_value"
+                              ]
+                            }
+                          },
+                          {
+                            "name": "unit",
+                            "value": {
+                              "type": "InputRef",
+                              "path": [
+                                "unit"
+                              ]
+                            }
+                          },
+                          {
+                            "name": "last_reading",
+                            "value": {
+                              "type": "Null"
+                            }
+                          }
+                        ],
+                        "mixins": [
+                          {
+                            "type": "MixinCall",
+                            "target": "RetryPolicy",
+                            "args": [
+                              {
+                                "name": "max_retries",
+                                "value": {
+                                  "type": "Int",
+                                  "value": 3
+                                }
+                              }
+                            ],
+                            "alias": "retry"
+                          }
+                        ],
+                        "id": "daa93607-9950-4112-a957-316551af7c91",
+                        "location": {
+                          "line": 206,
+                          "column": 23,
+                          "endLine": 206,
+                          "endColumn": 159
+                        }
+                      },
+                      "body": {
+                        "type": "AndThenBlock",
+                        "steps": [
+                          {
+                            "type": "StepStmt",
+                            "name": "anomaly",
+                            "call": {
+                              "type": "CallExpr",
+                              "target": "DetectAnomaly",
+                              "args": [
+                                {
+                                  "name": "reading",
+                                  "value": {
+                                    "type": "StepRef",
+                                    "path": [
+                                      "reading",
+                                      "reading"
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": "threshold_low",
+                                  "value": {
+                                    "type": "StepRef",
+                                    "path": [
+                                      "batch_cfg",
+                                      "low"
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": "threshold_high",
+                                  "value": {
+                                    "type": "StepRef",
+                                    "path": [
+                                      "batch_cfg",
+                                      "high"
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": "critical_low",
+                                  "value": {
+                                    "type": "StepRef",
+                                    "path": [
+                                      "batch_cfg",
+                                      "critical_low"
+                                    ]
+                                  }
+                                },
+                                {
+                                  "name": "critical_high",
+                                  "value": {
+                                    "type": "StepRef",
+                                    "path": [
+                                      "batch_cfg",
+                                      "critical_high"
+                                    ]
+                                  }
+                                }
+                              ],
+                              "id": "72fab48c-5496-43a0-b3be-754a5592a7cc",
+                              "location": {
+                                "line": 207,
+                                "column": 27,
+                                "endLine": 207,
+                                "endColumn": 211
+                              }
+                            },
+                            "id": "534f3011-0d8b-4f1d-8106-26fe4aba17f4",
+                            "location": {
+                              "line": 207,
+                              "column": 17,
+                              "endLine": 207,
+                              "endColumn": 211
+                            }
+                          }
+                        ],
+                        "id": "63c7d22d-91c5-49b6-bd5c-0effcc95da23",
+                        "location": {
+                          "line": 206,
+                          "column": 160,
+                          "endLine": 209,
+                          "endColumn": 1
+                        }
+                      },
+                      "id": "12f49748-f1af-467e-b944-63ea64c6c0d4",
+                      "location": {
+                        "line": 206,
+                        "column": 13,
+                        "endLine": 209,
+                        "endColumn": 1
+                      }
+                    }
+                  ],
+                  "yield": {
+                    "type": "YieldStmt",
+                    "call": {
+                      "type": "CallExpr",
+                      "target": "BatchMonitor",
+                      "args": [
+                        {
+                          "name": "summary",
+                          "value": {
+                            "type": "ConcatExpr",
+                            "operands": [
+                              {
+                                "type": "String",
+                                "value": "Processed sensor: "
+                              },
+                              {
+                                "type": "InputRef",
+                                "path": [
+                                  "sid"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "id": "13435b76-5afa-4bf1-aa73-307df394339f",
+                      "location": {
+                        "line": 209,
+                        "column": 19,
+                        "endLine": 209,
+                        "endColumn": 72
+                      }
+                    },
+                    "id": "263bbfd0-5de7-4702-93ea-fc81d3d8444c",
+                    "location": {
+                      "line": 209,
+                      "column": 13,
+                      "endLine": 209,
+                      "endColumn": 72
+                    }
+                  },
+                  "id": "da3b5cef-9d3e-40ea-8896-2296ef9bc521",
+                  "location": {
+                    "line": 205,
+                    "column": 107,
+                    "endLine": 211,
+                    "endColumn": 1
+                  }
+                },
+                "id": "21383e2d-9ac7-44ce-a375-3c2df25aacb0",
+                "location": {
+                  "line": 205,
+                  "column": 9,
+                  "endLine": 211,
+                  "endColumn": 1
+                }
+              }
+            ],
+            "yield": {
+              "type": "YieldStmt",
+              "call": {
+                "type": "CallExpr",
+                "target": "BatchMonitor",
+                "args": [
+                  {
+                    "name": "report",
+                    "value": {
+                      "type": "String",
+                      "value": "Batch configured"
+                    }
+                  },
+                  {
+                    "name": "summary",
+                    "value": {
+                      "type": "ConcatExpr",
+                      "operands": [
+                        {
+                          "type": "String",
+                          "value": "Batch started with "
+                        },
+                        {
+                          "type": "BinaryExpr",
+                          "operator": "*",
+                          "left": {
+                            "type": "BinaryExpr",
+                            "operator": "+",
+                            "left": {
+                              "type": "StepRef",
+                              "path": [
+                                "batch_cfg",
+                                "high"
+                              ]
+                            },
+                            "right": {
+                              "type": "StepRef",
+                              "path": [
+                                "batch_cfg",
+                                "critical_high"
+                              ]
+                            }
+                          },
+                          "right": {
+                            "type": "Int",
+                            "value": 1
+                          }
+                        },
+                        {
+                          "type": "String",
+                          "value": " total threshold"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "id": "80125a23-e9d4-4b15-9ee3-2a3bf0bf72ff",
+                "location": {
+                  "line": 211,
+                  "column": 15,
+                  "endLine": 211,
+                  "endColumn": 161
+                }
+              },
+              "id": "99d7e1ee-9766-41cb-b3df-0c9568585b7d",
+              "location": {
+                "line": 211,
+                "column": 9,
+                "endLine": 211,
+                "endColumn": 161
+              }
+            },
+            "id": "781016ed-ed48-4d14-9c1b-e06a4e8063dd",
+            "location": {
+              "line": 204,
+              "column": 7,
+              "endLine": 213,
+              "endColumn": 1
+            }
+          },
+          "id": "60a891a8-d22a-4c32-899e-76308e53d399",
+          "location": {
+            "line": 196,
+            "column": 5,
+            "endLine": 213,
+            "endColumn": 1
+          }
+        }
+      ],
+      "id": "1b94eeac-ccdb-429a-b565-3e1f73531acb",
+      "location": {
+        "line": 161,
+        "column": 1,
+        "endLine": 214,
+        "endColumn": 1
+      }
+    }
+  ],
+  "id": "b94cfee6-bd3b-441d-b411-d048020138ed"
+}

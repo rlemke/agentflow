@@ -24,7 +24,6 @@ through MongoDB locks and server registration.
 
 import json as _json
 import logging
-import os
 import socket
 import threading
 import time
@@ -58,6 +57,9 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
+_SENTINEL = -1
+
+
 @dataclass
 class RunnerConfig:
     """Configuration for the runner service."""
@@ -67,11 +69,11 @@ class RunnerConfig:
     server_name: str = ""
     topics: list[str] = field(default_factory=list)
     task_list: str = "default"
-    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
-    heartbeat_interval_ms: int = 10000
-    lock_duration_ms: int = 60000
+    poll_interval_ms: int = _SENTINEL
+    heartbeat_interval_ms: int = _SENTINEL
+    lock_duration_ms: int = _SENTINEL
     lock_extend_interval_ms: int = 20000
-    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
+    max_concurrent: int = _SENTINEL
     shutdown_timeout_ms: int = 30000
     http_port: int = 8080
     http_max_port_attempts: int = 20
@@ -79,6 +81,22 @@ class RunnerConfig:
     def __post_init__(self) -> None:
         if not self.server_name:
             self.server_name = socket.gethostname()
+        if self.poll_interval_ms == _SENTINEL:
+            from ...config import get_config
+
+            self.poll_interval_ms = get_config().runner.poll_interval_ms
+        if self.max_concurrent == _SENTINEL:
+            from ...config import get_config
+
+            self.max_concurrent = get_config().runner.max_concurrent
+        if self.heartbeat_interval_ms == _SENTINEL:
+            from ...config import get_config
+
+            self.heartbeat_interval_ms = get_config().runner.heartbeat_interval_ms
+        if self.lock_duration_ms == _SENTINEL:
+            from ...config import get_config
+
+            self.lock_duration_ms = get_config().runner.lock_duration_ms
 
 
 class _StatusHandler(BaseHTTPRequestHandler):
@@ -157,6 +175,8 @@ class RunnerService:
         self._start_time_ms: int = 0
         self._http_server: HTTPServer | None = None
         self._http_thread: threading.Thread | None = None
+        self._last_sweep: int = 0
+        self._sweep_interval_ms: int = 5000
 
         # Register built-in task handler
         self._tool_registry.register("afl:execute", self._handle_execute_workflow)
@@ -282,6 +302,7 @@ class RunnerService:
         while not self._stopping.is_set():
             try:
                 self._poll_cycle()
+                self._maybe_sweep_stuck_steps()
             except Exception:
                 logger.exception("Poll cycle error")
             self._stopping.wait(interval_s)
@@ -871,6 +892,35 @@ class RunnerService:
         return find_workflow(program_dict, workflow_name)
 
     # =========================================================================
+    # Stuck-Step Recovery Sweep
+    # =========================================================================
+
+    def _maybe_sweep_stuck_steps(self) -> None:
+        """Periodically resume workflows with steps stuck at EventTransmit.
+
+        After continue_step() persists request_transition=True, the
+        subsequent _resume_workflow() may fail silently (AST not found,
+        evaluator exception, etc.).  This sweep retries the resume so
+        that steps don't stay stuck indefinitely.
+        """
+        now = _current_time_ms()
+        if now - self._last_sweep < self._sweep_interval_ms:
+            return
+        self._last_sweep = now
+
+        try:
+            workflow_ids = self._persistence.get_pending_resume_workflow_ids()
+            if workflow_ids:
+                logger.info(
+                    "Stuck-step sweep: %d workflow(s) need resume",
+                    len(workflow_ids),
+                )
+            for wf_id in workflow_ids:
+                self._resume_workflow(wf_id)
+        except Exception:
+            logger.debug("Stuck-step sweep failed", exc_info=True)
+
+    # =========================================================================
     # Workflow Resume
     # =========================================================================
 
@@ -890,13 +940,21 @@ class RunnerService:
 
         if workflow_ast is None:
             logger.warning(
-                "No AST available for workflow %s, skipping resume",
+                "No AST available for workflow %s, skipping resume "
+                "(check that workflow and flow exist in persistence)",
                 workflow_id,
             )
             return
 
         program_ast = self._program_ast_cache.get(workflow_id)
         result = self._evaluator.resume(workflow_id, workflow_ast, program_ast=program_ast)
+
+        if result.status == ExecutionStatus.ERROR:
+            logger.warning(
+                "Workflow resume returned ERROR: workflow_id=%s error=%s",
+                workflow_id,
+                result.error,
+            )
 
         # Update runner state on terminal status
         if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):

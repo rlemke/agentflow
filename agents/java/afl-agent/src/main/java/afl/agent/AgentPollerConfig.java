@@ -95,6 +95,66 @@ public record AgentPollerConfig(
                         database
                 );
             }
+
+            // Runner section
+            JsonNode runner = root.get("runner");
+            if (runner != null) {
+                long poll = Optional.ofNullable(runner.get("pollIntervalMs"))
+                        .map(JsonNode::asLong)
+                        .orElse(cfg.pollIntervalMs());
+                int maxConc = Optional.ofNullable(runner.get("maxConcurrent"))
+                        .map(JsonNode::asInt)
+                        .orElse(cfg.maxConcurrent());
+                long heartbeat = Optional.ofNullable(runner.get("heartbeatIntervalMs"))
+                        .map(JsonNode::asLong)
+                        .orElse(cfg.heartbeatIntervalMs());
+
+                cfg = new AgentPollerConfig(
+                        cfg.serviceName(),
+                        cfg.serverGroup(),
+                        cfg.serverName(),
+                        cfg.taskList(),
+                        poll,
+                        maxConc,
+                        heartbeat,
+                        cfg.mongoUrl(),
+                        cfg.database()
+                );
+            }
+
+            // AFL_ENV overlay
+            String envName = System.getenv("AFL_ENV");
+            if (envName != null && !envName.isEmpty()) {
+                File overlayFile = new File(new File(path).getParent(), "afl.config." + envName + ".json");
+                if (overlayFile.exists()) {
+                    try {
+                        JsonNode overlay = mapper.readTree(overlayFile);
+                        JsonNode oMongo = overlay.get("mongodb");
+                        if (oMongo != null) {
+                            String oUrl = Optional.ofNullable(oMongo.get("url"))
+                                    .map(JsonNode::asText).filter(s -> !s.isEmpty()).orElse(cfg.mongoUrl());
+                            String oDb = Optional.ofNullable(oMongo.get("database"))
+                                    .map(JsonNode::asText).filter(s -> !s.isEmpty()).orElse(cfg.database());
+                            cfg = new AgentPollerConfig(cfg.serviceName(), cfg.serverGroup(), cfg.serverName(),
+                                    cfg.taskList(), cfg.pollIntervalMs(), cfg.maxConcurrent(),
+                                    cfg.heartbeatIntervalMs(), oUrl, oDb);
+                        }
+                        JsonNode oRunner = overlay.get("runner");
+                        if (oRunner != null) {
+                            long oPoll = Optional.ofNullable(oRunner.get("pollIntervalMs"))
+                                    .map(JsonNode::asLong).orElse(cfg.pollIntervalMs());
+                            int oMaxConc = Optional.ofNullable(oRunner.get("maxConcurrent"))
+                                    .map(JsonNode::asInt).orElse(cfg.maxConcurrent());
+                            long oHb = Optional.ofNullable(oRunner.get("heartbeatIntervalMs"))
+                                    .map(JsonNode::asLong).orElse(cfg.heartbeatIntervalMs());
+                            cfg = new AgentPollerConfig(cfg.serviceName(), cfg.serverGroup(), cfg.serverName(),
+                                    cfg.taskList(), oPoll, oMaxConc, oHb, cfg.mongoUrl(), cfg.database());
+                        }
+                    } catch (Exception ignored) {
+                        // Overlay parse error — use base config
+                    }
+                }
+            }
         } catch (Exception e) {
             // Ignore file read/parse errors, use defaults
         }
@@ -153,21 +213,33 @@ public record AgentPollerConfig(
         String database = Optional.ofNullable(System.getenv("AFL_MONGODB_DATABASE"))
                 .filter(s -> !s.isEmpty())
                 .orElse(cfg.database());
+        long pollMs = cfg.pollIntervalMs();
+        int maxConc = cfg.maxConcurrent();
+        long hbMs = cfg.heartbeatIntervalMs();
+        try {
+            String v = System.getenv("AFL_POLL_INTERVAL_MS");
+            if (v != null && !v.isEmpty()) pollMs = Long.parseLong(v);
+        } catch (NumberFormatException ignored) {}
+        try {
+            String v = System.getenv("AFL_MAX_CONCURRENT");
+            if (v != null && !v.isEmpty()) maxConc = Integer.parseInt(v);
+        } catch (NumberFormatException ignored) {}
+        try {
+            String v = System.getenv("AFL_HEARTBEAT_INTERVAL_MS");
+            if (v != null && !v.isEmpty()) hbMs = Long.parseLong(v);
+        } catch (NumberFormatException ignored) {}
 
-        if (!mongoUrl.equals(cfg.mongoUrl()) || !database.equals(cfg.database())) {
-            return new AgentPollerConfig(
-                    cfg.serviceName(),
-                    cfg.serverGroup(),
-                    cfg.serverName(),
-                    cfg.taskList(),
-                    cfg.pollIntervalMs(),
-                    cfg.maxConcurrent(),
-                    cfg.heartbeatIntervalMs(),
-                    mongoUrl,
-                    database
-            );
-        }
-        return cfg;
+        return new AgentPollerConfig(
+                cfg.serviceName(),
+                cfg.serverGroup(),
+                cfg.serverName(),
+                cfg.taskList(),
+                pollMs,
+                maxConc,
+                hbMs,
+                mongoUrl,
+                database
+        );
     }
 
     /**

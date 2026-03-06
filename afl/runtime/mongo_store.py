@@ -72,6 +72,7 @@ from .entities import (
     WorkflowDefinition,
 )
 from .persistence import IterationChanges, PersistenceAPI
+from .states import StepState
 from .step import StepDefinition
 from .types import BlockId, StepId, VersionInfo, WorkflowId
 
@@ -279,6 +280,16 @@ class MongoStore(PersistenceAPI):
             }
         )
         return [self._doc_to_step(doc) for doc in docs]
+
+    def get_pending_resume_workflow_ids(self) -> list[str]:
+        """Get workflow IDs with EventTransmit steps awaiting resume.
+
+        Uses a MongoDB distinct query for efficiency.
+        """
+        return self._db.steps.distinct(
+            "workflow_id",
+            {"state": StepState.EVENT_TRANSMIT, "request_transition": True},
+        )
 
     def get_steps_by_state(self, state: str) -> Sequence[StepDefinition]:
         """Fetch all steps in a given state."""

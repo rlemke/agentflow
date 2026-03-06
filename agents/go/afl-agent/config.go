@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -78,9 +79,17 @@ type mongoConfig struct {
 	Database string `json:"database"`
 }
 
+// runnerConfig represents the runner section of afl.config.json.
+type runnerConfig struct {
+	PollIntervalMs    *int `json:"pollIntervalMs"`
+	MaxConcurrent     *int `json:"maxConcurrent"`
+	HeartbeatIntervalMs *int `json:"heartbeatIntervalMs"`
+}
+
 // aflConfig represents the structure of afl.config.json.
 type aflConfig struct {
-	MongoDB mongoConfig `json:"mongodb"`
+	MongoDB mongoConfig  `json:"mongodb"`
+	Runner  runnerConfig `json:"runner"`
 }
 
 // LoadConfig loads configuration from a file path.
@@ -103,6 +112,43 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if fileCfg.MongoDB.Database != "" {
 		cfg.Database = fileCfg.MongoDB.Database
+	}
+
+	// Runner section
+	if fileCfg.Runner.PollIntervalMs != nil {
+		cfg.PollInterval = time.Duration(*fileCfg.Runner.PollIntervalMs) * time.Millisecond
+	}
+	if fileCfg.Runner.MaxConcurrent != nil {
+		cfg.MaxConcurrent = *fileCfg.Runner.MaxConcurrent
+	}
+	if fileCfg.Runner.HeartbeatIntervalMs != nil {
+		cfg.HeartbeatInterval = time.Duration(*fileCfg.Runner.HeartbeatIntervalMs) * time.Millisecond
+	}
+
+	// AFL_ENV overlay
+	if envName := os.Getenv("AFL_ENV"); envName != "" {
+		dir := filepath.Dir(path)
+		overlayPath := filepath.Join(dir, "afl.config."+envName+".json")
+		if overlayData, err := ioutil.ReadFile(overlayPath); err == nil {
+			var overlay aflConfig
+			if json.Unmarshal(overlayData, &overlay) == nil {
+				if overlay.MongoDB.URL != "" {
+					cfg.MongoURL = overlay.MongoDB.URL
+				}
+				if overlay.MongoDB.Database != "" {
+					cfg.Database = overlay.MongoDB.Database
+				}
+				if overlay.Runner.PollIntervalMs != nil {
+					cfg.PollInterval = time.Duration(*overlay.Runner.PollIntervalMs) * time.Millisecond
+				}
+				if overlay.Runner.MaxConcurrent != nil {
+					cfg.MaxConcurrent = *overlay.Runner.MaxConcurrent
+				}
+				if overlay.Runner.HeartbeatIntervalMs != nil {
+					cfg.HeartbeatInterval = time.Duration(*overlay.Runner.HeartbeatIntervalMs) * time.Millisecond
+				}
+			}
+		}
 	}
 
 	// Override with environment variables if set
@@ -167,5 +213,20 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if db := os.Getenv("AFL_MONGODB_DATABASE"); db != "" {
 		cfg.Database = db
+	}
+	if v := os.Getenv("AFL_POLL_INTERVAL_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil {
+			cfg.PollInterval = time.Duration(ms) * time.Millisecond
+		}
+	}
+	if v := os.Getenv("AFL_MAX_CONCURRENT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.MaxConcurrent = n
+		}
+	}
+	if v := os.Getenv("AFL_HEARTBEAT_INTERVAL_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil {
+			cfg.HeartbeatInterval = time.Duration(ms) * time.Millisecond
+		}
 	}
 }

@@ -593,10 +593,28 @@ class AFLValidator:
     def _validate_body(self, body, sig: FacetSig) -> None:
         """Validate a body, handling single or list of AndThenBlocks."""
         if isinstance(body, list):
+            # First pass: collect step names from each block
+            all_block_steps: list[set[str]] = []
             for block in body:
-                self._validate_and_then_block(block, sig)
+                all_block_steps.append(self._collect_block_step_names(block))
+
+            # Second pass: validate, passing other blocks' steps for
+            # cross-block reference detection
+            for idx, block in enumerate(body):
+                other_steps = set()
+                for j, s in enumerate(all_block_steps):
+                    if j != idx:
+                        other_steps |= s
+                self._validate_and_then_block(block, sig, other_block_steps=other_steps)
         elif isinstance(body, AndThenBlock):
             self._validate_and_then_block(body, sig)
+
+    @staticmethod
+    def _collect_block_step_names(block: AndThenBlock) -> set[str]:
+        """Collect all step names defined in a block."""
+        if not block.block:
+            return set()
+        return {step.name for step in block.block.steps}
 
     def _validate_facet_decl(self, decl: FacetDecl) -> None:
         """Validate a facet declaration."""
@@ -709,6 +727,10 @@ class AFLValidator:
         body: AndThenBlock,
         containing_sig: FacetSig,
         extra_yield_targets: set[str] | None = None,
+        other_block_steps: set[str] | None = None,
+        parent_steps: dict[str, "StepInfo"] | None = None,
+        parent_step_returns: dict[str, set[str]] | None = None,
+        parent_step_returns_types: dict[str, dict[str, str]] | None = None,
     ) -> None:
         """Validate an andThen block."""
         # andThen script variant
@@ -738,6 +760,17 @@ class AFLValidator:
         steps: dict[str, StepInfo] = {}
         step_returns: dict[str, set[str]] = {}
         step_returns_types: dict[str, dict[str, str]] = {}  # step → {field → type}
+
+        # Inherit parent block's steps (for step body validation)
+        if parent_steps:
+            for name, info in parent_steps.items():
+                steps[name] = info
+        if parent_step_returns:
+            for name, rets in parent_step_returns.items():
+                step_returns[name] = rets
+        if parent_step_returns_types:
+            for name, types in parent_step_returns_types.items():
+                step_returns_types[name] = types
 
         # If foreach, add the iteration variable
         foreach_var: str | None = None
@@ -793,13 +826,19 @@ class AFLValidator:
                 foreach_var,
                 step.name,  # Current step being defined
                 step_returns_types,
+                other_block_steps=other_block_steps,
             )
 
             # Validate inline step body if present
             if step.body:
                 step_target = step.call.name.split(".")[-1]
                 self._validate_and_then_block(
-                    step.body, containing_sig, extra_yield_targets={step_target}
+                    step.body,
+                    containing_sig,
+                    extra_yield_targets={step_target},
+                    parent_steps=steps,
+                    parent_step_returns=step_returns,
+                    parent_step_returns_types=step_returns_types,
                 )
 
             # Validate inline catch clause if present
@@ -817,6 +856,7 @@ class AFLValidator:
                 input_attrs,
                 foreach_var,
                 step_returns_types,
+                other_block_steps=other_block_steps,
             )
             target = yield_stmt.call.name.split(".")[-1]
             if target in yield_targets_used:
@@ -1084,12 +1124,19 @@ class AFLValidator:
         foreach_var: str | None,
         current_step: str | None = None,
         step_returns_types: dict[str, dict[str, str]] | None = None,
+        other_block_steps: set[str] | None = None,
     ) -> None:
         """Validate references in a call expression."""
         for arg in call.args:
             for ref in self._extract_references(arg.value):
                 self._validate_reference(
-                    ref, input_attrs, steps, step_returns, foreach_var, current_step
+                    ref,
+                    input_attrs,
+                    steps,
+                    step_returns,
+                    foreach_var,
+                    current_step,
+                    other_block_steps,
                 )
             # Type check expressions
             self._infer_type(arg.value, step_returns_types)
@@ -1099,7 +1146,13 @@ class AFLValidator:
             for arg in mixin.args:
                 for ref in self._extract_references(arg.value):
                     self._validate_reference(
-                        ref, input_attrs, steps, step_returns, foreach_var, current_step
+                        ref,
+                        input_attrs,
+                        steps,
+                        step_returns,
+                        foreach_var,
+                        current_step,
+                        other_block_steps,
                     )
 
     def _validate_reference(
@@ -1110,6 +1163,7 @@ class AFLValidator:
         step_returns: dict[str, set[str]],
         foreach_var: str | None,
         current_step: str | None = None,
+        other_block_steps: set[str] | None = None,
     ) -> None:
         """Validate a single reference."""
         if ref.is_input:
@@ -1140,6 +1194,16 @@ class AFLValidator:
                 # Could be the foreach variable
                 if foreach_var and step_name == foreach_var:
                     return  # Foreach variable references are allowed
+                # Check for cross-block step reference
+                if other_block_steps and step_name in other_block_steps:
+                    self._result.add_error(
+                        f"Cross-block step reference: '{step_name}' is defined "
+                        f"in a sibling andThen block and cannot be referenced here. "
+                        f"Use a step body (e.g. step = Call(...) andThen {{ ... }}) "
+                        f"to compose steps that depend on each other.",
+                        ref.location,
+                    )
+                    return
                 self._result.add_error(f"Reference to undefined step '{step_name}'", ref.location)
                 return
 
@@ -1175,6 +1239,7 @@ class AFLValidator:
         input_attrs: set[str],
         foreach_var: str | None,
         step_returns_types: dict[str, dict[str, str]] | None = None,
+        other_block_steps: set[str] | None = None,
     ) -> None:
         """Validate a yield statement."""
         target = yield_stmt.call.name.split(".")[-1]  # Use short name
@@ -1194,6 +1259,7 @@ class AFLValidator:
             step_returns,
             foreach_var,
             step_returns_types=step_returns_types,
+            other_block_steps=other_block_steps,
         )
 
     def _validate_schema_instantiation(self, call: CallExpr, schema_info: SchemaInfo) -> None:

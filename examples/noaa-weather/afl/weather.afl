@@ -171,31 +171,30 @@ namespace weather.workflows {
         dl = DownloadObservations(usaf = $.usaf, wban = $.wban, year = $.year) catch {
             yield AnalyzeStation(status = "download_failed", detail = "Download failed for " ++ $.usaf ++ "-" ++ $.wban)
         }
-    } andThen {
         parsed = ParseObservations(raw_path = dl.raw_path, station_id = dl.station_id)
         geo = ReverseGeocode(lat = $.lat, lon = $.lon)
-        qc_check = ValidateQuality(observations = parsed.observations, station_id = dl.station_id)
-    } andThen when {
-        case qc_check.qc.plausible == false => {
-            sparse = SparseAnalysis(observations = parsed.observations, station_id = dl.station_id)
-            yield AnalyzeStation(status = "sparse", detail = "Sparse analysis: " ++ sparse.summary)
-        }
-        case _ => {
-            stats = ComputeDailyStats(observations = parsed.observations, station_id = dl.station_id)
-            narr = GenerateNarrative(station_name = $.station_name, year = $.year, daily_stats = stats.daily_stats, geo_context = #{"city": geo.geo.city, "state": geo.geo.state, "country": geo.geo.country})
-            report = GenerateStationReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, narrative = narr.narrative)
-            html_report = RenderHTMLReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, temp_range = report.report.temp_range, narrative = narr.narrative)
-            station_map = RenderStationMap(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, lat = $.lat, lon = $.lon, year = $.year, temp_range = report.report.temp_range)
-            yield AnalyzeStation(status = "completed", detail = "Report: " ++ report.report.report_id)
+        qc_check = ValidateQuality(observations = parsed.observations, station_id = dl.station_id) andThen when {
+            case qc_check.qc.plausible == false => {
+                sparse = SparseAnalysis(observations = parsed.observations, station_id = dl.station_id)
+                yield AnalyzeStation(status = "sparse", detail = "Sparse analysis: " ++ sparse.summary)
+            }
+            case _ => {
+                stats = ComputeDailyStats(observations = parsed.observations, station_id = dl.station_id)
+                narr = GenerateNarrative(station_name = $.station_name, year = $.year, daily_stats = stats.daily_stats, geo_context = #{"city": geo.geo.city, "state": geo.geo.state, "country": geo.geo.country})
+                report = GenerateStationReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, narrative = narr.narrative)
+                html_report = RenderHTMLReport(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, year = $.year, location = geo.geo.display_name, daily_stats = stats.daily_stats, annual_precip = stats.annual_precip, temp_range = report.report.temp_range, narrative = narr.narrative)
+                station_map = RenderStationMap(station_id = $.usaf ++ "-" ++ $.wban, station_name = $.station_name, lat = $.lat, lon = $.lon, year = $.year, temp_range = report.report.temp_range)
+                yield AnalyzeStation(status = "completed", detail = "Report: " ++ report.report.report_id)
+            }
         }
     }
 
     /** Analyze a batch of weather stations with per-station error recovery. */
     workflow BatchWeatherAnalysis(country: String = "US", state: String = "", max_stations: Int = 10, year: Int = 2023) => (status: String) andThen {
-        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations)
-    } andThen foreach station in discovery.stations {
-        analysis = AnalyzeStation(usaf = $.station.usaf, wban = $.station.wban, station_name = $.station.station_name, lat = $.station.lat, lon = $.station.lon, year = $.year) catch {
-            err = GenerateBatchSummary(batch_id = $.country ++ "-" ++ $.state, station_count = 1, results = [#{"station_id": $.station.usaf ++ "-" ++ $.station.wban, "status": "error", "error": analysis.error}])
+        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations) andThen foreach station in discovery.stations {
+            analysis = AnalyzeStation(usaf = $.station.usaf, wban = $.station.wban, station_name = $.station.station_name, lat = $.station.lat, lon = $.station.lon, year = $.year) catch {
+                err = GenerateBatchSummary(batch_id = $.country ++ "-" ++ $.state, station_count = 1, results = [#{"station_id": $.station.usaf ++ "-" ++ $.station.wban, "status": "error", "error": analysis.error}])
+            }
         }
     }
 
@@ -216,6 +215,27 @@ namespace weather.workflows {
     workflow AnalyzeRegion(country: String = "US", state: String = "", max_stations: Int = 5, years: [Int] = [2022, 2023]) => (status: String) andThen foreach year in $.years {
         batch = BatchWeatherAnalysis(country = $.country, state = $.state, max_stations = $.max_stations, year = $.year)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Consolidated Fast-Path Event Facets
+// ---------------------------------------------------------------------------
+
+namespace climate.Station {
+    use climate.types
+
+    /** Analyze a station across a year range in one handler call.
+      * Internally loops start_year..end_year: download, parse, QC, daily stats, annual summary.
+      * Writes each year's report to weather_reports. */
+    event facet AnalyzeStationClimate(usaf: String, wban: String, station_name: String, lat: Double, lon: Double, start_year: Int, end_year: Int, max_missing_pct: Double = 20.0) => (yearly_summaries: Json, years_analyzed: Int, station_id: String)
+}
+
+namespace weather.BulkCache {
+    use weather.types
+
+    /** Download ISD-Lite files for one station across its active date range.
+      * Clips [start_year, end_year] to begin_date/end_date, downloads without parsing. */
+    event facet CacheBulkStationData(usaf: String, wban: String, start_year: Int, end_year: Int, begin_date: String = "19440101", end_date: String = "20241231") => (files_cached: Int, station_id: String)
 }
 
 // ---------------------------------------------------------------------------
@@ -257,10 +277,15 @@ namespace climate.Aggregate {
 
     /** Generate a narrative summary of climate trends for a state. */
     event facet GenerateClimateNarrative(state: String, trend: Json) => (narrative: String, highlights: Json) prompt {
-        system "You are a climate scientist writing a concise trend summary for a US state."
+        system "You are a climate scientist writing a concise trend summary for a geographic region."
         template "Summarize the climate trends for {state}. Trend data: {trend}. Highlight the warming rate per decade, precipitation changes, and notable decade-over-decade shifts."
         model "claude-sonnet-4-20250514"
     }
+
+    /** Compute region trend in one handler call: aggregate all station reports,
+      * run linear regression, generate narrative. Replaces AggregateStateYear +
+      * ComputeClimateTrend + GenerateClimateNarrative for the fast path. */
+    event facet ComputeRegionTrend(country: String, state: String, start_year: Int, end_year: Int) => (trend: ClimateTrend, narrative: String, highlights: Json)
 }
 
 namespace climate.workflows {
@@ -295,23 +320,24 @@ namespace climate.workflows {
 namespace weather.Cache {
     use weather.types
 
-    /** Download ISD-Lite files for all stations in a single year. */
-    workflow CacheBatchForYear(stations: Json, year: Int) => (status: String) andThen foreach station in $.stations {
+    /** Download ISD-Lite files for one station across its active years.
+      * Clips [start_year, end_year] to the station's begin_date/end_date
+      * so we never request years that NOAA cannot have data for. */
+    workflow CacheStationYears(station: Json, start_year: Int = 1944, end_year: Int = 2024) => (status: String) script python "s = params.get('station') or {}; bd = str(s.get('begin_date', '19440101')); ed = str(s.get('end_date', '20241231')); lo = max(int(params['start_year']), int(bd[:4])); hi = min(int(params['end_year']), int(ed[:4])); result['years'] = list(range(lo, hi + 1))" andThen foreach year in $.years {
         dl = DownloadObservations(usaf = $.station.usaf, wban = $.station.wban, year = $.year) catch {
-            yield CacheBatchForYear(status = "partial")
+            yield CacheStationYears(status = "partial")
         }
     } andThen {
-        yield CacheBatchForYear(status = "completed")
+        yield CacheStationYears(status = "completed")
     }
 
-    /** Cache all NOAA data for one state: discover stations, download 80 years. */
-    workflow CacheStateData(country: String = "US", state: String, max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) script python "result['years'] = list(range(int(params['start_year']), int(params['end_year'])+1))" andThen {
-        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations)
-    } andThen foreach year in $.years {
-        batch = CacheBatchForYear(stations = discovery.stations, year = $.year) catch {
-            yield CacheStateData(status = "partial")
+    /** Cache all NOAA data for one state: discover stations, download per-station year ranges. */
+    workflow CacheStateData(country: String = "US", state: String, max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations) andThen foreach station in discovery.stations {
+            cache = CacheStationYears(station = $.station, start_year = $.start_year, end_year = $.end_year) catch {
+                yield CacheStateData(status = "partial")
+            }
         }
-    } andThen {
         yield CacheStateData(status = "completed")
     }
 
@@ -322,5 +348,235 @@ namespace weather.Cache {
         }
     } andThen {
         yield CacheAllUSData(status = "completed")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// International Analysis Workflows
+// ---------------------------------------------------------------------------
+
+namespace climate.workflows {
+    use climate.types
+    use weather.types
+
+    /** Analyze climate trends for all 13 Canadian provinces/territories. */
+    workflow AnalyzeCanada(provinces: [String] = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach province in $.provinces {
+        analysis = AnalyzeStateTrends(country = "CA", state = $.province, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeCanada(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeCanada(status = "completed")
+    }
+
+    /** Analyze climate trends for Russia. */
+    workflow AnalyzeRussia(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        analysis = AnalyzeStateTrends(country = "RS", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield AnalyzeRussia(status = "completed")
+    }
+
+    /** Analyze climate trends for India. */
+    workflow AnalyzeIndia(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        analysis = AnalyzeStateTrends(country = "IN", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield AnalyzeIndia(status = "completed")
+    }
+
+    /** Analyze climate trends for Mexico. */
+    workflow AnalyzeMexico(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        analysis = AnalyzeStateTrends(country = "MX", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield AnalyzeMexico(status = "completed")
+    }
+
+    /** Analyze climate trends for Antarctica research stations. */
+    workflow AnalyzeAntarctica(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        analysis = AnalyzeStateTrends(country = "AY", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield AnalyzeAntarctica(status = "completed")
+    }
+
+    /** Analyze climate trends for 10 South American countries. */
+    workflow AnalyzeSouthAmerica(countries: [String] = ["BR","AR","CI","CO","PE","VE","EC","BO","PY","UY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        analysis = AnalyzeStateTrends(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeSouthAmerica(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeSouthAmerica(status = "completed")
+    }
+
+    /** Analyze climate trends for 18 European countries. */
+    workflow AnalyzeEurope(countries: [String] = ["UK","GM","FR","SP","IT","NO","SW","FI","PL","EZ","NL","BE","DA","SZ","PO","EI","GR","IC"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        analysis = AnalyzeStateTrends(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeEurope(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeEurope(status = "completed")
+    }
+
+    /** Analyze climate trends for 13 African countries. */
+    workflow AnalyzeAfrica(countries: [String] = ["SF","NI","KE","EG","MO","AG","LY","IV","GH","SN","TZ","UG","ET"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        analysis = AnalyzeStateTrends(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeAfrica(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeAfrica(status = "completed")
+    }
+
+    /** Analyze climate trends for 7 Asian countries. */
+    workflow AnalyzeAsia(countries: [String] = ["CH","JA","KS","TH","VM","BM","ID"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        analysis = AnalyzeStateTrends(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeAsia(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeAsia(status = "completed")
+    }
+
+    /** Analyze climate trends for 3 Arctic territories. */
+    workflow AnalyzeArctic(countries: [String] = ["GL","SV","IC"], max_stations: Int = 3, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        analysis = AnalyzeStateTrends(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeArctic(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeArctic(status = "completed")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fast-Path Workflows (consolidated handlers, ~270× fewer steps)
+// ---------------------------------------------------------------------------
+
+namespace climate.workflows {
+    use climate.types
+    use weather.types
+
+    /** Fast-path: analyze a state's climate with consolidated handlers.
+      * DiscoverStations → foreach station → (AnalyzeStationClimate + ReverseGeocode) → ComputeRegionTrend.
+      * ~12 steps per state vs ~3,240 for AnalyzeStateTrends. */
+    workflow AnalyzeStateTrendsFast(country: String = "US", state: String = "NY", max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String, narrative: String) andThen {
+        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations) andThen foreach station in discovery.stations {
+            climate = AnalyzeStationClimate(usaf = $.station.usaf, wban = $.station.wban, station_name = $.station.station_name, lat = $.station.lat, lon = $.station.lon, start_year = $.start_year, end_year = $.end_year) catch {
+                yield AnalyzeStateTrendsFast(status = "partial_failure", narrative = "")
+            }
+            geo = ReverseGeocode(lat = $.station.lat, lon = $.station.lon)
+        }
+        trend = ComputeRegionTrend(country = $.country, state = $.state, start_year = $.start_year, end_year = $.end_year)
+        yield AnalyzeStateTrendsFast(status = "completed", narrative = trend.narrative)
+    }
+
+    /** Fast-path: analyze all 50 US states using consolidated handlers.
+      * ~600 total steps vs ~162,000 for AnalyzeAllStates. */
+    workflow AnalyzeAllStatesFast(states: [String] = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach state in $.states {
+        analysis = AnalyzeStateTrendsFast(country = "US", state = $.state, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield AnalyzeAllStatesFast(status = "partial_failure")
+        }
+    } andThen {
+        yield AnalyzeAllStatesFast(status = "completed")
+    }
+}
+
+namespace weather.Cache {
+    use weather.types
+
+    /** Fast-path: cache all station data for a state using bulk download handler.
+      * DiscoverStations → foreach station → CacheBulkStationData. */
+    workflow CacheStateDataFast(country: String = "US", state: String, max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        discovery = DiscoverStations(country = $.country, state = $.state, max_stations = $.max_stations) andThen foreach station in discovery.stations {
+            cache = CacheBulkStationData(usaf = $.station.usaf, wban = $.station.wban, start_year = $.start_year, end_year = $.end_year, begin_date = $.station.begin_date, end_date = $.station.end_date) catch {
+                yield CacheStateDataFast(status = "partial")
+            }
+        }
+        yield CacheStateDataFast(status = "completed")
+    }
+
+    /** Fast-path: cache NOAA data for all 50 US states using bulk download. */
+    workflow CacheAllUSDataFast(states: [String] = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach state in $.states {
+        cache = CacheStateDataFast(country = "US", state = $.state, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheAllUSDataFast(status = "partial")
+        }
+    } andThen {
+        yield CacheAllUSDataFast(status = "completed")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// International Cache Warmup Workflows
+// ---------------------------------------------------------------------------
+
+namespace weather.Cache {
+    use weather.types
+
+    /** Cache NOAA data for all 13 Canadian provinces/territories. */
+    workflow CacheCanadaData(provinces: [String] = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach province in $.provinces {
+        cache = CacheStateData(country = "CA", state = $.province, max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheCanadaData(status = "partial")
+        }
+    } andThen {
+        yield CacheCanadaData(status = "completed")
+    }
+
+    /** Cache NOAA data for Russia. */
+    workflow CacheRussiaData(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        cache = CacheStateData(country = "RS", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield CacheRussiaData(status = "completed")
+    }
+
+    /** Cache NOAA data for India. */
+    workflow CacheIndiaData(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        cache = CacheStateData(country = "IN", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield CacheIndiaData(status = "completed")
+    }
+
+    /** Cache NOAA data for Mexico. */
+    workflow CacheMexicoData(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        cache = CacheStateData(country = "MX", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield CacheMexicoData(status = "completed")
+    }
+
+    /** Cache NOAA data for Antarctica research stations. */
+    workflow CacheAntarcticaData(max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen {
+        cache = CacheStateData(country = "AY", state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year)
+        yield CacheAntarcticaData(status = "completed")
+    }
+
+    /** Cache NOAA data for 10 South American countries. */
+    workflow CacheSouthAmericaData(countries: [String] = ["BR","AR","CI","CO","PE","VE","EC","BO","PY","UY"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        cache = CacheStateData(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheSouthAmericaData(status = "partial")
+        }
+    } andThen {
+        yield CacheSouthAmericaData(status = "completed")
+    }
+
+    /** Cache NOAA data for 18 European countries. */
+    workflow CacheEuropeData(countries: [String] = ["UK","GM","FR","SP","IT","NO","SW","FI","PL","EZ","NL","BE","DA","SZ","PO","EI","GR","IC"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        cache = CacheStateData(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheEuropeData(status = "partial")
+        }
+    } andThen {
+        yield CacheEuropeData(status = "completed")
+    }
+
+    /** Cache NOAA data for 13 African countries. */
+    workflow CacheAfricaData(countries: [String] = ["SF","NI","KE","EG","MO","AG","LY","IV","GH","SN","TZ","UG","ET"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        cache = CacheStateData(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheAfricaData(status = "partial")
+        }
+    } andThen {
+        yield CacheAfricaData(status = "completed")
+    }
+
+    /** Cache NOAA data for 7 Asian countries. */
+    workflow CacheAsiaData(countries: [String] = ["CH","JA","KS","TH","VM","BM","ID"], max_stations: Int = 5, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        cache = CacheStateData(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheAsiaData(status = "partial")
+        }
+    } andThen {
+        yield CacheAsiaData(status = "completed")
+    }
+
+    /** Cache NOAA data for 3 Arctic territories. */
+    workflow CacheArcticData(countries: [String] = ["GL","SV","IC"], max_stations: Int = 3, start_year: Int = 1944, end_year: Int = 2024) => (status: String) andThen foreach country in $.countries {
+        cache = CacheStateData(country = $.country, state = "", max_stations = $.max_stations, start_year = $.start_year, end_year = $.end_year) catch {
+            yield CacheArcticData(status = "partial")
+        }
+    } andThen {
+        yield CacheArcticData(status = "completed")
     }
 }

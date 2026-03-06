@@ -1286,3 +1286,228 @@ class TestStepLogEmission:
         assert handler_logs[0].level == "info"
         assert handler_logs[1].message == "Download complete"
         assert handler_logs[1].level == "success"
+
+
+# =========================================================================
+# TestInlineDispatchStepLogs
+# =========================================================================
+
+
+class _SimpleDispatcher:
+    """Minimal dispatcher for inline dispatch tests."""
+
+    def __init__(self, handler_fn=None):
+        self._handler = handler_fn or (lambda payload: {"output": 42})
+
+    def can_dispatch(self, facet_name: str) -> bool:
+        return True
+
+    def dispatch(self, facet_name: str, payload: dict) -> dict | None:
+        return self._handler(payload)
+
+
+class TestInlineDispatchStepLogs:
+    """Tests for step log emission during inline (evaluator-side) dispatch."""
+
+    def test_inline_dispatch_emits_framework_logs(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Inline dispatch emits dispatching and completed framework logs."""
+        dispatcher = _SimpleDispatcher()
+        result = evaluator.execute(
+            workflow_ast, inputs={"x": 1}, program_ast=program_ast, dispatcher=dispatcher
+        )
+        assert result.status == ExecutionStatus.COMPLETED
+
+        # Find the event-facet step (CountDocuments)
+        all_steps = list(store._steps.values())
+        event_step = [s for s in all_steps if s.facet_name == "CountDocuments"]
+        assert len(event_step) == 1
+        step = event_step[0]
+
+        logs = store.get_step_logs_by_step(step.id)
+        messages = [log_entry.message for log_entry in logs]
+
+        assert any("Dispatching handler" in m for m in messages)
+        assert any("Handler completed" in m for m in messages)
+
+        # Completed log should be success level
+        levels = {log_entry.message: log_entry.level for log_entry in logs}
+        completed_key = [k for k in levels if "Handler completed" in k][0]
+        assert levels[completed_key] == "success"
+
+        # All framework logs should have correct source
+        framework_logs = [entry for entry in logs if entry.source == "framework"]
+        assert len(framework_logs) >= 2
+
+    def test_inline_dispatch_handler_callback(self, store, evaluator, workflow_ast, program_ast):
+        """Inline dispatch injects _step_log callback for handler-level logs."""
+
+        def handler_with_logging(payload):
+            log = payload.get("_step_log")
+            if log:
+                log("Starting computation")
+                log("Done computing", "success")
+            return {"output": 42}
+
+        dispatcher = _SimpleDispatcher(handler_with_logging)
+        result = evaluator.execute(
+            workflow_ast, inputs={"x": 1}, program_ast=program_ast, dispatcher=dispatcher
+        )
+        assert result.status == ExecutionStatus.COMPLETED
+
+        all_steps = list(store._steps.values())
+        event_step = [s for s in all_steps if s.facet_name == "CountDocuments"]
+        step = event_step[0]
+
+        logs = store.get_step_logs_by_step(step.id)
+        handler_logs = [entry for entry in logs if entry.source == "handler"]
+        assert len(handler_logs) == 2
+        assert handler_logs[0].message == "Starting computation"
+        assert handler_logs[0].level == "info"
+        assert handler_logs[1].message == "Done computing"
+        assert handler_logs[1].level == "success"
+
+    def test_inline_dispatch_error_emits_error_log(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Inline dispatch error emits an error step log."""
+
+        def failing_handler(payload):
+            raise ValueError("handler failed")
+
+        dispatcher = _SimpleDispatcher(failing_handler)
+        evaluator.execute(
+            workflow_ast, inputs={"x": 1}, program_ast=program_ast, dispatcher=dispatcher
+        )
+
+        all_steps = list(store._steps.values())
+        event_step = [s for s in all_steps if s.facet_name == "CountDocuments"]
+        step = event_step[0]
+
+        # Step should be in error state
+        assert "error" in step.state.lower() or "Error" in step.state
+
+        logs = store.get_step_logs_by_step(step.id)
+        error_logs = [entry for entry in logs if entry.level == "error"]
+        assert len(error_logs) >= 1
+        assert any("Handler error" in entry.message for entry in error_logs)
+        assert any("handler failed" in entry.message for entry in error_logs)
+
+    def test_inline_dispatch_includes_duration(self, store, evaluator, workflow_ast, program_ast):
+        """Handler completed log includes dispatch duration in ms."""
+        dispatcher = _SimpleDispatcher()
+        evaluator.execute(
+            workflow_ast, inputs={"x": 1}, program_ast=program_ast, dispatcher=dispatcher
+        )
+
+        all_steps = list(store._steps.values())
+        event_step = [s for s in all_steps if s.facet_name == "CountDocuments"]
+        step = event_step[0]
+
+        logs = store.get_step_logs_by_step(step.id)
+        completed = [entry for entry in logs if "Handler completed" in entry.message]
+        assert len(completed) == 1
+        assert "ms)" in completed[0].message
+
+
+# =========================================================================
+# TestStuckStepSweep
+# =========================================================================
+
+
+class TestStuckStepSweep:
+    """Tests for the stuck-step recovery sweep mechanism."""
+
+    def test_sweep_finds_stuck_steps(self, store, evaluator, workflow_ast, program_ast):
+        """Sweep detects workflows with EventTransmit steps awaiting resume."""
+        # Execute until paused at EventTransmit
+        result = _execute_until_paused(
+            evaluator, workflow_ast, inputs={"x": 1}, program_ast=program_ast
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Simulate handler completion: continue_step sets request_transition=True
+        event_steps = [s for s in store._steps.values() if s.state == StepState.EVENT_TRANSMIT]
+        assert len(event_steps) == 1
+        evaluator.continue_step(event_steps[0].id, {"output": 42})
+
+        # The persistence layer should now report this workflow as needing resume
+        pending = store.get_pending_resume_workflow_ids()
+        assert result.workflow_id in pending
+
+    def test_sweep_resumes_stuck_workflow(self, store, evaluator, workflow_ast, program_ast):
+        """Sweep resumes a workflow whose step is stuck at EventTransmit."""
+        result = _execute_until_paused(
+            evaluator, workflow_ast, inputs={"x": 1}, program_ast=program_ast
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Simulate handler completion without calling _resume_workflow
+        event_steps = [s for s in store._steps.values() if s.state == StepState.EVENT_TRANSMIT]
+        evaluator.continue_step(event_steps[0].id, {"output": 42})
+
+        # Step is still at EventTransmit (with request_transition=True)
+        step = store.get_step(event_steps[0].id)
+        assert step.state == StepState.EVENT_TRANSMIT
+        assert step.transition.is_requesting_state_change
+
+        # Create runner and trigger sweep
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast=program_ast)
+        runner._last_sweep = 0  # Force sweep to run immediately
+        runner._maybe_sweep_stuck_steps()
+
+        # Step should now have advanced past EventTransmit
+        step = store.get_step(event_steps[0].id)
+        assert step.state != StepState.EVENT_TRANSMIT
+
+    def test_sweep_throttled(self, store, evaluator):
+        """Sweep respects the throttle interval."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        # Just ran a sweep
+        runner._last_sweep = _current_time_ms()
+        # Should not run again within the interval
+        runner._maybe_sweep_stuck_steps()
+        # No error — just verifying it returns without querying
+
+    def test_sweep_no_stuck_steps(self, store, evaluator):
+        """Sweep is a no-op when there are no stuck steps."""
+        runner = RegistryRunner(
+            persistence=store,
+            evaluator=evaluator,
+            config=RegistryRunnerConfig(),
+        )
+        runner._last_sweep = 0
+        runner._maybe_sweep_stuck_steps()
+        # No error, no workflows to resume
+
+    def test_pending_resume_workflow_ids_empty(self, store):
+        """get_pending_resume_workflow_ids returns empty list when no stuck steps."""
+        assert store.get_pending_resume_workflow_ids() == []
+
+    def test_pending_resume_ignores_normal_event_transmit(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Steps at EventTransmit WITHOUT request_transition are not flagged."""
+        result = _execute_until_paused(
+            evaluator, workflow_ast, inputs={"x": 1}, program_ast=program_ast
+        )
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Step is at EventTransmit but request_transition=False (normal blocked state)
+        event_steps = [s for s in store._steps.values() if s.state == StepState.EVENT_TRANSMIT]
+        assert len(event_steps) == 1
+        assert not event_steps[0].transition.is_requesting_state_change
+
+        # Should NOT be flagged as needing resume
+        pending = store.get_pending_resume_workflow_ids()
+        assert result.workflow_id not in pending

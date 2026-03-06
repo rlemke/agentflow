@@ -46,7 +46,6 @@ Example usage::
 
 import fnmatch
 import logging
-import os
 import socket
 import threading
 import time
@@ -77,6 +76,9 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
+_SENTINEL = -1
+
+
 @dataclass
 class RegistryRunnerConfig:
     """Configuration for the RegistryRunner."""
@@ -85,15 +87,27 @@ class RegistryRunnerConfig:
     server_group: str = "default"
     server_name: str = ""
     task_list: str = "default"
-    poll_interval_ms: int = int(os.environ.get("AFL_POLL_INTERVAL_MS", "1000"))
-    max_concurrent: int = int(os.environ.get("AFL_MAX_CONCURRENT", "2"))
-    heartbeat_interval_ms: int = 10000
+    poll_interval_ms: int = _SENTINEL
+    max_concurrent: int = _SENTINEL
+    heartbeat_interval_ms: int = _SENTINEL
     registry_refresh_interval_ms: int = 30000
     topics: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.server_name:
             self.server_name = socket.gethostname()
+        if self.poll_interval_ms == _SENTINEL:
+            from ..config import get_config
+
+            self.poll_interval_ms = get_config().runner.poll_interval_ms
+        if self.max_concurrent == _SENTINEL:
+            from ..config import get_config
+
+            self.max_concurrent = get_config().runner.max_concurrent
+        if self.heartbeat_interval_ms == _SENTINEL:
+            from ..config import get_config
+
+            self.heartbeat_interval_ms = get_config().runner.heartbeat_interval_ms
 
 
 class RegistryRunner:
@@ -138,6 +152,8 @@ class RegistryRunner:
         self._module_cache = self._dispatcher.module_cache
         self._registered_names: list[str] = []
         self._last_refresh: int = 0
+        self._last_sweep: int = 0
+        self._sweep_interval_ms: int = 5000
 
     @property
     def server_id(self) -> str:
@@ -480,6 +496,7 @@ class RegistryRunner:
             try:
                 self._maybe_refresh_registry()
                 self._poll_cycle()
+                self._maybe_sweep_stuck_steps()
             except Exception:
                 logger.exception("Poll cycle error")
             self._stopping.wait(interval_s)
@@ -534,6 +551,35 @@ class RegistryRunner:
         future = self._executor.submit(self._process_event, task)
         with self._active_lock:
             self._active_futures.append(future)
+
+    # =========================================================================
+    # Stuck-Step Recovery Sweep
+    # =========================================================================
+
+    def _maybe_sweep_stuck_steps(self) -> None:
+        """Periodically resume workflows with steps stuck at EventTransmit.
+
+        After continue_step() persists request_transition=True, the
+        subsequent _resume_workflow() may fail silently (AST not found,
+        evaluator exception, etc.).  This sweep retries the resume so
+        that steps don't stay stuck indefinitely.
+        """
+        now = _current_time_ms()
+        if now - self._last_sweep < self._sweep_interval_ms:
+            return
+        self._last_sweep = now
+
+        try:
+            workflow_ids = self._persistence.get_pending_resume_workflow_ids()
+            if workflow_ids:
+                logger.info(
+                    "Stuck-step sweep: %d workflow(s) need resume",
+                    len(workflow_ids),
+                )
+            for wf_id in workflow_ids:
+                self._resume_workflow(wf_id)
+        except Exception:
+            logger.debug("Stuck-step sweep failed", exc_info=True)
 
     # =========================================================================
     # Step Log Emission
@@ -692,18 +738,36 @@ class RegistryRunner:
                 facet_name=task.name,
             )
             try:
-                self._evaluator.fail_step(task.step_id, str(exc))
+                workflow_ast = self._ast_cache.get(task.workflow_id)
+                program_ast = self._program_ast_cache.get(task.workflow_id)
+                self._evaluator.fail_step(
+                    task.step_id,
+                    str(exc),
+                    workflow_ast=workflow_ast,
+                    program_ast=program_ast,
+                )
             except Exception:
                 logger.debug("Could not fail step %s", task.step_id, exc_info=True)
             task.state = TaskState.FAILED
             task.error = {"message": str(exc)}
             task.updated = _current_time_ms()
             self._persistence.save_task(task)
-            logger.exception(
-                "Error processing event task %s (name=%s)",
+            logger.warning(
+                "Error processing event task %s (name=%s, step=%s)",
                 task.uuid,
                 task.name,
+                task.step_id,
             )
+
+            # Resume the workflow so catch blocks / error propagation runs
+            try:
+                self._resume_workflow(task.workflow_id, task.runner_id)
+            except Exception:
+                logger.debug(
+                    "Could not resume workflow %s after error",
+                    task.workflow_id,
+                    exc_info=True,
+                )
 
     # =========================================================================
     # Workflow Resume
@@ -749,7 +813,8 @@ class RegistryRunner:
 
         if workflow_ast is None:
             logger.warning(
-                "No AST available for workflow %s, skipping resume",
+                "No AST available for workflow %s, skipping resume "
+                "(check that workflow and flow exist in persistence)",
                 workflow_id,
             )
             return
@@ -762,6 +827,13 @@ class RegistryRunner:
             runner_id=runner_id,
             dispatcher=self._dispatcher,
         )
+
+        if result.status == ExecutionStatus.ERROR:
+            logger.warning(
+                "Workflow resume returned ERROR: workflow_id=%s error=%s",
+                workflow_id,
+                result.error,
+            )
 
         if runner_id and result.status in (
             ExecutionStatus.COMPLETED,
