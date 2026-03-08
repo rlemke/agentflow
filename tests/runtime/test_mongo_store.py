@@ -973,3 +973,206 @@ class TestServerOperations:
         running = mongo_store.get_servers_by_state(ServerState.RUNNING)
         assert len(running) == 1
         assert running[0].uuid == "s-1"
+
+
+# =============================================================================
+# Orphaned Task Reaper Tests (MongoStore-specific)
+# =============================================================================
+
+
+class TestReapOrphanedTasks:
+    """Tests for reap_orphaned_tasks on the MongoStore."""
+
+    def test_no_dead_servers_no_reaping(self, mongo_store):
+        """If all servers are healthy, nothing is reaped."""
+        import time
+
+        server = ServerDefinition(
+            uuid="healthy-1",
+            server_group="test",
+            service_name="runner",
+            server_name="host1",
+            state=ServerState.RUNNING,
+            ping_time=int(time.time() * 1000),
+        )
+        mongo_store.save_server(server)
+
+        task = TaskDefinition(
+            uuid="task-1",
+            name="MyEvent",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.RUNNING,
+            task_list_name="default",
+        )
+        mongo_store.save_task(task)
+        # Manually set server_id on the task doc
+        mongo_store._db.tasks.update_one({"uuid": "task-1"}, {"$set": {"server_id": "healthy-1"}})
+
+        count = mongo_store.reap_orphaned_tasks()
+        assert count == 0
+
+        # Task should still be running
+        fetched = mongo_store.get_task("task-1")
+        assert fetched is not None
+        assert fetched.state == TaskState.RUNNING
+
+    def test_dead_server_tasks_reaped(self, mongo_store):
+        """Tasks claimed by a dead server are reset to pending."""
+        dead_server = ServerDefinition(
+            uuid="dead-1",
+            server_group="test",
+            service_name="runner",
+            server_name="host-dead",
+            state=ServerState.RUNNING,
+            ping_time=1000,  # ancient timestamp — definitely stale
+        )
+        mongo_store.save_server(dead_server)
+
+        # Two tasks claimed by the dead server
+        for i in range(2):
+            task = TaskDefinition(
+                uuid=f"orphan-{i}",
+                name="SomeEvent",
+                runner_id="r1",
+                workflow_id="w1",
+                flow_id="f1",
+                step_id=f"step-{i}",
+                state=TaskState.RUNNING,
+                task_list_name="default",
+            )
+            mongo_store.save_task(task)
+            mongo_store._db.tasks.update_one(
+                {"uuid": f"orphan-{i}"}, {"$set": {"server_id": "dead-1"}}
+            )
+
+        count = mongo_store.reap_orphaned_tasks()
+        assert count == 2
+
+        # Both tasks should now be pending
+        for i in range(2):
+            fetched = mongo_store.get_task(f"orphan-{i}")
+            assert fetched is not None
+            assert fetched.state == TaskState.PENDING
+
+    def test_shutdown_server_tasks_not_reaped(self, mongo_store):
+        """Tasks from a gracefully shut-down server are not reaped.
+
+        Only servers with state running/startup AND stale ping are
+        considered dead. A server in shutdown state was stopped
+        intentionally.
+        """
+        server = ServerDefinition(
+            uuid="shutdown-1",
+            server_group="test",
+            service_name="runner",
+            server_name="host-shutdown",
+            state=ServerState.SHUTDOWN,
+            ping_time=1000,  # old, but server is shut down
+        )
+        mongo_store.save_server(server)
+
+        task = TaskDefinition(
+            uuid="task-shutdown",
+            name="SomeEvent",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.RUNNING,
+            task_list_name="default",
+        )
+        mongo_store.save_task(task)
+        mongo_store._db.tasks.update_one(
+            {"uuid": "task-shutdown"}, {"$set": {"server_id": "shutdown-1"}}
+        )
+
+        count = mongo_store.reap_orphaned_tasks()
+        assert count == 0
+
+    def test_claim_task_with_server_id(self, mongo_store):
+        """claim_task stores server_id on the task document."""
+        task = TaskDefinition(
+            uuid="task-claim",
+            name="MyEvent",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.PENDING,
+            task_list_name="default",
+        )
+        mongo_store.save_task(task)
+
+        claimed = mongo_store.claim_task(["MyEvent"], server_id="server-xyz")
+        assert claimed is not None
+        assert claimed.state == TaskState.RUNNING
+
+        # Verify server_id was stored in the document
+        doc = mongo_store._db.tasks.find_one({"uuid": "task-claim"})
+        assert doc["server_id"] == "server-xyz"
+
+    def test_mixed_dead_and_healthy_servers(self, mongo_store):
+        """Only tasks from dead servers are reaped, not healthy ones."""
+        import time
+
+        now = int(time.time() * 1000)
+
+        # Healthy server
+        mongo_store.save_server(
+            ServerDefinition(
+                uuid="alive-1",
+                server_group="test",
+                service_name="runner",
+                server_name="host-alive",
+                state=ServerState.RUNNING,
+                ping_time=now,
+            )
+        )
+        # Dead server
+        mongo_store.save_server(
+            ServerDefinition(
+                uuid="dead-1",
+                server_group="test",
+                service_name="runner",
+                server_name="host-dead",
+                state=ServerState.RUNNING,
+                ping_time=1000,
+            )
+        )
+
+        # Task from alive server
+        t1 = TaskDefinition(
+            uuid="alive-task",
+            name="E",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s1",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(t1)
+        mongo_store._db.tasks.update_one({"uuid": "alive-task"}, {"$set": {"server_id": "alive-1"}})
+
+        # Task from dead server
+        t2 = TaskDefinition(
+            uuid="dead-task",
+            name="E",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s2",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(t2)
+        mongo_store._db.tasks.update_one({"uuid": "dead-task"}, {"$set": {"server_id": "dead-1"}})
+
+        count = mongo_store.reap_orphaned_tasks()
+        assert count == 1
+
+        # alive-task still running
+        assert mongo_store.get_task("alive-task").state == TaskState.RUNNING
+        # dead-task reset to pending
+        assert mongo_store.get_task("dead-task").state == TaskState.PENDING

@@ -1,0 +1,117 @@
+{% if facets %}
+{# ── Aggregate totals by facet ─────────────────────────────── #}
+<article>
+    <header>Tasks Handled by Event Facet</header>
+    <table role="grid">
+        <thead>
+            <tr>
+                <th style="width:40%">Event Facet</th>
+                <th style="width:15%;text-align:right">Total</th>
+                <th style="width:45%">Distribution</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for facet in facets %}
+            <tr>
+                <td class="mono">{{ facet }}</td>
+                <td style="text-align:right"><strong>{{ totals[facet] }}</strong></td>
+                <td>
+                    <div class="fleet-bar-bg">
+                        <div class="fleet-bar" style="width:{{ (totals[facet] / max_total * 100)|round(1) }}%">
+                            {{ totals[facet] }}
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</article>
+
+{# ── Per-server breakdown ──────────────────────────────────── #}
+<article>
+    <header>Per-Server Breakdown</header>
+    <div style="overflow-x:auto">
+    <table role="grid" class="fleet-matrix">
+        <thead>
+            <tr>
+                <th>Server</th>
+                <th>IPs</th>
+                {% for facet in facets %}
+                <th class="mono fleet-col-facet" title="{{ facet }}">{{ facet.split('.')[-1] }}</th>
+                {% endfor %}
+                <th style="text-align:right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for srv in servers %}
+            {% set row_total = namespace(v=0) %}
+            <tr>
+                <td>
+                    <a href="/v2/servers/{{ srv.uuid }}">{{ srv.name }}</a>
+                </td>
+                <td class="mono text-muted">{{ srv.ips }}</td>
+                {% for facet in facets %}
+                    {% set cnt = srv.counts.get(facet, 0) %}
+                    {% if row_total %}{% set row_total.v = row_total.v + cnt %}{% endif %}
+                    <td class="fleet-cell{% if cnt > 0 %} fleet-cell-active{% endif %}" style="text-align:right">
+                        {{ cnt if cnt > 0 else '—' }}
+                    </td>
+                {% endfor %}
+                <td style="text-align:right"><strong>{{ row_total.v }}</strong></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2"><strong>Fleet Total</strong></td>
+                {% for facet in facets %}
+                <td style="text-align:right"><strong>{{ totals[facet] }}</strong></td>
+                {% endfor %}
+                <td style="text-align:right"><strong>{{ totals.values()|sum }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+</article>
+
+<style>
+.fleet-bar-bg {
+    background: var(--pico-muted-border-color, #e0e0e0);
+    border-radius: 4px;
+    height: 1.4rem;
+    position: relative;
+    overflow: hidden;
+}
+.fleet-bar {
+    background: var(--pico-primary, #1095c1);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.4rem;
+    padding: 0 0.4rem;
+    border-radius: 4px;
+    min-width: 2rem;
+    text-align: right;
+    white-space: nowrap;
+}
+.fleet-matrix th.fleet-col-facet {
+    font-size: 0.75rem;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+    padding: 0.5rem 0.3rem;
+    max-width: 2.5rem;
+}
+.fleet-cell {
+    font-size: 0.85rem;
+    color: var(--pico-muted-color, #999);
+}
+.fleet-cell-active {
+    color: var(--pico-color, #333);
+    font-weight: 600;
+}
+</style>
+
+{% else %}
+{% with empty_icon="&#x2637;", empty_message="No servers have reported task handling statistics yet." %}{% include "partials/_empty_state.html" %}{% endwith %}
+{% endif %}

@@ -25,7 +25,7 @@ Each subdirectory contains a complete working example with AFL source and a Pyth
 | [event-driven-etl](event-driven-etl/) | Event-driven ETL — extract/transform/load pipeline (3 schemas, 6 event facets, 2 workflows, foreach, schema instantiation) |
 | [devops-deploy](devops-deploy/) | DevOps deployment pipeline — first `andThen when` showcase (nested when, foreach, prompt/script blocks, mixins+implicits) |
 | [hiv-drug-resistance](hiv-drug-resistance/) | HIV drug resistance genotyping — bioinformatics pipeline (`andThen when` QC, `catch` error recovery, `foreach` batch, prompt+script blocks) |
-| [noaa-weather](noaa-weather/) | NOAA weather station analysis — real-data pipeline (ISD-Lite downloads, OSM geocoding, prompt block LLM narrative, `andThen when`/`catch`/`foreach`) |
+| [noaa-weather](noaa-weather/) | NOAA GHCN-Daily climate analysis — catalog-first real-data pipeline (AWS S3, linear regression trends, OSM geocoding, `catch`/`foreach`, 25+ workflows incl. international and cache warmup) |
 
 ## User Documentation
 

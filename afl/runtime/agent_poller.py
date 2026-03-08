@@ -149,6 +149,8 @@ class AgentPoller:
         self._resume_locks_lock = threading.Lock()
         self._resume_pending: set[str] = set()
         self._resume_pending_lock = threading.Lock()
+        self._last_reap: int = 0
+        self._reap_interval_ms: int = 60000
 
     @property
     def server_id(self) -> str:
@@ -308,6 +310,7 @@ class AgentPoller:
             task = self._persistence.claim_task(
                 task_names=task_names,
                 task_list=self._config.task_list,
+                server_id=self._server_id,
             )
             if task is None:
                 break
@@ -462,6 +465,7 @@ class AgentPoller:
         while not self._stopping.is_set():
             try:
                 self._poll_cycle()
+                self._maybe_reap_orphaned_tasks()
             except Exception:
                 logger.exception("Poll cycle error")
             self._stopping.wait(interval_s)
@@ -488,6 +492,7 @@ class AgentPoller:
             task = self._persistence.claim_task(
                 task_names=task_names,
                 task_list=self._config.task_list,
+                server_id=self._server_id,
             )
             if task is None:
                 break
@@ -501,6 +506,33 @@ class AgentPoller:
         """Get the number of active work items."""
         with self._active_lock:
             return len(self._active_futures)
+
+    # =========================================================================
+    # Orphaned Task Reaper
+    # =========================================================================
+
+    def _maybe_reap_orphaned_tasks(self) -> None:
+        """Periodically reset tasks orphaned by crashed servers.
+
+        If a server's heartbeat is stale (>5 min) but its state is still
+        ``running``/``startup``, any tasks it claimed are stuck forever.
+        This reaper resets them to ``pending`` so healthy runners can
+        pick them up.
+        """
+        now = _current_time_ms()
+        if now - self._last_reap < self._reap_interval_ms:
+            return
+        self._last_reap = now
+
+        try:
+            count = self._persistence.reap_orphaned_tasks()
+            if count > 0:
+                logger.warning(
+                    "Orphan reaper: reset %d task(s) from crashed server(s)",
+                    count,
+                )
+        except Exception:
+            logger.debug("Orphan reaper failed", exc_info=True)
 
     def _cleanup_futures(self) -> None:
         """Remove completed futures from the active list."""

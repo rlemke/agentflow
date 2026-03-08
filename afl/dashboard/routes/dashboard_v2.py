@@ -715,3 +715,98 @@ def _enrich_runners_with_progress(
         except Exception:
             progress[r.uuid] = {"completed": 0, "total": 0, "pct": 0}
     return progress
+
+
+# =============================================================================
+# Fleet — aggregate task counts by facet across all servers
+# =============================================================================
+
+
+@router.get("/fleet")
+def fleet_view(request: Request, store=Depends(get_store)):
+    """Fleet overview: per-server task counts broken down by event facet."""
+    all_servers = _apply_effective_state(list(store.get_all_servers()))
+    running = [s for s in all_servers if s.state == "running"]
+
+    # Collect all facet names and per-server counts
+    facet_set: set[str] = set()
+    server_rows: list[dict] = []
+    for s in running:
+        counts: dict[str, int] = {}
+        for h in s.handled:
+            facet_set.add(h.handler)
+            counts[h.handler] = h.handled
+        server_rows.append(
+            {
+                "uuid": s.uuid,
+                "name": s.server_name or s.uuid[:12],
+                "ips": ", ".join(s.server_ips),
+                "handler_count": len(s.handlers),
+                "counts": counts,
+            }
+        )
+
+    facets = sorted(facet_set)
+
+    # Aggregate totals per facet
+    totals: dict[str, int] = {}
+    for f in facets:
+        totals[f] = sum(r["counts"].get(f, 0) for r in server_rows)
+
+    # Compute max for bar scaling
+    max_total = max(totals.values()) if totals else 1
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/fleet/overview.html",
+        {
+            "servers": server_rows,
+            "facets": facets,
+            "totals": totals,
+            "max_total": max_total,
+            "server_count": len(running),
+            "active_tab": "fleet",
+        },
+    )
+
+
+@router.get("/fleet/partial")
+def fleet_partial(request: Request, store=Depends(get_store)):
+    """HTMX partial for auto-refresh of fleet data."""
+    all_servers = _apply_effective_state(list(store.get_all_servers()))
+    running = [s for s in all_servers if s.state == "running"]
+
+    facet_set: set[str] = set()
+    server_rows: list[dict] = []
+    for s in running:
+        counts: dict[str, int] = {}
+        for h in s.handled:
+            facet_set.add(h.handler)
+            counts[h.handler] = h.handled
+        server_rows.append(
+            {
+                "uuid": s.uuid,
+                "name": s.server_name or s.uuid[:12],
+                "ips": ", ".join(s.server_ips),
+                "handler_count": len(s.handlers),
+                "counts": counts,
+            }
+        )
+
+    facets = sorted(facet_set)
+    totals: dict[str, int] = {}
+    for f in facets:
+        totals[f] = sum(r["counts"].get(f, 0) for r in server_rows)
+    max_total = max(totals.values()) if totals else 1
+
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "v2/fleet/_fleet_content.html",
+        {
+            "servers": server_rows,
+            "facets": facets,
+            "totals": totals,
+            "max_total": max_total,
+            "server_count": len(running),
+        },
+    )

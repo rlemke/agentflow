@@ -180,18 +180,11 @@ class TokenUsage:
 runner = ClaudeAgentRunner(evaluator=ev, persistence=store, token_budget=50000)
 ```
 
-#### Real Example: JFK Airport Narrative (NOAA Weather)
+#### Real Example: Research Agent (LLM Integration)
 
-The `noaa-weather` example's `GenerateNarrative` event facet uses a prompt block to produce meteorologist-style summaries. When run with `ANTHROPIC_API_KEY` set, Claude generates prose like:
+The `research-agent` example showcases 8 prompt-block event facets chained together via `ClaudeAgentRunner`. Each step uses a prompt block to drive Claude API calls for research synthesis, citation extraction, and summary generation. When run with `ANTHROPIC_API_KEY` set, Claude generates structured research output. Without the API key, handlers return deterministic fallback responses.
 
-> *JFK International Airport experienced a year of notable weather contrasts in 2023.
-> Temperatures ranged from a bone-chilling -10.2°C in late January to a sweltering 35.6°C
-> during a mid-July heat wave. The station recorded 127 rainy days totaling 1,142mm of
-> precipitation, with the wettest single day dropping 62mm during a nor'easter in October.
-> Spring arrived gradually with temperatures climbing through March and April, while autumn
-> brought an extended warm spell before winter set in during December.*
-
-Without the API key, the handler returns a deterministic fallback narrative built from the computed statistics.
+> **Note:** The `noaa-weather` example previously used a `GenerateNarrative` prompt block for meteorologist-style summaries, but this was removed in the v0.38.0 GHCN-Daily redesign. The NOAA pipeline now uses `ComputeRegionTrend` to generate data-driven narrative summaries via linear regression analysis without LLM calls.
 
 ---
 

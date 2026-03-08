@@ -1,6 +1,58 @@
 # Implementation Changelog
 
-**Current version: v0.36.0**
+**Current version: v0.39.0**
+
+## Completed (v0.39.0) — Orphaned Task Reaper, Crash Recovery
+
+Automatic recovery of tasks orphaned by crashed runners.
+
+**Runtime (`afl/runtime/`):**
+- `claim_task()` now accepts `server_id` parameter — tasks track which server claimed them
+- `reap_orphaned_tasks()` added to `PersistenceAPI` and `MongoStore` — finds servers with stale heartbeats (>5 min, state still `running`/`startup`) and resets their `running` tasks to `pending`
+- `RunnerService._maybe_reap_orphaned_tasks()`: runs every 60s in the poll loop, resets orphaned tasks, logs warning on recovery
+- `AgentPoller._maybe_reap_orphaned_tasks()`: same reaper integration for standalone pollers
+- Both `RunnerService` and `AgentPoller` pass `server_id` when claiming tasks
+
+**How it works:**
+1. Every `claim_task()` call stamps the task with the claiming server's UUID
+2. Every 60s, each runner queries for servers whose `ping_time` is >5 min stale but state is still `running`/`startup` (crashed without graceful shutdown)
+3. Tasks with `server_id` matching dead servers are atomically reset to `pending`
+4. Healthy runners pick them up on the next poll cycle
+
+**Safety:** Shutdown servers (graceful drain) are NOT reaped — only servers that crashed without deregistering. The 5-minute stale threshold avoids false positives from network hiccups.
+
+**Tests:** 15 new tests — 10 in `test_runner_service.py` (server tracking, interval control, exception safety, poll integration), 5 in `test_mongo_store.py` (dead/healthy/shutdown server scenarios, claim with server_id, mixed scenarios)
+
+**Files:** 6 modified (`persistence.py`, `mongo_store.py`, `memory_store.py`, `runner/service.py`, `agent_poller.py`, `dashboard/helpers.py`)
+
+## Completed (v0.38.0) — NOAA GHCN-Daily Redesign, Download Caching
+
+This was a complete rewrite of the NOAA weather example from ISD-Lite to GHCN-Daily.
+
+**NOAA Weather Example Redesign (`examples/noaa-weather/`):**
+- Data source changed from ISD-Lite (per-year fixed-width .gz files) to GHCN-Daily (AWS S3 public bucket)
+- Catalog-first approach: `ghcnd-stations.txt` + `ghcnd-inventory.txt` verify data availability before downloading
+- One CSV per station (`csv/by_station/{ID}.csv`) replaces per-year download loops — dramatically fewer steps
+- Reduced from 10+ event facets (7 namespaces) to 5 event facets (4 namespaces): `ghcn.Catalog.DiscoverStations`, `ghcn.Ingest.FetchStationData`, `ghcn.Analysis.AnalyzeStationClimate`, `ghcn.Analysis.ComputeRegionTrend`, `ghcn.Geocode.ReverseGeocode`
+- 4 schemas: `StationInfo`, `YearlyClimate`, `ClimateTrend`, `GeoContext`
+- Removed: ParseObservations, ValidateQuality (script block), SparseAnalysis, GenerateNarrative (prompt block), RenderHTMLReport, RenderStationMap, related handler modules
+- New fast-path workflows: `AnalyzeStateTrends` (discover → foreach station → fetch+analyze+geocode → trend), `AnalyzeAllStates` (foreach 50 states)
+- International workflows: `AnalyzeCanada`, `AnalyzeRussia`, `AnalyzeIndia`, `AnalyzeMexico`, `AnalyzeAntarctica`, `AnalyzeSouthAmerica`, `AnalyzeEurope`, `AnalyzeAfrica`, `AnalyzeAsia`, `AnalyzeArctic`
+- Cache warmup workflows: `CacheStateData`, `CacheAllUSData`, `CacheCanadaData`, etc.
+- Handler modules consolidated from 9 to 4: catalog, ingest, analysis, geocode
+- `ClimateStore`: shared file-based persistence in `/tmp/weather-climate-store/` for cross-handler data sharing
+- `ComputeRegionTrend`: linear regression for warming rate per decade and precipitation change percentage
+- Download caching: skip re-download and re-analysis for cached NOAA data
+
+**Dashboard (`afl/dashboard/`):**
+- Fleet visualization page (`/v2/fleet`): per-server task counts by event facet with horizontal bar charts and cross-server matrix
+- HTMX partial refresh for live fleet monitoring
+- Fleet sidebar link added to base template
+- API endpoint `/api/fleet` for JSON fleet data
+
+**Tests:** Handler tests rewritten for GHCN-Daily (82 tests in test_ghcn_handlers.py, 20 in test_climate_handlers.py, 18 in test_weather_handlers.py)
+
+**Files:** ~30 modified/created, 9 old handler directories removed
 
 ## Completed (v0.36.0) — TokenUsage, LLMHandler, Documentation
 

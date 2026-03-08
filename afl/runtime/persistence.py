@@ -366,6 +366,7 @@ class PersistenceAPI(Protocol):
         self,
         task_names: list[str],
         task_list: str = "default",
+        server_id: str = "",
     ) -> Optional["TaskDefinition"]:
         """Atomically claim a pending task matching one of the given names.
 
@@ -375,11 +376,29 @@ class PersistenceAPI(Protocol):
         Args:
             task_names: List of task names to match
             task_list: The task list to search (default: "default")
+            server_id: The claiming server's ID (for orphan detection)
 
         Returns:
             The claimed task, or None
         """
         ...
+
+    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> int:
+        """Reset tasks stuck in RUNNING state whose claiming server is down.
+
+        A server is considered down if its ``ping_time`` is stale (older than
+        *down_timeout_ms*) while its state is still ``running`` or ``startup``.
+        Tasks claimed by such servers are reset to PENDING so they can be
+        picked up by a healthy runner.
+
+        Args:
+            down_timeout_ms: How long a server's heartbeat can be stale
+                before it is considered dead (default: 5 minutes).
+
+        Returns:
+            Number of tasks reset.
+        """
+        return 0
 
     # Log operations
 

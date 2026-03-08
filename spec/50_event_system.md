@@ -285,12 +285,23 @@ This blocking behavior is what causes the evaluator to reach a fixed point and p
 
 ### Processing Flow
 
-1. External agent claims a pending task via `claim_task()` (atomic pending -> running transition).
+1. External agent claims a pending task via `claim_task(server_id=...)` (atomic pending -> running transition). The `server_id` stamps the task for crash recovery tracking.
 2. Agent performs the work described in `task.data`.
 3. Agent calls `continue_step(step_id, result)` to unblock the step with a result, or `fail_step(step_id, error)` to mark it as failed.
 4. The continuation writes the result into the step's return attributes.
 5. Evaluator resumes: `EventTransmit` -> `state.statement.blocks.Begin`.
 6. Normal evaluation continues.
+
+### Crash Recovery — Orphaned Task Reaper
+
+If a runner crashes while processing tasks, those tasks remain in `running` state indefinitely. The **orphaned task reaper** (running in every `RunnerService` and `AgentPoller`) automatically detects and recovers these:
+
+1. Each `claim_task()` records the claiming server's `server_id` on the task document.
+2. Every 60 seconds, the reaper queries for servers whose heartbeat (`ping_time`) is >5 minutes stale while their state is still `running`/`startup`.
+3. All tasks in `running` state with a `server_id` matching a dead server are atomically reset to `pending`.
+4. Healthy runners pick them up on the next poll cycle.
+
+Servers that shut down gracefully (state = `shutdown`) are **not** considered dead — the reaper only targets servers that crashed without deregistering.
 
 ### Idempotency
 

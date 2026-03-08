@@ -301,6 +301,42 @@ def api_servers(state: str | None = None, store=Depends(get_store)):
     )
 
 
+# -- Fleet -------------------------------------------------------------------
+
+
+@router.get("/fleet")
+def api_fleet(store=Depends(get_store)):
+    """Aggregate task counts by event facet across all running servers."""
+    servers = store.get_all_servers()
+
+    facet_totals: dict[str, int] = {}
+    server_rows: list[dict] = []
+    for s in servers:
+        if s.state != "running":
+            continue
+        counts: dict[str, int] = {}
+        for h in s.handled:
+            counts[h.handler] = h.handled
+            facet_totals[h.handler] = facet_totals.get(h.handler, 0) + h.handled
+        server_rows.append(
+            {
+                "uuid": s.uuid,
+                "name": s.server_name or s.uuid[:12],
+                "ips": s.server_ips,
+                "handlers": s.handlers,
+                "handled": counts,
+            }
+        )
+
+    return JSONResponse(
+        {
+            "facet_totals": dict(sorted(facet_totals.items())),
+            "servers": server_rows,
+            "server_count": len(server_rows),
+        }
+    )
+
+
 # -- Handlers ----------------------------------------------------------------
 
 

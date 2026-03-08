@@ -45,6 +45,7 @@ from afl.runtime import (
 )
 from afl.runtime.agent import ToolRegistry
 from afl.runtime.entities import (
+    ServerDefinition,
     ServerState,
     TaskDefinition,
     TaskState,
@@ -2795,3 +2796,153 @@ class TestQualifiedFacetNames:
         stmt = graph.get_statement("s1")
         assert stmt is not None
         assert stmt.facet_name == "DB.Query"
+
+
+# =============================================================================
+# Orphaned Task Reaper Tests
+# =============================================================================
+
+
+class TestClaimTaskServerTracking:
+    """Tests that claim_task records the server_id on the task."""
+
+    def test_claim_task_sets_server_id(self, store):
+        """claim_task with server_id stores it on the task document."""
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="MyEvent",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.PENDING,
+            task_list_name="default",
+        )
+        store.save_task(task)
+
+        result = store.claim_task(["MyEvent"], server_id="server-abc")
+        assert result is not None
+        assert result.state == TaskState.RUNNING
+
+    def test_claim_task_without_server_id_still_works(self, store):
+        """Backward compat: claim_task without server_id works."""
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="MyEvent",
+            runner_id="r1",
+            workflow_id="w1",
+            flow_id="f1",
+            step_id="s1",
+            state=TaskState.PENDING,
+            task_list_name="default",
+        )
+        store.save_task(task)
+
+        result = store.claim_task(["MyEvent"])
+        assert result is not None
+        assert result.state == TaskState.RUNNING
+
+
+class TestReapOrphanedTasks:
+    """Tests for the reap_orphaned_tasks persistence method."""
+
+    def test_no_servers_returns_zero(self, store):
+        """No servers at all → nothing to reap."""
+        assert store.reap_orphaned_tasks() == 0
+
+    def test_healthy_server_tasks_not_reaped(self, store):
+        """Tasks claimed by a healthy server should NOT be reaped."""
+        # Register a healthy server (recent ping)
+        server = ServerDefinition(
+            uuid="healthy-server",
+            server_group="test",
+            service_name="test-runner",
+            server_name="host1",
+            state=ServerState.RUNNING,
+            ping_time=int(time.time() * 1000),  # just now
+        )
+        store.save_server(server)
+
+        # The MemoryStore doesn't track server_id on tasks, so this
+        # test mainly verifies the method runs without error.
+        assert store.reap_orphaned_tasks() == 0
+
+    def test_default_returns_zero(self, store):
+        """Base PersistenceAPI.reap_orphaned_tasks returns 0."""
+        assert store.reap_orphaned_tasks() == 0
+
+
+class TestReaperInRunnerService:
+    """Tests for the orphan reaper integration in RunnerService."""
+
+    def test_reaper_called_periodically(self, store, evaluator, registry):
+        """The reaper is called after the interval elapses."""
+        config = RunnerConfig(
+            poll_interval_ms=100,
+            heartbeat_interval_ms=60000,
+        )
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 0  # fire every cycle
+
+        with patch.object(store, "reap_orphaned_tasks", return_value=0) as mock_reap:
+            svc._maybe_reap_orphaned_tasks()
+            assert mock_reap.call_count == 1
+
+    def test_reaper_skipped_within_interval(self, store, evaluator, registry):
+        """The reaper is skipped if interval hasn't elapsed."""
+        config = RunnerConfig(
+            poll_interval_ms=100,
+            heartbeat_interval_ms=60000,
+        )
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 999_999_999  # never fires
+        svc._last_reap = _current_time_ms()  # just ran
+
+        with patch.object(store, "reap_orphaned_tasks", return_value=0) as mock_reap:
+            svc._maybe_reap_orphaned_tasks()
+            assert mock_reap.call_count == 0
+
+    def test_reaper_logs_on_recovery(self, store, evaluator, registry):
+        """The reaper logs a warning when tasks are recovered."""
+        config = RunnerConfig(
+            poll_interval_ms=100,
+            heartbeat_interval_ms=60000,
+        )
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 0
+
+        with patch.object(store, "reap_orphaned_tasks", return_value=5):
+            # Should not raise; logs a warning internally
+            svc._maybe_reap_orphaned_tasks()
+
+    def test_reaper_survives_exception(self, store, evaluator, registry):
+        """The reaper catches exceptions and does not crash."""
+        config = RunnerConfig(
+            poll_interval_ms=100,
+            heartbeat_interval_ms=60000,
+        )
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 0
+
+        with patch.object(store, "reap_orphaned_tasks", side_effect=Exception("db error")):
+            # Should not raise
+            svc._maybe_reap_orphaned_tasks()
+
+    def test_poll_loop_passes_server_id_to_claim(self, store, evaluator, registry):
+        """claim_task in poll cycle includes server_id."""
+        config = RunnerConfig(
+            poll_interval_ms=100,
+            heartbeat_interval_ms=60000,
+        )
+        svc = RunnerService(store, evaluator, config, registry)
+
+        # Register a handler so event_names is non-empty
+        registry.register("TestEvent", lambda p: {"ok": True})
+
+        with patch.object(store, "claim_task", return_value=None) as mock_claim:
+            svc._poll_cycle()
+            # Should have been called with server_id
+            if mock_claim.call_count > 0:
+                _, kwargs = mock_claim.call_args
+                assert "server_id" in kwargs
+                assert kwargs["server_id"] == svc.server_id

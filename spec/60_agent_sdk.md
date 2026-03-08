@@ -193,6 +193,7 @@ def claim_task(
     self,
     task_names: list[str],
     task_list: str = "default",
+    server_id: str = "",
 ) -> Optional[TaskDefinition]
 ```
 
@@ -200,6 +201,9 @@ def claim_task(
   from `PENDING` to `RUNNING` and return it.
 - If no matching task exists, it MUST return `None`.
 - Concurrent callers MUST NOT receive the same task.
+- The `server_id` parameter stamps the task document with the claiming
+  server's UUID, enabling the orphaned task reaper to detect tasks
+  orphaned by crashed servers and reset them to `PENDING`.
 - The MemoryStore implementation uses `threading.Lock` for atomicity.
 - The MongoStore implementation uses `find_one_and_update()` with a
   compound index for atomicity.

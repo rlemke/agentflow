@@ -177,6 +177,8 @@ class RunnerService:
         self._http_thread: threading.Thread | None = None
         self._last_sweep: int = 0
         self._sweep_interval_ms: int = 5000
+        self._last_reap: int = 0
+        self._reap_interval_ms: int = 60000  # check for orphans every 60s
 
         # Register built-in task handler
         self._tool_registry.register("afl:execute", self._handle_execute_workflow)
@@ -303,6 +305,7 @@ class RunnerService:
             try:
                 self._poll_cycle()
                 self._maybe_sweep_stuck_steps()
+                self._maybe_reap_orphaned_tasks()
             except Exception:
                 logger.exception("Poll cycle error")
             self._stopping.wait(interval_s)
@@ -330,6 +333,7 @@ class RunnerService:
                 task = self._persistence.claim_task(
                     task_names=event_names,
                     task_list=self._config.task_list,
+                    server_id=self._server_id,
                 )
                 if task is None:
                     break
@@ -342,6 +346,7 @@ class RunnerService:
             task = self._persistence.claim_task(
                 task_names=[RESUME_TASK_NAME],
                 task_list=self._config.task_list,
+                server_id=self._server_id,
             )
             if task is None:
                 break
@@ -919,6 +924,33 @@ class RunnerService:
                 self._resume_workflow(wf_id)
         except Exception:
             logger.debug("Stuck-step sweep failed", exc_info=True)
+
+    # =========================================================================
+    # Orphaned Task Reaper
+    # =========================================================================
+
+    def _maybe_reap_orphaned_tasks(self) -> None:
+        """Periodically reset tasks orphaned by crashed servers.
+
+        If a server's heartbeat is stale (>5 min) but its state is still
+        ``running``/``startup``, any tasks it claimed are stuck forever.
+        This reaper resets them to ``pending`` so healthy runners can
+        pick them up.
+        """
+        now = _current_time_ms()
+        if now - self._last_reap < self._reap_interval_ms:
+            return
+        self._last_reap = now
+
+        try:
+            count = self._persistence.reap_orphaned_tasks()
+            if count > 0:
+                logger.warning(
+                    "Orphan reaper: reset %d task(s) from crashed server(s)",
+                    count,
+                )
+        except Exception:
+            logger.debug("Orphan reaper failed", exc_info=True)
 
     # =========================================================================
     # Workflow Resume

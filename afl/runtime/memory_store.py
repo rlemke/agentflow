@@ -308,6 +308,7 @@ class MemoryStore(PersistenceAPI):
         self,
         task_names: list[str],
         task_list: str = "default",
+        server_id: str = "",
     ) -> Optional["TaskDefinition"]:
         """Atomically claim a pending task matching one of the given names."""
         with self._claim_lock:

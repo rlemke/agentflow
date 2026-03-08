@@ -132,7 +132,7 @@ Set `ANTHROPIC_API_KEY` to enable live Claude API calls for prompt-block event f
 | `examples/event-driven-etl/` | Event-driven ETL — extract/transform/load pipeline (3 schemas, 6 event facets, 2 workflows, andThen chaining, foreach, schema instantiation, map literals, RegistryRunner-first) |
 | `examples/devops-deploy/` | DevOps deployment pipeline — first `andThen when` showcase (3 when blocks incl. nested, foreach, 3 schemas, 10 event facets, 2 workflows, prompt/script blocks, mixins+implicits, `++`/`==`/`&&`, RegistryRunner-first) |
 | `examples/hiv-drug-resistance/` | HIV drug resistance genotyping — bioinformatics pipeline (6 schemas, 9 event facets, 2 workflows, `andThen when` QC branching, `catch` per-sample error recovery, `andThen foreach` batch, 3 prompt blocks, 1 script block, mixins+implicits, RegistryRunner-first) |
-| `examples/noaa-weather/` | NOAA weather station analysis — real-data pipeline (ISD-Lite downloads, OSM Nominatim geocoding, 6 schemas, 10 event facets, 3 workflows, `andThen when` QC branching, `catch` download recovery, `andThen foreach` batch, prompt+script blocks, `++`/`==`, RegistryRunner-first) |
+| `examples/noaa-weather/` | NOAA GHCN-Daily climate analysis — catalog-first real-data pipeline (AWS S3 public bucket, 4 schemas, 5 event facets, 25+ workflows incl. international/cache, `catch` download recovery, `andThen foreach` batch, linear regression trends, `++`/`==`, RegistryRunner-first) |
 | `spec/` | Language and runtime specifications |
 | `docker/` | Dockerfiles for all services |
 | `scripts/` | Convenience scripts (setup, compile, runner, dashboard, rolling-deploy, etc.) |
@@ -175,4 +175,4 @@ Set `ANTHROPIC_API_KEY` to enable live Claude API calls for prompt-block event f
 - `spec/80_acceptance_tests.md` — test requirements
 - `spec/90_nonfunctional.md` — dependencies, build/run reference, Docker, configuration
 - `spec/95_self_assessment.md` — self-assessment across all fundamental areas
-- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.33.1)
+- `spec/99_changelog.md` — implementation changelog (v0.1.0 through v0.39.0)

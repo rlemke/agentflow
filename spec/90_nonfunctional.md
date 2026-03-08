@@ -395,6 +395,37 @@ scripts/rolling-deploy --example hiv-drug-resistance -- --log-format text --max-
 - SIGTERM triggers graceful drain: the runner finishes in-flight tasks before exiting
 - Handlers are re-registered once centrally (in MongoDB) before the rolling restart begins, so all restarted runners pick up the new handler code
 
+### Crash recovery — orphaned task reaper
+
+When a runner crashes (e.g. OOM, SIGKILL, network partition) without graceful shutdown, its in-flight tasks remain stuck in `running` state forever — no healthy runner will pick them up because they are not `pending`.
+
+The **orphaned task reaper** runs automatically inside every `RunnerService` and `AgentPoller`:
+
+1. Every `claim_task()` call stamps the task document with the claiming server's `server_id`
+2. Every 60 seconds, the reaper queries for servers whose `ping_time` is >5 minutes stale while their state is still `running` or `startup` (i.e., crashed without deregistering)
+3. All tasks in `running` state with a `server_id` matching a dead server are atomically reset to `pending`
+4. Healthy runners pick them up on the next poll cycle
+
+**Safety:**
+- Gracefully shut-down servers (state = `shutdown`) are NOT reaped — only servers that died without completing their drain
+- The 5-minute stale threshold (matching `SERVER_DOWN_TIMEOUT_MS`) avoids false positives from brief network hiccups or GC pauses
+- The dashboard Fleet page (`/v2/fleet`) shows servers in `down` state when their heartbeat is stale, providing visual confirmation
+
+**Manual recovery** (for tasks without `server_id`, e.g. from before the reaper was added):
+```bash
+docker exec afl-mongodb mongosh afl --eval "
+  db.tasks.updateMany(
+    {state: 'running', workflow_id: '<wf_id>'},
+    {\$set: {state: 'pending', server_id: ''}}
+  )
+"
+```
+
+**Configuration:**
+- Reap interval: 60 seconds (hardcoded, `_reap_interval_ms`)
+- Down timeout: 5 minutes (`SERVER_DOWN_TIMEOUT_MS` in `afl/dashboard/helpers.py`, reused in `reap_orphaned_tasks()`)
+- Heartbeat interval: 10 seconds (configurable via `AFL_HEARTBEAT_INTERVAL_MS`)
+
 ### Verifying runner state
 
 Each runner persists its HTTP status port in MongoDB (`ServerDefinition.http_port`), enabling remote health checks.

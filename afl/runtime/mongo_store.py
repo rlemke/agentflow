@@ -486,6 +486,7 @@ class MongoStore(PersistenceAPI):
         self,
         task_names: list[str],
         task_list: str = "default",
+        server_id: str = "",
     ) -> TaskDefinition | None:
         """Atomically claim a pending task matching one of the given names.
 
@@ -493,13 +494,19 @@ class MongoStore(PersistenceAPI):
         The partial unique index on (step_id, state=running) ensures only
         one agent processes an event per step.
         """
+        update: dict[str, Any] = {
+            "state": "running",
+            "updated": _current_time_ms(),
+        }
+        if server_id:
+            update["server_id"] = server_id
         doc = self._db.tasks.find_one_and_update(
             {
                 "state": "pending",
                 "name": {"$in": task_names},
                 "task_list_name": task_list,
             },
-            {"$set": {"state": "running", "updated": _current_time_ms()}},
+            {"$set": update},
             return_document=ReturnDocument.AFTER,
         )
         return self._doc_to_task(doc) if doc else None
@@ -524,6 +531,47 @@ class MongoStore(PersistenceAPI):
         """Get all tasks for a runner."""
         docs = self._db.tasks.find({"runner_id": runner_id})
         return [self._doc_to_task(doc) for doc in docs]
+
+    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> int:
+        """Reset tasks stuck in RUNNING whose claiming server is dead.
+
+        A server is dead if its state is running/startup but its ping_time
+        is older than *down_timeout_ms*.  Tasks with a ``server_id`` matching
+        a dead server are atomically reset to PENDING.
+        """
+        now = _current_time_ms()
+        cutoff = now - down_timeout_ms
+
+        # Find servers that are effectively down
+        dead_servers = self._db.servers.find(
+            {
+                "state": {"$in": ["running", "startup"]},
+                "$or": [
+                    {"ping_time": 0},
+                    {"ping_time": {"$lt": cutoff}},
+                ],
+            },
+            {"uuid": 1},
+        )
+        dead_ids = [doc["uuid"] for doc in dead_servers]
+        if not dead_ids:
+            return 0
+
+        # Reset their running tasks back to pending
+        result = self._db.tasks.update_many(
+            {
+                "state": "running",
+                "server_id": {"$in": dead_ids},
+            },
+            {
+                "$set": {
+                    "state": "pending",
+                    "server_id": "",
+                    "updated": now,
+                },
+            },
+        )
+        return result.modified_count if result else 0
 
     # =========================================================================
     # Log Operations
