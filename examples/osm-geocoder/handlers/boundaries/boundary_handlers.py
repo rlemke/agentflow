@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .boundary_extractor import (
     ADMIN_LEVEL_CITY,
     ADMIN_LEVEL_COUNTRY,
@@ -23,15 +24,9 @@ NAMESPACE = "osm.geo.Boundaries"
 
 
 def _make_admin_handler(facet_name: str, admin_levels: list[int]):
-    """Create a handler for an administrative boundary event facet.
-
-    Args:
-        facet_name: Name of the event facet
-        admin_levels: List of OSM admin_level values to extract
-
-    Returns:
-        Handler function that extracts boundaries and returns BoundaryResult
-    """
+    """Create a handler for an administrative boundary event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"admin_levels": sorted(admin_levels)}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -48,7 +43,6 @@ def _make_admin_handler(facet_name: str, admin_levels: list[int]):
         )
 
         if not HAS_OSMIUM or not pbf_path:
-            # Return mock result when pyosmium not available or no path
             return {
                 "result": {
                     "output_path": "",
@@ -77,19 +71,13 @@ def _make_admin_handler(facet_name: str, admin_levels: list[int]):
             }
         }
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_natural_handler(facet_name: str, natural_types: list[str]):
-    """Create a handler for a natural boundary event facet.
-
-    Args:
-        facet_name: Name of the event facet
-        natural_types: List of natural boundary types (water, forest, park)
-
-    Returns:
-        Handler function that extracts boundaries and returns BoundaryResult
-    """
+    """Create a handler for a natural boundary event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"natural_types": sorted(natural_types)}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -106,7 +94,6 @@ def _make_natural_handler(facet_name: str, natural_types: list[str]):
         )
 
         if not HAS_OSMIUM or not pbf_path:
-            # Return mock result when pyosmium not available or no path
             return {
                 "result": {
                     "output_path": "",
@@ -135,20 +122,27 @@ def _make_natural_handler(facet_name: str, natural_types: list[str]):
             }
         }
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_configurable_admin_handler(facet_name: str):
     """Create a handler for the configurable AdminBoundary event facet.
 
     Reads admin_level from the payload (defaults to 2 = country).
+    Uses dynamic cache_params since admin_level comes from payload.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         admin_level = payload.get("admin_level", 2)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (admin_level comes from payload)
+        hit = cached_result(qualified, cache, {"admin_levels": [admin_level]}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting admin level {admin_level} from {pbf_path}")
@@ -177,7 +171,7 @@ def _make_configurable_admin_handler(facet_name: str):
                 f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
                 level="success",
             )
-        return {
+        rv = {
             "result": {
                 "output_path": result.output_path,
                 "feature_count": result.feature_count,
@@ -187,6 +181,8 @@ def _make_configurable_admin_handler(facet_name: str):
                 "extraction_date": result.extraction_date,
             }
         }
+        save_result_meta(qualified, cache, {"admin_levels": [admin_level]}, rv)
+        return rv
 
     return handler
 
@@ -195,13 +191,19 @@ def _make_configurable_natural_handler(facet_name: str):
     """Create a handler for the configurable NaturalBoundary event facet.
 
     Reads natural_type from the payload (defaults to "water").
+    Uses dynamic cache_params since natural_type comes from payload.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         natural_type = payload.get("natural_type", "water")
         step_log = payload.get("_step_log")
+
+        hit = cached_result(qualified, cache, {"natural_types": [natural_type]}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting natural type {natural_type} from {pbf_path}")
@@ -230,7 +232,7 @@ def _make_configurable_natural_handler(facet_name: str):
                 f"{facet_name}: extracted {result.feature_count} {result.boundary_type} boundaries",
                 level="success",
             )
-        return {
+        rv = {
             "result": {
                 "output_path": result.output_path,
                 "feature_count": result.feature_count,
@@ -240,6 +242,8 @@ def _make_configurable_natural_handler(facet_name: str):
                 "extraction_date": result.extraction_date,
             }
         }
+        save_result_meta(qualified, cache, {"natural_types": [natural_type]}, rv)
+        return rv
 
     return handler
 

@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .building_extractor import (
     HAS_OSMIUM,
     BuildingResult,
@@ -22,12 +23,18 @@ NAMESPACE = "osm.geo.Buildings"
 
 def _make_extract_buildings_handler(facet_name: str):
     """Create handler for ExtractBuildings event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         building_type = payload.get("building_type", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (building_type comes from payload)
+        hit = cached_result(qualified, cache, {"building_type": building_type}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {building_type} buildings from {pbf_path}")
@@ -43,7 +50,9 @@ def _make_extract_buildings_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {building_type} buildings",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"building_type": building_type}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract buildings: %s", e)
             return {"result": _empty_result(building_type)}
@@ -53,6 +62,8 @@ def _make_extract_buildings_handler(facet_name: str):
 
 def _make_typed_building_handler(facet_name: str, building_type: str):
     """Create handler for a specific building type."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"building_type": building_type}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -78,11 +89,13 @@ def _make_typed_building_handler(facet_name: str, building_type: str):
             log.error("Failed to extract %s buildings: %s", building_type, e)
             return {"result": _empty_result(building_type)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_buildings_3d_handler(facet_name: str):
     """Create handler for Buildings3D (buildings with height data)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"building_type": "all", "require_height": True}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -107,17 +120,23 @@ def _make_buildings_3d_handler(facet_name: str):
             log.error("Failed to extract 3D buildings: %s", e)
             return {"result": _empty_result("all")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_large_buildings_handler(facet_name: str):
     """Create handler for LargeBuildings."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         min_area_m2 = payload.get("min_area_m2", 1000.0)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (min_area_m2 comes from payload)
+        hit = cached_result(qualified, cache, {"min_area_m2": min_area_m2}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting buildings >= {min_area_m2:.0f} m2 from {pbf_path}")
@@ -133,7 +152,9 @@ def _make_large_buildings_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} buildings >= {min_area_m2:.0f} m2",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"min_area_m2": min_area_m2}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract large buildings: %s", e)
             return {"result": _empty_result("all")}
@@ -143,10 +164,26 @@ def _make_large_buildings_handler(facet_name: str):
 
 def _make_building_stats_handler(facet_name: str):
     """Create handler for BuildingStatistics."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         step_log = payload.get("_step_log")
+
+        # Build cache dict from input_path for cache key computation
+        input_cache = {"path": input_path, "size": 0}
+        if input_path:
+            try:
+                backend = __import__(
+                    "afl.runtime.storage", fromlist=["get_storage_backend"]
+                ).get_storage_backend(input_path)
+                input_cache["size"] = backend.getsize(input_path)
+            except Exception:
+                pass
+
+        hit = cached_result(qualified, input_cache, {"stats": True}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: calculating stats for {input_path}")
@@ -163,7 +200,9 @@ def _make_building_stats_handler(facet_name: str):
                     f" (residential={stats.residential}, commercial={stats.commercial})",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, input_cache, {"stats": True}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate building stats: %s", e)
             return {"stats": _empty_stats()}
@@ -173,11 +212,26 @@ def _make_building_stats_handler(facet_name: str):
 
 def _make_filter_buildings_handler(facet_name: str):
     """Create handler for FilterBuildingsByType."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         building_type = payload.get("building_type", "all")
         step_log = payload.get("_step_log")
+
+        # Build cache dict from input_path for cache key computation
+        input_cache = {"path": input_path, "size": 0}
+        if input_path:
+            try:
+                from afl.runtime.storage import get_storage_backend as _get_backend
+
+                input_cache["size"] = _get_backend(input_path).getsize(input_path)
+            except Exception:
+                pass
+
+        hit = cached_result(qualified, input_cache, {"building_type": building_type}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} for {building_type} buildings")
@@ -225,7 +279,7 @@ def _make_filter_buildings_handler(facet_name: str):
                     f"{facet_name}: {len(filtered)}/{len(all_features)} {building_type} buildings",
                     level="success",
                 )
-            return {
+            rv = {
                 "result": {
                     "output_path": str(output_path),
                     "feature_count": len(filtered),
@@ -236,6 +290,8 @@ def _make_filter_buildings_handler(facet_name: str):
                     "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
+            save_result_meta(qualified, input_cache, {"building_type": building_type}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter buildings: %s", e)
             return {"result": _empty_result(building_type)}

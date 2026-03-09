@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .route_extractor import (
     HAS_OSMIUM,
     RouteResult,
@@ -23,6 +24,7 @@ NAMESPACE = "osm.geo.Routes"
 
 def _make_extract_routes_handler(facet_name: str):
     """Create handler for ExtractRoutes event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -31,6 +33,16 @@ def _make_extract_routes_handler(facet_name: str):
         network = payload.get("network", "*")
         include_infrastructure = payload.get("include_infrastructure", True)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (route_type, network, include_infrastructure from payload)
+        dyn_params = {
+            "route_type": route_type,
+            "network": network,
+            "include_infrastructure": include_infrastructure,
+        }
+        hit = cached_result(qualified, cache, dyn_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
@@ -58,7 +70,9 @@ def _make_extract_routes_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {route_type} routes",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, dyn_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract routes: %s", e)
             return {"result": _empty_result(route_type, network, include_infrastructure)}
@@ -68,12 +82,20 @@ def _make_extract_routes_handler(facet_name: str):
 
 def _make_filter_routes_handler(facet_name: str):
     """Create handler for FilterRoutesByType event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         route_type = payload.get("route_type", "bicycle")
         network = payload.get("network", "*")
         step_log = payload.get("_step_log")
+
+        # Build synthetic cache dict from input_path for cache key
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        dyn_params = {"route_type": route_type, "network": network}
+        hit = cached_result(qualified, input_cache, dyn_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} for {route_type} routes")
@@ -99,7 +121,9 @@ def _make_filter_routes_handler(facet_name: str):
                     f"{facet_name}: filtered to {result.feature_count} {route_type} routes",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, input_cache, dyn_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter routes: %s", e)
             return {"result": _empty_result(route_type, network, False)}
@@ -109,10 +133,18 @@ def _make_filter_routes_handler(facet_name: str):
 
 def _make_route_stats_handler(facet_name: str):
     """Create handler for RouteStatistics event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         step_log = payload.get("_step_log")
+
+        # Build synthetic cache dict from input_path for cache key
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        dyn_params: dict = {}
+        hit = cached_result(qualified, input_cache, dyn_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: calculating stats for {input_path}")
@@ -128,7 +160,9 @@ def _make_route_stats_handler(facet_name: str):
                     f"{facet_name}: {stats.route_count} routes, {stats.total_length_km:.1f} km",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, input_cache, dyn_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate stats: %s", e)
             return {"stats": _empty_stats()}
@@ -138,6 +172,7 @@ def _make_route_stats_handler(facet_name: str):
 
 def _make_typed_route_handler(facet_name: str, route_type: str):
     """Create handler for a specific route type (BicycleRoutes, HikingTrails, etc.)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -145,6 +180,16 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
         network = payload.get("network", "*")
         include_infrastructure = payload.get("include_infrastructure", True)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (route_type fixed, network/include_infrastructure from payload)
+        dyn_params = {
+            "route_type": route_type,
+            "network": network,
+            "include_infrastructure": include_infrastructure,
+        }
+        hit = cached_result(qualified, cache, dyn_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {route_type} routes from {pbf_path}")
@@ -171,7 +216,9 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
                     f"{facet_name}: extracted {result.feature_count} {route_type} routes",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, dyn_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract %s routes: %s", route_type, e)
             return {"result": _empty_result(route_type, network, include_infrastructure)}
@@ -181,6 +228,8 @@ def _make_typed_route_handler(facet_name: str, route_type: str):
 
 def _make_public_transport_handler(facet_name: str):
     """Create handler for PublicTransport event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"route_type": "public_transport", "include_infrastructure": True}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -210,7 +259,17 @@ def _make_public_transport_handler(facet_name: str):
             log.error("Failed to extract public transport: %s", e)
             return {"result": _empty_result("public_transport", "*", True)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
+
+
+def _file_size(path: str) -> int:
+    """Get file size, returning 0 if the file doesn't exist or is remote."""
+    if not path or path.startswith("hdfs://"):
+        return 0
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def _result_to_dict(result: RouteResult) -> dict:

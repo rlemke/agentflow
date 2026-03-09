@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .population_filter import (
     HAS_OSMIUM,
     Operator,
@@ -25,6 +26,7 @@ NAMESPACE = "osm.geo.Population"
 
 def _make_filter_by_population_handler(facet_name: str):
     """Create handler for FilterByPopulation event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -32,6 +34,17 @@ def _make_filter_by_population_handler(facet_name: str):
         place_type = payload.get("place_type", "all")
         operator = payload.get("operator", "gte")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (params come from payload)
+        cache_params = {
+            "place_type": place_type,
+            "min_population": min_population,
+            "operator": operator,
+        }
+        input_cache = {"path": input_path, "size": 0}
+        hit = cached_result(qualified, input_cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -61,7 +74,9 @@ def _make_filter_by_population_handler(facet_name: str):
                     f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {operator} {min_population})",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, input_cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter by population: %s", e)
             return {"result": _empty_result(place_type, min_population, 0)}
@@ -71,6 +86,7 @@ def _make_filter_by_population_handler(facet_name: str):
 
 def _make_filter_by_population_range_handler(facet_name: str):
     """Create handler for FilterByPopulationRange event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -78,6 +94,18 @@ def _make_filter_by_population_range_handler(facet_name: str):
         max_population = payload.get("max_population", 0)
         place_type = payload.get("place_type", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (params come from payload)
+        cache_params = {
+            "place_type": place_type,
+            "min_population": min_population,
+            "max_population": max_population,
+            "operator": "between",
+        }
+        input_cache = {"path": input_path, "size": 0}
+        hit = cached_result(qualified, input_cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -108,7 +136,9 @@ def _make_filter_by_population_range_handler(facet_name: str):
                     f"{facet_name}: {result.feature_count}/{result.original_count} matched ({place_type}, pop {min_population}-{max_population})",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, input_cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter by population range: %s", e)
             return {"result": _empty_result(place_type, min_population, max_population)}
@@ -118,6 +148,7 @@ def _make_filter_by_population_range_handler(facet_name: str):
 
 def _make_extract_places_handler(facet_name: str):
     """Create handler for ExtractPlacesWithPopulation event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -125,6 +156,12 @@ def _make_extract_places_handler(facet_name: str):
         place_type = payload.get("place_type", "all")
         min_population = payload.get("min_population", 0)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (place_type and min_population come from payload)
+        cache_params = {"place_type": place_type, "min_population": min_population}
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -152,7 +189,9 @@ def _make_extract_places_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {place_type} places (min_pop={min_population})",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract places with population: %s", e)
             return {"result": _empty_result(place_type, min_population, 0)}
@@ -162,12 +201,19 @@ def _make_extract_places_handler(facet_name: str):
 
 def _make_typed_place_handler(facet_name: str, place_type: str):
     """Create handler for a specific place type (Cities, Towns, etc.)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         min_population = payload.get("min_population", 0)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (min_population comes from payload)
+        cache_params = {"place_type": place_type, "min_population": min_population}
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -188,7 +234,9 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
                 step_log(
                     f"{facet_name}: extracted {result.feature_count} {place_type}", level="success"
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract %s: %s", place_type, e)
             return {"result": _empty_result(place_type, min_population, 0)}
@@ -198,6 +246,8 @@ def _make_typed_place_handler(facet_name: str, place_type: str):
 
 def _make_admin_handler(facet_name: str, place_type: str):
     """Create handler for administrative boundaries (Countries, States, Counties)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"place_type": place_type}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -226,16 +276,24 @@ def _make_admin_handler(facet_name: str, place_type: str):
             log.error("Failed to extract %s: %s", place_type, e)
             return {"result": _empty_result(place_type, 0, 0)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_population_stats_handler(facet_name: str):
     """Create handler for PopulationStatistics event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         place_type = payload.get("place_type", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (params come from payload)
+        cache_params = {"place_type": place_type}
+        input_cache = {"path": input_path, "size": 0}
+        hit = cached_result(qualified, input_cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: calculating stats for {input_path} ({place_type})")
@@ -251,7 +309,9 @@ def _make_population_stats_handler(facet_name: str):
                     f"{facet_name}: {stats.total_places} places, total pop {stats.total_population}",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, input_cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate population stats: %s", e)
             return {"stats": _empty_stats()}

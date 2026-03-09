@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .park_extractor import (
     HAS_OSMIUM,
     ParkResult,
@@ -24,6 +25,8 @@ NAMESPACE = "osm.geo.Parks"
 
 def _make_national_parks_handler(facet_name: str):
     """Create handler for NationalParks event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"park_type": "national"}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -52,11 +55,13 @@ def _make_national_parks_handler(facet_name: str):
             log.error("Failed to extract national parks: %s", e)
             return {"result": _empty_result("national", "*")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_state_parks_handler(facet_name: str):
     """Create handler for StateParks event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"park_type": "state"}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -84,11 +89,13 @@ def _make_state_parks_handler(facet_name: str):
             log.error("Failed to extract state parks: %s", e)
             return {"result": _empty_result("state", "*")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_nature_reserves_handler(facet_name: str):
     """Create handler for NatureReserves event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"park_type": "nature_reserve"}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -117,17 +124,27 @@ def _make_nature_reserves_handler(facet_name: str):
             log.error("Failed to extract nature reserves: %s", e)
             return {"result": _empty_result("nature_reserve", "*")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_protected_areas_handler(facet_name: str):
-    """Create handler for ProtectedAreas event facet."""
+    """Create handler for ProtectedAreas event facet.
+
+    Uses dynamic cache_params since protect_classes comes from payload.
+    """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         protect_classes = payload.get("protect_classes", "*")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        cp = {"park_type": "protected_area", "protect_classes": protect_classes}
+        hit = cached_result(qualified, cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting protected areas from {pbf_path}")
@@ -152,7 +169,9 @@ def _make_protected_areas_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} protected areas",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract protected areas: %s", e)
             return {"result": _empty_result("protected_area", protect_classes)}
@@ -161,7 +180,11 @@ def _make_protected_areas_handler(facet_name: str):
 
 
 def _make_extract_parks_handler(facet_name: str):
-    """Create handler for ExtractParks event facet."""
+    """Create handler for ExtractParks event facet.
+
+    Uses dynamic cache_params since park_type and protect_classes come from payload.
+    """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -169,6 +192,12 @@ def _make_extract_parks_handler(facet_name: str):
         park_type = payload.get("park_type", "all")
         protect_classes = payload.get("protect_classes", "*")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        cp = {"park_type": park_type, "protect_classes": protect_classes}
+        hit = cached_result(qualified, cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {park_type} parks from {pbf_path}")
@@ -194,7 +223,9 @@ def _make_extract_parks_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {park_type} parks",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract parks: %s", e)
             return {"result": _empty_result(park_type, protect_classes)}
@@ -203,13 +234,25 @@ def _make_extract_parks_handler(facet_name: str):
 
 
 def _make_filter_parks_handler(facet_name: str):
-    """Create handler for FilterParksByType event facet."""
+    """Create handler for FilterParksByType event facet.
+
+    Uses dynamic cache_params since park_type and protect_classes come from payload.
+    Input is a GeoJSON file (input_path) rather than a PBF cache.
+    """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         park_type = payload.get("park_type", "all")
         protect_classes = payload.get("protect_classes", "*")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check — use input_path as cache identity
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"park_type": park_type, "protect_classes": protect_classes}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} for {park_type} parks")
@@ -235,7 +278,9 @@ def _make_filter_parks_handler(facet_name: str):
                     f"{facet_name}: filtered to {result.feature_count} {park_type} parks",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, input_cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter parks: %s", e)
             return {"result": _empty_result(park_type, protect_classes)}
@@ -244,11 +289,22 @@ def _make_filter_parks_handler(facet_name: str):
 
 
 def _make_park_stats_handler(facet_name: str):
-    """Create handler for ParkStatistics event facet."""
+    """Create handler for ParkStatistics event facet.
+
+    Input is a GeoJSON file (input_path) rather than a PBF cache.
+    """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check — use input_path as cache identity
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp: dict[str, str] = {}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: calculating stats for {input_path}")
@@ -266,7 +322,9 @@ def _make_park_stats_handler(facet_name: str):
                     f" reserves={stats.nature_reserves})",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, input_cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate park stats: %s", e)
             return {"stats": _empty_stats()}
@@ -275,7 +333,11 @@ def _make_park_stats_handler(facet_name: str):
 
 
 def _make_large_parks_handler(facet_name: str):
-    """Create handler for LargeParks event facet."""
+    """Create handler for LargeParks event facet.
+
+    Uses dynamic cache_params since min_area_km2 and park_type come from payload.
+    """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -283,6 +345,12 @@ def _make_large_parks_handler(facet_name: str):
         min_area_km2 = payload.get("min_area_km2", 100.0)
         park_type = payload.get("park_type", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        cp = {"park_type": park_type, "min_area_km2": min_area_km2}
+        hit = cached_result(qualified, cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -310,12 +378,22 @@ def _make_large_parks_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} large {park_type} parks (>= {min_area_km2:.1f} km2)",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract large parks: %s", e)
             return {"result": _empty_result(park_type, "*")}
 
     return handler
+
+
+def _file_size(path: str) -> int:
+    """Return file size in bytes, or 0 if the file doesn't exist."""
+    try:
+        return os.path.getsize(path) if path else 0
+    except OSError:
+        return 0
 
 
 def _result_to_dict(result: ParkResult) -> dict:

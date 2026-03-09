@@ -10,6 +10,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta
 from .osm_type_filter import (
     HAS_OSMIUM as HAS_OSMIUM_TYPE,
 )
@@ -29,6 +30,15 @@ log = logging.getLogger(__name__)
 
 NAMESPACE = "osm.geo.Filters"
 
+
+def _file_size(path: str) -> int:
+    """Return file size in bytes, or 0 if unavailable."""
+    try:
+        return os.path.getsize(path) if path else 0
+    except OSError:
+        return 0
+
+
 # Check for boundary extractor availability (for ExtractAndFilterByRadius)
 try:
     from .boundary_extractor import HAS_OSMIUM, extract_boundaries
@@ -45,6 +55,7 @@ def _make_radius_filter_handler(facet_name: str):
     Filters GeoJSON features by equivalent radius using the specified
     threshold, unit, and comparison operator.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -52,6 +63,13 @@ def _make_radius_filter_handler(facet_name: str):
         unit = payload.get("unit", "kilometers")
         operator = payload.get("operator", "gte")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (params come from payload)
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"radius": radius, "unit": unit, "operator": operator}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} with radius {operator} {radius} {unit}")
@@ -85,7 +103,9 @@ def _make_radius_filter_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {operator} {radius} {unit})",
                 level="success",
             )
-        return {"result": _result_to_dict(result)}
+        rv = {"result": _result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 
@@ -95,6 +115,7 @@ def _make_radius_range_handler(facet_name: str):
 
     Filters GeoJSON features by equivalent radius within an inclusive range.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -102,6 +123,13 @@ def _make_radius_range_handler(facet_name: str):
         max_radius = payload.get("max_radius", 0.0)
         unit = payload.get("unit", "kilometers")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"min_radius": min_radius, "max_radius": max_radius, "unit": unit}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -142,7 +170,9 @@ def _make_radius_range_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (radius {min_radius}-{max_radius} {unit})",
                 level="success",
             )
-        return {"result": _result_to_dict(result)}
+        rv = {"result": _result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 
@@ -152,6 +182,7 @@ def _make_type_and_radius_handler(facet_name: str):
 
     Filters GeoJSON features by boundary type and equivalent radius.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -160,6 +191,13 @@ def _make_type_and_radius_handler(facet_name: str):
         unit = payload.get("unit", "kilometers")
         operator = payload.get("operator", "gte")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"boundary_type": boundary_type, "radius": radius, "unit": unit, "operator": operator}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -196,7 +234,9 @@ def _make_type_and_radius_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={boundary_type}, radius)",
                 level="success",
             )
-        return {"result": _result_to_dict(result)}
+        rv = {"result": _result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 
@@ -206,6 +246,7 @@ def _make_extract_and_filter_handler(facet_name: str):
 
     Extracts boundaries from a PBF file and filters by radius in one step.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -217,11 +258,6 @@ def _make_extract_and_filter_handler(facet_name: str):
         operator = payload.get("operator", "gte")
         step_log = payload.get("_step_log")
 
-        if step_log:
-            step_log(
-                f"{facet_name}: extracting from {pbf_path} then filtering radius {operator} {radius} {unit}"
-            )
-
         # Normalize admin_levels to list of ints
         if isinstance(admin_levels, str):
             admin_levels = [int(x.strip()) for x in admin_levels.split(",") if x.strip()]
@@ -231,6 +267,23 @@ def _make_extract_and_filter_handler(facet_name: str):
         if isinstance(natural_types, str):
             natural_types = [x.strip() for x in natural_types.split(",") if x.strip()]
         natural_types = natural_types if natural_types else None
+
+        # Dynamic cache check (admin_levels/natural_types/radius come from payload)
+        cp = {
+            "admin_levels": sorted(admin_levels) if admin_levels else [],
+            "natural_types": sorted(natural_types) if natural_types else [],
+            "radius": radius,
+            "unit": unit,
+            "operator": operator,
+        }
+        hit = cached_result(qualified, cache, cp, step_log)
+        if hit is not None:
+            return hit
+
+        if step_log:
+            step_log(
+                f"{facet_name}: extracting from {pbf_path} then filtering radius {operator} {radius} {unit}"
+            )
 
         log.info(
             "%s extracting from %s (admin=%s, natural=%s) then filtering radius %s %s %s",
@@ -286,7 +339,7 @@ def _make_extract_and_filter_handler(facet_name: str):
                 f"{facet_name}: extracted {extraction_result.feature_count}, filtered to {filter_result.feature_count}",
                 level="success",
             )
-        return {
+        rv = {
             "result": {
                 "output_path": filter_result.output_path,
                 "feature_count": filter_result.feature_count,
@@ -297,6 +350,8 @@ def _make_extract_and_filter_handler(facet_name: str):
                 "extraction_date": filter_result.extraction_date,
             }
         }
+        save_result_meta(qualified, cache, cp, rv)
+        return rv
 
     return handler
 
@@ -335,12 +390,20 @@ def _make_osm_type_filter_handler(facet_name: str):
 
     Filters PBF files by OSM element type (node, way, relation).
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         osm_type = payload.get("osm_type", "*")
         include_dependencies = payload.get("include_dependencies", False)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"osm_type": osm_type, "include_dependencies": include_dependencies}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} by OSM type={osm_type}")
@@ -378,7 +441,9 @@ def _make_osm_type_filter_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})",
                 level="success",
             )
-        return {"result": _osm_result_to_dict(result)}
+        rv = {"result": _osm_result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 
@@ -388,6 +453,7 @@ def _make_osm_tag_filter_handler(facet_name: str):
 
     Filters PBF files by OSM tag key/value.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -396,6 +462,18 @@ def _make_osm_tag_filter_handler(facet_name: str):
         osm_type = payload.get("osm_type", "*")
         include_dependencies = payload.get("include_dependencies", False)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {
+            "tag_key": tag_key,
+            "tag_value": tag_value,
+            "osm_type": osm_type,
+            "include_dependencies": include_dependencies,
+        }
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} by tag {tag_key}={tag_value}")
@@ -437,7 +515,9 @@ def _make_osm_tag_filter_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (tag {tag_key}={tag_value})",
                 level="success",
             )
-        return {"result": _osm_result_to_dict(result)}
+        rv = {"result": _osm_result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 
@@ -447,6 +527,7 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
 
     Filters GeoJSON files by OSM type stored in feature properties.
     """
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -454,6 +535,13 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
         tag_key = payload.get("tag_key", "") or None
         tag_value = payload.get("tag_value", "*")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"osm_type": osm_type, "tag_key": tag_key or "", "tag_value": tag_value}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering GeoJSON {input_path} by OSM type={osm_type}")
@@ -493,7 +581,9 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
                 f"{facet_name}: {result.feature_count}/{result.original_count} matched (type={osm_type})",
                 level="success",
             )
-        return {"result": _osm_result_to_dict(result)}
+        rv = {"result": _osm_result_to_dict(result)}
+        save_result_meta(qualified, input_cache, cp, rv)
+        return rv
 
     return handler
 

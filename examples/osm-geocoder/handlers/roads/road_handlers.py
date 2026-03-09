@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .road_extractor import (
     HAS_OSMIUM,
     MAJOR_ROAD_CLASSES,
@@ -25,12 +26,18 @@ NAMESPACE = "osm.geo.Roads"
 
 def _make_extract_roads_handler(facet_name: str):
     """Create handler for ExtractRoads event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         road_class = payload.get("road_class", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (road_class comes from payload)
+        hit = cached_result(qualified, cache, {"road_class": road_class}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {road_class} roads from {pbf_path}")
@@ -46,7 +53,9 @@ def _make_extract_roads_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {road_class} roads",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"road_class": road_class}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract roads: %s", e)
             return {"result": _empty_result(road_class)}
@@ -56,6 +65,8 @@ def _make_extract_roads_handler(facet_name: str):
 
 def _make_typed_road_handler(facet_name: str, road_class: str):
     """Create handler for a specific road class."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"road_class": road_class}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -81,11 +92,13 @@ def _make_typed_road_handler(facet_name: str, road_class: str):
             log.error("Failed to extract %s roads: %s", road_class, e)
             return {"result": _empty_result(road_class)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_major_roads_handler(facet_name: str):
     """Create handler for MajorRoads (motorway + trunk + primary + secondary)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"road_class": "major"}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -152,11 +165,13 @@ def _make_major_roads_handler(facet_name: str):
             log.error("Failed to extract major roads: %s", e)
             return {"result": _empty_result("major")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_special_road_handler(facet_name: str, attribute: str):
     """Create handler for special road features (bridges, tunnels, roundabouts)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"attribute": attribute}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -220,11 +235,13 @@ def _make_special_road_handler(facet_name: str, attribute: str):
             log.error("Failed to extract %s: %s", attribute, e)
             return {"result": _empty_result(attribute)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_surface_handler(facet_name: str, surface_type: str):
     """Create handler for surface-filtered roads (paved/unpaved)."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"surface_type": surface_type}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -250,11 +267,13 @@ def _make_surface_handler(facet_name: str, surface_type: str):
             log.error("Failed to extract %s roads: %s", surface_type, e)
             return {"result": _empty_result(surface_type)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_speed_limit_handler(facet_name: str):
     """Create handler for RoadsWithSpeedLimit."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"require_speed_limit": True}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -280,15 +299,22 @@ def _make_speed_limit_handler(facet_name: str):
             log.error("Failed to extract roads with speed limits: %s", e)
             return {"result": _empty_result("with_speed")}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_road_stats_handler(facet_name: str):
     """Create handler for RoadStatistics."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         step_log = payload.get("_step_log")
+        cache = {"path": input_path, "size": payload.get("input_size", 0)}
+
+        # Dynamic cache check (input_path comes from payload)
+        hit = cached_result(qualified, cache, {"kind": "stats"}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: calculating stats for {input_path}")
@@ -304,7 +330,9 @@ def _make_road_stats_handler(facet_name: str):
                     f"{facet_name}: {stats.total_roads} roads, {stats.total_length_km:.1f} km",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, cache, {"kind": "stats"}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate road stats: %s", e)
             return {"stats": _empty_stats()}
@@ -314,11 +342,18 @@ def _make_road_stats_handler(facet_name: str):
 
 def _make_filter_by_class_handler(facet_name: str):
     """Create handler for FilterRoadsByClass."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         road_class = payload.get("road_class", "all")
         step_log = payload.get("_step_log")
+        cache = {"path": input_path, "size": payload.get("input_size", 0)}
+
+        # Dynamic cache check (road_class comes from payload)
+        hit = cached_result(qualified, cache, {"road_class": road_class}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} for {road_class} roads")
@@ -334,7 +369,9 @@ def _make_filter_by_class_handler(facet_name: str):
                     f"{facet_name}: filtered to {result.feature_count} {road_class} roads",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"road_class": road_class}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter roads: %s", e)
             return {"result": _empty_result(road_class)}
@@ -344,12 +381,21 @@ def _make_filter_by_class_handler(facet_name: str):
 
 def _make_filter_by_speed_handler(facet_name: str):
     """Create handler for FilterBySpeedLimit."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         min_speed = payload.get("min_speed", 0)
         max_speed = payload.get("max_speed", 999)
         step_log = payload.get("_step_log")
+        cache = {"path": input_path, "size": payload.get("input_size", 0)}
+
+        # Dynamic cache check (speed range comes from payload)
+        hit = cached_result(
+            qualified, cache, {"min_speed": min_speed, "max_speed": max_speed}, step_log
+        )
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} for speed {min_speed}-{max_speed}")
@@ -365,7 +411,9 @@ def _make_filter_by_speed_handler(facet_name: str):
                     f"{facet_name}: filtered to {result.feature_count} roads (speed {min_speed}-{max_speed})",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"min_speed": min_speed, "max_speed": max_speed}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter by speed limit: %s", e)
             return {"result": _empty_result("filtered")}

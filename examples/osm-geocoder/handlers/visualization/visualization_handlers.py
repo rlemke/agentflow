@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta
 from .map_renderer import (
     HAS_FOLIUM,
     HAS_STATIC,
@@ -22,8 +23,35 @@ log = logging.getLogger(__name__)
 NAMESPACE = "osm.geo.Visualization"
 
 
+def _cache_dict_from_path(path: str) -> dict:
+    """Build a cache identity dict from a file path."""
+    if not path:
+        return {"path": "", "size": 0}
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        size = 0
+    return {"path": path, "size": size}
+
+
+def _cache_dict_from_paths(paths: list[str]) -> dict:
+    """Build a cache identity dict from multiple file paths."""
+    if not paths:
+        return {"path": "", "size": 0}
+    combined = ";".join(sorted(paths))
+    total_size = 0
+    for p in paths:
+        try:
+            total_size += os.path.getsize(p)
+        except OSError:
+            pass
+    return {"path": combined, "size": total_size}
+
+
 def _make_render_map_handler(facet_name: str):
     """Create handler for RenderMap event facet."""
+
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         geojson_path = payload.get("geojson_path", "")
@@ -34,6 +62,18 @@ def _make_render_map_handler(facet_name: str):
         color = payload.get("color", "#3388ff")
         fill_opacity = payload.get("fill_opacity", 0.4)
         step_log = payload.get("_step_log")
+
+        cache = _cache_dict_from_path(geojson_path)
+        cache_params = {
+            "format": format,
+            "width": width,
+            "height": height,
+            "color": color,
+            "fill_opacity": fill_opacity,
+        }
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: rendering {geojson_path} as {format}")
@@ -65,7 +105,9 @@ def _make_render_map_handler(facet_name: str):
                     f"{facet_name}: rendered {result.feature_count} features as {format}",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to render map: %s", e)
             return {"result": _empty_result(title, format)}
@@ -75,6 +117,7 @@ def _make_render_map_handler(facet_name: str):
 
 def _make_render_map_at_handler(facet_name: str):
     """Create handler for RenderMapAt event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         geojson_path = payload.get("geojson_path", "")
@@ -83,6 +126,12 @@ def _make_render_map_at_handler(facet_name: str):
         zoom = payload.get("zoom", 10)
         title = payload.get("title", "Map")
         step_log = payload.get("_step_log")
+
+        cache = _cache_dict_from_path(geojson_path)
+        cache_params = {"lat": lat, "lon": lon, "zoom": zoom}
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(
@@ -112,7 +161,9 @@ def _make_render_map_at_handler(facet_name: str):
                     f"{facet_name}: rendered {result.feature_count} features at ({lat:.4f}, {lon:.4f})",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to render map: %s", e)
             return {"result": _empty_result(title, "html")}
@@ -122,6 +173,7 @@ def _make_render_map_at_handler(facet_name: str):
 
 def _make_render_layers_handler(facet_name: str):
     """Create handler for RenderLayers event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         layers = payload.get("layers", [])
@@ -135,6 +187,12 @@ def _make_render_layers_handler(facet_name: str):
             layers = [layer.strip() for layer in layers.split(",") if layer.strip()]
         if isinstance(colors, str):
             colors = [c.strip() for c in colors.split(",") if c.strip()]
+
+        cache = _cache_dict_from_paths(layers)
+        cache_params = {"colors": sorted(colors) if colors else [], "format": format}
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: rendering {len(layers)} layers")
@@ -159,7 +217,9 @@ def _make_render_layers_handler(facet_name: str):
                     f"{facet_name}: rendered {result.feature_count} features across {len(layers)} layers",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to render layers: %s", e)
             return {"result": _empty_result(title, format)}
@@ -169,12 +229,25 @@ def _make_render_layers_handler(facet_name: str):
 
 def _make_render_styled_map_handler(facet_name: str):
     """Create handler for RenderStyledMap event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         geojson_path = payload.get("geojson_path", "")
         style_dict = payload.get("style", {})
         title = payload.get("title", "Map")
         step_log = payload.get("_step_log")
+
+        cache = _cache_dict_from_path(geojson_path)
+        cache_params = {
+            "color": style_dict.get("color", "#3388ff"),
+            "fill_color": style_dict.get("fill_color"),
+            "weight": style_dict.get("weight", 2),
+            "opacity": style_dict.get("opacity", 1.0),
+            "fill_opacity": style_dict.get("fill_opacity", 0.4),
+        }
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: rendering {geojson_path} with custom style")
@@ -189,11 +262,11 @@ def _make_render_styled_map_handler(facet_name: str):
 
         try:
             style = LayerStyle(
-                color=style_dict.get("color", "#3388ff"),
-                fill_color=style_dict.get("fill_color"),
-                weight=style_dict.get("weight", 2),
-                opacity=style_dict.get("opacity", 1.0),
-                fill_opacity=style_dict.get("fill_opacity", 0.4),
+                color=cache_params["color"],
+                fill_color=cache_params["fill_color"],
+                weight=cache_params["weight"],
+                opacity=cache_params["opacity"],
+                fill_opacity=cache_params["fill_opacity"],
             )
             result = render_map(
                 geojson_path,
@@ -206,7 +279,9 @@ def _make_render_styled_map_handler(facet_name: str):
                     f"{facet_name}: rendered {result.feature_count} features with custom style",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to render styled map: %s", e)
             return {"result": _empty_result(title, "html")}
@@ -216,10 +291,17 @@ def _make_render_styled_map_handler(facet_name: str):
 
 def _make_preview_map_handler(facet_name: str):
     """Create handler for PreviewMap event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         geojson_path = payload.get("geojson_path", "")
         step_log = payload.get("_step_log")
+
+        cache = _cache_dict_from_path(geojson_path)
+        cache_params: dict = {}
+        hit = cached_result(qualified, cache, cache_params, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: previewing {geojson_path}")
@@ -238,7 +320,9 @@ def _make_preview_map_handler(facet_name: str):
                 step_log(
                     f"{facet_name}: previewed {result.feature_count} features", level="success"
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, cache_params, rv)
+            return rv
         except Exception as e:
             log.error("Failed to preview map: %s", e)
             return {"result": _empty_result("Preview", "html")}

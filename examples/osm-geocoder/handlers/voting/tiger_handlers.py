@@ -10,6 +10,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ..shared.output_cache import cached_result, save_result_meta
 from .tiger_downloader import (
     DISTRICT_CONGRESSIONAL,
     DISTRICT_STATE_HOUSE,
@@ -25,6 +26,15 @@ from .tiger_downloader import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _file_size(path: str) -> int:
+    """Return file size in bytes, or 0 if unavailable."""
+    try:
+        return os.path.getsize(path) if path else 0
+    except OSError:
+        return 0
+
 
 NAMESPACE_DISTRICTS = "census.tiger.Districts"
 NAMESPACE_PROCESSING = "census.tiger.Processing"
@@ -212,6 +222,7 @@ def _make_voting_precincts_handler(facet_name: str):
 
 def _make_shapefile_to_geojson_handler(facet_name: str):
     """Create handler for ShapefileToGeoJSON event facet."""
+    qualified = f"{NAMESPACE_PROCESSING}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -220,6 +231,12 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
         state_fips = cache.get("state_fips", "US")
         year = cache.get("year", 0)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (district_type/state_fips/year come from cache dict)
+        cp = {"district_type": district_type, "state_fips": state_fips, "year": year}
+        hit = cached_result(qualified, cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: converting {zip_path} to GeoJSON")
@@ -255,7 +272,7 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
                     f"{facet_name}: converted to GeoJSON ({feature_count} features)",
                     level="success",
                 )
-            return {
+            rv = {
                 "result": {
                     "output_path": output_path,
                     "feature_count": feature_count,
@@ -266,6 +283,8 @@ def _make_shapefile_to_geojson_handler(facet_name: str):
                     "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
+            save_result_meta(qualified, cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to convert shapefile: %s", e)
             return {
@@ -355,12 +374,20 @@ def _make_state_fips_handler(facet_name: str):
 
 def _make_filter_districts_handler(facet_name: str):
     """Create handler for FilterDistricts event facet."""
+    qualified = f"{NAMESPACE_PROCESSING}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
         attribute = payload.get("attribute", "")
         value = payload.get("value", "")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check
+        input_cache = {"path": input_path, "size": _file_size(input_path)}
+        cp = {"attribute": attribute, "value": value}
+        hit = cached_result(qualified, input_cache, cp, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: filtering {input_path} where {attribute}={value}")
@@ -403,7 +430,7 @@ def _make_filter_districts_handler(facet_name: str):
             with open(output_path, "w") as f:
                 json.dump(output_geojson, f)
 
-            return {
+            rv = {
                 "result": {
                     "output_path": output_path,
                     "feature_count": len(filtered),
@@ -414,6 +441,8 @@ def _make_filter_districts_handler(facet_name: str):
                     "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
+            save_result_meta(qualified, input_cache, cp, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter districts: %s", e)
             return {

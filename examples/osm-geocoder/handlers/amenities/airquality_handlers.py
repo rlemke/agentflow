@@ -15,6 +15,8 @@ import os
 import tempfile
 from typing import Any
 
+from ..shared.output_cache import cached_result, save_result_meta
+
 log = logging.getLogger(__name__)
 
 try:
@@ -72,6 +74,13 @@ def handle_fetch_air_quality(payload: dict) -> dict:
 
     if step_log:
         step_log(f"FetchAirQuality: fetching {parameter} data for bbox {bbox}")
+
+    # Cache check using bbox as the path key
+    cache = {"path": bbox, "size": radius_m}
+    cache_params = {"parameter": parameter, "radius_m": radius_m}
+    hit = cached_result(f"{NAMESPACE}.FetchAirQuality", cache, cache_params, step_log)
+    if hit is not None:
+        return hit
 
     if not HAS_REQUESTS or not OPENAQ_API_KEY:
         log.warning("OpenAQ API key not set or requests not available; returning empty result")
@@ -152,7 +161,7 @@ def handle_fetch_air_quality(payload: dict) -> dict:
                 f"FetchAirQuality: fetched {len(features)} {parameter} stations (avg {avg_value:.1f} µg/m³)",
                 level="success",
             )
-        return {
+        rv = {
             "result": {
                 "output_path": output_path,
                 "station_count": len(features),
@@ -162,6 +171,8 @@ def handle_fetch_air_quality(payload: dict) -> dict:
                 "format": "GeoJSON",
             }
         }
+        save_result_meta(f"{NAMESPACE}.FetchAirQuality", cache, cache_params, rv)
+        return rv
 
     except Exception as e:
         log.error("Failed to fetch air quality data: %s", e)
@@ -195,6 +206,12 @@ def handle_correlate(payload: dict) -> dict:
 
     if not schools_path or not air_quality_path:
         return {"result": _empty_correlation_result()}
+
+    cache = {"path": schools_path, "size": _file_size(schools_path)}
+    cache_params = {"air_quality_path": air_quality_path, "max_distance_km": max_distance_km}
+    hit = cached_result(f"{NAMESPACE}.CorrelateSchoolAirQuality", cache, cache_params, step_log)
+    if hit is not None:
+        return hit
 
     try:
         with open(schools_path) as f:
@@ -276,7 +293,7 @@ def handle_correlate(payload: dict) -> dict:
             f"CorrelateSchoolAirQuality: {matched}/{len(schools)} schools matched (high={high}, medium={medium}, low={low})",
             level="success",
         )
-    return {
+    rv = {
         "result": {
             "output_path": output_path,
             "school_count": len(schools),
@@ -288,6 +305,8 @@ def handle_correlate(payload: dict) -> dict:
             "format": "GeoJSON",
         }
     }
+    save_result_meta(f"{NAMESPACE}.CorrelateSchoolAirQuality", cache, cache_params, rv)
+    return rv
 
 
 def handle_exposure_stats(payload: dict) -> dict:
@@ -307,6 +326,11 @@ def handle_exposure_stats(payload: dict) -> dict:
 
     if not input_path:
         return {"stats": _empty_stats()}
+
+    cache = {"path": input_path, "size": _file_size(input_path)}
+    hit = cached_result(f"{NAMESPACE}.ExposureStatistics", cache, {}, step_log)
+    if hit is not None:
+        return hit
 
     try:
         with open(input_path) as f:
@@ -346,7 +370,7 @@ def handle_exposure_stats(payload: dict) -> dict:
             f"ExposureStatistics: {total} schools (high={high}, medium={medium}, low={low}, avg PM2.5={avg_pm:.1f})",
             level="success",
         )
-    return {
+    rv = {
         "stats": {
             "total_schools": total,
             "matched_schools": matched,
@@ -361,6 +385,16 @@ def handle_exposure_stats(payload: dict) -> dict:
             "min_pm25": min(pm25_values) if pm25_values else 0.0,
         }
     }
+    save_result_meta(f"{NAMESPACE}.ExposureStatistics", cache, {}, rv)
+    return rv
+
+
+def _file_size(path: str) -> int:
+    """Return file size or 0 if unavailable."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def _empty_air_quality_result(parameter: str) -> dict:

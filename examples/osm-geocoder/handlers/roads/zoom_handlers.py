@@ -10,6 +10,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .zoom_builder import (
     _empty_metrics,
     _empty_result,
@@ -53,6 +54,8 @@ NAMESPACE = "osm.geo.Roads.ZoomBuilder"
 
 def _make_build_logical_graph_handler(facet_name: str):
     """Create handler for BuildLogicalGraph event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"kind": "logical_graph"}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -86,17 +89,23 @@ def _make_build_logical_graph_handler(facet_name: str):
             log.error("Failed to build logical graph: %s", e)
             return {"edge_count": 0, "node_count": 0, "graph_path": ""}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_build_anchors_handler(facet_name: str):
     """Create handler for BuildAnchors event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
         cities_path = payload.get("cities_path", "")
         zoom_level = payload.get("zoom_level", 4)
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"zoom_level": zoom_level}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: building anchors for zoom {zoom_level}")
@@ -118,7 +127,9 @@ def _make_build_anchors_handler(facet_name: str):
                     f"{facet_name}: built {len(anchors)} anchors for zoom {zoom_level}",
                     level="success",
                 )
-            return {"anchors_path": anchors_path, "anchor_count": len(anchors)}
+            rv = {"anchors_path": anchors_path, "anchor_count": len(anchors)}
+            save_result_meta(qualified, cache, {"zoom_level": zoom_level}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to build anchors: %s", e)
             return {"anchors_path": "", "anchor_count": 0}
@@ -128,6 +139,7 @@ def _make_build_anchors_handler(facet_name: str):
 
 def _make_compute_sbs_handler(facet_name: str):
     """Create handler for ComputeSBS event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
@@ -139,6 +151,13 @@ def _make_compute_sbs_handler(facet_name: str):
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(
+            qualified, cache, {"zoom_level": zoom_level, "k_pairs": k_pairs}, step_log
+        )
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: computing SBS for zoom {zoom_level}")
@@ -169,7 +188,9 @@ def _make_compute_sbs_handler(facet_name: str):
                     f"{facet_name}: {route_count} routes computed for zoom {zoom_level}",
                     level="success",
                 )
-            return {"sbs_path": sbs_path, "route_count": route_count}
+            rv = {"sbs_path": sbs_path, "route_count": route_count}
+            save_result_meta(qualified, cache, {"zoom_level": zoom_level, "k_pairs": k_pairs}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to compute SBS: %s", e)
             return {"sbs_path": "", "route_count": 0}
@@ -179,11 +200,17 @@ def _make_compute_sbs_handler(facet_name: str):
 
 def _make_compute_scores_handler(facet_name: str):
     """Create handler for ComputeScores event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
         sbs_paths_str = payload.get("sbs_paths", "")
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"sbs_paths": sbs_paths_str}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: computing scores")
@@ -223,7 +250,9 @@ def _make_compute_scores_handler(facet_name: str):
                 step_log(
                     f"{facet_name}: computed scores for {len(scores)} zoom levels", level="success"
                 )
-            return {"scores_path": scores_path}
+            rv = {"scores_path": scores_path}
+            save_result_meta(qualified, cache, {"sbs_paths": sbs_paths_str}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to compute scores: %s", e)
             return {"scores_path": ""}
@@ -233,6 +262,7 @@ def _make_compute_scores_handler(facet_name: str):
 
 def _make_detect_bypasses_handler(facet_name: str):
     """Create handler for DetectBypasses event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
@@ -242,6 +272,11 @@ def _make_detect_bypasses_handler(facet_name: str):
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"kind": "bypasses"}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: detecting bypasses")
@@ -261,7 +296,9 @@ def _make_detect_bypasses_handler(facet_name: str):
             bypass_count = sum(1 for v in flags.values() if v == "bypass")
             if step_log:
                 step_log(f"{facet_name}: detected {bypass_count} bypasses", level="success")
-            return {"bypasses_path": bypasses_path, "bypass_count": bypass_count}
+            rv = {"bypasses_path": bypasses_path, "bypass_count": bypass_count}
+            save_result_meta(qualified, cache, {"kind": "bypasses"}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to detect bypasses: %s", e)
             return {"bypasses_path": "", "bypass_count": 0}
@@ -271,6 +308,7 @@ def _make_detect_bypasses_handler(facet_name: str):
 
 def _make_detect_rings_handler(facet_name: str):
     """Create handler for DetectRings event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
@@ -280,6 +318,11 @@ def _make_detect_rings_handler(facet_name: str):
         graph_dir = gh_config.get("graphDir", "")
         profile = gh_config.get("profile", "car")
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"kind": "rings"}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: detecting rings")
@@ -298,7 +341,9 @@ def _make_detect_rings_handler(facet_name: str):
 
             if step_log:
                 step_log(f"{facet_name}: detected {len(flags)} rings", level="success")
-            return {"rings_path": rings_path, "ring_count": len(flags)}
+            rv = {"rings_path": rings_path, "ring_count": len(flags)}
+            save_result_meta(qualified, cache, {"kind": "rings"}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to detect rings: %s", e)
             return {"rings_path": "", "ring_count": 0}
@@ -308,6 +353,7 @@ def _make_detect_rings_handler(facet_name: str):
 
 def _make_select_edges_handler(facet_name: str):
     """Create handler for SelectEdges event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         graph_path = payload.get("graph_path", "")
@@ -316,6 +362,11 @@ def _make_select_edges_handler(facet_name: str):
         bypasses_path = payload.get("bypasses_path", "")
         rings_path = payload.get("rings_path", "")
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"scores_path": scores_path}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: selecting edges")
@@ -360,10 +411,12 @@ def _make_select_edges_handler(facet_name: str):
 
             if step_log:
                 step_log(f"{facet_name}: selected {len(assignments)} edges", level="success")
-            return {
+            rv = {
                 "assignments_path": assignments_path,
                 "selected_count": len(assignments),
             }
+            save_result_meta(qualified, cache, {"scores_path": scores_path}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to select edges: %s", e)
             return {"assignments_path": "", "selected_count": 0}
@@ -373,6 +426,7 @@ def _make_select_edges_handler(facet_name: str):
 
 def _make_export_zoom_layers_handler(facet_name: str):
     """Create handler for ExportZoomLayers event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         assignments_path = payload.get("assignments_path", "")
@@ -382,6 +436,11 @@ def _make_export_zoom_layers_handler(facet_name: str):
             os.path.join(os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp"), "zoom-export"),
         )
         step_log = payload.get("_step_log")
+        cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
+
+        hit = cached_result(qualified, cache, {"assignments_path": assignments_path}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: exporting zoom layers to {output_dir}")
@@ -410,7 +469,7 @@ def _make_export_zoom_layers_handler(facet_name: str):
                     f"{facet_name}: exported {len(assignments)} edges across 6 zoom levels to {output_dir}",
                     level="success",
                 )
-            return {
+            rv = {
                 "result": {
                     "output_dir": output_dir,
                     "total_logical_edges": len(graph.edges),
@@ -425,6 +484,8 @@ def _make_export_zoom_layers_handler(facet_name: str):
                     "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
+            save_result_meta(qualified, cache, {"assignments_path": assignments_path}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to export zoom layers: %s", e)
             return {"result": _empty_result(output_dir)}
@@ -434,6 +495,7 @@ def _make_export_zoom_layers_handler(facet_name: str):
 
 def _make_build_zoom_layers_handler(facet_name: str):
     """Create handler for BuildZoomLayers event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -445,6 +507,11 @@ def _make_build_zoom_layers_handler(facet_name: str):
         )
         max_concurrent = payload.get("max_concurrent", 16)
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (min_population comes from payload)
+        hit = cached_result(qualified, cache, {"min_population": min_population}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: running full pipeline to {output_dir}")
@@ -463,7 +530,9 @@ def _make_build_zoom_layers_handler(facet_name: str):
                     f"{facet_name}: built zoom layers ({result.get('selected_edges', 0)} edges selected)",
                     level="success",
                 )
-            return {"result": result, "metrics": metrics}
+            rv = {"result": result, "metrics": metrics}
+            save_result_meta(qualified, cache, {"min_population": min_population}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to build zoom layers: %s", e)
             return {"result": _empty_result(output_dir), "metrics": _empty_metrics()}

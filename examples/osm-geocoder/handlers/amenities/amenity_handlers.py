@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .amenity_extractor import (
     EDUCATION_AMENITIES,
     ENTERTAINMENT_AMENITIES,
@@ -28,12 +29,18 @@ NAMESPACE = "osm.geo.Amenities"
 
 def _make_extract_amenities_handler(facet_name: str):
     """Create handler for ExtractAmenities event facet."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
         pbf_path = cache.get("path", "")
         category = payload.get("category", "all")
         step_log = payload.get("_step_log")
+
+        # Dynamic cache check (category comes from payload)
+        hit = cached_result(qualified, cache, {"category": category}, step_log)
+        if hit is not None:
+            return hit
 
         if step_log:
             step_log(f"{facet_name}: extracting {category} amenities from {pbf_path}")
@@ -49,7 +56,9 @@ def _make_extract_amenities_handler(facet_name: str):
                     f"{facet_name}: extracted {result.feature_count} {category} amenities",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"category": category}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to extract amenities: %s", e)
             return {"result": _empty_result(category)}
@@ -59,6 +68,8 @@ def _make_extract_amenities_handler(facet_name: str):
 
 def _make_typed_amenity_handler(facet_name: str, amenity_types: set[str], category: str):
     """Create handler for a specific amenity type."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"amenity_types": sorted(amenity_types), "category": category}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -84,11 +95,13 @@ def _make_typed_amenity_handler(facet_name: str, amenity_types: set[str], catego
             log.error("Failed to extract %s amenities: %s", category, e)
             return {"result": _empty_result(category)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_single_amenity_handler(facet_name: str, amenity_type: str, category: str):
     """Create handler for a single amenity type."""
+    qualified = f"{NAMESPACE}.{facet_name}"
+    cache_params = {"amenity_type": amenity_type, "category": category}
 
     def handler(payload: dict) -> dict:
         cache = payload.get("cache", {})
@@ -114,11 +127,12 @@ def _make_single_amenity_handler(facet_name: str, amenity_type: str, category: s
             log.error("Failed to extract %s: %s", amenity_type, e)
             return {"result": _empty_result(category)}
 
-    return handler
+    return with_output_cache(handler, qualified, cache_params)
 
 
 def _make_amenity_stats_handler(facet_name: str):
     """Create handler for AmenityStatistics."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -131,6 +145,11 @@ def _make_amenity_stats_handler(facet_name: str):
         if not input_path:
             return {"stats": _empty_stats()}
 
+        cache = {"path": input_path, "size": _file_size(input_path)}
+        hit = cached_result(qualified, cache, {}, step_log)
+        if hit is not None:
+            return hit
+
         try:
             stats = calculate_amenity_stats(input_path)
             if step_log:
@@ -139,7 +158,9 @@ def _make_amenity_stats_handler(facet_name: str):
                     f" (food={stats.food}, shopping={stats.shopping}, healthcare={stats.healthcare})",
                     level="success",
                 )
-            return {"stats": _stats_to_dict(stats)}
+            rv = {"stats": _stats_to_dict(stats)}
+            save_result_meta(qualified, cache, {}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to calculate amenity stats: %s", e)
             return {"stats": _empty_stats()}
@@ -149,6 +170,7 @@ def _make_amenity_stats_handler(facet_name: str):
 
 def _make_search_amenities_handler(facet_name: str):
     """Create handler for SearchAmenities."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -162,6 +184,11 @@ def _make_search_amenities_handler(facet_name: str):
         if not input_path:
             return {"result": _empty_result("search")}
 
+        cache = {"path": input_path, "size": _file_size(input_path)}
+        hit = cached_result(qualified, cache, {"name_pattern": name_pattern}, step_log)
+        if hit is not None:
+            return hit
+
         try:
             result = search_amenities(input_path, name_pattern)
             if step_log:
@@ -169,7 +196,9 @@ def _make_search_amenities_handler(facet_name: str):
                     f"{facet_name}: found {result.feature_count} matching '{name_pattern}'",
                     level="success",
                 )
-            return {"result": _result_to_dict(result)}
+            rv = {"result": _result_to_dict(result)}
+            save_result_meta(qualified, cache, {"name_pattern": name_pattern}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to search amenities: %s", e)
             return {"result": _empty_result("search")}
@@ -179,6 +208,7 @@ def _make_search_amenities_handler(facet_name: str):
 
 def _make_filter_by_category_handler(facet_name: str):
     """Create handler for FilterByCategory."""
+    qualified = f"{NAMESPACE}.{facet_name}"
 
     def handler(payload: dict) -> dict:
         input_path = payload.get("input_path", "")
@@ -191,6 +221,11 @@ def _make_filter_by_category_handler(facet_name: str):
 
         if not input_path:
             return {"result": _empty_result(category)}
+
+        cache = {"path": input_path, "size": _file_size(input_path)}
+        hit = cached_result(qualified, cache, {"category": category}, step_log)
+        if hit is not None:
+            return hit
 
         try:
             import json
@@ -224,7 +259,7 @@ def _make_filter_by_category_handler(facet_name: str):
                     f"{facet_name}: {len(filtered)}/{len(all_features)} {category} amenities",
                     level="success",
                 )
-            return {
+            rv = {
                 "result": {
                     "output_path": str(output_path),
                     "feature_count": len(filtered),
@@ -234,11 +269,21 @@ def _make_filter_by_category_handler(facet_name: str):
                     "extraction_date": datetime.now(UTC).isoformat(),
                 }
             }
+            save_result_meta(qualified, cache, {"category": category}, rv)
+            return rv
         except Exception as e:
             log.error("Failed to filter amenities: %s", e)
             return {"result": _empty_result(category)}
 
     return handler
+
+
+def _file_size(path: str) -> int:
+    """Return file size or 0 if unavailable."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def _result_to_dict(result: AmenityResult) -> dict:
