@@ -1120,6 +1120,16 @@ class Evaluator:
         if step is None:
             raise ValueError(f"Step {step_id} not found")
         if step.state != StepState.EVENT_TRANSMIT:
+            if step.is_terminal:
+                # Step already completed (e.g. task was reprocessed after
+                # a runner crash left it in running state).  Treat as no-op
+                # so the caller can mark the task completed.
+                logger.warning(
+                    "continue_step: step %s already at terminal state %s — skipping",
+                    step_id,
+                    step.state,
+                )
+                return
             raise ValueError(
                 f"Step {step_id} is at {step.state}, expected {StepState.EVENT_TRANSMIT}"
             )
@@ -1165,6 +1175,13 @@ class Evaluator:
         if step is None:
             raise ValueError(f"Step {step_id} not found")
         if step.state != StepState.EVENT_TRANSMIT:
+            if step.is_terminal:
+                logger.warning(
+                    "fail_step: step %s already at terminal state %s — skipping",
+                    step_id,
+                    step.state,
+                )
+                return
             raise ValueError(
                 f"Step {step_id} is at {step.state}, expected {StepState.EVENT_TRANSMIT}"
             )

@@ -353,6 +353,7 @@ class RegistryRunner:
             task = self._persistence.claim_task(
                 task_names=task_names,
                 task_list=self._config.task_list,
+                server_id=self._server_id,
             )
             if task is None:
                 break
@@ -523,6 +524,7 @@ class RegistryRunner:
             task = self._persistence.claim_task(
                 task_names=task_names,
                 task_list=self._config.task_list,
+                server_id=self._server_id,
             )
             if task is None:
                 break

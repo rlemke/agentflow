@@ -292,10 +292,10 @@ class TestResumeTaskEndToEnd:
         dispatched = svc.run_once()
         assert dispatched == 1
 
-        # Task should be failed
+        # Step already at terminal state — continue_step is a no-op,
+        # so the resume task completes successfully (idempotent).
         saved_task = store._tasks[resume_task.uuid]
-        assert saved_task.state == TaskState.FAILED
-        assert saved_task.error is not None
+        assert saved_task.state == TaskState.COMPLETED
 
     def test_process_resume_task_missing_step_id(self, store, evaluator, config, registry):
         """Resume task with no step_id in data or task fields should fail."""
