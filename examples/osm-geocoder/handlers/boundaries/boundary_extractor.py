@@ -1,6 +1,9 @@
-"""Boundary extraction from OSM PBF files using pyosmium.
+"""Boundary extraction from OSM PBF files.
 
-Extracts administrative and natural boundaries and outputs GeoJSON.
+Uses ``osmium tags-filter`` to extract boundary relations from PBF into
+OSM XML, then ``osm2geojson`` to assemble geometries (including
+``type=boundary`` relations that pyosmium and GDAL cannot assemble).
+Falls back to pyosmium when osmium-tool or osm2geojson are unavailable.
 """
 
 from __future__ import annotations
@@ -8,6 +11,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,14 +36,15 @@ except ImportError:
     osm = None
 
 try:
-    from shapely import wkb
-    from shapely.geometry import mapping
+    import osm2geojson
 
-    HAS_SHAPELY = True
+    HAS_OSM2GEOJSON = True
 except ImportError:
-    HAS_SHAPELY = False
-    wkb = None
-    mapping = None
+    HAS_OSM2GEOJSON = False
+    osm2geojson = None
+
+# Check for osmium-tool CLI
+HAS_OSMIUM_TOOL = shutil.which("osmium") is not None
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +58,14 @@ ADMIN_LEVEL_STATE = 4
 ADMIN_LEVEL_COUNTY = 6
 ADMIN_LEVEL_CITY = 8
 
-# Natural type tag mappings
+# Natural type tag filter expressions for ``osmium tags-filter``
+_NATURAL_TAG_FILTERS: dict[str, list[str]] = {
+    "water": ["r/natural=water", "r/water=lake,reservoir,pond"],
+    "forest": ["r/natural=wood", "r/landuse=forest"],
+    "park": ["r/leisure=park,nature_reserve", "r/boundary=national_park"],
+}
+
+# Natural type tag mappings (for pyosmium fallback)
 NATURAL_TYPE_WATER = {"natural": ["water"], "water": ["lake", "reservoir", "pond"]}
 NATURAL_TYPE_FOREST = {"natural": ["wood"], "landuse": ["forest"]}
 NATURAL_TYPE_PARK = {"leisure": ["park", "nature_reserve"], "boundary": ["national_park"]}
@@ -82,153 +96,274 @@ class ExtractionResult:
     extraction_date: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
-class BoundaryHandler(osmium.SimpleHandler if HAS_OSMIUM else object):
-    """Pyosmium handler for extracting boundary features.
+# ── Primary extraction: osmium-tool + osm2geojson ───────────────────────
 
-    Collects ways and relations matching the specified boundary criteria.
-    """
 
-    def __init__(
-        self,
-        admin_levels: list[int] | None = None,
-        natural_types: list[str] | None = None,
-    ):
-        if HAS_OSMIUM:
-            super().__init__()
-        self.admin_levels = set(admin_levels) if admin_levels else set()
-        self.natural_types = natural_types or []
-        self.features: list[BoundaryFeature] = []
-        self._seen_ids: set[int] = set()  # track IDs captured via area()
-        self._wkb_factory = osmium.geom.WKBFactory() if HAS_OSMIUM else None
+def _build_tag_filters(
+    admin_levels: list[int] | None,
+    natural_types: list[str] | None,
+) -> list[str]:
+    """Build ``osmium tags-filter`` expressions."""
+    filters: list[str] = []
+    if admin_levels:
+        filters.append("r/boundary=administrative")
+    for nt in natural_types or []:
+        filters.extend(_NATURAL_TAG_FILTERS.get(nt, []))
+    return filters
 
-    def _matches_natural_type(self, tags: osm.TagList) -> str | None:
-        """Check if tags match any configured natural type."""
-        for natural_type in self.natural_types:
-            type_tags = self._get_natural_tags(natural_type)
-            for tag_key, tag_values in type_tags.items():
-                if tag_key in tags and tags[tag_key] in tag_values:
-                    return natural_type
-        return None
 
-    def _get_natural_tags(self, natural_type: str) -> dict[str, list[str]]:
-        """Get tag mappings for a natural type."""
-        if natural_type == "water":
-            return NATURAL_TYPE_WATER
-        elif natural_type == "forest":
-            return NATURAL_TYPE_FOREST
-        elif natural_type == "park":
-            return NATURAL_TYPE_PARK
-        return {}
+def _matches_admin(tags: dict[str, str], admin_levels: set[int]) -> bool:
+    if not admin_levels:
+        return False
+    if tags.get("boundary") != "administrative":
+        return False
+    try:
+        return int(tags.get("admin_level", "")) in admin_levels
+    except ValueError:
+        return False
 
-    def _extract_tags(self, tags: osm.TagList) -> dict[str, str]:
-        """Convert OSM tags to a dictionary."""
-        return {tag.k: tag.v for tag in tags}
 
-    def _get_geometry(self, obj: Any, obj_type: str) -> dict[str, Any] | None:
-        """Extract geometry from an OSM object."""
-        if not HAS_SHAPELY or not self._wkb_factory:
-            return None
+def _matches_natural(tags: dict[str, str], natural_types: list[str]) -> str | None:
+    """Return matched natural type or None."""
+    type_maps = {
+        "water": NATURAL_TYPE_WATER,
+        "forest": NATURAL_TYPE_FOREST,
+        "park": NATURAL_TYPE_PARK,
+    }
+    for nt in natural_types:
+        for tag_key, tag_values in type_maps.get(nt, {}).items():
+            if tags.get(tag_key) in tag_values:
+                return nt
+    return None
+
+
+def _extract_via_osm2geojson(
+    pbf_path: str,
+    admin_levels: list[int] | None,
+    natural_types: list[str] | None,
+) -> list[BoundaryFeature]:
+    """Extract using ``osmium tags-filter`` → ``osm2geojson``."""
+    tag_filters = _build_tag_filters(admin_levels, natural_types)
+    if not tag_filters:
+        return []
+
+    admin_set = set(admin_levels) if admin_levels else set()
+    natural_list = natural_types or []
+
+    with tempfile.NamedTemporaryFile(suffix=".osm", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        cmd = [
+            "osmium",
+            "tags-filter",
+            pbf_path,
+            *tag_filters,
+            "-f",
+            "osm",
+            "-o",
+            tmp_path,
+            "--overwrite",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            log.warning("osmium tags-filter failed: %s", result.stderr[:500])
+            return []
+
+        with open(tmp_path) as f:
+            xml = f.read()
+    finally:
         try:
-            if obj_type == "area":
-                wkb_data = self._wkb_factory.create_multipolygon(obj)
-            else:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    geojson = osm2geojson.xml2geojson(xml)
+    features: list[BoundaryFeature] = []
+
+    for feat in geojson.get("features", []):
+        props = feat.get("properties", {})
+        tags = props.get("tags", {})
+        osm_id = props.get("id", 0)
+        osm_type = props.get("type", "relation")
+        name = tags.get("name", "")
+        geometry = feat.get("geometry")
+
+        # Match against requested criteria
+        if _matches_admin(tags, admin_set):
+            features.append(
+                BoundaryFeature(
+                    osm_id=osm_id,
+                    osm_type=osm_type,
+                    name=name,
+                    admin_level=int(tags["admin_level"]),
+                    boundary_type="administrative",
+                    tags=tags,
+                    geometry=geometry,
+                )
+            )
+        elif natural_list:
+            nt = _matches_natural(tags, natural_list)
+            if nt:
+                features.append(
+                    BoundaryFeature(
+                        osm_id=osm_id,
+                        osm_type=osm_type,
+                        name=name,
+                        admin_level=None,
+                        boundary_type=nt,
+                        tags=tags,
+                        geometry=geometry,
+                    )
+                )
+
+    return features
+
+
+# ── Fallback: pyosmium ──────────────────────────────────────────────────
+
+
+if HAS_OSMIUM:
+
+    class _PyosmiumHandler(osmium.SimpleHandler):
+        """Pyosmium fallback handler (no geometry for type=boundary)."""
+
+        def __init__(
+            self,
+            admin_levels: list[int] | None = None,
+            natural_types: list[str] | None = None,
+        ):
+            super().__init__()
+            self.admin_levels = set(admin_levels) if admin_levels else set()
+            self.natural_types = natural_types or []
+            self.features: list[BoundaryFeature] = []
+            self._seen_ids: set[int] = set()
+
+            try:
+                from shapely import wkb as _wkb
+                from shapely.geometry import mapping as _mapping
+
+                self._wkb = _wkb
+                self._mapping = _mapping
+            except ImportError:
+                self._wkb = None
+                self._mapping = None
+            self._wkb_factory = osmium.geom.WKBFactory()
+
+        def _extract_tags(self, tags) -> dict[str, str]:
+            return {tag.k: tag.v for tag in tags}
+
+        def _get_geometry(self, area_obj) -> dict[str, Any] | None:
+            if not self._wkb or not self._wkb_factory:
+                return None
+            try:
+                wkb_data = self._wkb_factory.create_multipolygon(area_obj)
+                geom = self._wkb.loads(wkb_data, hex=True)
+                return self._mapping(geom)
+            except Exception:
                 return None
 
-            geom = wkb.loads(wkb_data, hex=True)
-            return mapping(geom)
-        except Exception as e:
-            log.debug("Could not extract geometry: %s", e)
+        def _matches_natural_type(self, tags) -> str | None:
+            type_maps = {
+                "water": NATURAL_TYPE_WATER,
+                "forest": NATURAL_TYPE_FOREST,
+                "park": NATURAL_TYPE_PARK,
+            }
+            for nt in self.natural_types:
+                for tag_key, tag_values in type_maps.get(nt, {}).items():
+                    if tag_key in tags and tags[tag_key] in tag_values:
+                        return nt
             return None
 
-    def area(self, a: osm.Area) -> None:
-        """Process an area (closed way or multipolygon relation)."""
-        tags = a.tags
+        def area(self, a) -> None:
+            tags = a.tags
+            if "boundary" in tags and tags["boundary"] == "administrative":
+                try:
+                    admin_level = int(tags.get("admin_level", ""))
+                except ValueError:
+                    admin_level = None
+                if admin_level is not None and admin_level in self.admin_levels:
+                    oid = a.orig_id()
+                    self._seen_ids.add(oid)
+                    self.features.append(
+                        BoundaryFeature(
+                            osm_id=oid,
+                            osm_type="relation" if a.from_way() is False else "way",
+                            name=tags.get("name", ""),
+                            admin_level=admin_level,
+                            boundary_type="administrative",
+                            tags=self._extract_tags(tags),
+                            geometry=self._get_geometry(a),
+                        )
+                    )
+                    return
 
-        # Check for administrative boundary
-        if "boundary" in tags and tags["boundary"] == "administrative":
-            admin_level_str = tags.get("admin_level", "")
-            try:
-                admin_level = int(admin_level_str)
-            except ValueError:
-                admin_level = None
-
-            if admin_level is not None and admin_level in self.admin_levels:
+            natural_type = self._matches_natural_type(tags)
+            if natural_type:
                 oid = a.orig_id()
                 self._seen_ids.add(oid)
-                feature = BoundaryFeature(
-                    osm_id=oid,
-                    osm_type="relation" if a.from_way() is False else "way",
-                    name=tags.get("name", ""),
-                    admin_level=admin_level,
-                    boundary_type="administrative",
-                    tags=self._extract_tags(tags),
-                    geometry=self._get_geometry(a, "area"),
+                self.features.append(
+                    BoundaryFeature(
+                        osm_id=oid,
+                        osm_type="relation" if a.from_way() is False else "way",
+                        name=tags.get("name", ""),
+                        admin_level=None,
+                        boundary_type=natural_type,
+                        tags=self._extract_tags(tags),
+                        geometry=self._get_geometry(a),
+                    )
                 )
-                self.features.append(feature)
-                return
 
-        # Check for natural boundary
-        natural_type = self._matches_natural_type(tags)
-        if natural_type:
-            oid = a.orig_id()
-            self._seen_ids.add(oid)
-            feature = BoundaryFeature(
-                osm_id=oid,
-                osm_type="relation" if a.from_way() is False else "way",
-                name=tags.get("name", ""),
-                admin_level=None,
-                boundary_type=natural_type,
-                tags=self._extract_tags(tags),
-                geometry=self._get_geometry(a, "area"),
-            )
-            self.features.append(feature)
+        def relation(self, r) -> None:
+            tags = r.tags
+            if "boundary" in tags and tags["boundary"] == "administrative":
+                try:
+                    admin_level = int(tags.get("admin_level", ""))
+                except ValueError:
+                    return
+                if admin_level in self.admin_levels and r.id not in self._seen_ids:
+                    self._seen_ids.add(r.id)
+                    self.features.append(
+                        BoundaryFeature(
+                            osm_id=r.id,
+                            osm_type="relation",
+                            name=tags.get("name", ""),
+                            admin_level=admin_level,
+                            boundary_type="administrative",
+                            tags=self._extract_tags(tags),
+                            geometry=None,
+                        )
+                    )
+                    return
 
-    def relation(self, r) -> None:
-        """Capture boundary relations not assembled into areas.
-
-        Large or complex boundary relations (e.g. Alaska at admin_level=4)
-        may fail area assembly in pyosmium.  This callback catches them
-        without geometry so they still appear in the output with feature
-        count > 0.  Deduplication against area() uses ``_seen_ids``.
-        """
-        tags = r.tags
-
-        if "boundary" in tags and tags["boundary"] == "administrative":
-            admin_level_str = tags.get("admin_level", "")
-            try:
-                admin_level = int(admin_level_str)
-            except ValueError:
-                return
-
-            if admin_level in self.admin_levels and r.id not in self._seen_ids:
+            natural_type = self._matches_natural_type(tags)
+            if natural_type and r.id not in self._seen_ids:
                 self._seen_ids.add(r.id)
                 self.features.append(
                     BoundaryFeature(
                         osm_id=r.id,
                         osm_type="relation",
                         name=tags.get("name", ""),
-                        admin_level=admin_level,
-                        boundary_type="administrative",
+                        admin_level=None,
+                        boundary_type=natural_type,
                         tags=self._extract_tags(tags),
                         geometry=None,
                     )
                 )
-                return
 
-        natural_type = self._matches_natural_type(tags)
-        if natural_type and r.id not in self._seen_ids:
-            self._seen_ids.add(r.id)
-            self.features.append(
-                BoundaryFeature(
-                    osm_id=r.id,
-                    osm_type="relation",
-                    name=tags.get("name", ""),
-                    admin_level=None,
-                    boundary_type=natural_type,
-                    tags=self._extract_tags(tags),
-                    geometry=None,
-                )
-            )
+
+def _extract_via_pyosmium(
+    pbf_path: str,
+    admin_levels: list[int] | None,
+    natural_types: list[str] | None,
+) -> list[BoundaryFeature]:
+    """Fallback extraction via pyosmium (no geometry for type=boundary)."""
+    handler = _PyosmiumHandler(admin_levels=admin_levels, natural_types=natural_types)
+    handler.apply_file(pbf_path, locations=True, idx="flex_mem")
+    return handler.features
+
+
+# ── Public API ──────────────────────────────────────────────────────────
 
 
 def extract_boundaries(
@@ -239,24 +374,29 @@ def extract_boundaries(
 ) -> ExtractionResult:
     """Extract boundaries from a PBF file and write to GeoJSON.
 
+    Uses osmium-tool + osm2geojson when available (full geometry for all
+    relation types).  Falls back to pyosmium (geometry only for
+    type=multipolygon relations).
+
     Args:
         pbf_path: Path to the OSM PBF file
-        admin_levels: List of admin_level values to extract (e.g., [2, 4] for countries and states)
+        admin_levels: List of admin_level values to extract (e.g., [2, 4])
         natural_types: List of natural boundary types (e.g., ["water", "forest", "park"])
-        output_dir: Directory to write output files (defaults to /tmp/osm-boundaries)
+        output_dir: Directory to write output files
 
     Returns:
         ExtractionResult with output path and statistics
     """
-    if not HAS_OSMIUM:
-        raise ImportError("pyosmium is required for boundary extraction")
+    if not HAS_OSMIUM and not (HAS_OSMIUM_TOOL and HAS_OSM2GEOJSON):
+        raise ImportError(
+            "pyosmium or (osmium-tool + osm2geojson) required for boundary extraction"
+        )
 
     pbf_str = str(pbf_path)
     backend = get_storage_backend(pbf_str)
     if not backend.exists(pbf_str):
         raise FileNotFoundError(f"PBF file not found: {pbf_path}")
     local_pbf = localize(pbf_str)
-    pbf_path = Path(local_pbf)
 
     if output_dir is None:
         out_base = resolve_output_dir("osm-boundaries")
@@ -264,7 +404,8 @@ def extract_boundaries(
         out_base = str(output_dir)
 
     # Build descriptive filename
-    parts = [pbf_path.stem]
+    pbf_stem = Path(local_pbf).stem
+    parts = [pbf_stem]
     if admin_levels:
         parts.append(f"admin{'-'.join(str(lvl) for lvl in sorted(admin_levels))}")
     if natural_types:
@@ -273,29 +414,25 @@ def extract_boundaries(
     output_path = f"{out_base}/{output_name}"
     ensure_dir(output_path)
 
-    # Extract boundaries
-    handler = BoundaryHandler(admin_levels=admin_levels, natural_types=natural_types)
-    # idx='flex_mem' builds areas from both type=multipolygon AND type=boundary
-    # relations.  Without it, state/county boundary relations (type=boundary)
-    # are silently skipped and produce 0 features.
-    handler.apply_file(str(pbf_path), locations=True, idx="flex_mem")
+    # Primary: osmium-tool + osm2geojson (proper geometry for all types)
+    if HAS_OSMIUM_TOOL and HAS_OSM2GEOJSON:
+        features = _extract_via_osm2geojson(local_pbf, admin_levels, natural_types)
+    elif HAS_OSMIUM:
+        features = _extract_via_pyosmium(local_pbf, admin_levels, natural_types)
+    else:
+        features = []
 
-    # Convert to GeoJSON
-    geojson = _features_to_geojson(handler.features)
+    # Convert to GeoJSON FeatureCollection
+    geojson = _features_to_geojson(features)
 
-    # Write output
     with open_output(output_path) as f:
         json.dump(geojson, f, ensure_ascii=False, indent=2)
 
-    log.info(
-        "Extracted %d boundaries to %s",
-        len(handler.features),
-        output_path,
-    )
+    log.info("Extracted %d boundaries to %s", len(features), output_path)
 
     return ExtractionResult(
         output_path=output_path,
-        feature_count=len(handler.features),
+        feature_count=len(features),
         boundary_type=_describe_boundary_type(admin_levels, natural_types),
         admin_levels=",".join(str(lvl) for lvl in (admin_levels or [])),
     )
@@ -333,12 +470,7 @@ def _describe_boundary_type(admin_levels: list[int] | None, natural_types: list[
     """Generate a human-readable description of the boundary type."""
     parts = []
     if admin_levels:
-        level_names = {
-            2: "country",
-            4: "state",
-            6: "county",
-            8: "city",
-        }
+        level_names = {2: "country", 4: "state", 6: "county", 8: "city"}
         parts.extend(level_names.get(lvl, f"admin{lvl}") for lvl in admin_levels)
     if natural_types:
         parts.extend(natural_types)
