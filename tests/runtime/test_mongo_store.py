@@ -1011,8 +1011,8 @@ class TestReapOrphanedTasks:
         # Manually set server_id on the task doc
         mongo_store._db.tasks.update_one({"uuid": "task-1"}, {"$set": {"server_id": "healthy-1"}})
 
-        count = mongo_store.reap_orphaned_tasks()
-        assert count == 0
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 0
 
         # Task should still be running
         fetched = mongo_store.get_task("task-1")
@@ -1048,8 +1048,11 @@ class TestReapOrphanedTasks:
                 {"uuid": f"orphan-{i}"}, {"$set": {"server_id": "dead-1"}}
             )
 
-        count = mongo_store.reap_orphaned_tasks()
-        assert count == 2
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 2
+        # Verify returned task info
+        assert all(r["server_id"] == "dead-1" for r in reaped)
+        assert {r["step_id"] for r in reaped} == {"step-0", "step-1"}
 
         # Both tasks should now be pending
         for i in range(2):
@@ -1089,8 +1092,8 @@ class TestReapOrphanedTasks:
             {"uuid": "task-shutdown"}, {"$set": {"server_id": "shutdown-1"}}
         )
 
-        count = mongo_store.reap_orphaned_tasks()
-        assert count == 0
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 0
 
     def test_claim_task_with_server_id(self, mongo_store):
         """claim_task stores server_id on the task document."""
@@ -1169,8 +1172,9 @@ class TestReapOrphanedTasks:
         mongo_store.save_task(t2)
         mongo_store._db.tasks.update_one({"uuid": "dead-task"}, {"$set": {"server_id": "dead-1"}})
 
-        count = mongo_store.reap_orphaned_tasks()
-        assert count == 1
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 1
+        assert reaped[0]["server_id"] == "dead-1"
 
         # alive-task still running
         assert mongo_store.get_task("alive-task").state == TaskState.RUNNING

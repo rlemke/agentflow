@@ -8,6 +8,7 @@ Covers:
 - Step reference dependencies from mixin args
 - Literal-only mixin args (no dependency)
 - Backward compat (no mixins field)
+- Timeout mixin extraction to task.timeout_ms
 - Implicit fallback for params not in call or mixin
 """
 
@@ -572,3 +573,264 @@ class TestCallSiteMixinArgs:
         final = evaluator.resume(result.workflow_id, workflow_ast, program_ast)
         assert final.success
         assert final.outputs["result"] == "info"
+
+
+# ---------------------------------------------------------------------------
+# TestTimeoutMixin
+# ---------------------------------------------------------------------------
+
+
+class TestTimeoutMixin:
+    """Tests for Timeout mixin extraction to task.timeout_ms."""
+
+    def test_facet_level_timeout_mixin(self):
+        """Timeout mixin on event facet sets task.timeout_ms."""
+        evaluator, store = _make_evaluator()
+
+        def handle_slow(params):
+            return {"done": True}
+
+        poller = _make_poller(store, evaluator, {"ns.SlowOp": handle_slow})
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "W",
+            "params": [],
+            "returns": [{"name": "result", "type": "Boolean"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-slow",
+                        "name": "s",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "SlowOp",
+                            "args": [],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-W",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "W",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["s", "done"]},
+                            },
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "EventFacetDecl",
+                            "name": "SlowOp",
+                            "params": [],
+                            "returns": [{"name": "done", "type": "Boolean"}],
+                            "mixins": [
+                                {
+                                    "type": "MixinSig",
+                                    "target": "Timeout",
+                                    "args": [
+                                        {
+                                            "name": "ms",
+                                            "value": {"type": "Int", "value": 120000},
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        result = evaluator.execute(workflow_ast, inputs={}, program_ast=program_ast)
+        assert result.status == ExecutionStatus.PAUSED
+
+        # Check the created task has timeout_ms set
+        tasks = store.get_pending_tasks("default")
+        slow_tasks = [t for t in tasks if t.name == "ns.SlowOp"]
+        assert len(slow_tasks) == 1
+        assert slow_tasks[0].timeout_ms == 120000
+
+        # Complete the workflow
+        poller.poll_once()
+        final = evaluator.resume(result.workflow_id, workflow_ast, program_ast)
+        assert final.success
+
+    def test_no_timeout_mixin_defaults_to_zero(self):
+        """Event facet without Timeout mixin gets task.timeout_ms=0."""
+        evaluator, store = _make_evaluator()
+
+        def handle_fast(params):
+            return {"done": True}
+
+        _make_poller(store, evaluator, {"ns.FastOp": handle_fast})
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "W",
+            "params": [],
+            "returns": [{"name": "result", "type": "Boolean"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-fast",
+                        "name": "f",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "FastOp",
+                            "args": [],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-W",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "W",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["f", "done"]},
+                            },
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "EventFacetDecl",
+                            "name": "FastOp",
+                            "params": [],
+                            "returns": [{"name": "done", "type": "Boolean"}],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        evaluator.execute(workflow_ast, inputs={}, program_ast=program_ast)
+        tasks = store.get_pending_tasks("default")
+        fast_tasks = [t for t in tasks if t.name == "ns.FastOp"]
+        assert len(fast_tasks) == 1
+        assert fast_tasks[0].timeout_ms == 0
+
+    def test_callsite_timeout_overrides_facet(self):
+        """Call-site Timeout mixin overrides facet-level Timeout."""
+        evaluator, store = _make_evaluator()
+
+        def handle_op(params):
+            return {"done": True}
+
+        _make_poller(store, evaluator, {"ns.Op": handle_op})
+
+        workflow_ast = {
+            "type": "WorkflowDecl",
+            "name": "W",
+            "params": [],
+            "returns": [{"name": "result", "type": "Boolean"}],
+            "body": {
+                "type": "AndThenBlock",
+                "steps": [
+                    {
+                        "type": "StepStmt",
+                        "id": "step-op",
+                        "name": "o",
+                        "call": {
+                            "type": "CallExpr",
+                            "target": "Op",
+                            "args": [],
+                            "mixins": [
+                                {
+                                    "type": "MixinCall",
+                                    "target": "Timeout",
+                                    "args": [
+                                        {
+                                            "name": "ms",
+                                            "value": {"type": "Int", "value": 300000},
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                ],
+                "yield": {
+                    "type": "YieldStmt",
+                    "id": "yield-W",
+                    "call": {
+                        "type": "CallExpr",
+                        "target": "W",
+                        "args": [
+                            {
+                                "name": "result",
+                                "value": {"type": "StepRef", "path": ["o", "done"]},
+                            },
+                        ],
+                    },
+                },
+            },
+        }
+
+        program_ast = {
+            "type": "Program",
+            "declarations": [
+                {
+                    "type": "Namespace",
+                    "name": "ns",
+                    "declarations": [
+                        {
+                            "type": "EventFacetDecl",
+                            "name": "Op",
+                            "params": [],
+                            "returns": [{"name": "done", "type": "Boolean"}],
+                            "mixins": [
+                                {
+                                    "type": "MixinSig",
+                                    "target": "Timeout",
+                                    "args": [
+                                        {
+                                            "name": "ms",
+                                            "value": {"type": "Int", "value": 60000},
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        evaluator.execute(workflow_ast, inputs={}, program_ast=program_ast)
+        tasks = store.get_pending_tasks("default")
+        op_tasks = [t for t in tasks if t.name == "ns.Op"]
+        assert len(op_tasks) == 1
+        # Call-site (300000) overrides facet-level (60000)
+        assert op_tasks[0].timeout_ms == 300000

@@ -2846,9 +2846,9 @@ class TestClaimTaskServerTracking:
 class TestReapOrphanedTasks:
     """Tests for the reap_orphaned_tasks persistence method."""
 
-    def test_no_servers_returns_zero(self, store):
+    def test_no_servers_returns_empty(self, store):
         """No servers at all → nothing to reap."""
-        assert store.reap_orphaned_tasks() == 0
+        assert store.reap_orphaned_tasks() == []
 
     def test_healthy_server_tasks_not_reaped(self, store):
         """Tasks claimed by a healthy server should NOT be reaped."""
@@ -2865,11 +2865,11 @@ class TestReapOrphanedTasks:
 
         # The MemoryStore doesn't track server_id on tasks, so this
         # test mainly verifies the method runs without error.
-        assert store.reap_orphaned_tasks() == 0
+        assert store.reap_orphaned_tasks() == []
 
-    def test_default_returns_zero(self, store):
-        """Base PersistenceAPI.reap_orphaned_tasks returns 0."""
-        assert store.reap_orphaned_tasks() == 0
+    def test_default_returns_empty(self, store):
+        """Base PersistenceAPI.reap_orphaned_tasks returns empty list."""
+        assert store.reap_orphaned_tasks() == []
 
 
 class TestReaperInRunnerService:
@@ -2884,7 +2884,7 @@ class TestReaperInRunnerService:
         svc = RunnerService(store, evaluator, config, registry)
         svc._reap_interval_ms = 0  # fire every cycle
 
-        with patch.object(store, "reap_orphaned_tasks", return_value=0) as mock_reap:
+        with patch.object(store, "reap_orphaned_tasks", return_value=[]) as mock_reap:
             svc._maybe_reap_orphaned_tasks()
             assert mock_reap.call_count == 1
 
@@ -2898,12 +2898,12 @@ class TestReaperInRunnerService:
         svc._reap_interval_ms = 999_999_999  # never fires
         svc._last_reap = _current_time_ms()  # just ran
 
-        with patch.object(store, "reap_orphaned_tasks", return_value=0) as mock_reap:
+        with patch.object(store, "reap_orphaned_tasks", return_value=[]) as mock_reap:
             svc._maybe_reap_orphaned_tasks()
             assert mock_reap.call_count == 0
 
     def test_reaper_logs_on_recovery(self, store, evaluator, registry):
-        """The reaper logs a warning when tasks are recovered."""
+        """The reaper logs a warning and emits step logs when tasks are recovered."""
         config = RunnerConfig(
             poll_interval_ms=100,
             heartbeat_interval_ms=60000,
@@ -2911,9 +2911,23 @@ class TestReaperInRunnerService:
         svc = RunnerService(store, evaluator, config, registry)
         svc._reap_interval_ms = 0
 
-        with patch.object(store, "reap_orphaned_tasks", return_value=5):
-            # Should not raise; logs a warning internally
-            svc._maybe_reap_orphaned_tasks()
+        reaped_tasks = [
+            {
+                "step_id": f"s{i}",
+                "workflow_id": "w1",
+                "name": "MyEvent",
+                "server_id": "dead-server-1",
+            }
+            for i in range(3)
+        ]
+        with patch.object(store, "reap_orphaned_tasks", return_value=reaped_tasks):
+            with patch.object(store, "save_step_log") as mock_log:
+                svc._maybe_reap_orphaned_tasks()
+                # Should emit a step log for each reaped task
+                assert mock_log.call_count == 3
+                entry = mock_log.call_args_list[0][0][0]
+                assert "restarted" in entry.message.lower()
+                assert "dead-ser" in entry.message  # truncated server_id
 
     def test_reaper_survives_exception(self, store, evaluator, registry):
         """The reaper catches exceptions and does not crash."""

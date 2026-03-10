@@ -532,12 +532,15 @@ class MongoStore(PersistenceAPI):
         docs = self._db.tasks.find({"runner_id": runner_id})
         return [self._doc_to_task(doc) for doc in docs]
 
-    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> int:
+    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> list[dict[str, str]]:
         """Reset tasks stuck in RUNNING whose claiming server is dead.
 
         A server is dead if its state is running/startup but its ping_time
         is older than *down_timeout_ms*.  Tasks with a ``server_id`` matching
         a dead server are atomically reset to PENDING.
+
+        Returns a list of dicts describing each reaped task so callers can
+        emit step logs.
         """
         now = _current_time_ms()
         cutoff = now - down_timeout_ms
@@ -555,10 +558,31 @@ class MongoStore(PersistenceAPI):
         )
         dead_ids = [doc["uuid"] for doc in dead_servers]
         if not dead_ids:
-            return 0
+            return []
+
+        # Find tasks before resetting so we can return their details
+        orphan_cursor = self._db.tasks.find(
+            {
+                "state": "running",
+                "server_id": {"$in": dead_ids},
+            },
+            {"step_id": 1, "workflow_id": 1, "name": 1, "server_id": 1},
+        )
+        reaped: list[dict[str, str]] = [
+            {
+                "step_id": doc.get("step_id", ""),
+                "workflow_id": doc.get("workflow_id", ""),
+                "name": doc.get("name", ""),
+                "server_id": doc.get("server_id", ""),
+            }
+            for doc in orphan_cursor
+        ]
+
+        if not reaped:
+            return []
 
         # Reset their running tasks back to pending
-        result = self._db.tasks.update_many(
+        self._db.tasks.update_many(
             {
                 "state": "running",
                 "server_id": {"$in": dead_ids},
@@ -571,7 +595,7 @@ class MongoStore(PersistenceAPI):
                 },
             },
         )
-        return result.modified_count if result else 0
+        return reaped
 
     # =========================================================================
     # Log Operations
@@ -1115,6 +1139,7 @@ class MongoStore(PersistenceAPI):
             "data_type": task.data_type,
             "data": task.data,
             "server_id": task.server_id,
+            "timeout_ms": task.timeout_ms,
         }
 
     def _doc_to_task(self, doc: dict) -> TaskDefinition:
@@ -1134,6 +1159,7 @@ class MongoStore(PersistenceAPI):
             data_type=doc.get("data_type", ""),
             data=doc.get("data"),
             server_id=doc.get("server_id", ""),
+            timeout_ms=doc.get("timeout_ms", 0),
         )
 
     def _log_to_doc(self, log: LogDefinition) -> dict:

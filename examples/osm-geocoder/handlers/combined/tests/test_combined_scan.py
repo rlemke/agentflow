@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ..plugin_base import ElementType, ExtractorPlugin, TagInterest
+from ..plugin_base import ElementType, TagInterest
 
 # ── TagInterest tests ────────────────────────────────────────────────
 
@@ -82,10 +82,13 @@ class TestPluginRegistry:
         registry = _build_plugin_registry()
         for name, cls in registry.items():
             plugin = cls()
-            assert isinstance(plugin, ExtractorPlugin)
+            # Use class name check to avoid isinstance failures from
+            # conftest sys.modules purging causing reimport
+            base_names = [b.__name__ for b in type(plugin).__mro__]
+            assert "ExtractorPlugin" in base_names
             assert plugin.category == name
-            assert isinstance(plugin.element_types, ElementType)
-            assert isinstance(plugin.tag_interest, TagInterest)
+            assert type(plugin.element_types).__name__ == "ElementType"
+            assert type(plugin.tag_interest).__name__ == "TagInterest"
 
 
 # ── Amenity plugin unit tests ────────────────────────────────────────
@@ -472,7 +475,14 @@ class TestCombinedScanResult:
         assert r.categories == ["roads"]
 
     def test_unknown_category_raises(self):
+        from .. import combined_handler
         from ..combined_handler import combined_scan
 
-        with pytest.raises(ValueError, match="Unknown categories"):
-            combined_scan("/tmp/fake.pbf", ["nonexistent_plugin"])
+        # Ensure HAS_OSMIUM is True so we get past the guard
+        orig = combined_handler.HAS_OSMIUM
+        combined_handler.HAS_OSMIUM = True
+        try:
+            with pytest.raises(ValueError, match="Unknown categories"):
+                combined_scan("/tmp/fake.pbf", ["nonexistent_plugin"])
+        finally:
+            combined_handler.HAS_OSMIUM = orig

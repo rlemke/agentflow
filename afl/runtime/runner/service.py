@@ -39,6 +39,9 @@ from ..entities import (
     RunnerState,
     ServerDefinition,
     ServerState,
+    StepLogEntry,
+    StepLogLevel,
+    StepLogSource,
     TaskState,
 )
 from ..evaluator import Evaluator, ExecutionStatus
@@ -959,12 +962,36 @@ class RunnerService:
         self._last_reap = now
 
         try:
-            count = self._persistence.reap_orphaned_tasks()
-            if count > 0:
+            reaped = self._persistence.reap_orphaned_tasks()
+            if reaped:
                 logger.warning(
                     "Orphan reaper: reset %d task(s) from crashed server(s)",
-                    count,
+                    len(reaped),
                 )
+                for task_info in reaped:
+                    entry = StepLogEntry(
+                        uuid=generate_id(),
+                        step_id=task_info["step_id"],
+                        workflow_id=task_info["workflow_id"],
+                        runner_id=self._server_id,
+                        facet_name=task_info["name"],
+                        source=StepLogSource.FRAMEWORK,
+                        level=StepLogLevel.WARNING,
+                        message=(
+                            f"Task restarted: {task_info['name']} — "
+                            f"previous server ({task_info['server_id'][:8]}...) "
+                            f"crashed, resetting to pending"
+                        ),
+                        time=_current_time_ms(),
+                    )
+                    try:
+                        self._persistence.save_step_log(entry)
+                    except Exception:
+                        logger.debug(
+                            "Could not save reaper step log for step %s",
+                            task_info["step_id"],
+                            exc_info=True,
+                        )
         except Exception:
             logger.debug("Orphan reaper failed", exc_info=True)
 

@@ -147,11 +147,52 @@ class EventTransmitHandler(StateHandler):
 
         return _step_log_callback
 
+    def _extract_timeout_ms(self) -> int:
+        """Extract timeout_ms from Timeout mixin on the facet definition.
+
+        Checks both facet-level signature mixins and step-level call-site
+        mixins (call-site overrides facet-level).
+
+        Returns 0 if no Timeout mixin is found.
+        """
+        timeout_ms = 0
+
+        # Check facet definition signature mixins
+        facet_def = self.context.get_facet_definition(self.step.facet_name)
+        if facet_def:
+            for mixin in facet_def.get("mixins", []):
+                target = mixin.get("target", "")
+                if target == "Timeout" or target.endswith(".Timeout"):
+                    for arg in mixin.get("args", []):
+                        if arg.get("name") == "ms":
+                            val = arg.get("value", {})
+                            if isinstance(val, dict):
+                                timeout_ms = val.get("value", 0)
+                            elif isinstance(val, (int, float)):
+                                timeout_ms = int(val)
+
+        # Check step-level call-site mixins (override facet-level)
+        stmt_def = self.context.get_statement_definition(self.step)
+        if stmt_def:
+            for mixin in getattr(stmt_def, "mixins", None) or []:
+                target = mixin.get("target", "")
+                if target == "Timeout" or target.endswith(".Timeout"):
+                    for arg in mixin.get("args", []):
+                        if arg.get("name") == "ms":
+                            val = arg.get("value", {})
+                            if isinstance(val, dict):
+                                timeout_ms = val.get("value", 0)
+                            elif isinstance(val, (int, float)):
+                                timeout_ms = int(val)
+
+        return timeout_ms
+
     def _create_event_task(self) -> None:
         """Create a TaskDefinition for the event and add to iteration changes."""
         from ..entities import TaskDefinition, TaskState
 
         now = _current_time_ms()
+        timeout_ms = self._extract_timeout_ms()
         task = TaskDefinition(
             uuid=generate_id(),
             name=self.step.facet_name,
@@ -164,6 +205,7 @@ class EventTransmitHandler(StateHandler):
             updated=now,
             task_list_name="default",
             data=self._build_payload(),
+            timeout_ms=timeout_ms,
         )
         self.context.changes.add_created_task(task)
 

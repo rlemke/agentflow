@@ -112,6 +112,11 @@ class RegistryDispatcher:
         reg = self._find_registration(facet_name)
         return reg is not None
 
+    def get_timeout_ms(self, facet_name: str) -> int:
+        """Return timeout_ms for the handler, or 0 if not found."""
+        reg = self._find_registration(facet_name)
+        return getattr(reg, "timeout_ms", 0) if reg else 0
+
     def dispatch(self, facet_name: str, payload: dict) -> dict | None:
         """Load and invoke the registered handler.
 

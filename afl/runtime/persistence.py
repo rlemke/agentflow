@@ -383,7 +383,7 @@ class PersistenceAPI(Protocol):
         """
         ...
 
-    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> int:
+    def reap_orphaned_tasks(self, down_timeout_ms: int = 300_000) -> list[dict[str, str]]:
         """Reset tasks stuck in RUNNING state whose claiming server is down.
 
         A server is considered down if its ``ping_time`` is stale (older than
@@ -396,9 +396,10 @@ class PersistenceAPI(Protocol):
                 before it is considered dead (default: 5 minutes).
 
         Returns:
-            Number of tasks reset.
+            List of dicts with ``step_id``, ``workflow_id``, ``name``,
+            and ``server_id`` for each reaped task.
         """
-        return 0
+        return []
 
     # Log operations
 

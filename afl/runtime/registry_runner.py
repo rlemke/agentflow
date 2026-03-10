@@ -671,17 +671,60 @@ class RegistryRunner:
 
             payload["_step_log"] = _step_log_callback
 
+            # Look up handler timeout — task-level (from AFL Timeout mixin)
+            # takes priority over registration-level default
+            timeout_ms = getattr(task, "timeout_ms", 0) or 0
+            if timeout_ms <= 0:
+                timeout_ms = self._dispatcher.get_timeout_ms(task.name)
+            timeout_s = timeout_ms / 1000.0 if timeout_ms > 0 else None
+            timeout_label = f" (timeout {timeout_ms}ms)" if timeout_ms > 0 else ""
+
             self._emit_step_log(
                 step_id=task.step_id,
                 workflow_id=task.workflow_id,
-                message=f"Dispatching handler: {task.name}",
+                message=f"Dispatching handler: {task.name}{timeout_label}",
                 facet_name=task.name,
             )
             dispatch_start = _current_time_ms()
 
             # Dispatch via shared dispatcher (handles module loading + async detection)
             try:
-                result = self._dispatcher.dispatch(task.name, payload)
+                if timeout_s is not None and timeout_s > 0:
+                    # Run dispatch in a separate thread with timeout
+                    with ThreadPoolExecutor(max_workers=1) as timeout_pool:
+                        future = timeout_pool.submit(self._dispatcher.dispatch, task.name, payload)
+                        try:
+                            result = future.result(timeout=timeout_s)
+                        except TimeoutError:
+                            elapsed = _current_time_ms() - dispatch_start
+                            error_msg = (
+                                f"Handler timed out after {elapsed}ms "
+                                f"(limit: {timeout_ms}ms): {task.name}"
+                            )
+                            self._emit_step_log(
+                                step_id=task.step_id,
+                                workflow_id=task.workflow_id,
+                                message=error_msg,
+                                level=StepLogLevel.ERROR,
+                                facet_name=task.name,
+                            )
+                            # Reset task to pending so it can be retried
+                            task.state = TaskState.PENDING
+                            task.error = None
+                            task.server_id = ""
+                            task.updated = _current_time_ms()
+                            self._persistence.save_task(task)
+                            logger.warning(
+                                "Handler timed out for '%s' (step=%s, "
+                                "elapsed=%dms, limit=%dms), resetting to pending",
+                                task.name,
+                                task.step_id,
+                                elapsed,
+                                timeout_ms,
+                            )
+                            return
+                else:
+                    result = self._dispatcher.dispatch(task.name, payload)
             except (ImportError, ModuleNotFoundError) as exc:
                 # Handler module can't be loaded on this runner (e.g.
                 # file:// path from a different host).  Release the task

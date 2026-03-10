@@ -346,6 +346,7 @@ class TaskDefinition:
     data_type: str = ""
     data: dict | None = None
     server_id: str = ""  # Claiming server's ID (for orphan detection)
+    timeout_ms: int = 0  # Handler timeout (0 = use registration default)
 
 
 # =============================================================================

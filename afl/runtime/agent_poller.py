@@ -525,12 +525,24 @@ class AgentPoller:
         self._last_reap = now
 
         try:
-            count = self._persistence.reap_orphaned_tasks()
-            if count > 0:
+            reaped = self._persistence.reap_orphaned_tasks()
+            if reaped:
                 logger.warning(
                     "Orphan reaper: reset %d task(s) from crashed server(s)",
-                    count,
+                    len(reaped),
                 )
+                for task_info in reaped:
+                    self._emit_step_log(
+                        step_id=task_info["step_id"],
+                        workflow_id=task_info["workflow_id"],
+                        message=(
+                            f"Task restarted: {task_info['name']} — "
+                            f"previous server ({task_info['server_id'][:8]}...) "
+                            f"crashed, resetting to pending"
+                        ),
+                        level=StepLogLevel.WARNING,
+                        facet_name=task_info["name"],
+                    )
         except Exception:
             logger.debug("Orphan reaper failed", exc_info=True)
 
@@ -646,16 +658,56 @@ class AgentPoller:
 
             payload["_step_log"] = _step_log_callback
 
+            # Look up timeout — task-level (from AFL Timeout mixin)
+            timeout_ms = getattr(task, "timeout_ms", 0) or 0
+            timeout_s = timeout_ms / 1000.0 if timeout_ms > 0 else None
+            timeout_label = f" (timeout {timeout_ms}ms)" if timeout_ms > 0 else ""
+
             self._emit_step_log(
                 step_id=task.step_id,
                 workflow_id=task.workflow_id,
-                message=f"Dispatching handler: {task.name}",
+                message=f"Dispatching handler: {task.name}{timeout_label}",
                 facet_name=task.name,
             )
             dispatch_start = _current_time_ms()
 
             # Invoke callback (handle both sync and async)
-            if inspect.iscoroutinefunction(callback):
+            if timeout_s is not None and timeout_s > 0:
+                with ThreadPoolExecutor(max_workers=1) as timeout_pool:
+                    if inspect.iscoroutinefunction(callback):
+                        future = timeout_pool.submit(asyncio.run, callback(payload))
+                    else:
+                        future = timeout_pool.submit(callback, payload)
+                    try:
+                        result = future.result(timeout=timeout_s)
+                    except TimeoutError:
+                        elapsed = _current_time_ms() - dispatch_start
+                        error_msg = (
+                            f"Handler timed out after {elapsed}ms "
+                            f"(limit: {timeout_ms}ms): {task.name}"
+                        )
+                        self._emit_step_log(
+                            step_id=task.step_id,
+                            workflow_id=task.workflow_id,
+                            message=error_msg,
+                            level=StepLogLevel.ERROR,
+                            facet_name=task.name,
+                        )
+                        task.state = TaskState.PENDING
+                        task.error = None
+                        task.server_id = ""
+                        task.updated = _current_time_ms()
+                        self._persistence.save_task(task)
+                        logger.warning(
+                            "Handler timed out for '%s' (step=%s, "
+                            "elapsed=%dms, limit=%dms), resetting to pending",
+                            task.name,
+                            task.step_id,
+                            elapsed,
+                            timeout_ms,
+                        )
+                        return
+            elif inspect.iscoroutinefunction(callback):
                 result = asyncio.run(callback(payload))
             else:
                 result = callback(payload)

@@ -196,6 +196,24 @@ class TestRegistryDispatcher:
         result = dispatcher.dispatch("ns.Unknown", {"input": 1})
         assert result is None
 
+    def test_get_timeout_ms(self, store, handler_file):
+        """get_timeout_ms returns the registration's timeout_ms."""
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Slow",
+                module_uri=f"file://{handler_file}",
+                entrypoint="handle",
+                timeout_ms=120000,
+            )
+        )
+        dispatcher = RegistryDispatcher(persistence=store)
+        assert dispatcher.get_timeout_ms("ns.Slow") == 120000
+
+    def test_get_timeout_ms_unregistered(self, store):
+        """get_timeout_ms returns 0 for unregistered facet."""
+        dispatcher = RegistryDispatcher(persistence=store)
+        assert dispatcher.get_timeout_ms("ns.Unknown") == 0
+
 
 # =========================================================================
 # TestInMemoryDispatcher
