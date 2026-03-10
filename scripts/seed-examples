@@ -237,6 +237,60 @@ def clean_seeds(store) -> tuple[int, int]:
     return flows_deleted, workflows_deleted
 
 
+def _register_example_handlers(
+    examples: list[tuple[str, list[str]]],
+    store,
+) -> int:
+    """Register handler implementations from examples that provide them.
+
+    Looks for ``handlers/__init__.py`` in each example directory and calls
+    ``register_all_registry_handlers(runner)`` if it exists.  Uses the
+    RegistryRunner so registrations are upserted via save_handler_registration.
+
+    Returns total number of handlers registered.
+    """
+    from afl.runtime import Evaluator, RegistryRunner, Telemetry
+
+    telemetry = Telemetry()
+    evaluator = Evaluator(store, telemetry)
+    runner = RegistryRunner(store, evaluator)
+
+    total = 0
+    for name, _afl_files in examples:
+        example_dir = os.path.join(EXAMPLES_DIR, name)
+        handlers_init = os.path.join(example_dir, "handlers", "__init__.py")
+        if not os.path.isfile(handlers_init):
+            continue
+
+        if example_dir not in sys.path:
+            sys.path.insert(0, example_dir)
+
+        try:
+            # Fresh import each time to avoid cross-example pollution
+            if "handlers" in sys.modules:
+                del sys.modules["handlers"]
+            to_remove = [k for k in sys.modules if k.startswith("handlers.")]
+            for k in to_remove:
+                del sys.modules[k]
+
+            from handlers import register_all_registry_handlers
+
+            before = store._db.handler_registrations.count_documents({})
+            register_all_registry_handlers(runner)
+            after = store._db.handler_registrations.count_documents({})
+            count = after - before
+            total += count
+            if count:
+                print(f"  {name:<20s} {count:>3} handlers registered")
+        except Exception as e:
+            print(f"  {name:<20s} handlers ERROR: {e}")
+        finally:
+            if example_dir in sys.path:
+                sys.path.remove(example_dir)
+
+    return total
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compile example AFL files and seed FlowDefinitions to MongoDB.",
@@ -325,6 +379,13 @@ def main() -> None:
 
         total_workflows += wf_count
         print(f"  {name:<20s} {file_count:>2} files  {wf_count:>2} workflows   {status}")
+
+    # Register handlers from examples that have handlers/__init__.py
+    total_handlers = 0
+    if not args.dry_run and store is not None:
+        total_handlers = _register_example_handlers(examples, store)
+        if total_handlers:
+            print(f"\nRegistered {total_handlers} handler(s).")
 
     print(f"\nSeeded {total_flows} flows with {total_workflows} workflows."
           if not args.dry_run else

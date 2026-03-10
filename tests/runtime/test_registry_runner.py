@@ -532,7 +532,7 @@ class TestRegistryRunnerPollOnce:
         assert "No handler registration" in updated_task.error["message"]
 
     def test_poll_handler_load_failure(self, store, evaluator, workflow_ast, program_ast):
-        """Handler with bad module_uri -> step error, task failed."""
+        """Handler with bad module_uri -> task released back to pending."""
         _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
 
         blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
@@ -558,12 +558,15 @@ class TestRegistryRunnerPollOnce:
             config=RegistryRunnerConfig(),
         )
 
-        dispatched = runner.poll_once()
-        assert dispatched == 1
+        runner.poll_once()
 
+        # ImportError releases task back to pending (another runner may handle it)
         updated_task = store._tasks[task.uuid]
-        assert updated_task.state == TaskState.FAILED
-        assert "Failed to load handler" in updated_task.error["message"]
+        assert updated_task.state == TaskState.PENDING
+
+        # Step stays at EventTransmit (not failed)
+        updated_step = store.get_step(step.id)
+        assert updated_step.state == StepState.EVENT_TRANSMIT
 
     def test_facet_name_injected_in_payload(
         self, store, evaluator, workflow_ast, program_ast, tmp_path

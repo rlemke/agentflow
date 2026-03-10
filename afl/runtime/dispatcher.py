@@ -73,6 +73,10 @@ class RegistryDispatcher:
 
     Loads handler registrations from the persistence store, dynamically
     imports modules, caches them, and invokes handlers inline.
+
+    Registrations are cached in memory on first load via ``preload()``
+    so that a running dispatcher is resilient to database restarts or
+    collection wipes.
     """
 
     def __init__(
@@ -84,6 +88,24 @@ class RegistryDispatcher:
         self._topics = topics or []
         self._module_cache: dict[tuple[str, str], Callable] = {}
         self._import_lock = threading.Lock()
+        # In-memory registration cache: facet_name -> registration
+        self._reg_cache: dict[str, Any] = {}
+        self._reg_cache_loaded = False
+
+    def preload(self) -> int:
+        """Load all handler registrations from persistence into memory.
+
+        Returns the number of registrations loaded.  Subsequent
+        ``can_dispatch`` / ``dispatch`` calls use the in-memory cache
+        and never hit the database.
+        """
+        registrations = self._persistence.list_handler_registrations()
+        self._reg_cache.clear()
+        for reg in registrations:
+            self._reg_cache[reg.facet_name] = reg
+        self._reg_cache_loaded = True
+        logger.info("RegistryDispatcher: preloaded %d registrations", len(self._reg_cache))
+        return len(self._reg_cache)
 
     def can_dispatch(self, facet_name: str) -> bool:
         """Check if a handler registration exists for the facet."""
@@ -123,7 +145,18 @@ class RegistryDispatcher:
         return callback(payload)
 
     def _find_registration(self, facet_name: str) -> Any:
-        """Find a handler registration by exact or short name."""
+        """Find a handler registration by exact or short name.
+
+        Uses the in-memory cache when preloaded, otherwise falls back
+        to the persistence store.
+        """
+        if self._reg_cache_loaded:
+            reg = self._reg_cache.get(facet_name)
+            if reg is None and "." in facet_name:
+                short_name = facet_name.rsplit(".", 1)[-1]
+                reg = self._reg_cache.get(short_name)
+            return reg
+
         reg = self._persistence.get_handler_registration(facet_name)
         if reg is None and "." in facet_name:
             short_name = facet_name.rsplit(".", 1)[-1]

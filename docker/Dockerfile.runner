@@ -23,4 +23,4 @@ RUN pip install --no-cache-dir requests pyshp folium osm2geojson
 COPY afl/ ./afl/
 
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "afl.runtime.runner", "--poll-interval", "1000", "--registry"]
+CMD ["python", "-m", "afl.runtime.runner", "--poll-interval", "1000"]

@@ -108,8 +108,10 @@ telemetry = Telemetry()
 evaluator = Evaluator(store, telemetry)
 runner = RegistryRunner(store, evaluator)
 
-store._db.handler_registrations.delete_many({})
-print('Cleared handler_registrations.')
+# Registrations use upsert (save_handler_registration) so no need to
+# wipe the collection — existing entries are updated in place and
+# registrations from other sources (Docker agents, etc.) are preserved.
+print('Registering handlers (upsert)...')
 print()
 
 total = 0

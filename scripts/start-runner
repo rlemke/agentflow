@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Register handlers for examples, then start the runner and dashboard.
 #
-# Local mode (default): clears existing handler_registrations, registers
-# handlers from one or more examples, starts the dashboard (port 8080),
-# and starts the runner service in registry mode.
+# Local mode (default): upserts handler_registrations from one or more
+# examples, starts the dashboard (port 8080), and starts the runner
+# service in registry mode.
 #
 # Remote mode: registers handlers locally (MongoDB), then SSHs to each
 # remote host to start runner processes, polling MongoDB for RUNNING state.
@@ -117,9 +117,10 @@ telemetry = Telemetry()
 evaluator = Evaluator(store, telemetry)
 runner = RegistryRunner(store, evaluator)
 
-# Clear existing registrations
-store._db.handler_registrations.delete_many({})
-print('Cleared handler_registrations.')
+# Registrations use upsert (save_handler_registration) so no need to
+# wipe the collection — existing entries are updated in place and
+# registrations from other sources (Docker agents, etc.) are preserved.
+print('Registering handlers (upsert)...')
 print()
 
 total = 0

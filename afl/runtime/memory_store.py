@@ -321,6 +321,8 @@ class MemoryStore(PersistenceAPI):
                 ):
                     task.state = "running"
                     task.updated = _current_time_ms()
+                    if server_id:
+                        task.server_id = server_id
                     return task
             return None
 

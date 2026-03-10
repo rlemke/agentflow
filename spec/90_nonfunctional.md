@@ -217,6 +217,53 @@ docker compose down -v                                      # stop + remove volu
 | `--build` | - | Force image rebuild before starting |
 | `--check-only` | - | Verify Docker availability, then exit |
 
+### macOS Docker Desktop: Volume Mounts and Network Storage
+
+Docker Desktop for Mac uses VirtioFS to share host directories with containers. This introduces filesystem semantics differences when mounting network-attached storage (NAS) volumes.
+
+#### SMB mounts (macOS → NAS)
+
+SMB (Samba/CIFS) volumes mounted on macOS (e.g. `/Volumes/afl_data/`) exhibit a specific bug when bind-mounted into Docker containers via VirtioFS:
+
+- **Writes work correctly**: Files created by the container are tracked by VirtioFS and fully accessible (open, stat, read).
+- **Pre-existing files in subdirectories fail**: `os.path.isfile()`, `os.stat()`, and `open()` return errors for files that existed on the SMB share before the container started. `os.listdir()` (readdir) succeeds — the filenames are visible, but `stat()` on individual files fails.
+- **Root-level files work**: Only files in subdirectories are affected.
+
+**Impact on AgentFlow**: The Geofabrik mirror (`AFL_GEOFABRIK_MIRROR`) contains pre-existing `.osm.pbf` files in nested directories (e.g. `north-america/us/alabama-latest.osm.pbf`). When mounted from an SMB share, containers cannot read these files even though `listdir()` shows them.
+
+**Workarounds**:
+1. **Use a local APFS drive for the mirror** (recommended): Set `AFL_GEOFABRIK_MIRROR` to a local or directly-attached drive (e.g. `/Volumes/afl_data_local/osm`). SMB is fine for write targets (`AFL_CACHE_DIR`, `AFL_OSM_OUTPUT_BASE`, `AFL_LOCAL_OUTPUT_DIR`) since containers create those files.
+2. **NFS export from the NAS**: NFS does not have this VirtioFS bug. If your NAS supports NFS, export the data directory and mount via NFS on macOS.
+3. **readdir fallback**: The downloader (`examples/osm-geocoder/handlers/shared/downloader.py`) includes `_mirror_file_exists()` which falls back to `os.listdir()` when `os.path.isfile()` fails. This detects file presence but cannot fix the `open()` failure for actual reads.
+
+**Summary of storage type behavior in Docker Desktop (macOS)**:
+
+| Storage Type | readdir | stat/open (pre-existing) | stat/open (container-created) | Recommended Use |
+|-------------|---------|--------------------------|-------------------------------|-----------------|
+| Local APFS | ✅ | ✅ | ✅ | Mirror (read-only data) |
+| SMB mount | ✅ | ❌ (subdirectory files) | ✅ | Write targets (cache, output) |
+| NFS mount | ✅ | ✅ | ✅ | All purposes |
+| Docker volume | ✅ | ✅ | ✅ | MongoDB data, ephemeral |
+
+#### MongoDB cannot use SMB mounts
+
+`MONGODB_DATA_DIR` on an SMB share causes MongoDB to crash on startup — the entrypoint `chown`/`find` fails on `.smbdelete` ghost files. Leave `MONGODB_DATA_DIR` unset (uses a Docker volume) or point it to a local drive.
+
+#### Recommended `.env` for macOS with NAS
+
+```bash
+# Mirror on local drive (pre-existing PBF files need direct access)
+AFL_GEOFABRIK_MIRROR=/Volumes/afl_data_local/osm
+
+# Write targets on NAS (SMB is fine for container-created files)
+AFL_CACHE_DIR=/Volumes/afl_data/osm-cache
+AFL_OSM_OUTPUT_BASE=/Volumes/afl_data/osm-output
+AFL_LOCAL_OUTPUT_DIR=/Volumes/afl_data/output
+
+# MongoDB on Docker volume (never SMB)
+# MONGODB_DATA_DIR=   (leave commented out)
+```
+
 ### Environment Configuration
 
 The `.env` file is the primary way to configure the Docker stack and convenience scripts.

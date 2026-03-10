@@ -37,6 +37,61 @@ for _ns, _facets in REGION_REGISTRY.items():
         if _name not in _REGION_LOOKUP:
             _REGION_LOOKUP[_name] = _path
 
+# US state abbreviation -> full name mapping for Cache handler convenience
+_US_STATE_ABBREVS: dict[str, str] = {
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "NewHampshire",
+    "NJ": "NewJersey",
+    "NM": "NewMexico",
+    "NY": "NewYork",
+    "NC": "NorthCarolina",
+    "ND": "NorthDakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "RhodeIsland",
+    "SC": "SouthCarolina",
+    "SD": "SouthDakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "WestVirginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+    "DC": "DistrictOfColumbia",
+}
+
 # Pattern to extract region path from a Geofabrik URL
 _GEOFABRIK_REGION_RE = re.compile(r"https?://download\.geofabrik\.de/(.+)-latest\.[^/]+$")
 
@@ -139,6 +194,12 @@ def _cache_handler(payload: dict) -> dict:
 
     # Try exact match first
     region_path = _REGION_LOOKUP.get(region)
+
+    # Try US state abbreviation (e.g. "CA" -> "California")
+    if not region_path:
+        full_name = _US_STATE_ABBREVS.get(region.upper())
+        if full_name:
+            region_path = _REGION_LOOKUP.get(full_name)
 
     # Fall back to case-insensitive search
     if not region_path:

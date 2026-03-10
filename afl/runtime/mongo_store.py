@@ -1114,6 +1114,7 @@ class MongoStore(PersistenceAPI):
             "task_list_name": task.task_list_name,
             "data_type": task.data_type,
             "data": task.data,
+            "server_id": task.server_id,
         }
 
     def _doc_to_task(self, doc: dict) -> TaskDefinition:
@@ -1132,6 +1133,7 @@ class MongoStore(PersistenceAPI):
             task_list_name=doc.get("task_list_name", "default"),
             data_type=doc.get("data_type", ""),
             data=doc.get("data"),
+            server_id=doc.get("server_id", ""),
         )
 
     def _log_to_doc(self, log: LogDefinition) -> dict:

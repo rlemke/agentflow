@@ -345,6 +345,7 @@ class TaskDefinition:
     task_list_name: str = "default"
     data_type: str = ""
     data: dict | None = None
+    server_id: str = ""  # Claiming server's ID (for orphan detection)
 
 
 # =============================================================================

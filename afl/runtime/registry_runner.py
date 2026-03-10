@@ -682,7 +682,23 @@ class RegistryRunner:
             # Dispatch via shared dispatcher (handles module loading + async detection)
             try:
                 result = self._dispatcher.dispatch(task.name, payload)
-            except (ImportError, AttributeError, TypeError) as exc:
+            except (ImportError, ModuleNotFoundError) as exc:
+                # Handler module can't be loaded on this runner (e.g.
+                # file:// path from a different host).  Release the task
+                # back to pending so another runner can pick it up.
+                task.state = TaskState.PENDING
+                task.error = None
+                task.server_id = ""
+                task.updated = _current_time_ms()
+                self._persistence.save_task(task)
+                logger.warning(
+                    "Cannot load handler for '%s', releasing task %s: %s",
+                    task.name,
+                    task.uuid,
+                    exc,
+                )
+                return
+            except (AttributeError, TypeError) as exc:
                 error_msg = f"Failed to load handler for '{task.name}': {exc}"
                 self._emit_step_log(
                     step_id=task.step_id,

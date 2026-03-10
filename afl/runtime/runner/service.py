@@ -653,6 +653,22 @@ class RunnerService:
                 task.step_id,
             )
 
+        except (ImportError, ModuleNotFoundError) as exc:
+            # Handler module can't be loaded on this runner (e.g. file://
+            # path doesn't exist inside a Docker container).  Release the
+            # task back to pending so another runner can pick it up.
+            task.state = TaskState.PENDING
+            task.error = None
+            task.server_id = ""
+            task.updated = _current_time_ms()
+            self._persistence.save_task(task)
+            logger.warning(
+                "Cannot load handler for '%s', releasing task %s back to pending: %s",
+                task.name,
+                task.uuid,
+                exc,
+            )
+
         except Exception as exc:
             try:
                 self._evaluator.fail_step(task.step_id, str(exc))

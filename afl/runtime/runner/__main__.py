@@ -157,19 +157,19 @@ def main() -> None:
         from afl.runtime.dispatcher import RegistryDispatcher
 
         dispatcher = RegistryDispatcher(persistence=store)
+        dispatcher.preload()
         registrations = store.list_handler_registrations()
         for reg in registrations:
 
             def _make_proxy(d: RegistryDispatcher, name: str):  # noqa: E301
-                def _proxy(payload: dict) -> dict:
-                    return d.dispatch(name, payload) or {}
+                def _proxy(payload: dict) -> dict | None:
+                    return d.dispatch(name, payload)
 
                 return _proxy
 
             tool_registry.register(reg.facet_name, _make_proxy(dispatcher, reg.facet_name))
         if registrations:
-            names = [r.facet_name for r in registrations]
-            print(f"  Registry handlers: {len(names)} loaded")
+            print(f"  Registry handlers: {len(registrations)} loaded (cached)")
 
     runner_config = RunnerConfig(
         server_group=args.server_group,

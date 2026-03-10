@@ -255,7 +255,8 @@ if [ "$WEATHER_AGENTS" -gt 0 ]; then
     SERVICES="$SERVICES agent-noaa-weather"
 fi
 
-PROFILE_ARGS=""
+# Agent/runner services require the agents profile
+PROFILE_ARGS="--profile agents"
 COMPOSE_FILES="-f docker-compose.yml"
 if [ "$HDFS" = true ]; then
     SERVICES="$SERVICES namenode datanode"

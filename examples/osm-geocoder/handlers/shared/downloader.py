@@ -59,6 +59,32 @@ def _get_path_lock(path: str) -> threading.Lock:
     return _path_locks[path]
 
 
+def _mirror_file_exists(path: str) -> bool:
+    """Check if a mirror file exists, with SMB mount fallback.
+
+    On macOS Docker + SMB mounts, ``os.path.isfile()`` can return False even
+    when the file is present (``stat()`` fails but ``readdir()`` works).
+    Falls back to checking the parent directory listing.
+    """
+    if os.path.isfile(path):
+        return True
+    # Fallback: check via directory listing (readdir works on SMB)
+    parent = os.path.dirname(path)
+    basename = os.path.basename(path)
+    try:
+        return basename in os.listdir(parent)
+    except OSError:
+        return False
+
+
+def _mirror_file_size(path: str) -> int:
+    """Get mirror file size, returning 0 if stat() fails (SMB mounts)."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
+
+
 def _cache_hit(url: str, path: str, storage=None) -> dict:
     """Build result dict for a cache hit."""
     if storage is None:
@@ -204,7 +230,7 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
     if GEOFABRIK_MIRROR:
         ext = FORMAT_EXTENSIONS[fmt]
         mirror_path = os.path.join(GEOFABRIK_MIRROR, f"{region_path}-latest.{ext}")
-        if os.path.isfile(mirror_path):
+        if _mirror_file_exists(mirror_path):
             if _cache_is_hdfs():
                 # HDFS cache: copy so distributed agents can access it
                 with _get_path_lock(local_path):
@@ -228,7 +254,7 @@ def download(region_path: str, fmt: str = "pbf") -> dict:
                 return result
             else:
                 # Local cache: use the mirror path directly, no copy
-                mirror_size = os.path.getsize(mirror_path)
+                mirror_size = _mirror_file_size(mirror_path)
                 log.info("mirror-direct: %s (%s)", region_path, _fmt_bytes(mirror_size))
                 return {
                     "url": url,
