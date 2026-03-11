@@ -546,19 +546,26 @@ class MongoStore(PersistenceAPI):
         cutoff = now - down_timeout_ms
 
         # Find servers that are effectively down
-        dead_servers = self._db.servers.find(
-            {
-                "state": {"$in": ["running", "startup"]},
-                "$or": [
-                    {"ping_time": 0},
-                    {"ping_time": {"$lt": cutoff}},
-                ],
-            },
-            {"uuid": 1},
+        dead_servers = list(
+            self._db.servers.find(
+                {
+                    "state": {"$in": ["running", "startup"]},
+                    "$or": [
+                        {"ping_time": 0},
+                        {"ping_time": {"$lt": cutoff}},
+                    ],
+                },
+                {"uuid": 1, "ping_time": 1},
+            )
         )
         dead_ids = [doc["uuid"] for doc in dead_servers]
         if not dead_ids:
             return []
+
+        # Build server_id → last_ping lookup for diagnostics
+        server_pings: dict[str, int] = {
+            doc["uuid"]: doc.get("ping_time", 0) for doc in dead_servers
+        }
 
         # Find tasks before resetting so we can return their details
         orphan_cursor = self._db.tasks.find(
@@ -566,7 +573,7 @@ class MongoStore(PersistenceAPI):
                 "state": "running",
                 "server_id": {"$in": dead_ids},
             },
-            {"step_id": 1, "workflow_id": 1, "name": 1, "server_id": 1},
+            {"step_id": 1, "workflow_id": 1, "name": 1, "server_id": 1, "updated": 1},
         )
         reaped: list[dict[str, str]] = [
             {
@@ -574,6 +581,8 @@ class MongoStore(PersistenceAPI):
                 "workflow_id": doc.get("workflow_id", ""),
                 "name": doc.get("name", ""),
                 "server_id": doc.get("server_id", ""),
+                "task_started_ms": str(doc.get("updated", 0)),
+                "last_ping_ms": str(server_pings.get(doc.get("server_id", ""), 0)),
             }
             for doc in orphan_cursor
         ]

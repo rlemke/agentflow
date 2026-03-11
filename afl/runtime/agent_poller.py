@@ -85,6 +85,28 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _reaper_message(task_info: dict[str, str]) -> str:
+    """Build a descriptive reaper step log message with timing diagnostics."""
+    now = _current_time_ms()
+    server_id = task_info.get("server_id", "")
+    name = task_info.get("name", "unknown")
+
+    parts = [f"Task restarted: {name} — previous server ({server_id[:8]}...) stopped responding"]
+
+    last_ping = int(task_info.get("last_ping_ms", "0"))
+    if last_ping > 0:
+        silent_s = (now - last_ping) / 1000
+        parts.append(f"server silent for {silent_s:.0f}s")
+
+    task_started = int(task_info.get("task_started_ms", "0"))
+    if task_started > 0:
+        running_s = (now - task_started) / 1000
+        parts.append(f"task was running for {running_s:.0f}s")
+
+    parts.append("resetting to pending")
+    return ", ".join(parts)
+
+
 _SENTINEL = -1
 
 
@@ -535,11 +557,7 @@ class AgentPoller:
                     self._emit_step_log(
                         step_id=task_info["step_id"],
                         workflow_id=task_info["workflow_id"],
-                        message=(
-                            f"Task restarted: {task_info['name']} — "
-                            f"previous server ({task_info['server_id'][:8]}...) "
-                            f"crashed, resetting to pending"
-                        ),
+                        message=_reaper_message(task_info),
                         level=StepLogLevel.WARNING,
                         facet_name=task_info["name"],
                     )
