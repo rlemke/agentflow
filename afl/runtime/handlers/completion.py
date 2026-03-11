@@ -147,11 +147,38 @@ class EventTransmitHandler(StateHandler):
 
         return _step_log_callback
 
+    @staticmethod
+    def _timeout_args_to_ms(args: list[dict]) -> int:
+        """Convert Timeout mixin args (hours, minutes, seconds, ms) to ms.
+
+        Supports any combination: ``Timeout(hours = 1, minutes = 30)``
+        produces 5_400_000 ms.
+        """
+        multipliers = {"hours": 3_600_000, "minutes": 60_000, "seconds": 1_000, "ms": 1}
+        total = 0
+        for arg in args:
+            name = arg.get("name", "")
+            if name not in multipliers:
+                continue
+            val = arg.get("value", {})
+            if isinstance(val, dict):
+                raw = val.get("value", 0)
+            elif isinstance(val, (int, float)):
+                raw = val
+            else:
+                continue
+            total += int(raw) * multipliers[name]
+        return total
+
     def _extract_timeout_ms(self) -> int:
         """Extract timeout_ms from Timeout mixin on the facet definition.
 
         Checks both facet-level signature mixins and step-level call-site
         mixins (call-site overrides facet-level).
+
+        Timeout accepts: ``hours``, ``minutes``, ``seconds``, ``ms`` —
+        all additive.  E.g. ``with Timeout(minutes = 10, seconds = 30)``
+        → 630_000 ms.
 
         Returns 0 if no Timeout mixin is found.
         """
@@ -163,13 +190,7 @@ class EventTransmitHandler(StateHandler):
             for mixin in facet_def.get("mixins", []):
                 target = mixin.get("target", "")
                 if target == "Timeout" or target.endswith(".Timeout"):
-                    for arg in mixin.get("args", []):
-                        if arg.get("name") == "ms":
-                            val = arg.get("value", {})
-                            if isinstance(val, dict):
-                                timeout_ms = val.get("value", 0)
-                            elif isinstance(val, (int, float)):
-                                timeout_ms = int(val)
+                    timeout_ms = self._timeout_args_to_ms(mixin.get("args", []))
 
         # Check step-level call-site mixins (override facet-level)
         stmt_def = self.context.get_statement_definition(self.step)
@@ -177,13 +198,7 @@ class EventTransmitHandler(StateHandler):
             for mixin in getattr(stmt_def, "mixins", None) or []:
                 target = mixin.get("target", "")
                 if target == "Timeout" or target.endswith(".Timeout"):
-                    for arg in mixin.get("args", []):
-                        if arg.get("name") == "ms":
-                            val = arg.get("value", {})
-                            if isinstance(val, dict):
-                                timeout_ms = val.get("value", 0)
-                            elif isinstance(val, (int, float)):
-                                timeout_ms = int(val)
+                    timeout_ms = self._timeout_args_to_ms(mixin.get("args", []))
 
         return timeout_ms
 

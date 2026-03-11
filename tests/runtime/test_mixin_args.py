@@ -646,8 +646,8 @@ class TestTimeoutMixin:
                                     "target": "Timeout",
                                     "args": [
                                         {
-                                            "name": "ms",
-                                            "value": {"type": "Int", "value": 120000},
+                                            "name": "minutes",
+                                            "value": {"type": "Int", "value": 2},
                                         },
                                     ],
                                 },
@@ -661,7 +661,7 @@ class TestTimeoutMixin:
         result = evaluator.execute(workflow_ast, inputs={}, program_ast=program_ast)
         assert result.status == ExecutionStatus.PAUSED
 
-        # Check the created task has timeout_ms set
+        # Check the created task has timeout_ms set (2 minutes = 120000ms)
         tasks = store.get_pending_tasks("default")
         slow_tasks = [t for t in tasks if t.name == "ns.SlowOp"]
         assert len(slow_tasks) == 1
@@ -772,8 +772,8 @@ class TestTimeoutMixin:
                                     "target": "Timeout",
                                     "args": [
                                         {
-                                            "name": "ms",
-                                            "value": {"type": "Int", "value": 300000},
+                                            "name": "minutes",
+                                            "value": {"type": "Int", "value": 5},
                                         },
                                     ],
                                 },
@@ -816,8 +816,8 @@ class TestTimeoutMixin:
                                     "target": "Timeout",
                                     "args": [
                                         {
-                                            "name": "ms",
-                                            "value": {"type": "Int", "value": 60000},
+                                            "name": "minutes",
+                                            "value": {"type": "Int", "value": 1},
                                         },
                                     ],
                                 },
