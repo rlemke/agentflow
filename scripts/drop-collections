@@ -47,7 +47,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/_env.sh"
 
-MONGO_URL="${AFL_MONGODB_URL:-mongodb://localhost:27018}"
+MONGO_URL="${AFL_MONGODB_URL:-mongodb://afl-mongodb:27017}"
 
 # All AFL collections (matches MongoStore._ensure_indexes)
 COLLECTIONS=(

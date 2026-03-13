@@ -45,15 +45,6 @@ fi
 if [ -n "${AFL_GEOFABRIK_MIRROR:-}" ]; then
     SETUP_ARGS+=(--mirror "$AFL_GEOFABRIK_MIRROR")
 fi
-if [ -n "${HDFS_NAMENODE_DIR:-}" ]; then
-    SETUP_ARGS+=(--hdfs-namenode-dir "$HDFS_NAMENODE_DIR")
-fi
-if [ -n "${HDFS_DATANODE_DIR:-}" ]; then
-    SETUP_ARGS+=(--hdfs-datanode-dir "$HDFS_DATANODE_DIR")
-fi
-if [ -n "${MONGODB_DATA_DIR:-}" ]; then
-    SETUP_ARGS+=(--mongodb-data-dir "$MONGODB_DATA_DIR")
-fi
 if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
     SETUP_ARGS+=(--graphhopper-data-dir "$GRAPHHOPPER_DATA_DIR")
 fi

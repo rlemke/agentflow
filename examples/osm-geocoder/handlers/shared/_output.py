@@ -1,7 +1,7 @@
 """Shared output helpers for OSM extractor handlers.
 
 Provides HDFS-aware output directory resolution and file writing.
-When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://namenode:8020/osm-output),
+When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://afl-hadoop-hdfs:8020/osm-output),
 extractors write output there. Otherwise they use local /tmp/.
 """
 
@@ -19,7 +19,7 @@ _OUTPUT_BASE = os.environ.get("AFL_OSM_OUTPUT_BASE", "")
 def resolve_output_dir(category: str, default_local: str = "") -> str:
     """Return output directory for a handler category.
 
-    When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://namenode:8020/osm-output),
+    When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://afl-hadoop-hdfs:8020/osm-output),
     returns '{base}/{category}'. Otherwise falls back to *default_local*,
     then AFL_LOCAL_OUTPUT_DIR, then ``/tmp``.
     """

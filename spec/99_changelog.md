@@ -1,6 +1,31 @@
 # Implementation Changelog
 
-**Current version: v0.39.0**
+**Current version: v0.40.0**
+
+## Completed (v0.40.0) — External Infrastructure, Lock Removal, Mount Localization
+
+Migrated MongoDB and HDFS from Docker Compose services to external servers, removed the distributed lock subsystem, and added VirtioFS mount localization.
+
+**Infrastructure:**
+- Removed `mongodb`, `namenode`, `datanode` services from `docker-compose.yml` — MongoDB and HDFS now run on external server `192.168.68.91` via `/etc/hosts` aliases (`afl-mongodb`, `afl-hadoop-hdfs`, `afl-hadoop-yarn`)
+- All services use `extra_hosts` to resolve `afl-mongodb` inside containers
+- Updated `AFL_MONGODB_URL` default from `mongodb://localhost:27018` to `mongodb://afl-mongodb:27017` across all scripts, configs, docs, and 24 OSM test scripts
+- Updated HDFS URI examples from `hdfs://namenode:8020` to `hdfs://afl-hadoop-hdfs:8020`
+
+**Lock removal (v0.39.1):**
+- Removed distributed lock subsystem (`LockDefinition`, `LockMetaData`, `KeyLockDAO`, lock persistence methods, lock extension threads, dashboard lock routes/templates/API, `RunnerConfig` lock fields, `--lock-duration` CLI arg)
+- Task claiming now uses MongoDB's atomic `find_one_and_update` via `claim_task()` — single `PENDING→RUNNING` transition
+- Updated all documentation to reference `claim_task()` instead of distributed locking
+
+**Mount localization (`AFL_LOCALIZE_MOUNTS`):**
+- `localize()` in `afl/runtime/storage.py` now supports copying mount-backed files to container-local storage before processing
+- `AFL_LOCALIZE_MOUNTS` env var: comma-separated path prefixes (e.g. `/data/osm-mirror`) — files under these mounts are copied to `/tmp/osm-local/` with size-based cache hit detection
+- Fixes VirtioFS hangs on large PBF files (1.3 GB California) in Docker containers — `open()` blocks indefinitely on VirtioFS even with local APFS-backed bind mounts
+- Added to `agent-osm-geocoder` in `docker-compose.yml`: `AFL_LOCALIZE_MOUNTS=/data/osm-mirror`
+
+**Tests:** 10 new tests in `test_storage.py` — mount prefix matching, file copy, cache hit, stale cache detection. Total: 3796 passed, 81 skipped.
+
+**Files:** 40+ files modified across docker-compose, scripts, specs, docs, handlers, and tests.
 
 ## Completed (v0.39.0) — Orphaned Task Reaper, Crash Recovery
 

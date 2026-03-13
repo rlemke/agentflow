@@ -50,7 +50,7 @@ from collections import defaultdict
 
 from afl.runtime.mongo_store import MongoStore
 
-mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://localhost:27018')
+mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://afl-mongodb:27017')
 store = MongoStore(mongo_url)
 
 state_filter = '${STATE_FILTER}' or None

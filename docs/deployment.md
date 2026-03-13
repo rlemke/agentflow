@@ -49,10 +49,10 @@ All services run on one machine via Docker Compose:
     |         |                  |        |
     +---------+------------------+--------+
                        |
-                +------v------+
-                |   MongoDB   |
-                |   (27018)   |
-                +-----------  +
+              +--------v--------+
+              |  afl-mongodb    |
+              |  (external)     |
+              +-----------------+
 ```
 
 ### Multi-Node (Production)
@@ -266,9 +266,9 @@ When using the override file, the following environment variables are set automa
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `AFL_CACHE_DIR` | `hdfs://namenode:8020/osm-cache` | OSM PBF download cache |
-| `GRAPHHOPPER_GRAPH_DIR` | `hdfs://namenode:8020/graphhopper` | GraphHopper routing graphs |
-| `AFL_GTFS_CACHE_DIR` | `hdfs://namenode:8020/gtfs-cache` | GTFS feed cache |
+| `AFL_CACHE_DIR` | `hdfs://afl-hadoop-hdfs:8020/osm-cache` | OSM PBF download cache |
+| `GRAPHHOPPER_GRAPH_DIR` | `hdfs://afl-hadoop-hdfs:8020/graphhopper` | GraphHopper routing graphs |
+| `AFL_GTFS_CACHE_DIR` | `hdfs://afl-hadoop-hdfs:8020/gtfs-cache` | GTFS feed cache |
 
 The `get_storage_backend()` factory detects `hdfs://` URIs and returns an `HDFSStorageBackend` (backed by pyarrow) instead of the default `LocalStorageBackend`.
 
@@ -495,10 +495,10 @@ Enable authentication in production:
 
 ```bash
 # Dump the database
-mongodump --uri="mongodb://localhost:27018" --db=afl --out=/backup/
+mongodump --uri="mongodb://afl-mongodb:27017" --db=afl --out=/backup/
 
 # Restore
-mongorestore --uri="mongodb://localhost:27018" --db=afl /backup/afl/
+mongorestore --uri="mongodb://afl-mongodb:27017" --db=afl /backup/afl/
 ```
 
 ### Key Collections

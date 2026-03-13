@@ -104,7 +104,11 @@ scripts/rolling-deploy --example hiv-drug-resistance
 ### Environment configuration
 Copy `.env.example` to `.env` and edit to configure MongoDB, scaling, overlays, and data directories. All `scripts/` commands source `_env.sh` which loads `.env` without overriding already-set vars. `scripts/easy.sh` runs the full pipeline (teardown → rebuild → setup → seed) from `.env` alone. See `spec/90_nonfunctional.md` for the full variable reference.
 
+MongoDB and HDFS run on external servers (defined in `/etc/hosts`): `afl-mongodb`, `afl-hadoop-hdfs`, `afl-hadoop-yarn` — they are **not** managed by Docker Compose.
+
 Set `ANTHROPIC_API_KEY` to enable live Claude API calls for prompt-block event facets. When unset, LLM handlers fall back to deterministic stubs.
+
+Set `AFL_LOCALIZE_MOUNTS` (comma-separated path prefixes) to copy Docker mount-backed files to container-local storage before processing, avoiding VirtioFS hangs on large files.
 
 ---
 

@@ -111,7 +111,7 @@ examples = '${EXAMPLES[*]}'.split()
 from afl.runtime.mongo_store import MongoStore
 from afl.runtime import RegistryRunner, RegistryRunnerConfig, Evaluator, Telemetry
 
-mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://localhost:27018')
+mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://afl-mongodb:27017')
 store = MongoStore(mongo_url)
 telemetry = Telemetry()
 evaluator = Evaluator(store, telemetry)

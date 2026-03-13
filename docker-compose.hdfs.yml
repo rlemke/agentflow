@@ -1,16 +1,14 @@
 # Docker Compose override for HDFS-aware OSM agents.
 #
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs up -d
-#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs build
+#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile agents up -d
+#   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile agents build
 #
 # This override:
-#   - Adds depends_on: namenode so agents wait for HDFS
 #   - Sets INSTALL_HDFS=true build arg so pyarrow gets installed
+#   - Adds extra_hosts for afl-hadoop-hdfs so agents can reach the HDFS server
 #   - HDFS paths are NOT hardcoded here — set AFL_CACHE_DIR, AFL_OSM_OUTPUT_BASE,
-#     etc. to hdfs:// URIs in .env when you want HDFS storage.  By default the
-#     base docker-compose.yml passes through .env values unchanged, so agents
-#     use the local mirror/cache path unless explicitly pointed at HDFS.
+#     etc. to hdfs:// URIs in .env when you want HDFS storage.
 
 services:
   agent-osm-geocoder:
@@ -19,9 +17,8 @@ services:
       dockerfile: docker/Dockerfile.osm-geocoder
       args:
         INSTALL_HDFS: "true"
-    depends_on:
-      namenode:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-hadoop-hdfs:192.168.68.91"
 
   agent-osm-geocoder-lite:
     build:
@@ -29,9 +26,8 @@ services:
       dockerfile: docker/Dockerfile.osm-geocoder-lite
       args:
         INSTALL_HDFS: "true"
-    depends_on:
-      namenode:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-hadoop-hdfs:192.168.68.91"
 
   runner:
     build:
@@ -39,3 +35,5 @@ services:
       dockerfile: docker/Dockerfile.runner
       args:
         INSTALL_HDFS: "true"
+    extra_hosts:
+      - "afl-hadoop-hdfs:192.168.68.91"

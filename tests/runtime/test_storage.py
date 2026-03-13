@@ -9,7 +9,9 @@ from afl.runtime.storage import (
     HDFSStorageBackend,
     LocalStorageBackend,
     _hdfs_retry,
+    _should_localize_mount,
     get_storage_backend,
+    localize,
 )
 
 # ---------------------------------------------------------------------------
@@ -459,3 +461,93 @@ class TestGetStorageBackend:
         b2 = get_storage_backend("hdfs://namenode:8020/data/b")
         assert b1 is b2
         assert mock_hdfs_cls.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# TestLocalize — mount path localization
+# ---------------------------------------------------------------------------
+
+
+class TestLocalizeMounts:
+    """Tests for localize() with AFL_LOCALIZE_MOUNTS."""
+
+    def test_should_localize_mount_unset(self, monkeypatch):
+        monkeypatch.delenv("AFL_LOCALIZE_MOUNTS", raising=False)
+        assert _should_localize_mount("/data/osm-mirror/file.pbf") is False
+
+    def test_should_localize_mount_empty(self, monkeypatch):
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", "")
+        assert _should_localize_mount("/data/osm-mirror/file.pbf") is False
+
+    def test_should_localize_mount_match(self, monkeypatch):
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", "/data/osm-mirror")
+        assert _should_localize_mount("/data/osm-mirror/file.pbf") is True
+
+    def test_should_localize_mount_no_match(self, monkeypatch):
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", "/data/osm-mirror")
+        assert _should_localize_mount("/tmp/local/file.pbf") is False
+
+    def test_should_localize_mount_multiple(self, monkeypatch):
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", "/mnt/a,/mnt/b")
+        assert _should_localize_mount("/mnt/b/file.txt") is True
+        assert _should_localize_mount("/mnt/c/file.txt") is False
+
+    def test_localize_local_path_no_env(self, monkeypatch):
+        """Local paths returned unchanged when AFL_LOCALIZE_MOUNTS is unset."""
+        monkeypatch.delenv("AFL_LOCALIZE_MOUNTS", raising=False)
+        assert localize("/data/osm-mirror/file.pbf") == "/data/osm-mirror/file.pbf"
+
+    def test_localize_copies_mount_file(self, tmp_path, monkeypatch):
+        """Mount-path files are copied to local cache."""
+        # Create a fake "mount" file
+        mount_dir = tmp_path / "mount"
+        mount_dir.mkdir()
+        src = mount_dir / "test.pbf"
+        src.write_bytes(b"fake pbf data")
+
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", str(mount_dir))
+
+        cache_dir = tmp_path / "cache"
+        result = localize(str(src), target_dir=str(cache_dir))
+
+        assert result != str(src)
+        assert result.startswith(str(cache_dir))
+        assert os.path.isfile(result)
+        assert open(result, "rb").read() == b"fake pbf data"
+
+    def test_localize_mount_cache_hit(self, tmp_path, monkeypatch):
+        """Cached copy is reused when sizes match."""
+        mount_dir = tmp_path / "mount"
+        mount_dir.mkdir()
+        src = mount_dir / "test.pbf"
+        src.write_bytes(b"fake pbf data")
+
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", str(mount_dir))
+        cache_dir = tmp_path / "cache"
+
+        # First call copies
+        result1 = localize(str(src), target_dir=str(cache_dir))
+        mtime1 = os.path.getmtime(result1)
+
+        # Second call should hit cache (same path returned, file not re-copied)
+        result2 = localize(str(src), target_dir=str(cache_dir))
+        assert result1 == result2
+        assert os.path.getmtime(result2) == mtime1
+
+    def test_localize_mount_cache_stale(self, tmp_path, monkeypatch):
+        """Stale cache (size mismatch) triggers re-copy."""
+        mount_dir = tmp_path / "mount"
+        mount_dir.mkdir()
+        src = mount_dir / "test.pbf"
+        src.write_bytes(b"version1")
+
+        monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", str(mount_dir))
+        cache_dir = tmp_path / "cache"
+
+        result1 = localize(str(src), target_dir=str(cache_dir))
+        assert open(result1, "rb").read() == b"version1"
+
+        # Source file changes size
+        src.write_bytes(b"version2-longer")
+        result2 = localize(str(src), target_dir=str(cache_dir))
+        assert open(result2, "rb").read() == b"version2-longer"

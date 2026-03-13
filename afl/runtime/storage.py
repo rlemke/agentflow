@@ -371,13 +371,29 @@ _hdfs_backends: dict[str, HDFSStorageBackend] = {}
 _DEFAULT_LOCAL_CACHE = "/tmp/osm-local"
 
 
+def _should_localize_mount(path: str) -> bool:
+    """Check if a local path is on a mount that should be copied locally.
+
+    Reads ``AFL_LOCALIZE_MOUNTS`` (comma-separated list of path prefixes).
+    When a path starts with any listed prefix, ``localize()`` will copy it
+    to the local cache instead of reading directly from the mount.  This
+    avoids VirtioFS hangs on large files in Docker containers.
+    """
+    prefixes = os.environ.get("AFL_LOCALIZE_MOUNTS", "")
+    if not prefixes:
+        return False
+    return any(path.startswith(p.strip()) for p in prefixes.split(",") if p.strip())
+
+
 def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
     """Ensure a file is available on the local filesystem.
 
-    For local paths, returns *path* unchanged.  For ``hdfs://`` URIs,
-    downloads the file to *target_dir* (preserving the HDFS directory
-    structure) and returns the local path.  Skips download when a local
-    copy with the same byte-size already exists.
+    For local paths, returns *path* unchanged unless the path matches a
+    prefix in ``AFL_LOCALIZE_MOUNTS``, in which case the file is copied to
+    *target_dir*.  For ``hdfs://`` URIs, downloads the file to *target_dir*
+    (preserving the HDFS directory structure) and returns the local path.
+    Skips copy/download when a local copy with the same byte-size already
+    exists.
 
     Args:
         path: Local path or ``hdfs://`` URI.
@@ -388,7 +404,22 @@ def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
         (e.g. pyosmium ``apply_file``).
     """
     if not path.startswith("hdfs://"):
-        return path
+        if not _should_localize_mount(path):
+            return path
+        # Copy mount-backed file to local cache
+        local_path = os.path.join(target_dir, path.lstrip("/"))
+        if os.path.isfile(local_path):
+            try:
+                if os.path.getsize(local_path) == os.path.getsize(path):
+                    logger.debug("localize: mount cache hit %s -> %s", path, local_path)
+                    return local_path
+            except OSError:
+                pass
+        logger.info("localize: copying mount file %s -> %s", path, local_path)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        shutil.copy2(path, local_path)
+        logger.info("localize: copied %s (%d bytes)", local_path, os.path.getsize(local_path))
+        return local_path
 
     parsed = urlparse(path)
     hdfs_subpath = parsed.path.lstrip("/")

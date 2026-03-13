@@ -62,7 +62,6 @@ scripts/setup --check-only
 
 | Service | Port | Scalable | Description |
 |---------|------|----------|-------------|
-| `mongodb` | 27018 | No | MongoDB database (27018 externally to avoid conflicts) |
 | `dashboard` | 8080 | No | Web dashboard for monitoring workflows |
 | `runner` | - | Yes | Distributed runner service |
 | `agent-addone` | - | Yes | Sample agent handling AddOne/Multiply/Greet events |
@@ -133,7 +132,7 @@ Choose the full image when you need routing graph operations (BuildGraph, Comput
 Environment variables can be set in a `.env` file:
 
 ```env
-MONGODB_PORT=27018
+AFL_MONGODB_URL=mongodb://afl-mongodb:27017
 AFL_MONGODB_DATABASE=afl
 ```
 
@@ -147,10 +146,10 @@ AFL_MONGODB_DATABASE=afl
        │                   │                   │
        └───────────────────┴───────────────────┘
                            │
-                    ┌──────┴──────┐
-                    │   MongoDB   │
-                    │   (27018)   │
-                    └─────────────┘
+                  ┌────────┴────────┐
+                  │  afl-mongodb    │
+                  │  (external)     │
+                  └─────────────────┘
 ```
 
 ## MCP Server Usage
@@ -209,14 +208,15 @@ Add to your `claude_desktop_config.json`:
 
 ### MongoDB Connection Issues
 
-If services can't connect to MongoDB:
+MongoDB runs on an external server (`afl-mongodb`, defined in `/etc/hosts`).
+If services can't connect:
 
 ```bash
-# Check MongoDB is healthy
-docker compose ps
+# Verify the host is reachable
+ping afl-mongodb
 
-# View MongoDB logs
-docker compose logs mongodb
+# Check MongoDB is responding
+mongosh --host afl-mongodb --eval "db.runCommand('ping')"
 ```
 
 ### Rebuilding Images

@@ -187,7 +187,7 @@ Or via curl:
 # Find the flow ID
 FLOW_ID=$(python3 -c "
 from afl.runtime.mongo_store import MongoStore
-store = MongoStore('mongodb://localhost:27018')
+store = MongoStore('mongodb://afl-mongodb:27017')
 for f in store.get_flows():
     if 'noaa' in f.name.lower() or 'weather' in f.name.lower():
         print(f.uuid); break

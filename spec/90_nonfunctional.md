@@ -194,7 +194,6 @@ docker compose down -v                                      # stop + remove volu
 
 | Service | Port | Scalable | Description |
 |---------|------|----------|-------------|
-| `mongodb` | 27018 | No | MongoDB 7 database |
 | `dashboard` | 8080 | No | Web dashboard |
 | `runner` | - | Yes | Distributed runner service |
 | `agent-addone` | - | Yes | Sample AddOne agent |
@@ -285,11 +284,9 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | Variable | Default | Description |
 |----------|---------|-------------|
 | **MongoDB** | | |
-| `MONGODB_PORT` | `27018` | Host port for MongoDB container |
-| `AFL_MONGODB_URL` | `mongodb://localhost:27018` | MongoDB connection URL |
+| `AFL_MONGODB_URL` | `mongodb://afl-mongodb:27017` | MongoDB connection URL (external server, defined in `/etc/hosts`) |
 | `AFL_MONGODB_DATABASE` | `afl` | Database name (runtime: steps, tasks, runners, flows) |
 | `AFL_EXAMPLES_DATABASE` | `afl_examples` | Database for example handler data (weather reports, census output) |
-| `MONGODB_DATA_DIR` | *(Docker volume)* | Host path for MongoDB data |
 | **Scaling** | | |
 | `AFL_RUNNERS` | `1` | Number of runner service instances |
 | `AFL_AGENTS` | `1` | Number of AddOne agent instances |
@@ -304,6 +301,7 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | `AFL_CACHE_DIR` | `/tmp/osm-cache` | OSM cache directory (local path or HDFS URI) |
 | `AFL_OSM_OUTPUT_BASE` | `/tmp` | OSM extractor output base (local path or HDFS URI) |
 | `AFL_LOCAL_OUTPUT_DIR` | `/Volumes/afl_data/output` | Handler output files (reports, maps, stats, GeoJSON). Used by all examples: osm-geocoder, census-us, hiv-drug-resistance, monte-carlo-risk, maven. Falls back to `/tmp` when unset. |
+| `AFL_LOCALIZE_MOUNTS` | *(empty)* | Comma-separated path prefixes for Docker mount paths that `localize()` should copy to container-local storage before processing. Avoids VirtioFS hangs on large files. Example: `/data/osm-mirror` |
 | **Remote runner management** | | |
 | `AFL_RUNNER_HOSTS` | *(empty)* | Space-separated hostnames for remote runner management |
 | `AFL_REMOTE_PATH` | *(same as local)* | Repo path on remote hosts |
@@ -314,8 +312,6 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | **LLM / Claude API** | | |
 | `ANTHROPIC_API_KEY` | *(empty)* | Anthropic API key for Claude-powered prompt blocks. When unset, LLM handlers fall back to deterministic stubs. Required by: `ClaudeAgentRunner`, `LLMHandler`, and example handlers like `noaa-weather` GenerateNarrative. |
 | **Data directories** | | |
-| `HDFS_NAMENODE_DIR` | *(Docker volume)* | Host path for HDFS NameNode data |
-| `HDFS_DATANODE_DIR` | *(Docker volume)* | Host path for HDFS DataNode data |
 | `GRAPHHOPPER_DATA_DIR` | *(Docker volume)* | Host path for GraphHopper data |
 | `POSTGIS_DATA_DIR` | *(Docker volume)* | Host path for PostGIS data |
 | `JENKINS_HOME_DIR` | *(Docker volume)* | Host path for Jenkins home |
@@ -482,7 +478,7 @@ Each runner persists its HTTP status port in MongoDB (`ServerDefinition.http_por
 # List all running servers from MongoDB
 python3 -c "
 from afl.runtime.mongo_store import MongoStore
-store = MongoStore('mongodb://localhost:27018')
+store = MongoStore('mongodb://afl-mongodb:27017')
 for s in store.get_servers_by_state('running'):
     print(f'{s.server_name}: port={s.http_port}, state={s.state}, id={s.uuid}')
 "

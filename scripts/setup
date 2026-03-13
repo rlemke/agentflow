@@ -50,13 +50,10 @@ Options:
   --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
                        (default: 0)
   --weather-agents N   Number of NOAA Weather agents (default: 0)
-  --hdfs               Start HDFS namenode + datanode services
-  --hdfs-namenode-dir PATH  Use external directory for HDFS NameNode data
-  --hdfs-datanode-dir PATH  Use external directory for HDFS DataNode data
+  --hdfs               Enable HDFS overlay (pyarrow install in agent images)
   --jenkins            Start Jenkins CI/CD server
   --postgis            Start PostGIS database and wire into OSM agents
   --postgis-data-dir PATH   Use external directory for PostGIS data
-  --mongodb-data-dir PATH   Use external directory for MongoDB data
   --jenkins-home-dir PATH   Use external directory for Jenkins home
   --graphhopper-data-dir PATH  Use external directory for GraphHopper data
   --mirror PATH        Use a local Geofabrik mirror directory (read-only)
@@ -78,13 +75,10 @@ while [[ $# -gt 0 ]]; do
         --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
         --weather-agents) WEATHER_AGENTS="$2";  shift 2 ;;
         --hdfs)          HDFS=true;             shift ;;
-        --hdfs-namenode-dir) export HDFS_NAMENODE_DIR="$2"; HDFS=true; shift 2 ;;
-        --hdfs-datanode-dir) export HDFS_DATANODE_DIR="$2"; HDFS=true; shift 2 ;;
         --jenkins)       JENKINS=true;          shift ;;
         --jenkins-home-dir) export JENKINS_HOME_DIR="$2"; JENKINS=true; shift 2 ;;
         --postgis)       POSTGIS=true;          shift ;;
         --postgis-data-dir) export POSTGIS_DATA_DIR="$2"; POSTGIS=true; shift 2 ;;
-        --mongodb-data-dir) export MONGODB_DATA_DIR="$2"; shift 2 ;;
         --graphhopper-data-dir) export GRAPHHOPPER_DATA_DIR="$2"; shift 2 ;;
         --mirror)        export AFL_GEOFABRIK_MIRROR="$2"; MIRROR=true; shift 2 ;;
         --clean)         CLEAN=true;            shift ;;
@@ -259,17 +253,9 @@ fi
 PROFILE_ARGS="--profile agents"
 COMPOSE_FILES="-f docker-compose.yml"
 if [ "$HDFS" = true ]; then
-    SERVICES="$SERVICES namenode datanode"
-    PROFILE_ARGS="$PROFILE_ARGS --profile hdfs"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.hdfs.yml"
     export INSTALL_HDFS=true
-    echo "HDFS support enabled — OSM agents will use hdfs://namenode:8020 for caching"
-    if [ -n "${HDFS_NAMENODE_DIR:-}" ]; then
-        echo "  NameNode data dir: $HDFS_NAMENODE_DIR"
-    fi
-    if [ -n "${HDFS_DATANODE_DIR:-}" ]; then
-        echo "  DataNode data dir: $HDFS_DATANODE_DIR"
-    fi
+    echo "HDFS support enabled — agents will connect to hdfs://afl-hadoop-hdfs:8020"
     echo ""
 fi
 if [ "$JENKINS" = true ]; then
@@ -289,10 +275,6 @@ if [ "$POSTGIS" = true ]; then
     if [ -n "${POSTGIS_DATA_DIR:-}" ]; then
         echo "  PostGIS data dir: $POSTGIS_DATA_DIR"
     fi
-    echo ""
-fi
-if [ -n "${MONGODB_DATA_DIR:-}" ]; then
-    echo "MongoDB external data dir: $MONGODB_DATA_DIR"
     echo ""
 fi
 if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
@@ -361,10 +343,9 @@ docker compose $COMPOSE_FILES $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
 echo ""
 echo "=== AgentFlow is running ==="
 echo "  Dashboard: http://localhost:8080"
-echo "  MongoDB:   localhost:${MONGODB_PORT:-27018}"
+echo "  MongoDB:   afl-mongodb:27017 (external)"
 if [ "$HDFS" = true ]; then
-    echo "  HDFS UI:   http://localhost:9870"
-    echo "  HDFS RPC:  hdfs://localhost:8020"
+    echo "  HDFS:      afl-hadoop-hdfs:8020 (external)"
 fi
 if [ "$JENKINS" = true ]; then
     echo "  Jenkins:   http://localhost:9090"

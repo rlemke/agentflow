@@ -1,33 +1,16 @@
 # AgentFlow Development Stack
 #
-# Infrastructure only: docker compose up
-# With agents:         docker compose --profile agents up
-# Scale agents:        docker compose --profile agents up --scale runner=3
+# Infrastructure: MongoDB at afl-mongodb:27017, HDFS at afl-hadoop-hdfs
+# (defined in /etc/hosts, not managed by this compose file)
+#
+# Start services:    docker compose up
+# With agents:       docker compose --profile agents up
+# Scale agents:      docker compose --profile agents up --scale runner=3
 # Dashboard: http://localhost:8080
-# MongoDB: localhost:27018
 #
 # Seed example workflows: docker compose --profile seed run --rm seed
-#
-# The default profile starts only infrastructure (mongodb, dashboard).
-# Agent/runner services are in the "agents" profile to prevent them from
-# auto-starting and competing with local runners for tasks.
 
 services:
-  # MongoDB database
-  mongodb:
-    image: mongo:7
-    container_name: afl-mongodb
-    ports:
-      - "${MONGODB_PORT:-27018}:27017"  # Use 27018 externally to avoid conflicts
-    volumes:
-      - ${MONGODB_DATA_DIR:-mongodb_data}:/data/db
-    healthcheck:
-      test: mongosh --eval "db.runCommand('ping').ok" --quiet
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   # Web dashboard for monitoring workflows
   dashboard:
     build:
@@ -37,15 +20,14 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_EXAMPLES_DATABASE=${AFL_EXAMPLES_DATABASE:-afl_examples}
       - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
     volumes:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:ro
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     healthcheck:
       test: python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
       interval: 10s
@@ -60,7 +42,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.runner
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
       - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
@@ -75,9 +57,8 @@ services:
       - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
       - ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm}:/data/osm-mirror:ro
       - ./examples:/app/examples:ro
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - agents
@@ -89,13 +70,12 @@ services:
       context: .
       dockerfile: docker/Dockerfile.agent
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_AGENT_NAME=addone-agent
       - AFL_AGENT_HANDLERS=handlers.AddOne
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - agents
@@ -107,11 +87,10 @@ services:
       dockerfile: docker/Dockerfile.seed
     container_name: afl-seed
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     profiles:
       - seed
 
@@ -122,7 +101,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.noaa-weather
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
       - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
@@ -132,9 +111,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - agents
@@ -146,7 +124,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.osm-geocoder
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
       - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
@@ -155,14 +133,14 @@ services:
       - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
       - AFL_GEOFABRIK_MIRROR=/data/osm-mirror
       - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
+      - AFL_LOCALIZE_MOUNTS=/data/osm-mirror
     volumes:
       - ${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
       - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
       - ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm}:/data/osm-mirror:ro
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - agents
@@ -174,7 +152,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.osm-geocoder-lite
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
       - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
@@ -187,9 +165,8 @@ services:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
       - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
       - ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm}:/data/osm-mirror:ro
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - agents
@@ -203,56 +180,14 @@ services:
       dockerfile: docker/Dockerfile.mcp
     container_name: afl-mcp
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
-    depends_on:
-      mongodb:
-        condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     stdin_open: true
     tty: true
     profiles:
       - mcp
-
-  # HDFS NameNode — start with: docker compose --profile hdfs up -d
-  namenode:
-    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-    container_name: afl-namenode
-    hostname: namenode
-    ports:
-      - "9870:9870"   # Web UI
-      - "8020:8020"   # RPC (hdfs://namenode:8020)
-    environment:
-      - CLUSTER_NAME=agentflow
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - HDFS_CONF_dfs_replication=1
-    volumes:
-      - ${HDFS_NAMENODE_DIR:-hadoop_namenode}:/hadoop/dfs/name
-    healthcheck:
-      test: curl -f http://localhost:9870 || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    profiles:
-      - hdfs
-
-  # HDFS DataNode
-  datanode:
-    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: afl-datanode
-    hostname: datanode
-    ports:
-      - "9864:9864"   # WebHDFS data transfer
-    environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-      - SERVICE_PRECONDITION=namenode:8020
-    volumes:
-      - ${HDFS_DATANODE_DIR:-hadoop_datanode}:/hadoop/dfs/data
-    depends_on:
-      namenode:
-        condition: service_healthy
-    profiles:
-      - hdfs
 
   # Jenkins CI/CD — start with: docker compose --profile jenkins up -d
   jenkins:
@@ -301,15 +236,15 @@ services:
       context: .
       dockerfile: docker/Dockerfile.aws-lambda
     environment:
-      - AFL_MONGODB_URL=mongodb://mongodb:27017
+      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
       - AFL_MONGODB_DATABASE=afl
       - LOCALSTACK_URL=http://localstack:4566
       - PYTHONPATH=/app
     depends_on:
-      mongodb:
-        condition: service_healthy
       localstack:
         condition: service_healthy
+    extra_hosts:
+      - "afl-mongodb:192.168.68.91"
     restart: unless-stopped
     profiles:
       - localstack
@@ -336,10 +271,7 @@ services:
       - postgis
 
 volumes:
-  mongodb_data:
   graphhopper_data:
-  hadoop_namenode:
-  hadoop_datanode:
   jenkins_home:
   localstack_data:
   postgis_data:

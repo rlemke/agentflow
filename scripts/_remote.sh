@@ -50,7 +50,7 @@ _afl_query_running_servers() {
     env PYTHONPATH="$_REMOTE_REPO_ROOT" "$_REMOTE_PYTHON" -c "
 import os
 from afl.runtime.mongo_store import MongoStore
-mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://localhost:27018')
+mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://afl-mongodb:27017')
 store = MongoStore(mongo_url)
 for s in store.get_servers_by_state('running'):
     print(f'{s.server_name} {s.http_port} {s.uuid}')
@@ -63,7 +63,7 @@ _afl_get_server_state() {
     env PYTHONPATH="$_REMOTE_REPO_ROOT" "$_REMOTE_PYTHON" -c "
 import os
 from afl.runtime.mongo_store import MongoStore
-mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://localhost:27018')
+mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://afl-mongodb:27017')
 store = MongoStore(mongo_url)
 s = store.get_server('$server_uuid')
 if s:

@@ -8,7 +8,7 @@ completion. The Docker runner and agent services handle all execution.
 
 Prerequisites:
     - Docker stack running: scripts/setup --build --runners 1 --agents 1
-    - MongoDB accessible at localhost:27018
+    - MongoDB accessible at afl-mongodb:27017
 
 Run:
     # Simple tests (only need runner + AddOne agent)
@@ -27,20 +27,20 @@ from helpers import (
     wait_for_task,
 )
 
-# Docker stack MongoDB is exposed on port 27018
-DOCKER_MONGODB_URL = "mongodb://localhost:27018"
+# MongoDB server (external, defined in /etc/hosts)
+DOCKER_MONGODB_URL = "mongodb://afl-mongodb:27017"
 DOCKER_DATABASE = "afl"
 
 
 @pytest.fixture
 def docker_db():
-    """Connect to the Docker stack MongoDB at localhost:27018."""
+    """Connect to MongoDB at afl-mongodb:27017."""
     pymongo = pytest.importorskip("pymongo", reason="pymongo required for distributed tests")
     client = pymongo.MongoClient(DOCKER_MONGODB_URL, serverSelectionTimeoutMS=3000)
     try:
         client.admin.command("ping")
     except Exception:
-        pytest.skip("Docker MongoDB not reachable at localhost:27018")
+        pytest.skip("MongoDB not reachable at afl-mongodb:27017")
     db = client[DOCKER_DATABASE]
     yield db
     client.close()

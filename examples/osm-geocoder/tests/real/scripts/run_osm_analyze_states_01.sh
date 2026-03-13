@@ -110,7 +110,7 @@ echo ""
 # 5. Submit the workflow
 # ---------------------------------------------------------------------------
 echo "=== Submitting AnalyzeStates_01 workflow ==="
-export AFL_MONGODB_URL="mongodb://localhost:${MONGODB_PORT:-27018}"
+export AFL_MONGODB_URL="mongodb://afl-mongodb:27017"
 "$PYTHON" -m afl.runtime.submit \
     --primary "$AFL_FILE" \
     "${LIB_ARGS[@]}" \
