@@ -701,6 +701,34 @@ class TestAgentPollerStepLogs:
         assert handler_logs[1].message == "Download complete"
         assert handler_logs[1].level == "success"
 
+    def test_task_heartbeat_callback_injection(self, store, evaluator, workflow_ast, program_ast):
+        """Handler receives _task_heartbeat callback that updates task heartbeat."""
+        result = _execute_until_paused(evaluator, workflow_ast, {"x": 1}, program_ast)
+
+        blocked = store.get_steps_by_state(StepState.EVENT_TRANSMIT)
+        assert blocked  # at least one step in EventTransmit
+
+        heartbeat_called = []
+
+        def heartbeat_handler(payload):
+            hb = payload.get("_task_heartbeat")
+            assert hb is not None, "_task_heartbeat not injected"
+            hb()  # call it
+            heartbeat_called.append(True)
+            return {"output": 42}
+
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(),
+        )
+        poller.register("CountDocuments", heartbeat_handler)
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast)
+
+        poller.poll_once()
+
+        assert len(heartbeat_called) == 1
+
 
 # =========================================================================
 # TestAgentPollerASTSnapshot

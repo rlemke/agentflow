@@ -125,12 +125,17 @@ def cached_result(
     if meta.get("key") != key:
         return None
 
-    # Verify the output file still exists
+    # Verify all output files still exist
+    output_paths = meta.get("output_paths") or []
     output_path = meta.get("output_path", "")
-    if output_path:
-        out_backend = get_storage_backend(output_path)
-        if not out_backend.exists(output_path):
-            log.info("output-cache: output gone, invalidating %s", handler_name)
+    if output_path and output_path not in output_paths:
+        output_paths.append(output_path)
+    for op in output_paths:
+        if not op:
+            continue
+        out_backend = get_storage_backend(op)
+        if not out_backend.exists(op):
+            log.info("output-cache: output gone (%s), invalidating %s", op, handler_name)
             return None
 
     result = meta.get("result")
@@ -167,9 +172,24 @@ def save_result_meta(
 
     key = _version_key(handler_name, pbf_path, pbf_size, cache_params)
 
-    # Extract output_path from result for existence checks on future lookups
+    # Extract output_path(s) from result for existence checks on future lookups.
+    # Handles both single-output handlers (output_path in result/stats) and
+    # multi-output handlers like CombinedScan (output_paths in a JSON results string).
     inner = result.get("result", result.get("stats", {}))
     output_path = inner.get("output_path", "")
+    output_paths: list[str] = []
+    if output_path:
+        output_paths.append(output_path)
+    # CombinedScan stores per-category results as a JSON string with output_path per category
+    results_json = result.get("results", "")
+    if isinstance(results_json, str) and results_json.startswith("{"):
+        try:
+            per_cat = json.loads(results_json)
+            for cat_data in per_cat.values():
+                if isinstance(cat_data, dict) and cat_data.get("output_path"):
+                    output_paths.append(cat_data["output_path"])
+        except (json.JSONDecodeError, AttributeError):
+            pass
 
     meta_dir = os.environ.get(
         "AFL_OSM_OUTPUT_BASE",
@@ -184,6 +204,7 @@ def save_result_meta(
         "pbf_size": pbf_size,
         "params": cache_params,
         "output_path": output_path,
+        "output_paths": output_paths,
         "app_version": _APP_VERSION,
         "result": result,
     }

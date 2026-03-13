@@ -347,6 +347,7 @@ class TaskDefinition:
     data: dict | None = None
     server_id: str = ""  # Claiming server's ID (for orphan detection)
     timeout_ms: int = 0  # Handler timeout (0 = use registration default)
+    task_heartbeat: int = 0  # Handler-level heartbeat timestamp (ms)
 
 
 # =============================================================================

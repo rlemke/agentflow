@@ -7,8 +7,10 @@ Extracts routes and related infrastructure from OSM PBF files for:
 - bus: Bus routes, stops
 """
 
-import json
+from __future__ import annotations
+
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -16,7 +18,7 @@ from pathlib import Path
 
 from afl.runtime.storage import get_storage_backend
 
-from ..shared._output import open_output, uri_stem
+from ..shared._output import uri_stem
 
 _storage = get_storage_backend()
 
@@ -37,7 +39,7 @@ class RouteType(Enum):
     PUBLIC_TRANSPORT = "public_transport"
 
     @classmethod
-    def from_string(cls, value: str) -> "RouteType":
+    def from_string(cls, value: str) -> RouteType:
         """Parse a route type string (case-insensitive)."""
         normalized = value.lower().strip()
         aliases = {
@@ -204,6 +206,8 @@ def filter_routes_by_type(
     route_type: str | RouteType,
     network: str = "*",
     output_path: str | Path | None = None,
+    heartbeat: callable | None = None,
+    task_uuid: str = "",
 ) -> RouteFeatures:
     """Filter already-extracted GeoJSON by route type.
 
@@ -212,10 +216,12 @@ def filter_routes_by_type(
         route_type: Type of route to filter for
         network: Network level filter
         output_path: Path to output GeoJSON file
+        heartbeat: Optional callback to signal progress during long operations
 
     Returns:
         RouteFeatures with output path and statistics
     """
+
     input_path = str(input_path)
     if output_path is None:
         suffix = f"_{route_type}" if isinstance(route_type, str) else f"_{route_type.value}"
@@ -230,44 +236,56 @@ def filter_routes_by_type(
     if isinstance(route_type, str):
         route_type = RouteType.from_string(route_type)
 
-    # Load input
-    with get_storage_backend(input_path).open(input_path, "r") as f:
-        geojson = json.load(f)
+    # Stream features one at a time to avoid loading multi-GB files into memory.
+    # Write to a local temp file first, then move to the final path — this avoids
+    # VirtioFS write stalls that block the GIL and kill server heartbeats.
+    import shutil
+    import tempfile
 
-    # Filter features
+    from afl.runtime.storage import localize
+
+    from ..shared._output import ensure_dir
+    from ..shared.geojson_writer import GeoJSONStreamWriter, iter_geojson_features
+
+    local_path = localize(input_path)
+
     network_filter = network if network != "*" else None
-    filtered = []
-    for feature in geojson.get("features", []):
-        props = feature.get("properties", {})
 
-        # Check route type
-        if props.get("route_type") != route_type.value:
-            # Also check OSM route tag
-            route_tag = props.get("route", "")
-            config = ROUTE_TAGS.get(route_type, {})
-            route_values = config.get("routes", {}).get("route", [])
-            if route_tag not in route_values:
-                continue
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+    os.close(tmp_fd)
 
-        # Check network
-        if network_filter:
-            if props.get("network", "").lower() != network_filter.lower():
-                continue
+    try:
+        with GeoJSONStreamWriter(tmp_path) as writer:
+            for feature in iter_geojson_features(local_path, heartbeat):
+                props = feature.get("properties", {})
 
-        filtered.append(feature)
+                # Check route type
+                if props.get("route_type") != route_type.value:
+                    # Also check OSM route tag
+                    route_tag = props.get("route", "")
+                    config = ROUTE_TAGS.get(route_type, {})
+                    route_values = config.get("routes", {}).get("route", [])
+                    if route_tag not in route_values:
+                        continue
 
-    # Build output
-    output_geojson = {
-        "type": "FeatureCollection",
-        "features": filtered,
-    }
+                # Check network
+                if network_filter:
+                    if props.get("network", "").lower() != network_filter.lower():
+                        continue
 
-    with open_output(str(output_path)) as f:
-        json.dump(output_geojson, f, indent=2)
+                writer.write_feature(feature)
+
+        # Move the completed output to the final path
+        ensure_dir(output_path)
+        shutil.move(tmp_path, output_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
     return RouteFeatures(
         output_path=str(output_path),
-        feature_count=len(filtered),
+        feature_count=writer.feature_count,
         route_type=route_type.value,
         network_level=network,
         include_infrastructure=False,
@@ -275,26 +293,33 @@ def filter_routes_by_type(
     )
 
 
-def calculate_route_stats(input_path: str | Path) -> RouteStats:
+def calculate_route_stats(
+    input_path: str | Path,
+    heartbeat: callable | None = None,
+    task_uuid: str = "",
+) -> RouteStats:
     """Calculate statistics for extracted routes.
 
     Args:
         input_path: Path to GeoJSON file with routes
+        heartbeat: Optional callback to signal progress during long operations
 
     Returns:
         RouteStats with counts and total length
     """
-    input_path = str(input_path)
-    with get_storage_backend(input_path).open(input_path, "r") as f:
-        geojson = json.load(f)
+    from afl.runtime.storage import localize
 
-    features = geojson.get("features", [])
+    from ..shared.geojson_writer import iter_geojson_features
+
+    input_path = str(input_path)
+    local_path = localize(input_path)
+
     route_count = 0
     infra_count = 0
     total_length = 0.0
     route_type = ""
 
-    for feature in features:
+    for feature in iter_geojson_features(local_path, heartbeat):
         props = feature.get("properties", {})
         feature_type = props.get("feature_type", "")
 

@@ -6,7 +6,8 @@ Converts polygon boundaries to equivalent circular radius using:
 Provides filtering by configurable units, comparison operators, and thresholds.
 """
 
-import json
+from __future__ import annotations
+
 import logging
 import math
 import posixpath
@@ -50,7 +51,7 @@ class Unit(Enum):
     MILES = "miles"
 
     @classmethod
-    def from_string(cls, value: str) -> "Unit":
+    def from_string(cls, value: str) -> Unit:
         """Parse a unit string (case-insensitive)."""
         normalized = value.lower().strip()
         # Handle aliases
@@ -82,7 +83,7 @@ class Operator(Enum):
     BETWEEN = "between"  # Inclusive range (requires min/max)
 
     @classmethod
-    def from_string(cls, value: str) -> "Operator":
+    def from_string(cls, value: str) -> Operator:
         """Parse an operator string (case-insensitive)."""
         normalized = value.lower().strip()
         aliases = {
@@ -291,6 +292,8 @@ def filter_geojson(
     criteria: RadiusCriteria,
     output_path: str | Path | None = None,
     boundary_type: str | None = None,
+    heartbeat: callable | None = None,
+    task_uuid: str = "",
 ) -> FilteredFeatures:
     """Filter GeoJSON features by equivalent radius.
 
@@ -299,10 +302,12 @@ def filter_geojson(
         criteria: Radius filtering criteria
         output_path: Path to output GeoJSON file (default: adds _filtered suffix)
         boundary_type: Optional boundary type to filter by (from properties)
+        heartbeat: Optional callback to signal progress during long operations
 
     Returns:
         FilteredFeatures with output path and counts
     """
+
     if not HAS_SHAPELY:
         raise RuntimeError("shapely is required for GeoJSON filtering")
 
@@ -313,55 +318,61 @@ def filter_geojson(
         output_path = f"{_dir}/{stem}_filtered.geojson"
     output_path = str(output_path)
 
-    # Load input GeoJSON
-    with get_storage_backend(input_path).open(input_path, "r") as f:
-        geojson = json.load(f)
+    # Stream features to avoid loading multi-GB files into memory.
+    # Write to a local temp file to avoid VirtioFS write stalls.
+    import os
+    import shutil
+    import tempfile
 
-    features = geojson.get("features", [])
-    original_count = len(features)
+    from afl.runtime.storage import localize
 
-    # Filter features
-    filtered_features = []
-    for feature in features:
-        # Check boundary type if specified
-        if boundary_type is not None:
-            props = feature.get("properties", {})
-            feature_type = props.get("boundary_type") or props.get("type") or ""
-            if feature_type.lower() != boundary_type.lower():
-                continue
+    from ..shared._output import ensure_dir
+    from ..shared.geojson_writer import GeoJSONStreamWriter, iter_geojson_features
 
-        # Compute equivalent radius and check criteria
-        geometry = feature.get("geometry")
-        if geometry is None:
-            continue
+    local_path = localize(input_path)
 
-        try:
-            geom = shape(geometry)
-            radius_meters = compute_equivalent_radius(geom)
+    original_count = 0
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+    os.close(tmp_fd)
 
-            if matches_criteria(radius_meters, criteria):
-                # Add computed radius to properties
-                if "properties" not in feature:
-                    feature["properties"] = {}
-                feature["properties"]["equivalent_radius_m"] = radius_meters
-                feature["properties"]["equivalent_radius_km"] = radius_meters / 1000
+    try:
+        with GeoJSONStreamWriter(tmp_path) as writer:
+            for feature in iter_geojson_features(local_path, heartbeat):
+                original_count += 1
 
-                filtered_features.append(feature)
-        except Exception as e:
-            log.warning("Failed to process feature: %s", e)
-            continue
+                # Check boundary type if specified
+                if boundary_type is not None:
+                    props = feature.get("properties", {})
+                    feature_type = props.get("boundary_type") or props.get("type") or ""
+                    if feature_type.lower() != boundary_type.lower():
+                        continue
 
-    # Build output GeoJSON
-    output_geojson = {
-        "type": "FeatureCollection",
-        "features": filtered_features,
-    }
+                # Compute equivalent radius and check criteria
+                geometry = feature.get("geometry")
+                if geometry is None:
+                    continue
 
-    # Write output
-    from ..shared._output import open_output as _open_output
+                try:
+                    geom = shape(geometry)
+                    radius_meters = compute_equivalent_radius(geom)
 
-    with _open_output(output_path) as f:
-        json.dump(output_geojson, f, indent=2)
+                    if matches_criteria(radius_meters, criteria):
+                        if "properties" not in feature:
+                            feature["properties"] = {}
+                        feature["properties"]["equivalent_radius_m"] = radius_meters
+                        feature["properties"]["equivalent_radius_km"] = radius_meters / 1000
+
+                        writer.write_feature(feature)
+                except Exception as e:
+                    log.warning("Failed to process feature: %s", e)
+                    continue
+
+        ensure_dir(output_path)
+        shutil.move(tmp_path, output_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
     # Build filter description
     filter_desc = _describe_filter(criteria, boundary_type)
@@ -370,7 +381,7 @@ def filter_geojson(
 
     return FilteredFeatures(
         output_path=str(output_path),
-        feature_count=len(filtered_features),
+        feature_count=writer.feature_count,
         original_count=original_count,
         boundary_type=boundary_type or "all",
         filter_applied=filter_desc,

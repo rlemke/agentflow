@@ -567,11 +567,19 @@ class MongoStore(PersistenceAPI):
             doc["uuid"]: doc.get("ping_time", 0) for doc in dead_servers
         }
 
-        # Find tasks before resetting so we can return their details
+        # Find tasks whose server is dead AND whose task-level heartbeat
+        # is also stale (or never set).  Tasks with a recent task_heartbeat
+        # are still making progress even if the server heartbeat is stale.
+        heartbeat_cutoff = now - down_timeout_ms
         orphan_cursor = self._db.tasks.find(
             {
                 "state": "running",
                 "server_id": {"$in": dead_ids},
+                "$or": [
+                    {"task_heartbeat": {"$exists": False}},
+                    {"task_heartbeat": 0},
+                    {"task_heartbeat": {"$lt": heartbeat_cutoff}},
+                ],
             },
             {"step_id": 1, "workflow_id": 1, "name": 1, "server_id": 1, "updated": 1},
         )
@@ -590,16 +598,22 @@ class MongoStore(PersistenceAPI):
         if not reaped:
             return []
 
-        # Reset their running tasks back to pending
+        # Reset their running tasks back to pending (same filter as above)
         self._db.tasks.update_many(
             {
                 "state": "running",
                 "server_id": {"$in": dead_ids},
+                "$or": [
+                    {"task_heartbeat": {"$exists": False}},
+                    {"task_heartbeat": 0},
+                    {"task_heartbeat": {"$lt": heartbeat_cutoff}},
+                ],
             },
             {
                 "$set": {
                     "state": "pending",
                     "server_id": "",
+                    "task_heartbeat": 0,
                     "updated": now,
                 },
             },
@@ -860,6 +874,13 @@ class MongoStore(PersistenceAPI):
     def update_server_ping(self, server_id: str, ping_time: int) -> None:
         """Update server ping time."""
         self._db.servers.update_one({"uuid": server_id}, {"$set": {"ping_time": ping_time}})
+
+    def update_task_heartbeat(self, task_id: str, heartbeat_time: int) -> None:
+        """Update a running task's heartbeat timestamp."""
+        self._db.tasks.update_one(
+            {"uuid": task_id, "state": "running"},
+            {"$set": {"task_heartbeat": heartbeat_time}},
+        )
 
     # =========================================================================
     # Published Source Operations

@@ -55,6 +55,8 @@ def _make_filter_routes_handler(facet_name: str):
                 input_path,
                 route_type=route_type,
                 network=network,
+                heartbeat=payload.get("_task_heartbeat"),
+                task_uuid=payload.get("_task_uuid", ""),
             )
             if step_log:
                 step_log(
@@ -94,7 +96,11 @@ def _make_route_stats_handler(facet_name: str):
             return {"stats": _empty_stats()}
 
         try:
-            stats = calculate_route_stats(input_path)
+            stats = calculate_route_stats(
+                input_path,
+                heartbeat=payload.get("_task_heartbeat"),
+                task_uuid=payload.get("_task_uuid", ""),
+            )
             if step_log:
                 step_log(
                     f"{facet_name}: {stats.route_count} routes, {stats.total_length_km:.1f} km",

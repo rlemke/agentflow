@@ -96,7 +96,12 @@ def _make_radius_filter_handler(facet_name: str):
             }
 
         criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
-        result = filter_geojson(input_path, criteria)
+        result = filter_geojson(
+            input_path,
+            criteria,
+            heartbeat=payload.get("_task_heartbeat"),
+            task_uuid=payload.get("_task_uuid", ""),
+        )
 
         if step_log:
             step_log(
@@ -163,7 +168,12 @@ def _make_radius_range_handler(facet_name: str):
             operator="between",
             max_radius=max_radius,
         )
-        result = filter_geojson(input_path, criteria)
+        result = filter_geojson(
+            input_path,
+            criteria,
+            heartbeat=payload.get("_task_heartbeat"),
+            task_uuid=payload.get("_task_uuid", ""),
+        )
 
         if step_log:
             step_log(
@@ -227,7 +237,13 @@ def _make_type_and_radius_handler(facet_name: str):
             }
 
         criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
-        result = filter_geojson(input_path, criteria, boundary_type=boundary_type)
+        result = filter_geojson(
+            input_path,
+            criteria,
+            boundary_type=boundary_type,
+            heartbeat=payload.get("_task_heartbeat"),
+            task_uuid=payload.get("_task_uuid", ""),
+        )
 
         if step_log:
             step_log(
@@ -332,7 +348,12 @@ def _make_extract_and_filter_handler(facet_name: str):
 
         # Step 2: Filter by radius
         criteria = parse_criteria(radius=radius, unit=unit, operator=operator)
-        filter_result = filter_geojson(extraction_result.output_path, criteria)
+        filter_result = filter_geojson(
+            extraction_result.output_path,
+            criteria,
+            heartbeat=payload.get("_task_heartbeat"),
+            task_uuid=payload.get("_task_uuid", ""),
+        )
 
         if step_log:
             step_log(
@@ -574,6 +595,8 @@ def _make_geojson_osm_type_filter_handler(facet_name: str):
             osm_type=osm_type,
             tag_key=tag_key,
             tag_value=tag_value if tag_value != "*" else None,
+            heartbeat=payload.get("_task_heartbeat"),
+            task_uuid=payload.get("_task_uuid", ""),
         )
 
         if step_log:

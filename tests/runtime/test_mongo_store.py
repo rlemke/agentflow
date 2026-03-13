@@ -1180,3 +1180,118 @@ class TestReapOrphanedTasks:
         assert mongo_store.get_task("alive-task").state == TaskState.RUNNING
         # dead-task reset to pending
         assert mongo_store.get_task("dead-task").state == TaskState.PENDING
+
+    def test_task_heartbeat_protects_from_reaping(self, mongo_store):
+        """Tasks with a recent task_heartbeat are NOT reaped even if server is dead."""
+        import time
+
+        now = int(time.time() * 1000)
+
+        # Dead server (stale ping)
+        mongo_store.save_server(
+            ServerDefinition(
+                uuid="dead-hb",
+                server_group="test",
+                service_name="runner",
+                server_name="host-dead-hb",
+                state=ServerState.RUNNING,
+                ping_time=1000,  # ancient
+            )
+        )
+
+        # Task with recent task_heartbeat — should be protected
+        t1 = TaskDefinition(
+            uuid="hb-alive",
+            name="LongFilter",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s1",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(t1)
+        mongo_store._db.tasks.update_one(
+            {"uuid": "hb-alive"},
+            {"$set": {"server_id": "dead-hb", "task_heartbeat": now}},
+        )
+
+        # Task with NO task_heartbeat — should be reaped
+        t2 = TaskDefinition(
+            uuid="hb-stale",
+            name="OtherEvent",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s2",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(t2)
+        mongo_store._db.tasks.update_one(
+            {"uuid": "hb-stale"},
+            {"$set": {"server_id": "dead-hb", "task_heartbeat": 0}},
+        )
+
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 1
+        assert reaped[0]["step_id"] == "s2"
+
+        # Protected task still running
+        assert mongo_store.get_task("hb-alive").state == TaskState.RUNNING
+        # Stale task reset to pending
+        assert mongo_store.get_task("hb-stale").state == TaskState.PENDING
+
+    def test_stale_task_heartbeat_still_reaped(self, mongo_store):
+        """Tasks with an OLD task_heartbeat are still reaped."""
+        # Dead server
+        mongo_store.save_server(
+            ServerDefinition(
+                uuid="dead-old-hb",
+                server_group="test",
+                service_name="runner",
+                server_name="host-dead-old-hb",
+                state=ServerState.RUNNING,
+                ping_time=1000,
+            )
+        )
+
+        # Task with stale heartbeat (older than down_timeout)
+        task = TaskDefinition(
+            uuid="hb-old",
+            name="StaleFilter",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s1",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(task)
+        mongo_store._db.tasks.update_one(
+            {"uuid": "hb-old"},
+            {"$set": {"server_id": "dead-old-hb", "task_heartbeat": 500}},
+        )
+
+        reaped = mongo_store.reap_orphaned_tasks()
+        assert len(reaped) == 1
+        assert reaped[0]["step_id"] == "s1"
+        assert mongo_store.get_task("hb-old").state == TaskState.PENDING
+
+    def test_update_task_heartbeat(self, mongo_store):
+        """update_task_heartbeat sets the task_heartbeat field."""
+        import time
+
+        task = TaskDefinition(
+            uuid="hb-update",
+            name="MyEvent",
+            runner_id="r",
+            workflow_id="w",
+            flow_id="f",
+            step_id="s1",
+            state=TaskState.RUNNING,
+        )
+        mongo_store.save_task(task)
+
+        now = int(time.time() * 1000)
+        mongo_store.update_task_heartbeat("hb-update", now)
+
+        doc = mongo_store._db.tasks.find_one({"uuid": "hb-update"})
+        assert doc["task_heartbeat"] == now

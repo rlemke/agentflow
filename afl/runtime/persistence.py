@@ -401,6 +401,15 @@ class PersistenceAPI(Protocol):
         """
         return []
 
+    def update_task_heartbeat(self, task_id: str, heartbeat_time: int) -> None:
+        """Update a running task's heartbeat timestamp.
+
+        Handlers call this periodically during long-running operations so the
+        orphan reaper knows the task is still making progress even if the
+        server's heartbeat is stale (e.g. due to I/O contention).
+        """
+        return None
+
     # Log operations
 
     @abstractmethod

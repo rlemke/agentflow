@@ -386,6 +386,8 @@ def filter_geojson_by_osm_type(
     tag_key: str | None = None,
     tag_value: str | None = None,
     output_path: str | Path | None = None,
+    heartbeat: callable | None = None,
+    task_uuid: str = "",
 ) -> OSMFilteredFeatures:
     """Filter a GeoJSON file by OSM element type and/or tags.
 
@@ -397,10 +399,12 @@ def filter_geojson_by_osm_type(
         tag_key: Optional tag key to filter by
         tag_value: Optional tag value (use "*" or None for any value)
         output_path: Path to output GeoJSON file (default: adds _filtered suffix)
+        heartbeat: Optional callback to signal progress during long operations
 
     Returns:
         OSMFilteredFeatures with output path and counts
     """
+
     input_path = str(input_path)
     if output_path is None:
         out_dir = resolve_output_dir("osm-filtered")
@@ -413,48 +417,55 @@ def filter_geojson_by_osm_type(
     if isinstance(osm_type, str):
         osm_type = OSMType.from_string(osm_type)
 
-    # Load input GeoJSON
-    with get_storage_backend(input_path).open(input_path, "r") as f:
-        geojson = json.load(f)
+    # Stream features to avoid loading multi-GB files into memory.
+    # Write to local temp file to avoid VirtioFS write stalls.
+    import os
+    import shutil
+    import tempfile
 
-    features = geojson.get("features", [])
-    original_count = len(features)
+    from afl.runtime.storage import localize
 
-    # Filter features
-    filtered_features = []
-    for feature in features:
-        props = feature.get("properties", {})
+    from ..shared.geojson_writer import GeoJSONStreamWriter, iter_geojson_features
 
-        # Check OSM type
-        if osm_type != OSMType.ALL:
-            feature_type = props.get("osm_type", "")
-            if feature_type != osm_type.value:
-                continue
+    local_path = localize(input_path)
 
-        # Check tag if specified
-        if tag_key:
-            if tag_key not in props:
-                continue
-            if tag_value and tag_value != "*" and props[tag_key] != tag_value:
-                continue
+    original_count = 0
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+    os.close(tmp_fd)
 
-        filtered_features.append(feature)
+    try:
+        with GeoJSONStreamWriter(tmp_path) as writer:
+            for feature in iter_geojson_features(local_path, heartbeat):
+                original_count += 1
+                props = feature.get("properties", {})
 
-    # Build output GeoJSON
-    output_geojson = {
-        "type": "FeatureCollection",
-        "features": filtered_features,
-    }
+                # Check OSM type
+                if osm_type != OSMType.ALL:
+                    feature_type = props.get("osm_type", "")
+                    if feature_type != osm_type.value:
+                        continue
 
-    # Write output
-    with open_output(output_path_str) as f:
-        json.dump(output_geojson, f, indent=2)
+                # Check tag if specified
+                if tag_key:
+                    if tag_key not in props:
+                        continue
+                    if tag_value and tag_value != "*" and props[tag_key] != tag_value:
+                        continue
+
+                writer.write_feature(feature)
+
+        ensure_dir(output_path_str)
+        shutil.move(tmp_path, output_path_str)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
     filter_desc = _describe_osm_filter(osm_type, tag_key, tag_value, False)
 
     return OSMFilteredFeatures(
         output_path=output_path_str,
-        feature_count=len(filtered_features),
+        feature_count=writer.feature_count,
         original_count=original_count,
         osm_type=osm_type.value,
         filter_applied=filter_desc,

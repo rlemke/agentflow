@@ -24,6 +24,7 @@ through MongoDB locks and server registration.
 
 import json as _json
 import logging
+import os
 import socket
 import threading
 import time
@@ -631,7 +632,16 @@ class RunnerService:
         5. Update handled stats
         """
         try:
-            payload = task.data or {}
+            payload = dict(task.data or {})
+
+            # Inject _task_heartbeat callback so long-running handlers can
+            # signal progress and avoid being reaped by the orphan detector.
+            def _task_heartbeat_callback():
+                now = _current_time_ms()
+                self._persistence.update_task_heartbeat(task.uuid, now)
+
+            payload["_task_heartbeat"] = _task_heartbeat_callback
+            payload["_task_uuid"] = task.uuid
 
             # Dispatch to handler (try exact name, then short name)
             result = self._tool_registry.handle(task.name, payload)
@@ -984,7 +994,8 @@ class RunnerService:
         self._last_reap = now
 
         try:
-            reaped = self._persistence.reap_orphaned_tasks()
+            timeout_ms = int(os.environ.get("AFL_REAPER_TIMEOUT_MS", "300000"))
+            reaped = self._persistence.reap_orphaned_tasks(down_timeout_ms=timeout_ms)
             if reaped:
                 logger.warning(
                     "Orphan reaper: reset %d task(s) from crashed server(s)",

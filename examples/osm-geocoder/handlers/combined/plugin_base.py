@@ -138,8 +138,13 @@ class ExtractorPlugin(ABC):
         """Close output stream and return result.  Called after the scan."""
 
     def _open_writer(self, output_path: str) -> GeoJSONStreamWriter:
-        """Open a streaming GeoJSON writer for the given path."""
-        writer = GeoJSONStreamWriter(output_path)
+        """Open a streaming GeoJSON writer for the given path.
+
+        Uses atomic mode so the output file only appears once the scan
+        completes successfully — prevents corrupt partial files when
+        the process is killed mid-scan.
+        """
+        writer = GeoJSONStreamWriter(output_path, atomic=True)
         self._writer = writer
         return writer
 

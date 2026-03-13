@@ -51,6 +51,7 @@ For async handlers (e.g., LLM-based handlers)::
 import asyncio
 import inspect
 import logging
+import os
 import socket
 import threading
 import time
@@ -547,7 +548,8 @@ class AgentPoller:
         self._last_reap = now
 
         try:
-            reaped = self._persistence.reap_orphaned_tasks()
+            timeout_ms = int(os.environ.get("AFL_REAPER_TIMEOUT_MS", "300000"))
+            reaped = self._persistence.reap_orphaned_tasks(down_timeout_ms=timeout_ms)
             if reaped:
                 logger.warning(
                     "Orphan reaper: reset %d task(s) from crashed server(s)",
@@ -675,6 +677,15 @@ class AgentPoller:
                 )
 
             payload["_step_log"] = _step_log_callback
+
+            # Inject _task_heartbeat callback so long-running handlers can
+            # signal progress and avoid being reaped by the orphan detector.
+            def _task_heartbeat_callback():
+                now = _current_time_ms()
+                self._persistence.update_task_heartbeat(task.uuid, now)
+
+            payload["_task_heartbeat"] = _task_heartbeat_callback
+            payload["_task_uuid"] = task.uuid
 
             # Look up timeout — task-level (from AFL Timeout mixin)
             timeout_ms = getattr(task, "timeout_ms", 0) or 0

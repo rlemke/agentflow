@@ -671,6 +671,15 @@ class RegistryRunner:
 
             payload["_step_log"] = _step_log_callback
 
+            # Inject _task_heartbeat callback so long-running handlers can
+            # signal progress and avoid being reaped by the orphan detector.
+            def _task_heartbeat_callback():
+                now = _current_time_ms()
+                self._persistence.update_task_heartbeat(task.uuid, now)
+
+            payload["_task_heartbeat"] = _task_heartbeat_callback
+            payload["_task_uuid"] = task.uuid
+
             # Look up handler timeout — task-level (from AFL Timeout mixin)
             # takes priority over registration-level default
             timeout_ms = getattr(task, "timeout_ms", 0) or 0
