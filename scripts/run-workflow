@@ -242,7 +242,7 @@ print()
 telemetry = Telemetry(enabled=True)
 evaluator = Evaluator(persistence=store, telemetry=telemetry)
 
-result = evaluator.execute(wf_ast, inputs=inputs, program_ast=program_dict)
+result = evaluator.execute(wf_ast, inputs=inputs, program_ast=program_dict, wf_id=wf.uuid)
 
 if result.success:
     print(f'Completed successfully.')
