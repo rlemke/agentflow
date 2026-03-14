@@ -259,8 +259,9 @@ def filter_routes_by_type(
             for feature in iter_geojson_features(local_path, heartbeat):
                 props = feature.get("properties", {})
 
-                # Check route type
-                if props.get("route_type") != route_type.value:
+                # Check route type — features use 'route_types' (plural array)
+                feature_route_types = props.get("route_types", [])
+                if route_type.value not in feature_route_types:
                     # Also check OSM route tag
                     route_tag = props.get("route", "")
                     config = ROUTE_TAGS.get(route_type, {})
@@ -324,7 +325,8 @@ def calculate_route_stats(
         feature_type = props.get("feature_type", "")
 
         if not route_type:
-            route_type = props.get("route_type", "")
+            rts = props.get("route_types", [])
+            route_type = rts[0] if rts else ""
 
         if feature_type == "route":
             route_count += 1

@@ -35,6 +35,22 @@ def _is_large_file(path: str, threshold: int = 50 * 1024 * 1024) -> bool:
         return False
 
 
+def _is_compact_json(path: str) -> bool:
+    """Check if a JSON file is compact (few lines relative to size).
+
+    The streaming parser requires indented JSON with newlines between features.
+    Compact single-line JSON must be loaded entirely.
+    """
+    try:
+        with open(path) as f:
+            # Read first 8 KB — if there are very few newlines, it's compact
+            sample = f.read(8192)
+            newlines = sample.count("\n")
+            return newlines < 5
+    except OSError:
+        return False
+
+
 def iter_geojson_features(
     path: str,
     heartbeat: callable | None = None,
@@ -82,7 +98,16 @@ def iter_geojson_features(
         yield from geojson.get("features", [])
         return
 
-    # Large file: stream line by line to avoid OOM
+    # Large file: stream line by line — but only works for indented JSON.
+    # Compact (single-line) JSON must be loaded entirely since the line-based
+    # parser cannot split features without newlines.
+    if _is_compact_json(read_path):
+        log.info("Large compact JSON detected, loading entirely: %s", read_path)
+        with open(read_path) as f:
+            geojson = json.load(f)
+        yield from geojson.get("features", [])
+        return
+
     yield from _stream_features(read_path, heartbeat, heartbeat_interval)
 
 
