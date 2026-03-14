@@ -2,38 +2,13 @@
 
 This guide covers deploying, configuring, monitoring, and operating AgentFlow in development and production environments.
 
-## Quick Start
+## Deployment Models
 
-The fastest way to run AgentFlow is with Docker Compose:
+AgentFlow supports two equivalent deployment models — **Docker** and **Local (non-Docker)**. Both use the same microservice architecture and coordinate through a shared MongoDB instance. You can mix them freely: run MongoDB externally, some runners in Docker, others as local processes.
 
-```bash
-# Clone the repository
-git clone <repo-url>
-cd agentflow
+### Microservice Architecture
 
-# Start the stack (MongoDB, dashboard, runner, sample agent)
-docker compose up -d
-
-# Open the dashboard
-open http://localhost:8080
-
-# Seed example workflows (optional)
-docker compose --profile seed run --rm seed
-```
-
-Or use the setup script for a guided bootstrap:
-
-```bash
-scripts/setup                              # defaults: 1 runner, 1 agent
-scripts/setup --runners 3 --agents 2       # scaled deployment
-scripts/setup --build                      # rebuild images first
-```
-
-## Architecture
-
-### Single-Node (Development)
-
-All services run on one machine via Docker Compose:
+Regardless of deployment model, the architecture is the same:
 
 ```
                  +-----------+
@@ -44,27 +19,139 @@ All services run on one machine via Docker Compose:
     +--------+---------+---------+--------+
     |        |                   |        |
 +---v--+ +---v---+          +---v---+ +--v---+
-|Runner| |Runner |   ...    | Agent | |Agent |
+|Runner| |Runner |   ...    |Runner | |Runner|
 +---+--+ +---+---+          +---+---+ +--+---+
     |         |                  |        |
     +---------+------------------+--------+
                        |
               +--------v--------+
-              |  afl-mongodb    |
-              |  (external)     |
+              |     MongoDB     |
               +-----------------+
 ```
 
-### Multi-Node (Production)
+**Key coordination mechanisms** (identical in Docker and local mode):
 
-For production, run MongoDB on dedicated infrastructure and distribute services across nodes:
+- **Atomic task claiming**: `claim_task()` uses MongoDB `find_one_and_update` — only one runner claims each task, regardless of where it runs
+- **Server registration**: Each runner registers in the `servers` collection with a unique UUID and hostname, and sends periodic heartbeats
+- **Handler registrations**: Shared in MongoDB — all runners see the same handler modules
+- **Orphan reaper**: If any runner dies (stale heartbeat), other runners reset its in-progress tasks back to `pending` for retry
 
-- **MongoDB**: Dedicated server or managed service (MongoDB Atlas)
-- **Dashboard**: Single instance behind a reverse proxy
-- **Runners**: Multiple instances on worker nodes
-- **Agents**: Multiple instances, scaled per workload
+### Quick Start: Local Mode (Recommended for Development)
 
-All services connect to the same MongoDB instance and coordinate via atomic task claiming (`claim_task()`).
+Run everything as local Python processes — no Docker required. Only needs MongoDB reachable at `AFL_MONGODB_URL`.
+
+```bash
+# One command: stop old runners, verify MongoDB, seed examples, start runners + dashboard
+scripts/easy-local.sh
+
+# With options
+scripts/easy-local.sh --example osm-geocoder          # single example
+scripts/easy-local.sh --instances 3                    # 3 concurrent runners
+scripts/easy-local.sh --no-seed                        # skip seeding
+scripts/easy-local.sh -- --log-format text             # plain-text runner logs
+
+# Open the dashboard
+open http://localhost:8080
+```
+
+Or manage runners directly:
+
+```bash
+# Register handlers and start runner(s) + dashboard
+scripts/start-runner -- --log-format text
+scripts/start-runner --example hiv-drug-resistance --instances 3
+
+# Stop all local runners
+scripts/stop-runners
+```
+
+### Quick Start: Docker Mode
+
+```bash
+# Start the stack (dashboard, runner, agents)
+docker compose up -d
+
+# Or use the setup script for a guided bootstrap
+scripts/setup                              # defaults: 1 runner, 1 agent
+scripts/setup --runners 3 --agents 2       # scaled deployment
+scripts/setup --build                      # rebuild images first
+
+# One-command pipeline: teardown → rebuild → setup → seed
+scripts/easy.sh
+
+# Open the dashboard
+open http://localhost:8080
+```
+
+### Comparing Docker vs Local Mode
+
+| Aspect | Docker Mode | Local Mode |
+|--------|-------------|------------|
+| **Startup** | `scripts/easy.sh` or `docker compose up` | `scripts/easy-local.sh` or `scripts/start-runner` |
+| **MongoDB** | Can run in Docker or external | Must be external (running separately) |
+| **Handler loading** | Container-internal paths, `RegistryRunner` | Host filesystem paths, `RegistryRunner` |
+| **Scaling** | `docker compose up --scale runner=N` | `scripts/start-runner --instances N` |
+| **Process isolation** | Full container isolation | OS process isolation |
+| **File paths** | Container paths (`/app/...`) | Host paths (`/Users/...`) |
+| **Shared data** | Docker volumes or bind mounts | Direct filesystem access |
+| **Log output** | `docker compose logs -f runner` | Inline in terminal (stdout/stderr) |
+| **Stop** | `docker compose down` | `scripts/stop-runners` |
+| **Dependencies** | Docker Desktop | Python 3 + `.venv` with AFL packages |
+
+**Important**: Docker agents and local runners should not be mixed for the same handler registrations. Docker containers use container-internal `sys.path` and cannot load handler modules registered with host filesystem paths, and vice versa. Stop Docker agents/runners before starting local ones:
+
+```bash
+docker compose down          # stop all Docker services
+scripts/easy-local.sh        # start local runners
+```
+
+### Multi-Node Distributed Execution
+
+Both deployment models support horizontal scaling across multiple machines. Multiple runners on different hosts cooperate on the same workflow automatically — the MongoDB task queue ensures each task is claimed by exactly one runner.
+
+**Requirements for multi-node:**
+
+1. **Shared MongoDB**: All machines point to the same `AFL_MONGODB_URL` (use IP or DNS hostname accessible from all nodes)
+2. **Handler code**: Same repo checkout with `.venv` and dependencies installed on each machine
+3. **Shared data** (optional): NFS/SMB mount for `AFL_GEOFABRIK_MIRROR`, `AFL_CACHE_DIR`, etc. — or let each machine download its own copies (cache misses are handled automatically)
+
+```bash
+# On each machine: start local runner(s) pointing to shared MongoDB
+AFL_MONGODB_URL=mongodb://db-server:27017 scripts/easy-local.sh --no-seed --instances 4
+
+# Or with remote runner management (SSH-based)
+scripts/start-runner --all --example osm-geocoder    # start on all AFL_RUNNER_HOSTS
+scripts/start-runner --host worker1 --host worker2   # specific hosts
+scripts/stop-runners --all                           # stop all remote runners
+scripts/rolling-deploy --example osm-geocoder        # zero-downtime restart
+```
+
+**How it works:**
+
+```
+  Machine A                Machine B                Machine C
+  +---------+              +---------+              +---------+
+  |Runner x4|              |Runner x4|              |Runner x4|
+  |Dashboard|              |         |              |         |
+  +---------+              +---------+              +---------+
+       |                        |                        |
+       +------------------------+------------------------+
+                                |
+                       +--------v--------+
+                       |   MongoDB       |
+                       |  (db-server)    |
+                       +-----------------+
+```
+
+Each runner independently polls the shared task queue. When a workflow creates 100 event tasks, all 12 runners (4 per machine) compete for tasks via atomic `claim_task()`. The workload distributes naturally across all available runners.
+
+### Production Recommendations
+
+- **MongoDB**: Dedicated server or managed service (MongoDB Atlas) with replica sets for HA
+- **Dashboard**: Single instance behind a reverse proxy (nginx/caddy)
+- **Runners**: Multiple instances per worker node, scaled via `--instances N` and `--max-concurrent M`
+- **Monitoring**: Dashboard at `/v2/workflows` and `/v2/servers`; API at `/api/servers` for health checks
+- **Crash recovery**: Orphan reaper automatically resets tasks from dead runners (configurable via `AFL_REAPER_TIMEOUT_MS`)
 
 ## Configuration Reference
 

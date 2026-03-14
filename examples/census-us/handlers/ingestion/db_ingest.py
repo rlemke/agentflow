@@ -23,7 +23,7 @@ def get_mongo_db() -> Database:
     Uses ``AFL_EXAMPLES_DATABASE`` (default ``afl_examples``) so that
     example data is isolated from the AFL runtime database.
     """
-    url = os.environ.get("AFL_MONGODB_URL", "mongodb://localhost:27017")
+    url = os.environ.get("AFL_MONGODB_URL", "mongodb://afl-mongodb:27017")
     db_name = os.environ.get("AFL_EXAMPLES_DATABASE", "afl_examples")
     return MongoClient(url)[db_name]
 

@@ -54,10 +54,13 @@ _SIZE_THRESHOLD = 100 * 1024 * 1024
 
 def _resolve_mongo_config() -> tuple[str, str]:
     """Resolve MongoDB URI and database name from environment."""
-    host = os.environ.get("AFL_MONGO_HOST", "mongodb")
-    port = os.environ.get("AFL_MONGO_PORT", "27017")
-    db_name = os.environ.get("AFL_MONGO_DB", "afl")
-    uri = f"mongodb://{host}:{port}/{db_name}"
+    db_name = os.environ.get("AFL_MONGODB_DATABASE", "afl")
+    uri = os.environ.get("AFL_MONGODB_URL", "")
+    if not uri:
+        # Legacy fallback
+        host = os.environ.get("AFL_MONGO_HOST", "afl-mongodb")
+        port = os.environ.get("AFL_MONGO_PORT", "27017")
+        uri = f"mongodb://{host}:{port}"
     return uri, db_name
 
 

@@ -174,19 +174,27 @@ if [[ "$MODE" == "local" ]]; then
     # Start dashboard
     if [[ "$DASHBOARD" == "true" ]]; then
         echo "Starting dashboard on port 8080..."
-        env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.dashboard &
+        env PYTHONPATH="$REPO_ROOT" PYTHONUNBUFFERED=1 "$PYTHON" -m afl.dashboard &
         PIDS+=($!)
         echo "  Dashboard started (PID $!)"
+        # Wait for dashboard to bind port before starting runners
+        # (runners also have HTTP status servers that auto-increment ports)
+        for _i in $(seq 1 20); do
+            if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.5
+        done
     fi
 
     # Start runner(s)
     if [[ "$INSTANCES" -eq 1 && "$DASHBOARD" == "false" ]]; then
         echo "Starting runner with --registry..."
-        exec env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}"
+        exec env PYTHONPATH="$REPO_ROOT" PYTHONUNBUFFERED=1 "$PYTHON" -m afl.runtime.runner --registry ${RUNNER_ARGS[@]+"${RUNNER_ARGS[@]}"}
     else
         echo "Starting $INSTANCES runner instance(s) with --registry..."
         for i in $(seq 1 "$INSTANCES"); do
-            env PYTHONPATH="$REPO_ROOT" "$PYTHON" -m afl.runtime.runner --registry "${RUNNER_ARGS[@]}" &
+            env PYTHONPATH="$REPO_ROOT" PYTHONUNBUFFERED=1 "$PYTHON" -m afl.runtime.runner --registry ${RUNNER_ARGS[@]+"${RUNNER_ARGS[@]}"} &
             PIDS+=($!)
             echo "  Runner $i started (PID $!)"
         done

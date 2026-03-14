@@ -111,14 +111,14 @@ if command -v mongosh &>/dev/null; then
     MONGO_CMD="mongosh"
 elif command -v mongo &>/dev/null; then
     MONGO_CMD="mongo"
-elif docker compose ps --services 2>/dev/null | grep -q mongodb; then
-    # Try via Docker container
-    MONGO_CMD="docker compose exec -T mongodb mongosh"
+elif docker exec afl-mongodb mongosh --version &>/dev/null 2>&1; then
+    # Try via external MongoDB container
+    MONGO_CMD="docker exec afl-mongodb mongosh"
 fi
 
 if [ -z "$MONGO_CMD" ]; then
-    echo "Error: mongosh/mongo not found locally and no mongodb container running." >&2
-    echo "Install mongosh or start containers with: scripts/setup" >&2
+    echo "Error: mongosh/mongo not found locally and no afl-mongodb container reachable." >&2
+    echo "Install mongosh or ensure MongoDB is running at afl-mongodb:27017" >&2
     exit 1
 fi
 

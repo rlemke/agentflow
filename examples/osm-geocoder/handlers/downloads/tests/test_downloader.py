@@ -391,14 +391,14 @@ class TestDownloadMirror:
             mock.patch.object(_downloader_mod, "GEOFABRIK_MIRROR", mirror_dir),
             mock.patch.object(_downloader_mod, "CACHE_DIR", test_cache_dir),
             mock.patch.object(_downloader_mod, "_storage", test_storage),
-            mock.patch(f"{MODULE}.shutil.copy2") as mock_copy,
+            mock.patch(f"{MODULE}.subprocess.run") as mock_cp,
             mock.patch(f"{MODULE}.requests.get") as mock_get,
         ):
             result = download(region)
 
         assert result["wasInCache"] is True
         assert result["path"] == cache_file
-        mock_copy.assert_not_called()
+        mock_cp.assert_not_called()
         mock_get.assert_not_called()
 
 

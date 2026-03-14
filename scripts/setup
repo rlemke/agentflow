@@ -200,13 +200,16 @@ if [ "$CLEAN" = true ]; then
     echo "=== Cleaning AgentFlow data ==="
     echo ""
 
-    # Drop MongoDB database
-    if docker compose ps --status running 2>/dev/null | grep -q mongodb; then
+    # Drop MongoDB database (external server at afl-mongodb)
+    if command -v mongosh &>/dev/null; then
         echo "Dropping MongoDB 'afl' database..."
-        docker compose exec -T mongodb mongosh --quiet --eval 'db.getSiblingDB("afl").dropDatabase()'
-        echo "  MongoDB: done"
+        mongosh --host "${AFL_MONGODB_HOST:-afl-mongodb}" --port "${AFL_MONGODB_PORT:-27017}" --quiet --eval 'db.getSiblingDB("afl").dropDatabase()' 2>/dev/null \
+            && echo "  MongoDB: done" \
+            || echo "  MongoDB: not reachable at ${AFL_MONGODB_HOST:-afl-mongodb}:${AFL_MONGODB_PORT:-27017}, skipping"
+    elif docker exec afl-mongodb mongosh --quiet --eval 'db.getSiblingDB("afl").dropDatabase()' 2>/dev/null; then
+        echo "  MongoDB: done (via docker exec)"
     else
-        echo "  MongoDB: container not running, skipping"
+        echo "  MongoDB: mongosh not available and afl-mongodb container not found, skipping"
     fi
 
     # Clean HDFS cache directories (if namenode is running)
@@ -238,7 +241,7 @@ fi
 cd "$PROJECT_DIR"
 
 # Determine which services to build
-SERVICES="mongodb dashboard runner agent-addone"
+SERVICES="dashboard runner agent-addone"
 if [ "$OSM_AGENTS" -gt 0 ]; then
     SERVICES="$SERVICES agent-osm-geocoder"
 fi

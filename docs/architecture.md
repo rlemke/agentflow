@@ -89,15 +89,27 @@ The `PersistenceAPI` abstract class defines the storage interface. Two implement
 
 ## Agent Execution Models
 
-AgentFlow supports four models for processing event facet tasks:
+AgentFlow supports four models for processing event facet tasks. All models work identically whether running as Docker containers or local processes — the only difference is how they are started.
 
-### RegistryRunner (Recommended)
+### RunnerService + RegistryRunner (Recommended)
 
-`afl/runtime/registry_runner.py`
+`afl/runtime/runner/service.py` with `--registry` flag
 
-Auto-loads handler implementations from the database. Handlers are Python modules registered via `register_handler()` or the MCP `afl_manage_handlers` tool. No custom service code needed.
+The recommended production model. Combines the `RunnerService` (distributed orchestration with atomic task claiming, thread pool, HTTP status endpoints, and heartbeat-based health checking) with the `RegistryRunner` pattern (auto-loads handler implementations from MongoDB).
 
-**Flow:** Poll tasks -> Match handler by facet name -> Load module -> Dispatch -> Write results -> Signal resume
+**Flow:** Poll tasks -> Claim atomically -> Match handler by facet name -> Load module -> Dispatch -> Write results -> Resume workflow
+
+**Docker:**
+```bash
+docker compose up -d --scale runner=3
+```
+
+**Local:**
+```bash
+scripts/start-runner --instances 3 -- --log-format text
+```
+
+Both start identical `RunnerService` processes. Each registers in MongoDB's `servers` collection, sends heartbeats, and claims tasks via atomic `find_one_and_update`. Multiple instances across multiple machines cooperate automatically.
 
 ### AgentPoller
 
@@ -106,12 +118,6 @@ Auto-loads handler implementations from the database. Handlers are Python module
 Standalone agent services with a `register()` callback pattern. Each agent polls MongoDB for tasks matching its registered facet names.
 
 Available in Python, Scala, Go, TypeScript, and Java.
-
-### RunnerService
-
-`afl/runtime/runner/service.py`
-
-Distributed orchestration with atomic task claiming, thread pool, HTTP status endpoints, and heartbeat-based health checking. Designed for production multi-node deployments.
 
 ### ClaudeAgentRunner
 

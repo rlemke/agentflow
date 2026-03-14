@@ -535,19 +535,20 @@ class TestLocalizeMounts:
         assert os.path.getmtime(result2) == mtime1
 
     def test_localize_mount_cache_stale(self, tmp_path, monkeypatch):
-        """Stale cache (size mismatch) triggers re-copy."""
+        """Stale 0-byte cache file triggers re-copy."""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         src = mount_dir / "test.pbf"
-        src.write_bytes(b"version1")
+        src.write_bytes(b"real data")
 
         monkeypatch.setenv("AFL_LOCALIZE_MOUNTS", str(mount_dir))
         cache_dir = tmp_path / "cache"
 
-        result1 = localize(str(src), target_dir=str(cache_dir))
-        assert open(result1, "rb").read() == b"version1"
+        # Simulate a stale 0-byte file from a previous failed copy
+        local_path = os.path.join(str(cache_dir), str(src).lstrip("/"))
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        open(local_path, "w").close()  # 0-byte file
+        assert os.path.getsize(local_path) == 0
 
-        # Source file changes size
-        src.write_bytes(b"version2-longer")
-        result2 = localize(str(src), target_dir=str(cache_dir))
-        assert open(result2, "rb").read() == b"version2-longer"
+        result = localize(str(src), target_dir=str(cache_dir))
+        assert open(result, "rb").read() == b"real data"

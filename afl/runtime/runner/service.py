@@ -570,6 +570,27 @@ class RunnerService:
         try:
             payload = dict(task.data or {})
 
+            # Inject _step_log callback for handler-level progress logging
+            def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
+                entry = StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=task.step_id,
+                    workflow_id=task.workflow_id,
+                    runner_id=self._server_id,
+                    facet_name=task.name,
+                    source=StepLogSource.HANDLER,
+                    level=level,
+                    message=message,
+                    time=_current_time_ms(),
+                    details=details,
+                )
+                try:
+                    self._persistence.save_step_log(entry)
+                except Exception:
+                    logger.debug("Could not save step log for step %s", task.step_id, exc_info=True)
+
+            payload["_step_log"] = _step_log_callback
+
             # Inject _task_heartbeat callback so long-running handlers can
             # signal progress and avoid being reaped by the orphan detector.
             def _task_heartbeat_callback():

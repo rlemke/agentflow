@@ -11,7 +11,7 @@ the cache file is always either absent or complete (never partial).
 
 import logging
 import os
-import shutil
+import subprocess
 import tempfile
 import threading
 from datetime import UTC, datetime
@@ -138,16 +138,20 @@ def _stream_to_file(url: str, path: str, storage) -> None:
 
 
 def _copy_to_cache(src_path: str, dst_path: str) -> None:
-    """Copy a local file to the configured cache location (local or HDFS)."""
-    src_size = os.path.getsize(src_path)
+    """Copy a local file to the configured cache location (local or HDFS).
+
+    Uses ``subprocess cp`` instead of ``shutil.copy2`` / ``open()`` because
+    Python's ``open()`` can hang indefinitely on VirtioFS mounts in Docker
+    containers when reading large files (e.g. 1.3 GB PBF).
+    """
     fname = os.path.basename(src_path)
-    log.info("cache-copy: start %s (%s) -> %s", fname, _fmt_bytes(src_size), dst_path)
     _storage.makedirs(_storage.dirname(dst_path), exist_ok=True)
     is_local = not CACHE_DIR.startswith("hdfs://")
     if is_local:
         tmp_path = dst_path + f".tmp.{os.getpid()}.{threading.get_ident()}"
         try:
-            shutil.copy2(src_path, tmp_path)
+            log.info("cache-copy: start %s -> %s (via cp)", fname, dst_path)
+            subprocess.run(["cp", src_path, tmp_path], check=True)
             os.replace(tmp_path, dst_path)
         except BaseException:
             try:
@@ -156,29 +160,42 @@ def _copy_to_cache(src_path: str, dst_path: str) -> None:
                 pass
             raise
     else:
-        # HDFS: read from mirror in chunks, buffer in write stream, then upload
-        copied = 0
-        next_log = _LOG_INTERVAL
-        with open(src_path, "rb") as src:
-            with _storage.open(dst_path, "wb") as dst:
-                while True:
-                    chunk = src.read(65536)
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-                    copied += len(chunk)
-                    if copied >= next_log:
-                        log.info(
-                            "cache-copy: %s — %s / %s buffered",
-                            fname,
-                            _fmt_bytes(copied),
-                            _fmt_bytes(src_size),
-                        )
-                        next_log += _LOG_INTERVAL
-                log.info("cache-copy: %s — uploading %s to HDFS...", fname, _fmt_bytes(copied))
-            # dst.close() happens here — the actual HDFS upload
-        log.info("cache-copy: %s — upload complete", fname)
-    log.info("cache-copy: finished %s (%s)", fname, _fmt_bytes(src_size))
+        # HDFS: cp source to a local temp file first (avoids VirtioFS hang
+        # on open()), then stream the local copy to HDFS.
+        with tempfile.NamedTemporaryFile(suffix=f".{fname}", delete=False) as tf:
+            local_tmp = tf.name
+        try:
+            log.info("cache-copy: start %s -> local tmp (via cp)", fname)
+            subprocess.run(["cp", src_path, local_tmp], check=True)
+            src_size = os.path.getsize(local_tmp)
+            log.info("cache-copy: %s (%s) -> HDFS %s", fname, _fmt_bytes(src_size), dst_path)
+            copied = 0
+            next_log = _LOG_INTERVAL
+            with open(local_tmp, "rb") as src:
+                with _storage.open(dst_path, "wb") as dst:
+                    while True:
+                        chunk = src.read(65536)
+                        if not chunk:
+                            break
+                        dst.write(chunk)
+                        copied += len(chunk)
+                        if copied >= next_log:
+                            log.info(
+                                "cache-copy: %s — %s / %s buffered",
+                                fname,
+                                _fmt_bytes(copied),
+                                _fmt_bytes(src_size),
+                            )
+                            next_log += _LOG_INTERVAL
+                    log.info("cache-copy: %s — uploading %s to HDFS...", fname, _fmt_bytes(copied))
+                # dst.close() happens here — the actual HDFS upload
+            log.info("cache-copy: %s — upload complete", fname)
+        finally:
+            try:
+                os.unlink(local_tmp)
+            except OSError:
+                pass
+    log.info("cache-copy: finished %s", fname)
 
 
 def geofabrik_url(region_path: str, fmt: str = "pbf") -> str:

@@ -236,3 +236,15 @@ class GeoJSONStreamWriter:
             self._tmp_path = None
             return
         self.close()
+
+    def __del__(self) -> None:
+        """Best-effort cleanup of temp file if writer was not properly closed."""
+        if self._tmp_path is not None:
+            try:
+                self._f.close()
+            except Exception:
+                pass
+            try:
+                os.unlink(self._tmp_path)
+            except OSError:
+                pass

@@ -406,19 +406,27 @@ def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
     if not path.startswith("hdfs://"):
         if not _should_localize_mount(path):
             return path
-        # Copy mount-backed file to local cache
+        # Copy mount-backed file to local cache.
+        # Use subprocess cp instead of shutil.copy2 because Python's open()
+        # can hang indefinitely on VirtioFS mounts for large files.
         local_path = os.path.join(target_dir, path.lstrip("/"))
         if os.path.isfile(local_path):
-            try:
-                if os.path.getsize(local_path) == os.path.getsize(path):
-                    logger.debug("localize: mount cache hit %s -> %s", path, local_path)
-                    return local_path
-            except OSError:
-                pass
-        logger.info("localize: copying mount file %s -> %s", path, local_path)
+            local_size = os.path.getsize(local_path)
+            if local_size > 0:
+                logger.debug(
+                    "localize: mount cache hit %s -> %s (%d bytes)", path, local_path, local_size
+                )
+                return local_path
+            # 0-byte file = stale from a previous failed copy; re-copy
+            logger.warning("localize: removing stale 0-byte cache file %s", local_path)
+            os.unlink(local_path)
+        logger.info("localize: copying mount file %s -> %s (via cp)", path, local_path)
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        shutil.copy2(path, local_path)
-        logger.info("localize: copied %s (%d bytes)", local_path, os.path.getsize(local_path))
+        import subprocess
+
+        subprocess.run(["cp", path, local_path], check=True)
+        copied_size = os.path.getsize(local_path)
+        logger.info("localize: copied %s (%d bytes)", local_path, copied_size)
         return local_path
 
     parsed = urlparse(path)
