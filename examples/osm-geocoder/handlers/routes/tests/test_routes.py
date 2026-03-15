@@ -186,7 +186,7 @@ class TestRouteStats:
                     "type": "Feature",
                     "properties": {
                         "feature_type": "route",
-                        "route_type": "bicycle",
+                        "route_types": ["bicycle"],
                     },
                     "geometry": None,
                 },
@@ -194,7 +194,7 @@ class TestRouteStats:
                     "type": "Feature",
                     "properties": {
                         "feature_type": "infrastructure",
-                        "route_type": "bicycle",
+                        "route_types": ["bicycle"],
                     },
                     "geometry": {"type": "Point", "coordinates": [0, 0]},
                 },
@@ -202,7 +202,7 @@ class TestRouteStats:
                     "type": "Feature",
                     "properties": {
                         "feature_type": "way",
-                        "route_type": "bicycle",
+                        "route_types": ["bicycle"],
                     },
                     "geometry": {
                         "type": "LineString",

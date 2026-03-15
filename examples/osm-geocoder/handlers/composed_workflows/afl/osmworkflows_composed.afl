@@ -339,7 +339,7 @@ namespace osm.workflows {
     // ==========================================================================
 
     /** Validates a cached region's OSM data and produces a summary of valid/invalid entries. */
-    workflow ValidateAndSummarize(region: String = "Liechtenstein", output_dir: String = "/tmp") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
+    workflow ValidateAndSummarize(region: String = "Liechtenstein", output_dir: String = "/Volumes/afl_data/output/osm") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
         cache = osm.ops.CacheRegion(region = $.region)
         f = ValidateAndSummarizeFromCache(cache = cache.cache, output_dir = $.output_dir)
         yield ValidateAndSummarize(
@@ -351,7 +351,7 @@ namespace osm.workflows {
     }
 
     /** Cache-dependent logic for ValidateAndSummarize. */
-    facet ValidateAndSummarizeFromCache(cache: OSMCache, output_dir: String = "/tmp") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
+    facet ValidateAndSummarizeFromCache(cache: OSMCache, output_dir: String = "/Volumes/afl_data/output/osm") => (total: Long, valid: Long, invalid: Long, output_path: String) andThen {
         validation = osm.ops.Validation.ValidateCache(
             cache = $.cache,
             output_dir = $.output_dir,
@@ -376,7 +376,7 @@ namespace osm.workflows {
     /** Runs OSMOSE local verification on a region's PBF and summarizes geometry/tag/reference issues. */
     workflow OsmoseQualityCheck(
         region: String = "Liechtenstein",
-        output_dir: String = "/tmp"
+        output_dir: String = "/Volumes/afl_data/output/osm"
     ) => (
         total_issues: Long,
         geometry_issues: Long,
@@ -398,7 +398,7 @@ namespace osm.workflows {
     }
 
     /** Cache-dependent logic for OsmoseQualityCheck. */
-    facet OsmoseQualityCheckFromCache(cache: OSMCache, output_dir: String = "/tmp") => (
+    facet OsmoseQualityCheckFromCache(cache: OSMCache, output_dir: String = "/Volumes/afl_data/output/osm") => (
         total_issues: Long,
         geometry_issues: Long,
         tag_issues: Long,
@@ -530,7 +530,7 @@ namespace osm.workflows {
     /** Builds a routing graph and assigns minimum zoom levels to road edges for low-zoom tile rendering. */
     workflow RoadZoomBuilder(
         region: String = "Liechtenstein",
-        output_dir: String = "/tmp/zoom-builder",
+        output_dir: String = "/Volumes/afl_data/output/osm/zoom-builder",
         max_concurrent: Long = 16
     ) => (
         total_edges: Long,
@@ -551,7 +551,7 @@ namespace osm.workflows {
     }
 
     /** Cache-dependent logic for RoadZoomBuilder. */
-    facet RoadZoomBuilderFromCache(cache: OSMCache, output_dir: String = "/tmp/zoom-builder", max_concurrent: Long = 16) => (
+    facet RoadZoomBuilderFromCache(cache: OSMCache, output_dir: String = "/Volumes/afl_data/output/osm/zoom-builder", max_concurrent: Long = 16) => (
         total_edges: Long,
         selected_edges: Long,
         zoom_distribution: String,

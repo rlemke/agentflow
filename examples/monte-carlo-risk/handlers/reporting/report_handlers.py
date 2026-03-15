@@ -10,7 +10,9 @@ import os
 from datetime import UTC, datetime
 from typing import Any
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+from afl.config import get_output_base
+
+_LOCAL_OUTPUT = get_output_base()
 _RISK_REPORTS_DIR = os.path.join(_LOCAL_OUTPUT, "risk-reports")
 
 NAMESPACE = "risk.Reporting"

@@ -46,7 +46,9 @@ while True:
 """
 
 
-_LOCAL_CACHE_DIR = "/tmp/osm-local-cache"
+def _local_cache_dir() -> str:
+    from afl.config import get_output_base
+    return os.path.join(get_output_base(), "cache", "osm-local")
 
 # Files larger than this are copied locally before parsing (100 MB)
 _SIZE_THRESHOLD = 100 * 1024 * 1024
@@ -72,8 +74,9 @@ def _is_network_mount(path: str) -> bool:
 def _local_cache_path(source_path: str) -> str:
     """Derive a local cache path for a source file."""
     basename = os.path.basename(source_path)
-    os.makedirs(_LOCAL_CACHE_DIR, exist_ok=True)
-    return os.path.join(_LOCAL_CACHE_DIR, basename)
+    cache_dir = _local_cache_dir()
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, basename)
 
 
 def _needs_local_copy(source_path: str) -> bool:
@@ -96,7 +99,7 @@ def json_load_with_heartbeat(
     """Load JSON, copying large network files locally first.
 
     For files on network mounts (``/Volumes/...``) larger than 100 MB,
-    the file is first copied to ``/tmp/osm-local-cache/`` using ``cp``
+    the file is first copied to ``AFL_OUTPUT_BASE/cache/osm-local/`` using ``cp``
     (a separate process immune to GIL stalls), with a heartbeat
     subprocess pinging MongoDB during the copy.  The local copy is then
     loaded with ``json.load()`` at local-disk speed.

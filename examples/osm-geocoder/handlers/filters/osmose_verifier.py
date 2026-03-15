@@ -488,7 +488,7 @@ def _build_summary(handler: VerificationHandler) -> VerifySummaryData:
 
 def verify_pbf(
     pbf_path: str,
-    output_dir: str = "/tmp",
+    output_dir: str | None = None,
     *,
     check_geometry: bool = True,
     check_tags: bool = True,
@@ -513,6 +513,11 @@ def verify_pbf(
     Returns:
         Tuple of (VerifyResult, VerifySummaryData).
     """
+    if output_dir is None:
+        import os
+        from afl.config import get_output_base
+        output_dir = os.path.join(get_output_base(), "osm", "osmose")
+
     if not HAS_OSMIUM:
         raise RuntimeError("pyosmium is required for PBF verification")
 
@@ -559,7 +564,7 @@ def verify_pbf(
 
 def verify_geojson(
     input_path: str,
-    output_dir: str = "/tmp",
+    output_dir: str | None = None,
 ) -> tuple[VerifyResult, VerifySummaryData]:
     """Validate a GeoJSON file for structure, geometries, and coordinate ranges.
 
@@ -570,6 +575,11 @@ def verify_geojson(
     Returns:
         Tuple of (VerifyResult, VerifySummaryData).
     """
+    if output_dir is None:
+        import os
+        from afl.config import get_output_base
+        output_dir = os.path.join(get_output_base(), "osm", "osmose")
+
     issues: list[dict[str, Any]] = []
 
     try:

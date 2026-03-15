@@ -41,7 +41,7 @@ def handle_verify_all(payload: dict) -> dict:
 
     Params:
         cache: OSMCache dict with 'path' key pointing to the .osm.pbf file
-        output_dir: Base output directory (default "/tmp")
+        output_dir: Base output directory (default AFL_OUTPUT_BASE/osm/osmose)
         check_geometry: Enable geometry checks (default true)
         check_tags: Enable tag checks (default true)
         check_references: Enable reference integrity checks (default true)
@@ -65,7 +65,9 @@ def handle_verify_all(payload: dict) -> dict:
     if step_log:
         step_log(f"VerifyAll: running full verification on {pbf_path}")
 
-    output_dir = payload.get("output_dir", "/tmp")
+    from afl.config import get_output_base
+
+    output_dir = payload.get("output_dir", os.path.join(get_output_base(), "osm", "osmose"))
 
     result, summary = verify_pbf(
         pbf_path,

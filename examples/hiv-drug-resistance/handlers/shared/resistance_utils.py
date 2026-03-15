@@ -12,7 +12,9 @@ import gzip
 import hashlib
 import os
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+from afl.config import get_output_base
+
+_LOCAL_OUTPUT = get_output_base()
 _HIV_REPORTS_DIR = os.path.join(_LOCAL_OUTPUT, "hiv-reports")
 
 # ---------------------------------------------------------------------------

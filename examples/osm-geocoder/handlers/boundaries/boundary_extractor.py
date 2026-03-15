@@ -50,8 +50,10 @@ HAS_OSMIUM_TOOL = shutil.which("osmium") is not None
 log = logging.getLogger(__name__)
 
 # Default output directory for extracted boundaries
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-DEFAULT_OUTPUT_DIR = Path(os.path.join(_LOCAL_OUTPUT, "osm-boundaries"))
+from afl.config import get_output_base
+
+_LOCAL_OUTPUT = get_output_base()
+DEFAULT_OUTPUT_DIR = Path(os.path.join(_LOCAL_OUTPUT, "osm", "boundaries"))
 
 # Admin level mappings
 ADMIN_LEVEL_COUNTRY = 2

@@ -2,7 +2,7 @@
 
 Provides HDFS-aware output directory resolution and file writing.
 When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://afl-hadoop-hdfs:8020/osm-output),
-extractors write output there. Otherwise they use local /tmp/.
+extractors write output there. Otherwise they derive from AFL_OUTPUT_BASE/osm.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import IO
 
+from afl.config import get_output_base
 from afl.runtime.storage import get_storage_backend
 
 _OUTPUT_BASE = os.environ.get("AFL_OSM_OUTPUT_BASE", "")
@@ -20,12 +21,11 @@ def resolve_output_dir(category: str, default_local: str = "") -> str:
     """Return output directory for a handler category.
 
     When AFL_OSM_OUTPUT_BASE is set (e.g. hdfs://afl-hadoop-hdfs:8020/osm-output),
-    returns '{base}/{category}'. Otherwise falls back to *default_local*,
-    then AFL_LOCAL_OUTPUT_DIR, then ``/tmp``.
+    returns '{base}/{category}'. Otherwise derives from AFL_OUTPUT_BASE/osm/{category}.
     """
     if _OUTPUT_BASE:
         return f"{_OUTPUT_BASE.rstrip('/')}/{category}"
-    base = default_local or os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+    base = default_local or os.path.join(get_output_base(), "osm")
     return f"{base}/{category}"
 
 
@@ -39,7 +39,7 @@ def resolve_local_output_dir(*parts: str) -> str:
         resolve_local_output_dir("maps", "alabama")
         # -> "/Volumes/afl_data/output/maps/alabama"
     """
-    base = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/Volumes/afl_data/output")
+    base = get_output_base()
     path = os.path.join(base, *parts)
     Path(path).mkdir(parents=True, exist_ok=True)
     return path

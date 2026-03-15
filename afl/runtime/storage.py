@@ -368,7 +368,12 @@ class _WebHDFSWriteStream:
 _local_backend: LocalStorageBackend | None = None
 _hdfs_backends: dict[str, HDFSStorageBackend] = {}
 
-_DEFAULT_LOCAL_CACHE = "/tmp/osm-local"
+def _default_local_cache() -> str:
+    from afl.config import get_output_base
+    return os.path.join(get_output_base(), "cache", "osm-local")
+
+
+_DEFAULT_LOCAL_CACHE = None  # resolved lazily
 
 
 def _should_localize_mount(path: str) -> bool:
@@ -385,7 +390,7 @@ def _should_localize_mount(path: str) -> bool:
     return any(path.startswith(p.strip()) for p in prefixes.split(",") if p.strip())
 
 
-def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
+def localize(path: str, target_dir: str | None = None) -> str:
     """Ensure a file is available on the local filesystem.
 
     For local paths, returns *path* unchanged unless the path matches a
@@ -403,6 +408,9 @@ def localize(path: str, target_dir: str = _DEFAULT_LOCAL_CACHE) -> str:
         A local filesystem path suitable for tools that require local files
         (e.g. pyosmium ``apply_file``).
     """
+    if target_dir is None:
+        target_dir = _default_local_cache()
+
     if not path.startswith("hdfs://"):
         if not _should_localize_mount(path):
             return path

@@ -20,9 +20,11 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
+from afl.config import get_output_base
+
 logger = logging.getLogger(__name__)
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+_LOCAL_OUTPUT = get_output_base()
 _CACHE_DIR = os.environ.get("AFL_CENSUS_CACHE_DIR", os.path.join(_LOCAL_OUTPUT, "census-cache"))
 
 # Per-path locks to prevent duplicate concurrent downloads

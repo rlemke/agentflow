@@ -15,7 +15,9 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+from afl.config import get_output_base
+
+_LOCAL_OUTPUT = get_output_base()
 
 from .zoom_detection import (
     detect_bypasses,

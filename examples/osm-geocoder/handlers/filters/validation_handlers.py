@@ -70,7 +70,9 @@ def handle_validate_cache(payload: dict) -> dict:
     """Full validation of an OSM cache file."""
     cache = payload.get("cache", {})
     pbf_path = cache.get("path", "") if isinstance(cache, dict) else ""
-    output_dir = payload.get("output_dir", "/tmp")
+    from afl.config import get_output_base
+
+    output_dir = payload.get("output_dir", os.path.join(get_output_base(), "osm", "validation"))
     step_log = payload.get("_step_log")
 
     if not pbf_path:

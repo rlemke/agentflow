@@ -34,7 +34,7 @@ namespace osm.ops.Validation {
 
     /** Runs all validation checks on a cached OSM dataset. */
     event facet ValidateCache(cache: OSMCache,
-        output_dir: String = "/tmp",
+        output_dir: String = "/Volumes/afl_data/output/osm/validation",
         use_hdfs: Boolean = false) => (stats: ValidationStats, result: ValidationResult)
 
     /** Validates geometry correctness only. */

@@ -33,8 +33,10 @@ except ImportError:
     HAS_REQUESTS = False
 
 # Environment-based cache directory
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
-GTFS_CACHE_DIR = os.environ.get("AFL_GTFS_CACHE_DIR", os.path.join(_LOCAL_OUTPUT, "afl_gtfs_cache"))
+from afl.config import get_output_base
+
+_LOCAL_OUTPUT = get_output_base()
+GTFS_CACHE_DIR = os.environ.get("AFL_GTFS_CACHE_DIR", os.path.join(_LOCAL_OUTPUT, "osm", "gtfs-cache"))
 
 # Safety cap for grid-based analyses
 MAX_GRID_CELLS = 10_000

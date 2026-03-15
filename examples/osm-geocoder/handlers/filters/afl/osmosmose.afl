@@ -47,7 +47,7 @@ namespace osm.ops.OSMOSE {
     /** Runs all verification checks on a PBF cache. */
     event facet VerifyAll(
         cache: OSMCache,
-        output_dir: String = "/tmp",
+        output_dir: String = "/Volumes/afl_data/output/osm/osmose",
         check_geometry: Boolean = true,
         check_tags: Boolean = true,
         check_references: Boolean = true,

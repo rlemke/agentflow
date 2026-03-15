@@ -11,9 +11,11 @@ import os
 from pathlib import Path
 from typing import Any
 
+from afl.config import get_output_base
+
 logger = logging.getLogger(__name__)
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+_LOCAL_OUTPUT = get_output_base()
 _OUTPUT_DIR = os.environ.get(
     "AFL_SITESEL_OUTPUT_DIR", os.path.join(_LOCAL_OUTPUT, "sitesel-output")
 )

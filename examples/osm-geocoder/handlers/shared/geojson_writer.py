@@ -22,6 +22,8 @@ import time
 from collections.abc import Iterator
 from typing import IO
 
+from afl.config import get_output_base, get_temp_dir
+
 from ._output import ensure_dir, open_output
 
 log = logging.getLogger(__name__)
@@ -74,7 +76,7 @@ def iter_geojson_features(
     # Check the local cache FIRST to avoid stat() calls on VirtioFS.
     read_path = path
     if path.startswith("/Volumes/"):
-        local_dir = "/tmp/osm-local-cache"
+        local_dir = os.path.join(get_output_base(), "cache", "osm-local")
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, os.path.basename(path))
         if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
@@ -185,11 +187,11 @@ class GeoJSONStreamWriter:
 
     Usage::
 
-        with GeoJSONStreamWriter("/tmp/roads.geojson") as w:
+        with GeoJSONStreamWriter("/Volumes/afl_data/output/osm/roads.geojson") as w:
             w.write_feature({"type": "Feature", ...})
         print(w.feature_count)
 
-    When *atomic* is True, writes go to a temporary file under ``/tmp``
+    When *atomic* is True, writes go to a temporary file under ``AFL_OUTPUT_BASE/tmp``
     and are moved to *path* only on successful :meth:`close`.  This
     prevents corrupt partial files when the process is killed mid-scan
     (especially on VirtioFS mounts).
@@ -206,7 +208,7 @@ class GeoJSONStreamWriter:
         if atomic:
             import tempfile
 
-            fd, self._tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+            fd, self._tmp_path = tempfile.mkstemp(suffix=".geojson", dir=get_temp_dir())
             os.close(fd)
             self._f: IO = open(self._tmp_path, "w")
         else:

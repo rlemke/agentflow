@@ -251,7 +251,9 @@ def filter_routes_by_type(
 
     network_filter = network if network != "*" else None
 
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+    from afl.config import get_temp_dir
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir=get_temp_dir())
     os.close(tmp_fd)
 
     try:

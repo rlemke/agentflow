@@ -9,9 +9,11 @@ import logging
 import os
 from typing import Any
 
+from afl.config import get_output_base
+
 log = logging.getLogger(__name__)
 
-_LOCAL_OUTPUT = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+_LOCAL_OUTPUT = get_output_base()
 
 NAMESPACE = "maven.runner"
 

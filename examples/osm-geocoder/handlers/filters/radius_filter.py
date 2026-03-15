@@ -332,7 +332,9 @@ def filter_geojson(
     local_path = localize(input_path)
 
     original_count = 0
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir="/tmp")
+    from afl.config import get_temp_dir
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".geojson", dir=get_temp_dir())
     os.close(tmp_fd)
 
     try:

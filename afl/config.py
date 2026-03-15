@@ -185,6 +185,31 @@ class RunnerConfig:
         )
 
 
+_OUTPUT_BASE_DEFAULT = "/Volumes/afl_data/output"
+
+
+def get_output_base() -> str:
+    """Return the base output directory.
+
+    Checks ``AFL_OUTPUT_BASE``, then ``AFL_LOCAL_OUTPUT_DIR`` for backward
+    compatibility, then falls back to ``/Volumes/afl_data/output``.
+    """
+    return os.environ.get(
+        "AFL_OUTPUT_BASE",
+        os.environ.get("AFL_LOCAL_OUTPUT_DIR", _OUTPUT_BASE_DEFAULT),
+    )
+
+
+def get_temp_dir() -> str:
+    """Return temporary directory under the output base.
+
+    Creates the directory if it does not exist.
+    """
+    d = os.path.join(get_output_base(), "tmp")
+    Path(d).mkdir(parents=True, exist_ok=True)
+    return d
+
+
 @dataclass
 class StorageConfig:
     """Storage configuration.
@@ -197,7 +222,7 @@ class StorageConfig:
         hdfs_user: HDFS user name for WebHDFS requests
     """
 
-    local_output_dir: str = "/tmp"
+    local_output_dir: str = _OUTPUT_BASE_DEFAULT
     hdfs_webhdfs_port: int = 9870
     hdfs_max_retries: int = 3
     hdfs_retry_delay: float = 1.0
@@ -217,7 +242,7 @@ class StorageConfig:
     def from_dict(cls, data: dict[str, Any]) -> StorageConfig:
         """Create from a dictionary (supports camelCase and snake_case keys)."""
         return cls(
-            local_output_dir=str(data.get("local_output_dir", data.get("localOutputDir", "/tmp"))),
+            local_output_dir=str(data.get("local_output_dir", data.get("localOutputDir", _OUTPUT_BASE_DEFAULT))),
             hdfs_webhdfs_port=int(data.get("hdfs_webhdfs_port", data.get("hdfsWebhdfsPort", 9870))),
             hdfs_max_retries=int(data.get("hdfs_max_retries", data.get("hdfsMaxRetries", 3))),
             hdfs_retry_delay=float(data.get("hdfs_retry_delay", data.get("hdfsRetryDelay", 1.0))),
@@ -237,7 +262,7 @@ class StorageConfig:
         """
         defaults = cls()
         return cls(
-            local_output_dir=os.environ.get("AFL_LOCAL_OUTPUT_DIR", defaults.local_output_dir),
+            local_output_dir=get_output_base(),
             hdfs_webhdfs_port=int(
                 os.environ.get("AFL_WEBHDFS_PORT", str(defaults.hdfs_webhdfs_port))
             ),

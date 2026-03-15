@@ -10,6 +10,8 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from afl.config import get_output_base
+
 from ..shared.output_cache import cached_result, save_result_meta, with_output_cache
 from .zoom_builder import (
     _empty_metrics,
@@ -433,7 +435,7 @@ def _make_export_zoom_layers_handler(facet_name: str):
         graph_path = payload.get("graph_path", "")
         output_dir = payload.get(
             "output_dir",
-            os.path.join(os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp"), "zoom-export"),
+            os.path.join(get_output_base(), "osm", "zoom-export"),
         )
         step_log = payload.get("_step_log")
         cache = {"path": graph_path, "size": payload.get("graph_size", 0)}
@@ -503,7 +505,7 @@ def _make_build_zoom_layers_handler(facet_name: str):
         min_population = payload.get("min_population", 50000)
         output_dir = payload.get(
             "output_dir",
-            os.path.join(os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp"), "zoom-builder"),
+            os.path.join(get_output_base(), "osm", "zoom-builder"),
         )
         max_concurrent = payload.get("max_concurrent", 16)
         step_log = payload.get("_step_log")

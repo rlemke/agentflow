@@ -8,6 +8,8 @@ import logging
 import os
 from typing import Any
 
+from afl.config import get_output_base
+
 logger = logging.getLogger(__name__)
 
 NAMESPACE = "sitesel.Output"
@@ -62,7 +64,7 @@ def handle_export_scored(params: dict[str, Any]) -> dict[str, Any]:
         count = _try_output_store_ingest(scored_path, state_fips, facet_name)
 
         # Always copy to the local output directory as well
-        output_dir = os.environ.get("AFL_LOCAL_OUTPUT_DIR", "/tmp")
+        output_dir = get_output_base()
         dest_dir = os.path.join(output_dir, "sitesel-export")
         os.makedirs(dest_dir, exist_ok=True)
         dest_path = os.path.join(dest_dir, f"{state_fips}_scored.geojson")

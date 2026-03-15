@@ -344,7 +344,7 @@ class TestStorageConfig:
 
     def test_defaults(self):
         cfg = StorageConfig()
-        assert cfg.local_output_dir == "/tmp"
+        assert cfg.local_output_dir == "/Volumes/afl_data/output"
         assert cfg.hdfs_webhdfs_port == 9870
         assert cfg.hdfs_max_retries == 3
         assert cfg.hdfs_retry_delay == 1.0
@@ -393,8 +393,9 @@ class TestStorageConfig:
             "HADOOP_USER_NAME",
         ):
             monkeypatch.delenv(var, raising=False)
+        monkeypatch.delenv("AFL_OUTPUT_BASE", raising=False)
         cfg = StorageConfig.from_env()
-        assert cfg.local_output_dir == "/tmp"
+        assert cfg.local_output_dir == "/Volumes/afl_data/output"
         assert cfg.hdfs_user == "root"
 
     def test_to_dict(self):

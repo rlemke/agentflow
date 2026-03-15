@@ -90,8 +90,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default="/tmp/lz-output",
-        help="Output directory for LZ results (default: /tmp/lz-output)",
+        default="/Volumes/afl_data/output/continental-lz",
+        help="Output directory for LZ results (default: /Volumes/afl_data/output/continental-lz)",
     )
     args = parser.parse_args()
 
