@@ -1802,6 +1802,47 @@ class TestDocComments:
         assert doc.params[0].name == "x"
         assert doc.params[1].name == "y"
 
+    def test_doc_comment_returns_plural(self, parser):
+        """@returns (plural) is accepted as an alias for @return."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Cache an OSM region file for local processing.
+             * @param region Two-letter US state code (e.g. WA, CA)
+             * @returns path Local filesystem path to the cached PBF file
+             * @returns size File size in bytes
+             */
+            event facet CacheRegion(region: String) => (path: String, size: Long)
+        }
+        """)
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert doc.description == "Cache an OSM region file for local processing."
+        assert len(doc.params) == 1
+        assert doc.params[0].name == "region"
+        assert doc.params[0].description == "Two-letter US state code (e.g. WA, CA)"
+        assert len(doc.returns) == 2
+        assert doc.returns[0].name == "path"
+        assert doc.returns[0].description == "Local filesystem path to the cached PBF file"
+        assert doc.returns[1].name == "size"
+        assert doc.returns[1].description == "File size in bytes"
+
+    def test_doc_comment_mixed_return_and_returns(self, parser):
+        """Both @return and @returns work in the same doc comment."""
+        ast = parser.parse("""
+        namespace ns {
+            /**
+             * Do something.
+             * @return a First value
+             * @returns b Second value
+             */
+            event facet F(x: String) => (a: Long, b: Long)
+        }
+        """)
+        doc = ast.namespaces[0].event_facets[0].doc
+        assert len(doc.returns) == 2
+        assert doc.returns[0].name == "a"
+        assert doc.returns[1].name == "b"
+
 
 class TestComparisonOperators:
     """Test comparison operator parsing."""

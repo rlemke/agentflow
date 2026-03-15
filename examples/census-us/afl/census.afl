@@ -1,3 +1,4 @@
+/** Orchestration workflows for US Census data analysis pipelines. */
 namespace census.workflows {
     use census.types
     use census.Operations
@@ -6,6 +7,13 @@ namespace census.workflows {
     use census.Summary
     use census.Ingestion
 
+    /**
+     * Downloads ACS and TIGER data for a single state, extracts demographic
+     * indicators, joins geography, and produces a summary report.
+     * @param state_fips FIPS code identifying the state (e.g. "01" for Alabama)
+     * @param state_name Human-readable state name
+     * @returns summary Aggregated census summary for the state
+     */
     workflow AnalyzeState(state_fips: String = "01", state_name: String = "Alabama") => (summary: CensusSummary) andThen {
         acs = DownloadACS(state_fips = $.state_fips)
         acs_detail = DownloadACSDetailed(state_fips = $.state_fips)
@@ -28,6 +36,13 @@ namespace census.workflows {
         yield AnalyzeState(summary = summary.result)
     }
 
+    /**
+     * Analyzes a state like AnalyzeState, then persists each extracted dataset
+     * and the joined summary to the database.
+     * @param state_fips FIPS code identifying the state
+     * @param state_name Human-readable state name
+     * @returns summary Aggregated census summary for the state
+     */
     workflow AnalyzeStateWithDB(state_fips: String = "01", state_name: String = "Alabama") => (summary: CensusSummary) andThen {
         acs = DownloadACS(state_fips = $.state_fips)
         acs_detail = DownloadACSDetailed(state_fips = $.state_fips)
@@ -65,6 +80,10 @@ namespace census.workflows {
         yield AnalyzeStateWithDB(summary = summary.result)
     }
 
+    /**
+     * Runs AnalyzeState in parallel for three states: Alabama, Alaska, and Arizona.
+     * @returns states_completed Number of states analyzed
+     */
     workflow AnalyzeStates_03() => (states_completed: Long) andThen {
         alabama = AnalyzeState(state_fips = "01", state_name = "Alabama")
         alaska = AnalyzeState(state_fips = "02", state_name = "Alaska")

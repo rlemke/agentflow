@@ -11,7 +11,9 @@
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
+/** Type definitions for sensor readings, anomaly detection, alerts, and diagnostics. */
 namespace monitor.types {
+    /** A single timestamped sensor measurement. */
     schema SensorReading {
         sensor_id: String,
         timestamp: Long,
@@ -19,6 +21,7 @@ namespace monitor.types {
         unit: String
     }
 
+    /** Normal and critical threshold boundaries for sensor values. */
     schema ThresholdConfig {
         low: Double,
         high: Double,
@@ -26,6 +29,7 @@ namespace monitor.types {
         critical_high: Double
     }
 
+    /** Result of anomaly detection including severity and deviation. */
     schema AnomalyResult {
         is_anomaly: Boolean,
         severity: String,
@@ -33,6 +37,7 @@ namespace monitor.types {
         threshold_breached: String
     }
 
+    /** Alert notification payload with priority and routing channel. */
     schema AlertPayload {
         sensor_id: String,
         anomaly: Json,
@@ -40,6 +45,7 @@ namespace monitor.types {
         channel: String
     }
 
+    /** Diagnostic report summarizing sensor health and anomaly history. */
     schema DiagnosticReport {
         sensor_id: String,
         readings_checked: Int,
@@ -47,6 +53,7 @@ namespace monitor.types {
         health_status: String
     }
 
+    /** Aggregate monitoring summary across sensors. */
     schema MonitoringSummary {
         total_sensors: Int,
         total_anomalies: Int,
@@ -58,17 +65,29 @@ namespace monitor.types {
 // ---------------------------------------------------------------------------
 // Mixins and implicits
 // ---------------------------------------------------------------------------
+/** Reusable retry and alert configuration policies. */
 namespace monitor.mixins {
+    /** Configures retry behavior with exponential backoff.
+     * @param max_retries Maximum number of retry attempts
+     * @param backoff_ms Backoff interval in milliseconds between retries
+     */
     facet RetryPolicy(max_retries: Int = 3, backoff_ms: Int = 1000)
+    /** Configures alert routing and escalation behavior.
+     * @param channel Alert notification channel name
+     * @param escalate Whether to escalate alerts to on-call
+     */
     facet AlertConfig(channel: String = "default", escalate: Boolean = false)
 
+    /** Default retry policy: 3 retries with 1s backoff. */
     implicit defaultRetry = RetryPolicy(max_retries = 3, backoff_ms = 1000)
+    /** Default alert config: default channel, no escalation. */
     implicit defaultAlert = AlertConfig(channel = "default", escalate = false)
 }
 
 // ---------------------------------------------------------------------------
 // Ingestion -- IngestReading, ValidateReading
 // ---------------------------------------------------------------------------
+/** Raw sensor reading ingestion and validation. */
 namespace monitor.Ingestion {
     use monitor.types
 
@@ -98,6 +117,7 @@ namespace monitor.Ingestion {
 // ---------------------------------------------------------------------------
 // Analysis -- DetectAnomaly, ClassifyAlert
 // ---------------------------------------------------------------------------
+/** Anomaly detection and alert classification. */
 namespace monitor.Analysis {
     use monitor.types
 
@@ -129,6 +149,7 @@ namespace monitor.Analysis {
 // ---------------------------------------------------------------------------
 // Reporting -- RunDiagnostics, GenerateSummary
 // ---------------------------------------------------------------------------
+/** Sensor diagnostics and monitoring summary generation. */
 namespace monitor.Reporting {
     use monitor.types
 
@@ -158,6 +179,7 @@ namespace monitor.Reporting {
 // ---------------------------------------------------------------------------
 // Workflows
 // ---------------------------------------------------------------------------
+/** Workflows for single-sensor and batch sensor monitoring. */
 namespace monitor.workflows {
     use monitor.types
     use monitor.mixins

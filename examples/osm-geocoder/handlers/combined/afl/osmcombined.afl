@@ -1,3 +1,4 @@
+/** Single-pass multi-category OSM extraction for efficient PBF processing. */
 namespace osm.Combined {
     use osm.types
 

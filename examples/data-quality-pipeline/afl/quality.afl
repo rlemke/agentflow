@@ -10,7 +10,9 @@
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
+/** Type definitions for data profiling, validation, scoring, and remediation. */
 namespace dataquality.types {
+    /** Statistical profile of a single dataset column. */
     schema ColumnProfile {
         column_name: String,
         missing_count: Int,
@@ -18,12 +20,14 @@ namespace dataquality.types {
         dtype: String
     }
 
+    /** Configuration thresholds for quality validation checks. */
     schema QualityConfig {
         missing_threshold: Double,
         type_error_max: Int,
         freshness_hours: Int
     }
 
+    /** Result of a single validation check with pass/fail and score. */
     schema ValidationResult {
         check_name: String,
         passed: Boolean,
@@ -31,18 +35,21 @@ namespace dataquality.types {
         details: Json
     }
 
+    /** Weights for each quality dimension in the composite score. */
     schema ScoringWeights {
         completeness: Double,
         accuracy: Double,
         freshness: Double
     }
 
+    /** Raw and weighted score for a single quality dimension. */
     schema QualityScore {
         dimension: String,
         raw_score: Double,
         weighted_score: Double
     }
 
+    /** A prioritized action to fix a data quality issue. */
     schema RemediationAction {
         priority: Int,
         action: String,
@@ -50,6 +57,7 @@ namespace dataquality.types {
         reason: String
     }
 
+    /** Comprehensive quality report with grade, scores, and remediation actions. */
     schema QualityReport {
         dataset: String,
         grade: String,
@@ -64,8 +72,17 @@ namespace dataquality.types {
 // ---------------------------------------------------------------------------
 // Mixins and implicits
 // ---------------------------------------------------------------------------
+/** Reusable strictness and freshness policies for quality checks. */
 namespace dataquality.mixins {
+    /** Configures validation strictness level.
+     * @param fail_fast Whether to stop on first failure
+     * @param min_score Minimum score threshold to pass
+     */
     facet Strictness(fail_fast: Boolean = false, min_score: Double = 0.7)
+    /** Configures data freshness requirements.
+     * @param max_age_hours Maximum acceptable data age in hours
+     * @param check_timestamps Whether to validate timestamp columns
+     */
     facet Freshness(max_age_hours: Int = 24, check_timestamps: Boolean = true)
 
     implicit defaultStrictness = Strictness(fail_fast = false, min_score = 0.7)

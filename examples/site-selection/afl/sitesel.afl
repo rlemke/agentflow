@@ -1,69 +1,127 @@
+/** Shared data types for the site-selection analysis pipeline. */
 namespace sitesel.types {
+    /** A downloaded ACS data file with state and cache metadata. */
     schema ACSFile {
         path: String,
         state_fips: String,
         wasInCache: Boolean
     }
+    /** A downloaded TIGER/Line shapefile with geography level and cache metadata. */
     schema TIGERFile {
         path: String,
         state_fips: String,
         geo_level: String,
         wasInCache: Boolean
     }
+    /** A downloaded OSM PBF extract file with region and cache metadata. */
     schema PBFFile {
         path: String,
         region: String,
         wasInCache: Boolean
     }
+    /** Joined demographic features for a state with feature count. */
     schema DemographicsResult {
         output_path: String,
         feature_count: Long,
         state_fips: String
     }
+    /** Extracted restaurant locations from OSM data with counts by region. */
     schema RestaurantResult {
         output_path: String,
         restaurant_count: Long,
         region: String
     }
+    /** County-level site scores with the top-ranked county and its score. */
     schema ScoredResult {
         output_path: String,
         county_count: Long,
         top_county: String,
         top_score: Double
     }
+    /** Result of exporting scored data to a file in the specified format. */
     schema ExportResult {
         output_path: String,
         format: String
     }
 }
 
+/** Download operations for fetching ACS, TIGER, and OSM source data. */
 namespace sitesel.Downloads {
     use sitesel.types
 
+    /**
+     * Downloads ACS demographic data for a state.
+     * @param state_fips FIPS code identifying the state
+     * @returns file Downloaded ACS file with cache metadata
+     */
     event facet DownloadACS(state_fips: String = "01") => (file: ACSFile)
+
+    /**
+     * Downloads TIGER/Line shapefiles at the specified geography level.
+     * @param state_fips FIPS code identifying the state
+     * @param geo_level Geography level (e.g. "COUNTY")
+     * @returns file Downloaded TIGER shapefile with cache metadata
+     */
     event facet DownloadTIGER(state_fips: String = "01", geo_level: String = "COUNTY") => (file: TIGERFile)
+
+    /**
+     * Downloads an OSM PBF extract for a region.
+     * @param region OSM region name (e.g. "alabama")
+     * @returns file Downloaded PBF file with cache metadata
+     */
     event facet DownloadPBF(region: String = "alabama") => (file: PBFFile)
 }
 
+/** Extraction facets that process downloaded source data into analysis-ready features. */
 namespace sitesel.Extract {
     use sitesel.types
 
+    /**
+     * Joins ACS demographics with TIGER county boundaries for a state.
+     * @param acs_path Path to the downloaded ACS data file
+     * @param tiger_path Path to the downloaded TIGER shapefile
+     * @param state_fips FIPS code identifying the state
+     * @returns result Joined demographic features with county geometry
+     */
     event facet JoinDemographics(acs_path: String, tiger_path: String, state_fips: String) => (result: DemographicsResult)
+
+    /**
+     * Extracts restaurant and food-service locations from an OSM PBF file.
+     * @param pbf_path Path to the downloaded PBF extract
+     * @param region OSM region name
+     * @returns result Extracted restaurant locations with counts
+     */
     event facet ExtractRestaurants(pbf_path: String, region: String) => (result: RestaurantResult)
 }
 
+/** Scoring facets that rank counties based on demographic and POI data. */
 namespace sitesel.Scoring {
     use sitesel.types
 
+    /**
+     * Scores and ranks counties by combining demographics and restaurant density.
+     * @param demographics_path Path to joined demographic features
+     * @param restaurants_path Path to extracted restaurant data
+     * @param state_fips FIPS code identifying the state
+     * @returns result Scored counties with top-ranked county identified
+     */
     event facet ScoreCounties(demographics_path: String, restaurants_path: String, state_fips: String) => (result: ScoredResult)
 }
 
+/** Output facets for exporting scored results to files. */
 namespace sitesel.Output {
     use sitesel.types
 
+    /**
+     * Exports scored county data to a downloadable file.
+     * @param scored_path Path to the scored county results
+     * @param state_fips FIPS code identifying the state
+     * @returns result Export file location and format
+     */
     event facet ExportScored(scored_path: String, state_fips: String) => (result: ExportResult)
 }
 
+/** Orchestration workflows for site-selection analysis. */
 namespace sitesel.workflows {
     use sitesel.types
     use sitesel.Downloads
@@ -71,6 +129,14 @@ namespace sitesel.workflows {
     use sitesel.Scoring
     use sitesel.Output
 
+    /**
+     * Downloads ACS, TIGER, and OSM data for a state, joins demographics with
+     * geography, extracts restaurants, scores counties, and exports results.
+     * @param state_fips FIPS code identifying the state
+     * @param state_name Human-readable state name
+     * @param region OSM region name for PBF download
+     * @returns result Scored county rankings for the state
+     */
     workflow AnalyzeSite(state_fips: String = "01", state_name: String = "Alabama", region: String = "alabama") => (result: ScoredResult) andThen {
         acs = DownloadACS(state_fips = $.state_fips)
         tiger = DownloadTIGER(state_fips = $.state_fips, geo_level = "COUNTY")
@@ -82,6 +148,10 @@ namespace sitesel.workflows {
         yield AnalyzeSite(result = scored.result)
     }
 
+    /**
+     * Runs AnalyzeSite in parallel for three states: Alabama, Alaska, and Arizona.
+     * @returns states_completed Number of states analyzed
+     */
     workflow AnalyzeSites_03() => (states_completed: Long) andThen {
         alabama = AnalyzeSite(state_fips = "01", state_name = "Alabama", region = "alabama")
         alaska = AnalyzeSite(state_fips = "02", state_name = "Alaska", region = "alaska")

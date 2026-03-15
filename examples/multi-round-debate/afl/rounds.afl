@@ -11,7 +11,9 @@
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
+/** Type definitions for debate state, arguments, scoring, and convergence. */
 namespace multidebate.types {
+    /** State carried between debate rounds including topic and previous results. */
     schema RoundState {
         round_num: Int,
         topic: String,
@@ -20,6 +22,7 @@ namespace multidebate.types {
         prev_scores: Json
     }
 
+    /** An agent's refined argument with stance and confidence level. */
     schema RefinedArgument {
         agent: String,
         stance: String,
@@ -27,12 +30,14 @@ namespace multidebate.types {
         confidence: Double
     }
 
+    /** Score for an individual agent in a debate round. */
     schema RoundScore {
         agent: String,
         score: Double,
         improvement: Double
     }
 
+    /** Metrics tracking whether agent positions are converging across rounds. */
     schema ConvergenceMetrics {
         score_delta: Double,
         position_drift: Double,
@@ -40,6 +45,7 @@ namespace multidebate.types {
         converged: Boolean
     }
 
+    /** Final outcome of the debate including winner and convergence trajectory. */
     schema DebateOutcome {
         winner: String,
         final_synthesis: String,
@@ -51,17 +57,29 @@ namespace multidebate.types {
 // ---------------------------------------------------------------------------
 // Mixins and implicits
 // ---------------------------------------------------------------------------
+/** Debate configuration policies for round limits and convergence. */
 namespace multidebate.mixins {
+    /** Configures maximum rounds and convergence threshold.
+     * @param max_rounds Maximum number of debate rounds
+     * @param convergence_threshold Score delta below which debate is considered converged
+     */
     facet RoundConfig(max_rounds: Int = 3, convergence_threshold: Double = 0.1)
+    /** Configures convergence detection thresholds.
+     * @param min_agreement Minimum agreement level to declare convergence
+     * @param max_drift Maximum position drift allowed between rounds
+     */
     facet ConvergenceThreshold(min_agreement: Double = 0.7, max_drift: Double = 0.2)
 
+    /** Default round config: 3 rounds, 0.1 convergence threshold. */
     implicit defaultRoundConfig = RoundConfig(max_rounds = 3, convergence_threshold = 0.1)
+    /** Default convergence threshold: 0.7 agreement, 0.2 max drift. */
     implicit defaultConvergenceThreshold = ConvergenceThreshold(min_agreement = 0.7, max_drift = 0.2)
 }
 
 // ---------------------------------------------------------------------------
 // Setup -- InitiateRound, AssignPositions
 // ---------------------------------------------------------------------------
+/** Debate round initialization and position assignment. */
 namespace multidebate.Setup {
     use multidebate.types
 
@@ -92,6 +110,7 @@ namespace multidebate.Setup {
 // ---------------------------------------------------------------------------
 // Argumentation -- RefineArgument, ChallengeArgument
 // ---------------------------------------------------------------------------
+/** Argument refinement and cross-agent challenges. */
 namespace multidebate.Argumentation {
     use multidebate.types
 
@@ -124,6 +143,7 @@ namespace multidebate.Argumentation {
 // ---------------------------------------------------------------------------
 // Scoring -- ScoreRound, EvaluateConvergence
 // ---------------------------------------------------------------------------
+/** Round scoring and convergence evaluation. */
 namespace multidebate.Scoring {
     use multidebate.types
 
@@ -154,6 +174,7 @@ namespace multidebate.Scoring {
 // ---------------------------------------------------------------------------
 // Synthesis -- SummarizeRound, DeclareOutcome
 // ---------------------------------------------------------------------------
+/** Round summarization and final outcome declaration. */
 namespace multidebate.Synthesis {
     use multidebate.types
 
@@ -185,6 +206,7 @@ namespace multidebate.Synthesis {
 // ---------------------------------------------------------------------------
 // Composed facet -- DebateRound (12 steps)
 // ---------------------------------------------------------------------------
+/** Composed debate round facet encapsulating the full round lifecycle. */
 namespace multidebate.composition {
     use multidebate.types
     use multidebate.mixins
@@ -219,6 +241,7 @@ namespace multidebate.composition {
 // ---------------------------------------------------------------------------
 // Workflows
 // ---------------------------------------------------------------------------
+/** Workflows for iterative multi-round and agent-focused debates. */
 namespace multidebate.workflows {
     use multidebate.types
     use multidebate.mixins

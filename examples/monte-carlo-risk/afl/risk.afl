@@ -2,7 +2,9 @@
 // Demonstrates: schemas, pre-scripts, andThen scripts, concurrent blocks,
 // deep dependency chains, multi-namespace composition.
 
+/** Shared type definitions for portfolio risk analysis. */
 namespace risk.types {
+    /** A portfolio with positions, currency, and valuation metadata. */
     schema Portfolio {
         name: String,
         positions: Json,
@@ -10,17 +12,20 @@ namespace risk.types {
         valuation_date: String,
         total_value: Long
     }
+    /** A correlation matrix with Cholesky decomposition for asset returns. */
     schema CorrelationMatrix {
         matrix: Json,
         asset_ids: Json,
         cholesky: Json
     }
+    /** Configuration for Monte Carlo simulation runs. */
     schema SimulationConfig {
         num_paths: Long,
         time_horizon_days: Long,
         confidence_levels: Json,
         random_seed: Long
     }
+    /** Results from a single simulation batch including P&L distribution. */
     schema BatchResult {
         batch_id: Long,
         num_paths: Long,
@@ -28,6 +33,7 @@ namespace risk.types {
         mean_pnl: Long,
         worst_pnl: Long
     }
+    /** Aggregated risk metrics including VaR, CVaR, and drawdown statistics. */
     schema RiskMetrics {
         var_95: Long,
         var_99: Long,
@@ -37,12 +43,14 @@ namespace risk.types {
         max_drawdown: Long,
         sharpe_ratio: Long
     }
+    /** Result of a stress test scenario showing portfolio impact. */
     schema StressResult {
         scenario_name: String,
         portfolio_pnl: Long,
         worst_position: String,
         best_position: String
     }
+    /** Portfolio Greeks (delta, gamma, vega) for sensitivity analysis. */
     schema Greeks {
         delta: Json,
         gamma: Json,
@@ -50,6 +58,7 @@ namespace risk.types {
         portfolio_delta: Long,
         portfolio_vega: Long
     }
+    /** Final risk report with file path, summary, and timestamp. */
     schema RiskReport {
         report_path: String,
         summary: Json,
@@ -57,36 +66,89 @@ namespace risk.types {
     }
 }
 
+/** Market data loading and historical correlation computation. */
 namespace risk.MarketData {
     use risk.types
 
+    /**
+     * Load a named portfolio with its positions and valuation.
+     * @param portfolio_name Name of the portfolio to load
+     * @returns portfolio The loaded portfolio structure
+     */
     event facet LoadPortfolio(portfolio_name: String = "default") => (portfolio: Portfolio)
 
+    /**
+     * Fetch historical price data and compute the asset correlation matrix.
+     * @param asset_ids JSON array of asset identifiers
+     * @param lookback_days Number of trading days to look back
+     * @returns correlation Correlation matrix with Cholesky decomposition
+     */
     event facet FetchHistoricalData(asset_ids: Json, lookback_days: Long = 252) => (correlation: CorrelationMatrix)
 }
 
+/** Monte Carlo simulation engine for GBM paths and stress scenarios. */
 namespace risk.Simulation {
     use risk.types
 
+    /**
+     * Run a batch of Monte Carlo simulation paths using GBM.
+     * @param positions Portfolio positions to simulate
+     * @param cholesky Cholesky-decomposed correlation matrix
+     * @param num_paths Number of paths in this batch
+     * @param time_horizon_days Simulation time horizon in days
+     * @param batch_id Identifier for this batch
+     * @param random_seed Seed for reproducibility
+     * @returns result Batch simulation results with P&L distribution
+     */
     event facet SimulateBatch(positions: Json, cholesky: Json, num_paths: Long = 1000, time_horizon_days: Long = 10, batch_id: Long = 0, random_seed: Long = 42) => (result: BatchResult)
 
+    /**
+     * Simulate a stress scenario by applying shock factors to positions.
+     * @param positions Portfolio positions to stress
+     * @param scenario_name Name of the stress scenario
+     * @param shock_factors JSON array of per-asset shock multipliers
+     * @returns result Stress test outcome with P&L impact
+     */
     event facet SimulateStress(positions: Json, scenario_name: String, shock_factors: Json) => (result: StressResult)
 }
 
+/** Risk analytics: VaR/CVaR computation and Greeks calculation. */
 namespace risk.Analytics {
     use risk.types
 
+    /**
+     * Compute Value-at-Risk and Conditional VaR from P&L distributions.
+     * @param pnl_distributions Aggregated P&L distribution data
+     * @param confidence_levels JSON array of confidence levels (e.g. 0.95, 0.99)
+     * @returns metrics Risk metrics including VaR, CVaR, and drawdown
+     */
     event facet ComputeVaR(pnl_distributions: Json, confidence_levels: Json = "[0.95, 0.99]") => (metrics: RiskMetrics)
 
+    /**
+     * Compute portfolio Greeks (delta, gamma, vega) for sensitivity analysis.
+     * @param positions Portfolio positions
+     * @param cholesky Cholesky-decomposed correlation matrix
+     * @returns greeks Per-asset and portfolio-level Greeks
+     */
     event facet ComputeGreeks(positions: Json, cholesky: Json) => (greeks: Greeks)
 }
 
+/** Risk report generation combining metrics, Greeks, and stress results. */
 namespace risk.Reporting {
     use risk.types
 
+    /**
+     * Generate a consolidated risk report from analysis results.
+     * @param portfolio The analyzed portfolio
+     * @param metrics Computed VaR/CVaR risk metrics
+     * @param greeks Portfolio sensitivity Greeks
+     * @param stress_results JSON array of stress test outcomes
+     * @returns report Final risk report with path and summary
+     */
     event facet GenerateReport(portfolio: Portfolio, metrics: RiskMetrics, greeks: Greeks, stress_results: Json) => (report: RiskReport)
 }
 
+/** Top-level risk analysis workflows. */
 namespace risk.workflows {
     use risk.types
     use risk.MarketData

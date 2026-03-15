@@ -3,7 +3,9 @@
 // schemas, prompt blocks, script blocks, mixins+implicits, and
 // RegistryRunner-first approach.
 
+/** Type definitions for deployment configuration, health checks, and rollback reporting. */
 namespace deploy.types {
+    /** Kubernetes deployment configuration with resource limits and labels. */
     schema DeploymentConfig {
         namespace_name: String,
         replicas: Int,
@@ -13,12 +15,14 @@ namespace deploy.types {
         image_pull_policy: String
     }
 
+    /** Health check results including individual check outcomes. */
     schema HealthCheckResult {
         healthy: Boolean,
         results: Json,
         checks_run: Int
     }
 
+    /** Report generated after a deployment rollback operation. */
     schema RollbackReport {
         rollback_id: String,
         previous_version: String,
@@ -28,16 +32,34 @@ namespace deploy.types {
     }
 }
 
+/** Reusable cross-cutting policies for retry, timeout, and credential management. */
 namespace deploy.mixins {
+    /** Configures retry behavior with exponential backoff.
+     * @param max_retries Maximum number of retry attempts
+     * @param backoff_ms Backoff interval in milliseconds between retries
+     * @returns Retry configuration parameters
+     */
     facet RetryPolicy(max_retries: Int = 3, backoff_ms: Int = 1000) => (max_retries: Int, backoff_ms: Int)
+    /** Configures operation timeout.
+     * @param timeout_seconds Maximum seconds to wait before timing out
+     * @returns Timeout configuration
+     */
     facet Timeout(timeout_seconds: Int = 300) => (timeout_seconds: Int)
+    /** Configures container registry credentials.
+     * @param registry_secret Name of the Kubernetes secret for image pull authentication
+     * @returns Credential configuration
+     */
     facet Credentials(registry_secret: String = "default-secret") => (registry_secret: String)
 
+    /** Default retry policy: 3 retries with 1s backoff. */
     implicit default_retry = RetryPolicy()
+    /** Default timeout: 300 seconds. */
     implicit default_timeout = Timeout()
+    /** Default credentials using the default-secret. */
     implicit default_credentials = Credentials()
 }
 
+/** Container image build and test execution facets. */
 namespace deploy.Build {
     use deploy.types
 
@@ -63,6 +85,7 @@ namespace deploy.Build {
     }
 }
 
+/** Kubernetes deployment application and rollout monitoring. */
 namespace deploy.Deploy {
     use deploy.types
 
@@ -88,6 +111,7 @@ result['config'] = {
     event facet WaitForRollout(deployment_id: String, timeout_seconds: Int = 300) => (ready: Boolean, ready_replicas: Int, message: String) with Timeout()
 }
 
+/** Post-deployment health checking and incident triage. */
 namespace deploy.Monitor {
     use deploy.types
 
@@ -102,6 +126,7 @@ namespace deploy.Monitor {
     }
 }
 
+/** Deployment rollback and verification. */
 namespace deploy.Rollback {
     use deploy.types
 
@@ -112,6 +137,7 @@ namespace deploy.Rollback {
     event facet VerifyRollback(service: String, rollback_id: String) => (verified: Boolean, message: String)
 }
 
+/** Deployment workflows for single-service and batch deployments. */
 namespace deploy.workflows {
     use deploy.types
 

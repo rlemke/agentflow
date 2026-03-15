@@ -12,13 +12,16 @@
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
+/** Shared type definitions for multi-agent debate. */
 namespace debate.types {
+    /** A debate position with stance, rationale, and priority. */
     schema Position {
         stance: String,
         rationale: String,
         priority: Long
     }
 
+    /** An argument with claims, evidence, and confidence from a debate agent. */
     schema Argument {
         agent_role: String,
         position: String,
@@ -27,6 +30,7 @@ namespace debate.types {
         confidence: Double
     }
 
+    /** A rebuttal targeting another agent's argument with counter-claims. */
     schema Rebuttal {
         agent_role: String,
         target_role: String,
@@ -35,6 +39,7 @@ namespace debate.types {
         strength: Double
     }
 
+    /** Scoring of a debate agent on clarity, evidence quality, and persuasiveness. */
     schema Score {
         agent_role: String,
         clarity: Long,
@@ -43,6 +48,7 @@ namespace debate.types {
         overall: Long
     }
 
+    /** Final verdict declaring a winner with rationale and dissenting points. */
     schema Verdict {
         winner: String,
         margin: Double,
@@ -50,6 +56,7 @@ namespace debate.types {
         dissenting_points: Json
     }
 
+    /** Consensus outcome with agreement level, common ground, and unresolved items. */
     schema ConsensusResult {
         agreement_level: Double,
         common_ground: Json,
@@ -61,8 +68,11 @@ namespace debate.types {
 // -----------------------------------------------------------------------
 // Mixins
 // -----------------------------------------------------------------------
+/** Agent persona and timeout mixins for debate steps. */
 namespace debate.mixins {
+    /** Assigns a persona and expertise area to a debate agent. */
     facet AgentRole(persona: String = "neutral", expertise: String = "general")
+    /** Maximum execution time for a debate step. */
     facet Timeout(minutes: Int = 30)
 
     implicit defaultRole = AgentRole(persona = "neutral", expertise = "general")
@@ -72,6 +82,7 @@ namespace debate.mixins {
 // -----------------------------------------------------------------------
 // Framing
 // -----------------------------------------------------------------------
+/** Topic framing and role assignment for debates. */
 namespace debate.Framing {
     use debate.types
 

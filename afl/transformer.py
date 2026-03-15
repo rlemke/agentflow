@@ -64,7 +64,7 @@ from .ast import (
     YieldStmt,
 )
 
-_TAG_RE = re.compile(r"^@(param|return)\s+(\w+)\s+(.*)")
+_TAG_RE = re.compile(r"^@(param|returns?)\s+(\w+)\s+(.*)")
 
 
 def _clean_doc_comment(raw: str) -> DocComment:

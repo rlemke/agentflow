@@ -3,7 +3,9 @@
 // error recovery), andThen foreach (batch processing), prompt blocks,
 // script blocks, schemas, mixins+implicits, and RegistryRunner-first approach.
 
+/** Type definitions for HIV sequencing, variant calling, and resistance profiling. */
 namespace hiv.types {
+    /** Quality control threshold parameters for sequencing reads. */
     schema QCThresholds {
         min_read_quality: Int,
         min_depth: Int,
@@ -11,6 +13,7 @@ namespace hiv.types {
         min_length: Int
     }
 
+    /** Result of aligning sequencing reads to a reference genome. */
     schema AlignmentResult {
         bam_path: String,
         mapped_reads: Int,
@@ -18,6 +21,7 @@ namespace hiv.types {
         mean_depth: Int
     }
 
+    /** A single amino acid variant detected at a genomic position. */
     schema VariantCall {
         gene: String,
         position: Int,
@@ -28,6 +32,7 @@ namespace hiv.types {
         is_drm: Boolean
     }
 
+    /** Drug resistance score for a single antiretroviral drug. */
     schema DrugScore {
         drug_name: String,
         drug_class: String,
@@ -36,6 +41,7 @@ namespace hiv.types {
         interpretation: String
     }
 
+    /** Complete resistance profile for a sample including mutations and drug scores. */
     schema ResistanceProfile {
         sample_id: String,
         subtype: String,
@@ -43,6 +49,7 @@ namespace hiv.types {
         drug_scores: Json
     }
 
+    /** Summary statistics for a batch of processed samples. */
     schema BatchSummary {
         batch_id: String,
         total_samples: Int,
@@ -52,14 +59,28 @@ namespace hiv.types {
     }
 }
 
+/** Reusable quality and retry policies for sequencing operations. */
 namespace hiv.mixins {
+    /** Configures minimum quality and depth thresholds for sequencing QC.
+     * @param min_read_quality Minimum Phred quality score for reads
+     * @param min_depth Minimum read depth required
+     * @returns Quality threshold parameters
+     */
     facet QualityPolicy(min_read_quality: Int = 30, min_depth: Int = 100) => (min_read_quality: Int, min_depth: Int)
+    /** Configures retry behavior with exponential backoff.
+     * @param max_retries Maximum number of retry attempts
+     * @param backoff_ms Backoff interval in milliseconds between retries
+     * @returns Retry configuration parameters
+     */
     facet RetryPolicy(max_retries: Int = 3, backoff_ms: Int = 2000) => (max_retries: Int, backoff_ms: Int)
 
+    /** Default quality policy: Q30 reads, 100x depth. */
     implicit default_quality = QualityPolicy()
+    /** Default retry policy: 3 retries with 2s backoff. */
     implicit default_retry = RetryPolicy()
 }
 
+/** Read quality assessment and reference genome alignment. */
 namespace hiv.Sequencing {
     use hiv.types
 
@@ -70,6 +91,7 @@ namespace hiv.Sequencing {
     event facet AlignReads(sample_id: String, fastq_path: String, reference: String = "HXB2") => (alignment: AlignmentResult) with RetryPolicy()
 }
 
+/** Variant calling, consensus generation, and mutation classification. */
 namespace hiv.Analysis {
     use hiv.types
 
@@ -108,6 +130,7 @@ result['apobec_count'] = apobec_count
 "
 }
 
+/** Drug resistance scoring and clinical interpretation. */
 namespace hiv.Interpretation {
     use hiv.types
 
@@ -126,6 +149,7 @@ namespace hiv.Interpretation {
     }
 }
 
+/** Sample and batch report generation. */
 namespace hiv.Reporting {
     use hiv.types
 
@@ -136,6 +160,7 @@ namespace hiv.Reporting {
     event facet GenerateBatchReport(batch_id: String, sample_count: Int, results: Json) => (report_path: String, summary: BatchSummary)
 }
 
+/** Workflows for single-sample analysis and batch processing. */
 namespace hiv.workflows {
     use hiv.types
 

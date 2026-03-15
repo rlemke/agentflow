@@ -10,7 +10,9 @@
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
+/** Shared type definitions for the research agent pipeline. */
 namespace research.types {
+    /** A research topic with depth, keywords, and subtopic limits. */
     schema Topic {
         name: String,
         depth: Long,
@@ -19,6 +21,7 @@ namespace research.types {
         max_subtopics: Long
     }
 
+    /** A subtopic derived from a parent topic for focused investigation. */
     schema Subtopic {
         name: String,
         parent_topic: String,
@@ -26,6 +29,7 @@ namespace research.types {
         priority: Long
     }
 
+    /** A research source with title, URL, and relevance score. */
     schema Source {
         title: String,
         url: String,
@@ -33,6 +37,7 @@ namespace research.types {
         source_type: String
     }
 
+    /** A factual finding extracted from a source with confidence level. */
     schema Finding {
         claim: String,
         evidence: String,
@@ -40,6 +45,7 @@ namespace research.types {
         source_title: String
     }
 
+    /** Synthesized analysis with themes, contradictions, and knowledge gaps. */
     schema Analysis {
         themes: Json,
         contradictions: Json,
@@ -48,6 +54,7 @@ namespace research.types {
         confidence_score: Double
     }
 
+    /** A draft research report with sections and citations. */
     schema Draft {
         title: String,
         sections: Json,
@@ -55,6 +62,7 @@ namespace research.types {
         citations: Json
     }
 
+    /** Peer review result with score, approval status, and feedback. */
     schema ReviewResult {
         score: Long,
         approved: Boolean,
@@ -66,8 +74,11 @@ namespace research.types {
 // -----------------------------------------------------------------------
 // Mixins
 // -----------------------------------------------------------------------
+/** Cross-cutting concerns for research steps. */
 namespace research.mixins {
+    /** Retry policy with configurable attempts and backoff. */
     facet Retry(max_attempts: Int = 3, backoff_ms: Int = 2000)
+    /** Citation formatting configuration. */
     facet Citation(style: String = "apa", include_urls: Boolean = true)
 
     implicit defaultRetry = Retry(max_attempts = 3, backoff_ms = 2000)
@@ -77,6 +88,7 @@ namespace research.mixins {
 // -----------------------------------------------------------------------
 // Planning
 // -----------------------------------------------------------------------
+/** Research planning and topic decomposition. */
 namespace research.Planning {
     use research.types
 
@@ -105,6 +117,7 @@ namespace research.Planning {
 // -----------------------------------------------------------------------
 // Gathering
 // -----------------------------------------------------------------------
+/** Source gathering and finding extraction. */
 namespace research.Gathering {
     use research.types
 
@@ -132,6 +145,7 @@ namespace research.Gathering {
 // -----------------------------------------------------------------------
 // Analysis
 // -----------------------------------------------------------------------
+/** Finding synthesis and gap identification. */
 namespace research.Analysis {
     use research.types
 
@@ -159,6 +173,7 @@ namespace research.Analysis {
 // -----------------------------------------------------------------------
 // Writing
 // -----------------------------------------------------------------------
+/** Report drafting and peer review. */
 namespace research.Writing {
     use research.types
 
@@ -188,6 +203,7 @@ namespace research.Writing {
 // -----------------------------------------------------------------------
 // Workflows
 // -----------------------------------------------------------------------
+/** Top-level research workflows. */
 namespace research.workflows {
     use research.types
     use research.mixins

@@ -7,7 +7,9 @@
 // -----------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------
+/** Shared type definitions for ML hyperparameter sweep. */
 namespace ml.types {
+    /** Metadata describing a prepared dataset. */
     schema DatasetInfo {
         name: String,
         num_features: Long,
@@ -17,6 +19,7 @@ namespace ml.types {
         labels_path: String
     }
 
+    /** Configuration for train/validation/test data splitting. */
     schema SplitConfig {
         train_ratio: Double,
         val_ratio: Double,
@@ -25,6 +28,7 @@ namespace ml.types {
         random_seed: Long
     }
 
+    /** Training hyperparameters for a single sweep configuration. */
     schema HyperParams {
         learning_rate: Double,
         epochs: Long,
@@ -33,6 +37,7 @@ namespace ml.types {
         optimizer: String
     }
 
+    /** Results from a single training run including loss and accuracy. */
     schema TrainResult {
         model_id: String,
         run_label: String,
@@ -42,6 +47,7 @@ namespace ml.types {
         hyperparams: Json
     }
 
+    /** Model evaluation metrics on the test set. */
     schema EvalResult {
         model_id: String,
         accuracy: Double,
@@ -51,6 +57,7 @@ namespace ml.types {
         confusion_matrix: Json
     }
 
+    /** Comparison of models with ranking and best model selection. */
     schema ComparisonResult {
         best_model_id: String,
         metric_name: String,
@@ -58,6 +65,7 @@ namespace ml.types {
         summary: String
     }
 
+    /** Summary report of a completed hyperparameter sweep. */
     schema SweepReport {
         dataset_name: String,
         total_configs: Long,
@@ -66,6 +74,7 @@ namespace ml.types {
         best_config: Json
     }
 
+    /** Neural network architecture configuration. */
     schema ModelConfig {
         model_type: String,
         hidden_layers: Json,
@@ -76,10 +85,15 @@ namespace ml.types {
 // -----------------------------------------------------------------------
 // Mixins
 // -----------------------------------------------------------------------
+/** Cross-cutting mixins and implicit defaults for training runs. */
 namespace ml.mixins {
+    /** Retry policy with configurable attempts and backoff. */
     facet Retry(max_attempts: Int = 3, backoff_ms: Int = 1000)
+    /** Maximum execution time for a training step. */
     facet Timeout(minutes: Int = 60)
+    /** GPU device assignment and memory allocation. */
     facet GPU(device_id: Int = 0, memory_fraction: Double = 0.9)
+    /** Experiment tracking integration for run logging. */
     facet ExperimentTracker(run_name: String, project: String = "hyperparam-sweep")
 
     implicit defaultRetry = Retry(max_attempts = 3, backoff_ms = 1000)
@@ -90,6 +104,7 @@ namespace ml.mixins {
 // -----------------------------------------------------------------------
 // Data
 // -----------------------------------------------------------------------
+/** Dataset preparation and splitting. */
 namespace ml.Data {
     use ml.types
 
@@ -117,6 +132,7 @@ namespace ml.Data {
 // -----------------------------------------------------------------------
 // Training
 // -----------------------------------------------------------------------
+/** Model training with configurable hyperparameters. */
 namespace ml.Training {
     use ml.types
 
@@ -134,6 +150,7 @@ namespace ml.Training {
 // -----------------------------------------------------------------------
 // Evaluation
 // -----------------------------------------------------------------------
+/** Model evaluation and comparison. */
 namespace ml.Evaluation {
     use ml.types
 
@@ -153,6 +170,7 @@ namespace ml.Evaluation {
 // -----------------------------------------------------------------------
 // Reporting
 // -----------------------------------------------------------------------
+/** LLM-powered sweep report generation. */
 namespace ml.Reporting {
     use ml.types
 
@@ -171,6 +189,7 @@ namespace ml.Reporting {
 // -----------------------------------------------------------------------
 // Workflows
 // -----------------------------------------------------------------------
+/** Top-level hyperparameter sweep workflows. */
 namespace ml.workflows {
     use ml.types
     use ml.mixins
