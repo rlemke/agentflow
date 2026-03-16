@@ -598,6 +598,12 @@ class AFLValidator:
             for block in body:
                 all_block_steps.append(self._collect_block_step_names(block))
 
+            # Accumulate step context from regular andThen blocks for
+            # cross-block visibility in when blocks (Gap 2).
+            accumulated_steps: dict[str, StepInfo] = {}
+            accumulated_step_returns: dict[str, set[str]] = {}
+            accumulated_step_returns_types: dict[str, dict[str, str]] = {}
+
             # Second pass: validate, passing other blocks' steps for
             # cross-block reference detection
             for idx, block in enumerate(body):
@@ -605,7 +611,52 @@ class AFLValidator:
                 for j, s in enumerate(all_block_steps):
                     if j != idx:
                         other_steps |= s
-                self._validate_and_then_block(block, sig, other_block_steps=other_steps)
+
+                if block.when:
+                    # When blocks can see steps from prior regular andThen blocks
+                    self._validate_and_then_block(
+                        block,
+                        sig,
+                        other_block_steps=other_steps,
+                        parent_steps=accumulated_steps,
+                        parent_step_returns=accumulated_step_returns,
+                        parent_step_returns_types=accumulated_step_returns_types,
+                    )
+                else:
+                    self._validate_and_then_block(block, sig, other_block_steps=other_steps)
+                    # Accumulate step info from regular blocks for subsequent when blocks
+                    if block.block:
+                        for step in block.block.steps:
+                            facet_info = self._resolve_facet_name(step.call.name)
+                            schema_info = None
+                            if facet_info:
+                                accumulated_steps[step.name] = StepInfo(
+                                    name=step.name,
+                                    facet_name=step.call.name,
+                                    location=step.location,
+                                )
+                                accumulated_step_returns[step.name] = facet_info.returns
+                                accumulated_step_returns_types[step.name] = facet_info.returns_types
+                            else:
+                                schema_info = self._resolve_schema_name(step.call.name)
+                                if schema_info:
+                                    accumulated_steps[step.name] = StepInfo(
+                                        name=step.name,
+                                        facet_name=step.call.name,
+                                        location=step.location,
+                                    )
+                                    accumulated_step_returns[step.name] = schema_info.fields
+                                    accumulated_step_returns_types[step.name] = (
+                                        schema_info.fields_types
+                                    )
+                                else:
+                                    accumulated_steps[step.name] = StepInfo(
+                                        name=step.name,
+                                        facet_name=step.call.name,
+                                        location=step.location,
+                                    )
+                                    accumulated_step_returns[step.name] = set()
+                                    accumulated_step_returns_types[step.name] = {}
         elif isinstance(body, AndThenBlock):
             self._validate_and_then_block(body, sig)
 
@@ -740,7 +791,14 @@ class AFLValidator:
 
         # andThen when variant
         if body.when:
-            self._validate_when_block(body.when, containing_sig, extra_yield_targets)
+            self._validate_when_block(
+                body.when,
+                containing_sig,
+                extra_yield_targets,
+                step_returns_types=parent_step_returns_types,
+                steps=parent_steps,
+                step_returns=parent_step_returns,
+            )
             return
 
         if not body.block:
@@ -872,6 +930,9 @@ class AFLValidator:
         when: WhenBlock,
         containing_sig: FacetSig,
         extra_yield_targets: set[str] | None = None,
+        step_returns_types: dict[str, dict[str, str]] | None = None,
+        steps: dict[str, "StepInfo"] | None = None,
+        step_returns: dict[str, set[str]] | None = None,
     ) -> None:
         """Validate a when block.
 
@@ -915,10 +976,11 @@ class AFLValidator:
             )
 
         # Validate each case
+        input_attrs = {p.name for p in containing_sig.params}
         for case in when.cases:
             if not case.is_default and case.condition is not None:
-                # Check that condition type is Boolean
-                condition_type = self._infer_type(case.condition)
+                # Check that condition type is Boolean (Gap 1: pass step_returns_types)
+                condition_type = self._infer_type(case.condition, step_returns_types)
                 if condition_type != "Unknown" and condition_type != "Boolean":
                     self._result.add_error(
                         f"When case condition must be Boolean, got {condition_type}",
@@ -926,20 +988,34 @@ class AFLValidator:
                     )
                 # Validate references in condition
                 for ref in self._extract_references(case.condition):
-                    # Conditions can only reference inputs ($.param) — no steps in scope
                     if ref.is_input:
-                        input_attrs = {p.name for p in containing_sig.params}
                         if ref.path and ref.path[0] not in input_attrs:
                             self._result.add_error(
                                 f"Invalid input reference '$.{ref.path[0]}': "
                                 f"no parameter named '{ref.path[0]}'",
                                 ref.location,
                             )
+                    else:
+                        # Gap 3: validate step references in when conditions
+                        self._validate_reference(
+                            ref,
+                            input_attrs,
+                            steps or {},
+                            step_returns or {},
+                            foreach_var=None,
+                        )
 
             # Validate the case block body using a synthetic AndThenBlock
             if case.block:
                 synthetic = AndThenBlock(block=case.block)
-                self._validate_and_then_block(synthetic, containing_sig, extra_yield_targets)
+                self._validate_and_then_block(
+                    synthetic,
+                    containing_sig,
+                    extra_yield_targets,
+                    parent_steps=steps,
+                    parent_step_returns=step_returns,
+                    parent_step_returns_types=step_returns_types,
+                )
 
     def _validate_catch_clause(
         self,

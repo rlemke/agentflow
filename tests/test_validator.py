@@ -2520,3 +2520,200 @@ class TestStepReturnTypeInference:
         """)
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
+
+
+class TestWhenBlockStepReturnTypes:
+    """Test step return type inference in when block conditions (Phase 2 gaps)."""
+
+    def test_when_condition_step_string_plus_int_error(self, validator):
+        """Gap 1: case s1.name + 1 where name: String should catch type error."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet HandleHigh(x: Int)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.risk_level + 1 => {
+                h = HandleHigh(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_when_condition_step_int_equals_valid(self, validator):
+        """Gap 1: case s1.score == 10 where score: Int should pass (Boolean)."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet HandleHigh(x: Int)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.score == 10 => {
+                h = HandleHigh(x = s1.score)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_when_condition_step_string_eq_valid(self, validator):
+        """Gap 1: case s1.risk_level == "critical" should pass."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet HandleCritical(x: Int)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.risk_level == "critical" => {
+                h = HandleCritical(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_when_condition_step_bool_arithmetic_error(self, validator):
+        """Gap 1: case s1.flag + 1 where flag: Boolean should error."""
+        ast = parse("""
+        event facet GetFlag() => (flag: Boolean)
+        facet Handle(x: Int)
+        workflow Test() andThen {
+            s1 = GetFlag()
+        } andThen when {
+            case s1.flag + 1 => {
+                h = Handle(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Boolean" in str(e) for e in result.errors)
+
+    def test_cross_block_step_visible_in_when(self, validator):
+        """Gap 2: when block can see steps from prior regular andThen blocks."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet HandleCritical(level: String)
+        facet HandleNormal(level: String)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.risk_level == "critical" => {
+                h = HandleCritical(level = s1.risk_level)
+            }
+            case _ => {
+                n = HandleNormal(level = s1.risk_level)
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_cross_block_step_type_checked_in_when_body(self, validator):
+        """Gap 2: step type info flows into when body for type checking."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet Process(x: Int)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.score > 5 => {
+                p = Process(x = s1.risk_level + 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
+
+    def test_when_condition_undefined_step_error(self, validator):
+        """Gap 3: referencing undefined step in when condition should error."""
+        ast = parse("""
+        facet Handle(x: Int)
+        workflow Test(id: Int) andThen when {
+            case s1.score == 10 => {
+                h = Handle(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("undefined step" in str(e) and "s1" in str(e) for e in result.errors)
+
+    def test_when_condition_invalid_step_attr_error(self, validator):
+        """Gap 3: referencing invalid attribute on step in when condition should error."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (risk_level: String, score: Int)
+        facet Handle(x: Int)
+        workflow Test(id: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.nonexistent == "x" => {
+                h = Handle(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("Invalid attribute 'nonexistent'" in str(e) for e in result.errors)
+
+    def test_when_condition_step_and_input_mixed(self, validator):
+        """Conditions can mix step refs and input refs."""
+        ast = parse("""
+        event facet GetRisk(id: Int) => (score: Int)
+        facet Handle(x: Int)
+        workflow Test(id: Int, threshold: Int) andThen {
+            s1 = GetRisk(id = $.id)
+        } andThen when {
+            case s1.score > $.threshold => {
+                h = Handle(x = s1.score)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_when_no_prior_blocks_step_ref_still_unknown(self, validator):
+        """Without prior blocks, step refs in when conditions reference undefined steps."""
+        ast = parse("""
+        facet Handle(x: Int)
+        workflow Test(id: Int) andThen when {
+            case $.id == 1 => {
+                h = Handle(x = 1)
+            }
+            case _ => {}
+        }
+        """)
+        result = validator.validate(ast)
+        # Input ref $.id is valid, no step refs — should pass
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_when_condition_schema_field_type_resolved(self, validator):
+        """Gap 1+2: schema field types resolve through cross-block when conditions."""
+        ast = parse("""
+        namespace ns {
+            schema Config { name: String, count: Long }
+            facet Handle(x: Int)
+            workflow Test() andThen {
+                cfg = Config(name = "test", count = 42)
+            } andThen when {
+                case cfg.name + 1 => {
+                    h = Handle(x = 1)
+                }
+                case _ => {}
+            }
+        }
+        """)
+        result = validator.validate(ast)
+        assert not result.is_valid
+        assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
