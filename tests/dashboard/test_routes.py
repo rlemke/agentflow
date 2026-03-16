@@ -96,7 +96,7 @@ class TestHomeRoute:
         tc, store = client
         resp = tc.get("/")
         assert resp.status_code == 200
-        assert "Runners" in resp.text
+        assert "Workflows" in resp.text
         assert "Servers" in resp.text
 
     def test_home_with_data(self, client):
@@ -123,52 +123,13 @@ class TestHomeRoute:
 
 
 class TestRunnerRoutes:
-    def test_runner_list_empty(self, client):
+    def test_runner_list_redirects_to_v2(self, client):
         tc, store = client
-        resp = tc.get("/runners")
-        assert resp.status_code == 200
+        resp = tc.get("/runners", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/workflows"
 
-    def test_runner_list_with_data(self, client):
-        tc, store = client
-        from afl.runtime.entities import (
-            RunnerDefinition,
-            RunnerState,
-            WorkflowDefinition,
-        )
-
-        workflow = WorkflowDefinition(
-            uuid="wf-1",
-            name="TestWF",
-            namespace_id="ns-1",
-            facet_id="f-1",
-            flow_id="flow-1",
-            starting_step="s-1",
-            version="1.0",
-        )
-        runner = RunnerDefinition(
-            uuid="r-1",
-            workflow_id="wf-1",
-            workflow=workflow,
-            state=RunnerState.RUNNING,
-        )
-        store.save_runner(runner)
-
-        resp = tc.get("/runners")
-        assert resp.status_code == 200
-        assert "r-1" in resp.text or "TestWF" in resp.text
-
-    def test_runner_list_filter_by_state(self, client):
-        tc, store = client
-        resp = tc.get("/runners?state=running")
-        assert resp.status_code == 200
-
-    def test_runner_detail_not_found(self, client):
-        tc, store = client
-        resp = tc.get("/runners/nonexistent")
-        assert resp.status_code == 200
-        assert "not found" in resp.text.lower()
-
-    def test_runner_detail_with_data(self, client):
+    def test_runner_list_with_data_redirects(self, client):
         tc, store = client
         from afl.runtime.entities import (
             RunnerDefinition,
@@ -193,9 +154,50 @@ class TestRunnerRoutes:
         )
         store.save_runner(runner)
 
-        resp = tc.get("/runners/r-1")
-        assert resp.status_code == 200
-        assert "TestWF" in resp.text
+        resp = tc.get("/runners", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/workflows"
+
+    def test_runner_list_filter_by_state_redirects(self, client):
+        tc, store = client
+        resp = tc.get("/runners?state=running", follow_redirects=False)
+        assert resp.status_code == 307
+        assert "tab=running" in resp.headers["location"]
+
+    def test_runner_detail_redirects_to_v2(self, client):
+        tc, store = client
+        resp = tc.get("/runners/nonexistent", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/workflows/nonexistent"
+
+    def test_runner_detail_with_data_redirects(self, client):
+        tc, store = client
+        from afl.runtime.entities import (
+            RunnerDefinition,
+            RunnerState,
+            WorkflowDefinition,
+        )
+
+        workflow = WorkflowDefinition(
+            uuid="wf-1",
+            name="TestWF",
+            namespace_id="ns-1",
+            facet_id="f-1",
+            flow_id="flow-1",
+            starting_step="s-1",
+            version="1.0",
+        )
+        runner = RunnerDefinition(
+            uuid="r-1",
+            workflow_id="wf-1",
+            workflow=workflow,
+            state=RunnerState.RUNNING,
+        )
+        store.save_runner(runner)
+
+        resp = tc.get("/runners/r-1", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/workflows/r-1"
 
     def test_cancel_runner(self, client):
         tc, store = client
@@ -923,32 +925,31 @@ def _make_handler(facet_name="ns.TestFacet", module_uri="my.handlers", entrypoin
 
 
 class TestHandlerRoutes:
-    def test_handler_list_empty(self, client):
+    def test_handler_list_redirects_to_v2(self, client):
         tc, store = client
-        resp = tc.get("/handlers")
-        assert resp.status_code == 200
-        assert "Handlers" in resp.text
+        resp = tc.get("/handlers", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/handlers"
 
-    def test_handler_list_with_data(self, client):
+    def test_handler_list_with_data_redirects(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler())
-        resp = tc.get("/handlers")
-        assert resp.status_code == 200
-        assert "ns.TestFacet" in resp.text
+        resp = tc.get("/handlers", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/handlers"
 
-    def test_handler_detail(self, client):
+    def test_handler_detail_redirects_to_v2(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler())
-        resp = tc.get("/handlers/ns.TestFacet")
-        assert resp.status_code == 200
-        assert "ns.TestFacet" in resp.text
-        assert "my.handlers" in resp.text
+        resp = tc.get("/handlers/ns.TestFacet", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/handlers/ns.TestFacet"
 
-    def test_handler_detail_not_found(self, client):
+    def test_handler_detail_not_found_redirects(self, client):
         tc, store = client
-        resp = tc.get("/handlers/ns.Missing")
-        assert resp.status_code == 200
-        assert "not found" in resp.text.lower()
+        resp = tc.get("/handlers/ns.Missing", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/handlers/ns.Missing"
 
     def test_delete_handler(self, client):
         tc, store = client
@@ -1300,7 +1301,7 @@ class TestTaskDetailAndFiltering:
 
         resp = tc.get("/tasks/t-1")
         assert resp.status_code == 200
-        assert "/runners/r-1" in resp.text
+        assert "/v2/workflows/r-1" in resp.text
         assert "/flows/flow-1" in resp.text
         assert "/steps/step-1" in resp.text
 
@@ -1449,15 +1450,14 @@ class TestListFiltering:
         assert "TestFlow" in resp.text
         assert "OtherFlow" not in resp.text
 
-    def test_handler_list_search(self, client):
+    def test_handler_list_search_redirects(self, client):
         tc, store = client
         store.save_handler_registration(_make_handler("ns.TestFacet"))
         store.save_handler_registration(_make_handler("other.Handler", module_uri="other.mod"))
 
-        resp = tc.get("/handlers?q=ns.Test")
-        assert resp.status_code == 200
-        assert "ns.TestFacet" in resp.text
-        assert "other.Handler" not in resp.text
+        resp = tc.get("/handlers?q=ns.Test", follow_redirects=False)
+        assert resp.status_code == 307
+        assert resp.headers["location"] == "/v2/handlers"
 
     def test_source_list_search(self, client):
         tc, store = client

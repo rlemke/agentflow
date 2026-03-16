@@ -26,46 +26,28 @@ router = APIRouter(prefix="/runners")
 
 
 @router.get("")
-def runner_list(request: Request, state: str | None = None, store=Depends(get_store)):
-    """List all runners, optionally filtered by state."""
+def runner_list(state: str | None = None):
+    """Redirect to v2 workflows list."""
+    url = "/v2/workflows"
     if state:
-        runners = store.get_runners_by_state(state)
-    else:
-        runners = store.get_all_runners()
-
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "runners/list.html",
-        {"runners": runners, "filter_state": state},
-    )
+        # Map old state param to v2 tab
+        tab_map = {
+            "running": "running",
+            "paused": "running",
+            "created": "running",
+            "completed": "completed",
+            "failed": "failed",
+            "cancelled": "failed",
+        }
+        tab = tab_map.get(state, "running")
+        url = f"/v2/workflows?tab={tab}"
+    return RedirectResponse(url=url, status_code=307)
 
 
 @router.get("/{runner_id}")
-def runner_detail(runner_id: str, request: Request, store=Depends(get_store)):
-    """Show runner detail with steps, logs, and parameters."""
-    runner = store.get_runner(runner_id)
-    if not runner:
-        return request.app.state.templates.TemplateResponse(
-            request,
-            "runners/detail.html",
-            {"runner": None, "steps": [], "logs": []},
-        )
-
-    steps = store.get_steps_by_workflow(runner.workflow_id)
-    logs = store.get_logs_by_runner(runner_id)
-    step_log_counts = _build_step_log_counts(store, runner.workflow_id)
-
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "runners/detail.html",
-        {
-            "runner": runner,
-            "steps": steps,
-            "tree": build_step_tree(list(steps)),
-            "logs": logs,
-            "step_log_counts": step_log_counts,
-        },
-    )
+def runner_detail(runner_id: str):
+    """Redirect to v2 workflow detail."""
+    return RedirectResponse(url=f"/v2/workflows/{runner_id}", status_code=307)
 
 
 @router.get("/{runner_id}/steps")
@@ -117,18 +99,18 @@ def _build_step_log_counts(store, workflow_id: str) -> dict[str, int]:
 def cancel_runner(runner_id: str, store=Depends(get_store)):
     """Cancel a runner."""
     store.update_runner_state(runner_id, "cancelled")
-    return RedirectResponse(url=f"/runners/{runner_id}", status_code=303)
+    return RedirectResponse(url=f"/v2/workflows/{runner_id}", status_code=303)
 
 
 @router.post("/{runner_id}/pause")
 def pause_runner(runner_id: str, store=Depends(get_store)):
     """Pause a running runner."""
     store.update_runner_state(runner_id, "paused")
-    return RedirectResponse(url=f"/runners/{runner_id}", status_code=303)
+    return RedirectResponse(url=f"/v2/workflows/{runner_id}", status_code=303)
 
 
 @router.post("/{runner_id}/resume")
 def resume_runner(runner_id: str, store=Depends(get_store)):
     """Resume a paused runner."""
     store.update_runner_state(runner_id, "running")
-    return RedirectResponse(url=f"/runners/{runner_id}", status_code=303)
+    return RedirectResponse(url=f"/v2/workflows/{runner_id}", status_code=303)

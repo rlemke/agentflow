@@ -234,11 +234,11 @@ class TestTreeIntegration:
         tc, store = client
         self._seed(store)
 
-        resp = tc.get("/runners/r-1")
+        resp = tc.get("/v2/workflows/r-1")
         assert resp.status_code == 200
         assert "view-toggle" in resp.text
-        assert 'id="step-flat"' in resp.text
-        assert 'id="step-tree"' in resp.text
+        assert 'id="v2-step-flat"' in resp.text
+        assert 'id="v2-step-tree"' in resp.text
 
     def test_runner_steps_page_has_toggle(self, client):
         tc, store = client

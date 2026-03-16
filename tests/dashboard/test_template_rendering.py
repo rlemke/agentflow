@@ -91,28 +91,28 @@ class TestStateColorRendering:
     def test_running_badge_primary(self, client):
         tc, store = client
         store.save_runner(_make_runner("r-1", state="running"))
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows?tab=running")
         assert resp.status_code == 200
         assert "badge-primary" in resp.text
 
     def test_completed_badge_success(self, client):
         tc, store = client
         store.save_runner(_make_runner("r-2", state="completed"))
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows?tab=completed")
         assert resp.status_code == 200
         assert "badge-success" in resp.text
 
     def test_failed_badge_danger(self, client):
         tc, store = client
         store.save_runner(_make_runner("r-3", state="failed"))
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows?tab=failed")
         assert resp.status_code == 200
         assert "badge-danger" in resp.text
 
     def test_paused_badge_warning(self, client):
         tc, store = client
         store.save_runner(_make_runner("r-4", state="paused"))
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows?tab=running")
         assert resp.status_code == 200
         assert "badge-warning" in resp.text
 
@@ -128,20 +128,20 @@ class TestNavigationRendering:
         resp = tc.get("/")
         assert resp.status_code == 200
         html = resp.text
-        assert 'href="/runners"' in html
+        assert 'href="/v2/workflows"' in html
         assert 'href="/flows"' in html
         assert 'href="/tasks"' in html
         assert 'href="/v2/servers"' in html
         assert 'href="/output"' in html
         assert 'href="/workflows/new"' in html
 
-    def test_nav_links_on_runners_page(self, client):
+    def test_nav_links_on_workflows_page(self, client):
         tc, store = client
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows")
         assert resp.status_code == 200
         html = resp.text
         # Base template nav should be present on every page
-        assert 'href="/runners"' in html
+        assert 'href="/v2/workflows"' in html
         assert 'href="/flows"' in html
 
     def test_nav_links_on_tasks_page(self, client):
@@ -149,16 +149,16 @@ class TestNavigationRendering:
         resp = tc.get("/tasks")
         assert resp.status_code == 200
         html = resp.text
-        assert 'href="/runners"' in html
+        assert 'href="/events"' in html
         assert 'href="/v2/servers"' in html
 
-    def test_breadcrumb_on_runner_detail(self, client):
+    def test_breadcrumb_on_workflow_detail(self, client):
         tc, store = client
         store.save_runner(_make_runner("r-1"))
-        resp = tc.get("/runners/r-1")
+        resp = tc.get("/v2/workflows/r-1")
         assert resp.status_code == 200
-        # Runner detail page should contain a link back to runners
-        assert "runners" in resp.text.lower()
+        # Workflow detail page should contain a link back to workflows
+        assert "workflows" in resp.text.lower()
 
 
 # =============================================================================
@@ -167,15 +167,12 @@ class TestNavigationRendering:
 
 
 class TestTableRendering:
-    def test_runner_list_column_headers(self, client):
+    def test_workflow_list_page_renders(self, client):
         tc, store = client
-        resp = tc.get("/runners")
+        resp = tc.get("/v2/workflows")
         assert resp.status_code == 200
         html = resp.text
-        assert "<th>ID</th>" in html
-        assert "<th>Workflow</th>" in html
-        assert "<th>State</th>" in html
-        assert "<th>Duration</th>" in html
+        assert "Workflows" in html
 
     def test_task_list_column_headers(self, client):
         tc, store = client

@@ -657,41 +657,19 @@ def global_search(
     """Search across all resources — returns HTML partial for command palette."""
     results = search_all(q, store)
 
-    if not results:
-        if q.strip():
-            return HTMLResponse('<div class="cmd-palette-empty">No results found</div>')
-        return HTMLResponse(
-            '<div class="cmd-palette-empty">Type to search across all resources</div>'
-        )
-
     # Group results by type
     grouped: dict[str, list] = {}
     for r in results:
         grouped.setdefault(r["type"], []).append(r)
 
-    html_parts = []
-    type_labels = {
-        "workflow": "Workflows",
-        "flow": "Flows",
-        "server": "Servers",
-        "handler": "Handlers",
-    }
-    for rtype in ["workflow", "flow", "server", "handler"]:
-        items = grouped.get(rtype, [])
-        if not items:
-            continue
-        html_parts.append(f'<div class="cmd-palette-category">{type_labels[rtype]}</div>')
-        for item in items:
-            html_parts.append(
-                f'<div class="cmd-palette-item" data-href="{item["href"]}" '
-                f"onclick=\"window.location.href='{item['href']}'\">"
-                f'<span class="cmd-palette-item-icon">{item["icon"]}</span>'
-                f'<span class="cmd-palette-item-name">{item["name"]}</span>'
-                f'<span class="cmd-palette-item-type">{item["type"]}</span>'
-                f"</div>"
-            )
-
-    return HTMLResponse("".join(html_parts))
+    templates = request.app.state.templates
+    html = templates.get_template("partials/_search_results.html").render(
+        results=results,
+        grouped=grouped,
+        query=q.strip(),
+        request=request,
+    )
+    return HTMLResponse(html)
 
 
 # ---------------------------------------------------------------------------

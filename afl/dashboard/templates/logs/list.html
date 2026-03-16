@@ -4,7 +4,7 @@
 <h1>Logs{% if runner %} — Runner <span class="mono">{{ runner.uuid|truncate_uuid }}</span>{% endif %}</h1>
 
 {% if runner %}
-<p><a href="/runners/{{ runner.uuid }}">Back to runner</a></p>
+<p><a href="/v2/workflows/{{ runner.uuid }}">Back to runner</a></p>
 {% endif %}
 
 <figure>

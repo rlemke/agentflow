@@ -310,13 +310,14 @@ class TestNavStructure:
         resp = tc.get("/v2/workflows")
         assert "/tasks" in resp.text
         assert "/flows" in resp.text
-        assert "/runners" in resp.text
+        assert "/v2/workflows" in resp.text
         assert "/output" in resp.text
 
-    def test_old_runners_route_still_works(self, client):
+    def test_old_runners_route_redirects_to_v2(self, client):
         tc, store = client
-        resp = tc.get("/runners")
-        assert resp.status_code == 200
+        resp = tc.get("/runners", follow_redirects=False)
+        assert resp.status_code == 307
+        assert "/v2/workflows" in resp.headers["location"]
 
 
 @pytestmark_routes

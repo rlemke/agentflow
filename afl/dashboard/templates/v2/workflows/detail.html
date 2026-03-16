@@ -75,7 +75,6 @@
         <button type="submit" class="secondary outline">Cancel</button>
     </form>
     {% endif %}
-    <a href="/runners/{{ runner.uuid }}" role="button" class="secondary outline">Old Detail View</a>
 </div>
 
 <h2>Steps</h2>
@@ -156,19 +155,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/step_tree.js"></script>
-<script src="/static/log_stream.js"></script>
-<script>
-function switchView(name, btn) {
-    var views = ['flat', 'tree', 'graph', 'timeline'];
-    for (var i = 0; i < views.length; i++) {
-        var el = document.getElementById('v2-step-' + views[i]);
-        if (el) el.style.display = (views[i] === name) ? '' : 'none';
-    }
-    var btns = document.querySelectorAll('.view-toggle-btn');
-    for (var j = 0; j < btns.length; j++) {
-        btns[j].classList.toggle('active', btns[j] === btn);
-    }
-}
+<script type="module">
+import { initViewToggle } from "/static/view_toggle.js";
+initViewToggle();
 </script>
 {% endblock %}

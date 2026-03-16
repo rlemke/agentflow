@@ -28,7 +28,7 @@
         <article>
             <header>Related Entities</header>
             <table>
-                <tr><th>Runner</th><td><a href="/runners/{{ task.runner_id }}" class="mono">{{ task.runner_id }}</a></td></tr>
+                <tr><th>Runner</th><td><a href="/v2/workflows/{{ task.runner_id }}" class="mono">{{ task.runner_id }}</a></td></tr>
                 <tr><th>Workflow ID</th><td class="mono">{{ task.workflow_id }}</td></tr>
                 <tr><th>Flow</th><td><a href="/flows/{{ task.flow_id }}" class="mono">{{ task.flow_id }}</a></td></tr>
                 <tr><th>Step</th><td>{% if step_name %}<strong>{{ step_name }}</strong> — {% endif %}<a href="/steps/{{ task.step_id }}" class="mono">{{ task.step_id }}</a></td></tr>

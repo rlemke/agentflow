@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 
 from ..dependencies import get_store
@@ -25,31 +25,19 @@ router = APIRouter(prefix="/handlers")
 
 
 @router.get("")
-def handler_list(request: Request, q: str | None = None, store=Depends(get_store)):
-    """List all handler registrations, optionally filtered by facet name search."""
-    handlers = store.list_handler_registrations()
-    if q:
-        handlers = [h for h in handlers if q.lower() in h.facet_name.lower()]
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "handlers/list.html",
-        {"handlers": handlers, "search_query": q},
-    )
+def handler_list(q: str | None = None):
+    """Redirect to v2 handlers list."""
+    return RedirectResponse(url="/v2/handlers", status_code=307)
 
 
 @router.get("/{facet_name:path}")
-def handler_detail(facet_name: str, request: Request, store=Depends(get_store)):
-    """Show handler registration detail."""
-    handler = store.get_handler_registration(facet_name)
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "handlers/detail.html",
-        {"handler": handler},
-    )
+def handler_detail(facet_name: str):
+    """Redirect to v2 handler detail."""
+    return RedirectResponse(url=f"/v2/handlers/{facet_name}", status_code=307)
 
 
 @router.post("/{facet_name:path}/delete")
 def delete_handler(facet_name: str, store=Depends(get_store)):
     """Delete a handler registration and redirect to list."""
     store.delete_handler_registration(facet_name)
-    return RedirectResponse(url="/handlers", status_code=303)
+    return RedirectResponse(url="/v2/handlers", status_code=303)

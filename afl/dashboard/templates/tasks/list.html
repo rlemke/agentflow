@@ -1,53 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Tasks — AgentFlow{% endblock %}
+
+{% block breadcrumb %}
+<div class="container">
+    <nav class="breadcrumb">
+        <a href="/tasks">Tasks</a>
+    </nav>
+</div>
+{% endblock %}
+
+{% block subnav %}
+<div class="container">
+    <div class="subnav">
+        <a href="/tasks"
+           class="subnav-pill{% if not filter_state %} active{% endif %}">
+            All <span class="subnav-count">{{ tab_counts.all }}</span>
+        </a>
+        <a href="/tasks?state=pending"
+           class="subnav-pill{% if filter_state == 'pending' %} active{% endif %}">
+            Pending <span class="subnav-count">{{ tab_counts.pending }}</span>
+        </a>
+        <a href="/tasks?state=running"
+           class="subnav-pill{% if filter_state == 'running' %} active{% endif %}">
+            Running <span class="subnav-count">{{ tab_counts.running }}</span>
+        </a>
+        <a href="/tasks?state=completed"
+           class="subnav-pill{% if filter_state == 'completed' %} active{% endif %}">
+            Completed <span class="subnav-count">{{ tab_counts.completed }}</span>
+        </a>
+        <a href="/tasks?state=failed"
+           class="subnav-pill{% if filter_state == 'failed' %} active{% endif %}">
+            Failed <span class="subnav-count">{{ tab_counts.failed }}</span>
+        </a>
+        <a href="/tasks?state=ignored"
+           class="subnav-pill{% if filter_state == 'ignored' %} active{% endif %}">
+            Ignored <span class="subnav-count">{{ tab_counts.ignored }}</span>
+        </a>
+        <a href="/tasks?state=canceled"
+           class="subnav-pill{% if filter_state == 'canceled' %} active{% endif %}">
+            Canceled <span class="subnav-count">{{ tab_counts.canceled }}</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 <h1>Task Queue</h1>
 
-<nav>
-    <a href="/tasks">All</a> |
-    <a href="/tasks?state=pending">Pending</a> |
-    <a href="/tasks?state=running">Running</a> |
-    <a href="/tasks?state=completed">Completed</a> |
-    <a href="/tasks?state=failed">Failed</a> |
-    <a href="/tasks?state=ignored">Ignored</a> |
-    <a href="/tasks?state=canceled">Canceled</a>
-</nav>
-
-{% if filter_state %}
-<p>Filtered by state: {% with state=filter_state %}{% include "partials/_state_badge.html" %}{% endwith %}</p>
-{% endif %}
+<button class="btn-refresh"
+        hx-get="/tasks/partial{% if filter_state %}?state={{ filter_state }}{% endif %}"
+        hx-target="#task-table-content"
+        hx-swap="innerHTML">
+    <span class="refresh-icon">&#x21bb;</span> Refresh
+    <span class="loading-spinner htmx-indicator"></span>
+</button>
 
 <div id="task-table-content"
      {% if filter_state == 'pending' or filter_state == 'running' %}hx-get="/tasks/partial{% if filter_state %}?state={{ filter_state }}{% endif %}" hx-trigger="every 5s" hx-swap="innerHTML"{% endif %}>
-<figure>
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Step</th>
-            <th>State</th>
-            <th>Task List</th>
-            <th>Runner</th>
-            <th>Duration</th>
-            <th>Created</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for task in tasks %}
-        <tr>
-            <td class="mono"><a href="/tasks/{{ task.uuid }}">{{ task.uuid|truncate_uuid }}</a></td>
-            <td>{{ task.name }}</td>
-            <td>{{ step_names.get(task.step_id, '') or '—' }}</td>
-            <td>{% with state=task.state %}{% include "partials/_state_badge.html" %}{% endwith %}</td>
-            <td>{{ task.task_list_name }}</td>
-            <td><a href="/runners/{{ task.runner_id }}" class="mono">{{ task.runner_id|truncate_uuid }}</a></td>
-            <td>{{ (task.updated - task.created)|duration }}</td>
-            <td>{{ task.created|timestamp }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-</figure>
+    {% include "tasks/_table_content.html" %}
 </div>
 {% endblock %}

@@ -23,14 +23,28 @@ from ..dependencies import get_store
 router = APIRouter(prefix="/tasks")
 
 
-@router.get("")
-def task_list(request: Request, state: str | None = None, store=Depends(get_store)):
-    """List all tasks, optionally filtered by state."""
-    if state:
-        tasks = store.get_tasks_by_state(state)
-    else:
-        tasks = store.get_all_tasks()
+def _count_tasks_by_state(store) -> dict[str, int]:
+    """Count tasks per state for subnav tabs."""
+    all_tasks = store.get_all_tasks()
+    counts: dict[str, int] = {
+        "all": 0,
+        "pending": 0,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "canceled": 0,
+    }
+    for t in all_tasks:
+        counts["all"] += 1
+        s = t.state if isinstance(t.state, str) else t.state.value
+        if s in counts:
+            counts[s] += 1
+    return counts
 
+
+def _resolve_step_names(tasks, store) -> dict[str, str]:
+    """Resolve step names for a list of tasks."""
     step_names: dict[str, str] = {}
     for task in tasks:
         if task.step_id and task.step_id not in step_names:
@@ -39,11 +53,30 @@ def task_list(request: Request, state: str | None = None, store=Depends(get_stor
                 step_names[task.step_id] = (
                     step.statement_name or step.statement_id or step.facet_name or ""
                 )
+    return step_names
+
+
+@router.get("")
+def task_list(request: Request, state: str | None = None, store=Depends(get_store)):
+    """List all tasks, optionally filtered by state."""
+    if state:
+        tasks = store.get_tasks_by_state(state)
+    else:
+        tasks = store.get_all_tasks()
+
+    step_names = _resolve_step_names(tasks, store)
+    tab_counts = _count_tasks_by_state(store)
 
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/list.html",
-        {"tasks": tasks, "filter_state": state, "step_names": step_names},
+        {
+            "tasks": tasks,
+            "filter_state": state,
+            "step_names": step_names,
+            "tab_counts": tab_counts,
+            "active_tab": "tasks",
+        },
     )
 
 
@@ -55,14 +88,7 @@ def task_list_partial(request: Request, state: str | None = None, store=Depends(
     else:
         tasks = store.get_all_tasks()
 
-    step_names: dict[str, str] = {}
-    for task in tasks:
-        if task.step_id and task.step_id not in step_names:
-            step = store.get_step(task.step_id)
-            if step:
-                step_names[task.step_id] = (
-                    step.statement_name or step.statement_id or step.facet_name or ""
-                )
+    step_names = _resolve_step_names(tasks, store)
 
     return request.app.state.templates.TemplateResponse(
         request,
