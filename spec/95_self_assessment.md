@@ -28,9 +28,9 @@ Solid. The `declarations`-only JSON format is clean. `_convert()` dispatch is st
 
 ---
 
-## Validator — B
+## Validator — B+
 
-Good coverage of structural rules (duplicates, reference validity, yield targets, when block constraints). In v0.31.0, `_infer_type` now resolves input reference types (`$.param`) from signature parameters via `_param_scope`, catching errors like `$.text + 1` where `text: String` and `$.flag > 0` where `flag: Boolean`. This closes the biggest type inference gap. Step references (`step.field`) still return `"Unknown"` — resolving return types through the call graph is the remaining Phase 2 work. The improvement is meaningful: the 5 primitive types (`String`, `Int`, `Long`, `Double`, `Boolean`) cover the vast majority of parameter declarations.
+Good coverage of structural rules (duplicates, reference validity, yield targets, when block constraints). Phase 1 (v0.31.0): `_infer_type` resolves input reference types (`$.param`) from signature parameters via `_param_scope`. Phase 2a (v0.36.0): step return types resolved within andThen blocks via `step_returns_types` built from `FacetInfo.returns_types` and `SchemaInfo.fields_types`. Phase 2b (v0.40.1): step return types threaded into when block conditions and cross-block step visibility — `andThen { s1 = F() } andThen when { case s1.field == "x" }` now resolves types and validates step references. Remaining gap: schema-typed return fields resolve to "Unknown" (not the schema name), and deeply nested field access (`step.field.subfield`) is not supported.
 
 ---
 
@@ -64,9 +64,9 @@ The HIV example now has real integration tests (`tests/real/`) that run the full
 
 ---
 
-## UI / Dashboard — B-
+## UI / Dashboard — B
 
-The dashboard is functional but it's the area where the approach has scaled least gracefully. The v0.31.0 shared component extraction was a meaningful step toward component reuse.
+The dashboard has improved significantly through v0.40.1. The earlier B- reflected two coexisting navigation paradigms, inline JS blobs, duplicate old/v2 pages, and inconsistent auto-refresh. These have been addressed.
 
 ### What works
 
@@ -74,22 +74,19 @@ The dashboard is functional but it's the area where the approach has scaled leas
 - SSE log streaming (v0.27.0), DAG visualization, timeline charts add real operational value
 - Cmd+K command palette and sidebar nav (v0.23.0) improved navigation significantly
 - Census maps with GeoJSON rendering show it can handle domain-specific visualization
-- Auto-refresh partials avoid full page reloads
 - Python tests cover routes and HTML output reliably
-- **Shared components (v0.31.0):** `_state_badge.html`, `_empty_state.html`, `_attrs_table.html` partials replace 30 duplicated patterns across 22 templates. State badges now have a single source of truth. This is the template-level component reuse the dashboard lacked
+- **Shared components (v0.31.0):** `_state_badge.html`, `_empty_state.html`, `_attrs_table.html` partials replace 30 duplicated patterns across 22 templates
+- **ES modules + CSS design tokens (v0.36.0):** frontend modernization step
+- **Unified navigation (v0.40.1):** Old runner/handler routes redirect to v2 equivalents; tasks and events pages migrated to v2 subnav pattern with breadcrumbs and tab counts
+- **JS extraction (v0.40.1):** Inline JS extracted into shared ES modules (`state_filter.js`, `view_toggle.js`); fixed double-loading of `step_tree.js`
+- **HTMX auto-refresh (v0.40.1):** Tasks and events pages now auto-refresh via HTMX partials
+- **Search XSS fix (v0.40.1):** Global search results rendered via Jinja2 partial instead of f-string HTML concatenation
 
-### What doesn't
+### Remaining gaps
 
-- **No frontend architecture.** It's templates with inline JavaScript, jQuery-style event handlers, and CSS classes scattered across Jinja2 files. Every new feature is another template with its own JS blob
 - **One-off visualizations.** The DAG visualization and timeline chart are standalone JavaScript implementations, not backed by a charting library with consistent styling
 - **No responsive design discipline.** It works on desktop but that's about it
-- **Ad-hoc state management.** Some pages auto-refresh, some use SSE, some are static — no consistent pattern
-- **Basic forms.** The handler create/edit forms (v0.26.0) are plain HTML forms without client-side validation or feedback
-- **No design system.** Visual design is utilitarian Bootstrap without coherent theming
-
-### The core issue
-
-I treated the dashboard as "add the next feature to the template" rather than building a proper frontend foundation. A monitoring dashboard for a workflow engine is actually a significant UI challenge — step hierarchies, real-time state, dependency graphs, log streaming — and it deserved either a proper React/Vue SPA or at least a disciplined HTMX + server-components approach from the start. The v0.31.0 shared partials are a step in the right direction — extracting reusable components from the template soup — but the deeper architectural issues (no JS module system, no design system, no consistent state management) remain.
+- **Basic forms.** The handler create/edit forms are plain HTML forms without client-side validation or feedback
 
 ---
 
