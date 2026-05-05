@@ -1,0 +1,17 @@
+// Event facet — the canonical agent boundary.
+//
+// An `event facet` is dispatched to an external handler at runtime
+// (registered in the handler registry, see fw_list_handlers).
+// The signature declares the inputs the handler receives and the
+// returns the workflow expects back.
+
+namespace hello {
+    /** Greets a name via an external handler. */
+    event facet Greet(name: String) => (message: String)
+
+    /** Workflow that calls the agent boundary, then yields the message. */
+    workflow SayHello(name: String) => (greeting: String) andThen {
+        result = Greet(name = $.name)
+        yield SayHello(greeting = result.message)
+    }
+}

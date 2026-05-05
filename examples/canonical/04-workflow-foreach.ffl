@@ -1,0 +1,15 @@
+// andThen foreach — fan out a step over a collection in parallel.
+//
+// The `foreach` clause introduces a loop variable that lives in the
+// input scope: reference it as `$.<varname>` inside the block.
+// Each iteration becomes its own runtime step, so the runner can
+// dispatch them in parallel.
+
+namespace pages {
+    event facet Fetch(url: String) => (body: String)
+
+    workflow FetchAll(urls: Json) => (count: Long) andThen foreach url in $.urls {
+        page = Fetch(url = $.url)
+        yield FetchAll(count = 1)
+    }
+}

@@ -128,6 +128,30 @@ Composed workflows in `osm.workflows.sourced` demonstrate the pattern:
 | Tutorial | [docs/getting-started/tutorial.md](docs/getting-started/tutorial.md) |
 | Tools + handlers pattern (per-domain CLI + `_lib/` + shim) | [agent-spec/tools-pattern.agent-spec.yaml](agent-spec/tools-pattern.agent-spec.yaml) |
 | Cache layout (sidecars, namespaces, cache types) | [agent-spec/cache-layout.agent-spec.yaml](agent-spec/cache-layout.agent-spec.yaml) |
+| MCP context-engineering design (rule_ids, docs URIs) | [docs/architecture/mcp-context-engineering.md](docs/architecture/mcp-context-engineering.md) |
+| Validator rule docs (one file per rule_id) | [docs/reference/rules/](docs/reference/rules/) |
+| Canonical FFL examples | [examples/canonical/](examples/canonical/) |
+
+## Writing and fixing FFL — the validator-driven loop
+
+The validator emits structured `rule_id`s with `docs_uri` pointers. Use this loop instead of guessing:
+
+1. Run `fw_validate` (MCP) or `afl <file> --check` on the source.
+2. For each error, fetch `afl://docs/rules/{rule_id}` for paired wrong/right examples and a "why".
+3. Apply the fix and re-validate.
+
+When writing new FFL, start from a canonical example under [`examples/canonical/`](examples/canonical/) — every file there is a small, validator-clean template. The MCP server also exposes them at `afl://examples/canonical/{name}`.
+
+Key constraints the rule docs cover (and the language enforces):
+
+- **Workflows and schemas must live inside a namespace** (`WORKFLOW_AT_TOP_LEVEL`, `SCHEMA_AT_TOP_LEVEL`).
+- **References are always `step.field` form** — bare step names are not valid expressions (`REF_INVALID_STEP_FORMAT`).
+- **`foreach` loop variables are accessed via `$.<varname>`** inside the block (same scope as workflow inputs).
+- **Yield targets** must be the containing facet OR one of its declared mixins (`YIELD_INVALID_TARGET`).
+- **`when` blocks need a default case, last** (`WHEN_MISSING_DEFAULT`, `WHEN_DEFAULT_NOT_LAST`).
+- **No truthy/falsy coercion** — comparisons return Boolean, and `&&`/`||`/`!` only accept Boolean operands.
+
+When adding a new validator check, give it a `rule_id` AND write the matching `docs/reference/rules/{rule_id}.md` in the same change. Coverage is currently exact (41/41 emitted rule_ids documented); the script that diffs them lives in [docs/architecture/mcp-context-engineering.md](docs/architecture/mcp-context-engineering.md).
 
 ## Domain pipelines — tools / handlers / cache pattern
 

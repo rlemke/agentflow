@@ -1,0 +1,16 @@
+// Mixin composition — extra return attributes attached to a facet/workflow.
+//
+// `with FacetA()` on a signature makes the mixin's return attributes
+// part of what callers can yield to. yield statements may target the
+// containing facet OR any of its declared mixins.
+
+namespace audit {
+    facet Timestamp() => (at: String)
+    event facet Charge(account: String, amount: Long) => (txn_id: String)
+
+    workflow ChargeWithAudit(account: String, amount: Long, at: String) => (txn_id: String, at: String) with Timestamp() andThen {
+        charged = Charge(account = $.account, amount = $.amount)
+        yield ChargeWithAudit(txn_id = charged.txn_id)
+        yield Timestamp(at = $.at)
+    }
+}

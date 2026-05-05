@@ -1,0 +1,10 @@
+// Smallest valid FFL: a namespace containing a single facet.
+//
+// A facet is a typed attribute structure with parameters and an
+// optional return clause. Facets and workflows must live inside a
+// namespace — top-level declarations of either are not allowed.
+
+namespace greet {
+    /** Build a greeting from a name. */
+    facet Greet(name: String) => (greeting: String)
+}

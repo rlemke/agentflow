@@ -1,0 +1,26 @@
+// Schema definition + instantiation.
+//
+// Schemas are pure data structures — no body, no mixins. They live
+// inside a namespace, just like facets. Instantiate a schema by
+// calling it with named field arguments; the result's fields are
+// accessible via `step.field`.
+//
+// References must always be `step.field` form — bare step names
+// (like passing `order` directly) are not valid expressions, so
+// downstream steps consume schema fields individually.
+
+namespace shop {
+    schema Order {
+        sku: String,
+        qty: Long,
+        unit_price: Double
+    }
+
+    event facet Charge(sku: String, qty: Long, unit_price: Double) => (txn_id: String)
+
+    workflow PlaceOrder(sku: String, qty: Long, price: Double) => (txn_id: String) andThen {
+        order = Order(sku = $.sku, qty = $.qty, unit_price = $.price)
+        charged = Charge(sku = order.sku, qty = order.qty, unit_price = order.unit_price)
+        yield PlaceOrder(txn_id = charged.txn_id)
+    }
+}

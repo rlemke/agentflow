@@ -57,11 +57,22 @@ from .ast import (
 
 @dataclass
 class ValidationError:
-    """A semantic validation error."""
+    """A semantic validation error or warning.
+
+    ``rule_id`` is a stable machine-readable identifier (e.g. ``REF_UNDEFINED_STEP``)
+    that callers can use to look up paired wrong/right examples and repair guidance
+    without parsing the human ``message``. ``docs_uri`` points at the canonical
+    rule doc; the MCP server resolves these via the ``afl://docs/rules/{rule_id}``
+    resource.
+    """
 
     message: str
+    rule_id: str = "UNKNOWN"
+    severity: str = "error"
     line: int | None = None
     column: int | None = None
+    docs_uri: str | None = None
+    suggested_fix: str | None = None
 
     def __str__(self) -> str:
         location = ""
@@ -70,6 +81,12 @@ class ValidationError:
             if self.column is not None:
                 location += f", column {self.column}"
         return f"{self.message}{location}"
+
+
+def _docs_uri_for(rule_id: str) -> str | None:
+    if rule_id and rule_id != "UNKNOWN":
+        return f"afl://docs/rules/{rule_id}"
+    return None
 
 
 @dataclass
@@ -83,17 +100,51 @@ class ValidationResult:
     def is_valid(self) -> bool:
         return len(self.errors) == 0
 
-    def add_error(self, message: str, location: SourceLocation | None = None) -> None:
+    def add_error(
+        self,
+        message: str,
+        location: SourceLocation | None = None,
+        *,
+        rule_id: str = "UNKNOWN",
+        suggested_fix: str | None = None,
+    ) -> None:
         """Add a validation error."""
         line = location.line if location else None
         column = location.column if location else None
-        self.errors.append(ValidationError(message, line, column))
+        self.errors.append(
+            ValidationError(
+                message=message,
+                rule_id=rule_id,
+                severity="error",
+                line=line,
+                column=column,
+                docs_uri=_docs_uri_for(rule_id),
+                suggested_fix=suggested_fix,
+            )
+        )
 
-    def add_warning(self, message: str, location: SourceLocation | None = None) -> None:
+    def add_warning(
+        self,
+        message: str,
+        location: SourceLocation | None = None,
+        *,
+        rule_id: str = "UNKNOWN",
+        suggested_fix: str | None = None,
+    ) -> None:
         """Add a validation warning."""
         line = location.line if location else None
         column = location.column if location else None
-        self.warnings.append(ValidationError(message, line, column))
+        self.warnings.append(
+            ValidationError(
+                message=message,
+                rule_id=rule_id,
+                severity="warning",
+                line=line,
+                column=column,
+                docs_uri=_docs_uri_for(rule_id),
+                suggested_fix=suggested_fix,
+            )
+        )
 
 
 @dataclass
@@ -190,6 +241,7 @@ class FFLValidator:
                 f"Schema '{schema.name}' must be defined inside a namespace. "
                 f"Top-level schemas are not allowed.",
                 schema.location,
+                rule_id="SCHEMA_AT_TOP_LEVEL",
             )
 
         # Namespace declarations
@@ -320,6 +372,7 @@ class FFLValidator:
                 f"Ambiguous schema reference '{short_name}': could be {', '.join(sorted(candidates))}. "
                 f"Use fully qualified name to disambiguate.",
                 location,
+                rule_id="REF_AMBIGUOUS_SCHEMA",
             )
             return None
 
@@ -335,6 +388,7 @@ class FFLValidator:
                 f"Ambiguous schema reference '{short_name}': could be {', '.join(sorted(all_matches))}. "
                 f"Use fully qualified name to disambiguate.",
                 location,
+                rule_id="REF_AMBIGUOUS_SCHEMA",
             )
             return None
 
@@ -379,12 +433,14 @@ class FFLValidator:
                     f"Schema types must be defined in a namespace and either imported via 'use' "
                     f"or referenced with a fully qualified name.",
                     type_node.location or location,
+                    rule_id="REF_UNKNOWN_TYPE",
                 )
             elif "." in type_name and type_name not in self._schema_info:
                 # Qualified name not found
                 self._result.add_error(
                     f"Unknown schema '{type_name}': no schema found with this qualified name.",
                     type_node.location or location,
+                    rule_id="REF_UNKNOWN_SCHEMA",
                 )
 
     def _validate_signature_types(self, sig: FacetSig) -> None:
@@ -421,7 +477,11 @@ class FFLValidator:
             if name in self._facets:
                 return self._facets[name]
             # Not found as exact match
-            self._result.add_error(f"Unknown facet '{name}'", location)
+            self._result.add_error(
+                f"Unknown facet '{name}'",
+                location,
+                rule_id="REF_UNKNOWN_FACET",
+            )
             return None
 
         # Unqualified name
@@ -459,6 +519,7 @@ class FFLValidator:
                 f"Ambiguous facet reference '{short_name}': could be {', '.join(sorted(candidates))}. "
                 f"Use fully qualified name to disambiguate.",
                 location,
+                rule_id="REF_AMBIGUOUS_FACET",
             )
             return None
 
@@ -470,6 +531,7 @@ class FFLValidator:
                     f"{', '.join(sorted(all_matches))}. "
                     f"Use fully qualified name to disambiguate.",
                     location,
+                    rule_id="REF_AMBIGUOUS_FACET",
                 )
                 return None
             return self._facets[candidates[0]]
@@ -483,6 +545,7 @@ class FFLValidator:
                 f"Ambiguous facet reference '{short_name}': could be {', '.join(sorted(all_matches))}. "
                 f"Use fully qualified name to disambiguate.",
                 location,
+                rule_id="REF_AMBIGUOUS_FACET",
             )
             return None
 
@@ -507,6 +570,7 @@ class FFLValidator:
             self._result.add_error(
                 f"Workflow '{workflow.sig.name}' must be declared inside a namespace",
                 workflow.location,
+                rule_id="WORKFLOW_AT_TOP_LEVEL",
             )
             self._validate_workflow_decl(workflow)
         for implicit in program.implicits:
@@ -540,6 +604,7 @@ class FFLValidator:
                 self._result.add_error(
                     f"Invalid use statement: namespace '{uses_decl.name}' does not exist",
                     uses_decl.location,
+                    rule_id="USE_UNKNOWN_NAMESPACE",
                 )
             else:
                 self._current_imports.add(uses_decl.name)
@@ -585,7 +650,11 @@ class FFLValidator:
                 if prev_loc and prev_loc.line
                 else ""
             )
-            self._result.add_error(f"Duplicate {kind} name '{name}'{prev_line}", location)
+            self._result.add_error(
+                f"Duplicate {kind} name '{name}'{prev_line}",
+                location,
+                rule_id="DUPLICATE_NAME",
+            )
         else:
             names[name] = location
 
@@ -732,6 +801,7 @@ class FFLValidator:
             self._result.add_error(
                 "Prompt block must have a 'template' directive",
                 block.location,
+                rule_id="PROMPT_MISSING_TEMPLATE",
             )
             return
 
@@ -752,6 +822,7 @@ class FFLValidator:
                         f"no parameter named '{placeholder}'. "
                         f"Valid parameters are: {sorted(param_names)}",
                         block.location,
+                        rule_id="PROMPT_INVALID_PLACEHOLDER",
                     )
 
     def _validate_script_block(self, block: ScriptBlock, sig: FacetSig) -> None:
@@ -765,6 +836,7 @@ class FFLValidator:
             self._result.add_error(
                 "Script block must contain code",
                 block.location,
+                rule_id="SCRIPT_EMPTY",
             )
             return
 
@@ -773,6 +845,7 @@ class FFLValidator:
                 f"Unsupported script language '{block.language}'. "
                 f"Currently only 'python' is supported.",
                 block.location,
+                rule_id="SCRIPT_UNSUPPORTED_LANGUAGE",
             )
 
     def _validate_workflow_decl(self, decl: WorkflowDecl) -> None:
@@ -867,7 +940,9 @@ class FFLValidator:
                     else ""
                 )
                 self._result.add_error(
-                    f"Duplicate step name '{step.name}'{prev_line}", step.location
+                    f"Duplicate step name '{step.name}'{prev_line}",
+                    step.location,
+                    rule_id="DUPLICATE_STEP_NAME",
                 )
             else:
                 steps[step.name] = StepInfo(
@@ -970,6 +1045,7 @@ class FFLValidator:
                 self._result.add_error(
                     f"Duplicate yield target '{target}': each yield must reference a different facet or mixin",
                     yield_stmt.location,
+                    rule_id="YIELD_DUPLICATE_TARGET",
                 )
             else:
                 yield_targets_used.add(target)
@@ -996,6 +1072,7 @@ class FFLValidator:
             self._result.add_error(
                 "When block must have at least one case",
                 when.location,
+                rule_id="WHEN_NO_CASES",
             )
             return
 
@@ -1010,18 +1087,21 @@ class FFLValidator:
             self._result.add_error(
                 "When block can have at most one default case",
                 when.location,
+                rule_id="WHEN_MULTIPLE_DEFAULTS",
             )
 
         if default_count == 0:
             self._result.add_error(
                 "When block must have a default case (case _ =>)",
                 when.location,
+                rule_id="WHEN_MISSING_DEFAULT",
             )
 
         if default_count == 1 and default_index != len(when.cases) - 1:
             self._result.add_error(
                 "Default case must be the last case in a when block",
                 when.location,
+                rule_id="WHEN_DEFAULT_NOT_LAST",
             )
 
         # Validate each case
@@ -1034,6 +1114,7 @@ class FFLValidator:
                     self._result.add_error(
                         f"When case condition must be Boolean, got {condition_type}",
                         case.location,
+                        rule_id="WHEN_CONDITION_NOT_BOOLEAN",
                     )
                 # Validate references in condition
                 for ref in self._extract_references(case.condition):
@@ -1043,6 +1124,7 @@ class FFLValidator:
                                 f"Invalid input reference '$.{ref.path[0]}': "
                                 f"no parameter named '{ref.path[0]}'",
                                 ref.location,
+                                rule_id="REF_INVALID_INPUT",
                             )
                     else:
                         # Gap 3: validate step references in when conditions
@@ -1179,6 +1261,7 @@ class FFLValidator:
                 self._result.add_warning(
                     f"Field '{field_name}' not found on schema '{schema_info.name}'",
                     location,
+                    rule_id="SCHEMA_UNKNOWN_FIELD",
                 )
                 return "Unknown"
             current_type = schema_info.fields_types[field_name]
@@ -1230,6 +1313,7 @@ class FFLValidator:
                         f"Type error: operator '{expr.operator}' requires Boolean operands, "
                         f"got {left_type}",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_BOOLEAN_OPERAND_REQUIRED",
                     )
                     return "Unknown"
                 if right_type != "Unknown" and right_type != "Boolean":
@@ -1237,6 +1321,7 @@ class FFLValidator:
                         f"Type error: operator '{expr.operator}' requires Boolean operands, "
                         f"got {right_type}",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_BOOLEAN_OPERAND_REQUIRED",
                     )
                     return "Unknown"
                 return "Boolean"
@@ -1250,6 +1335,7 @@ class FFLValidator:
                             f"Type error: cannot use ordered comparison '{expr.operator}' "
                             f"with Boolean operand",
                             getattr(expr, "location", None),
+                            rule_id="TYPE_ORDERED_COMPARISON_BOOLEAN",
                         )
                         return "Unknown"
                     for t in (left_type, right_type):
@@ -1258,6 +1344,7 @@ class FFLValidator:
                                 f"Type error: cannot use ordered comparison '{expr.operator}' "
                                 f"with schema type '{t}'",
                                 getattr(expr, "location", None),
+                                rule_id="TYPE_ORDERED_COMPARISON_SCHEMA",
                             )
                             return "Unknown"
                 return "Boolean"
@@ -1269,6 +1356,7 @@ class FFLValidator:
                         f"Type error: cannot use arithmetic operator '{expr.operator}' "
                         f"with String operand (use '++' for concatenation)",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_ARITHMETIC_STRING",
                     )
                     return "Unknown"
                 if left_type == "Boolean" or right_type == "Boolean":
@@ -1276,6 +1364,7 @@ class FFLValidator:
                         f"Type error: cannot use arithmetic operator '{expr.operator}' "
                         f"with Boolean operand",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_ARITHMETIC_BOOLEAN",
                     )
                     return "Unknown"
                 # Schema types cannot be used in arithmetic
@@ -1285,6 +1374,7 @@ class FFLValidator:
                             f"Type error: cannot use arithmetic operator '{expr.operator}' "
                             f"with schema type '{t}'",
                             getattr(expr, "location", None),
+                            rule_id="TYPE_ARITHMETIC_SCHEMA",
                         )
                         return "Unknown"
             # If either is Unknown, allow it (runtime will catch errors)
@@ -1304,6 +1394,7 @@ class FFLValidator:
                     self._result.add_error(
                         f"Type error: operator '!' requires Boolean operand, got {operand_type}",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_NOT_OPERAND_REQUIRED",
                     )
                     return "Unknown"
                 return "Boolean"
@@ -1313,18 +1404,21 @@ class FFLValidator:
                     self._result.add_error(
                         "Type error: cannot negate String operand",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_NEGATE_STRING",
                     )
                     return "Unknown"
                 if operand_type == "Boolean":
                     self._result.add_error(
                         "Type error: cannot negate Boolean operand",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_NEGATE_BOOLEAN",
                     )
                     return "Unknown"
                 if self._is_schema_type(operand_type):
                     self._result.add_error(
                         f"Type error: cannot negate schema type '{operand_type}'",
                         getattr(expr, "location", None),
+                        rule_id="TYPE_NEGATE_SCHEMA",
                     )
                     return "Unknown"
             if operand_type in self._NUMERIC_TYPES:
@@ -1400,12 +1494,15 @@ class FFLValidator:
                     self._result.add_error(
                         f"Invalid input reference '$.{attr}': no parameter named '{attr}'",
                         ref.location,
+                        rule_id="REF_INVALID_INPUT",
                     )
         else:
             # step.attr - must reference a valid step and attribute
             if not ref.path or len(ref.path) < 2:
                 self._result.add_error(
-                    "Invalid step reference: must be 'step.attribute'", ref.location
+                    "Invalid step reference: must be 'step.attribute'",
+                    ref.location,
+                    rule_id="REF_INVALID_STEP_FORMAT",
                 )
                 return
 
@@ -1425,9 +1522,14 @@ class FFLValidator:
                         f"Use a step body (e.g. step = Call(...) andThen {{ ... }}) "
                         f"to compose steps that depend on each other.",
                         ref.location,
+                        rule_id="REF_CROSS_BLOCK_STEP",
                     )
                     return
-                self._result.add_error(f"Reference to undefined step '{step_name}'", ref.location)
+                self._result.add_error(
+                    f"Reference to undefined step '{step_name}'",
+                    ref.location,
+                    rule_id="REF_UNDEFINED_STEP",
+                )
                 return
 
             # Check that we're not referencing a step defined after current step
@@ -1441,6 +1543,7 @@ class FFLValidator:
                             self._result.add_error(
                                 f"Step '{current_step}' cannot reference step '{step_name}' which is not defined before it",
                                 ref.location,
+                                rule_id="REF_FORWARD_STEP",
                             )
                             return
 
@@ -1451,6 +1554,7 @@ class FFLValidator:
                     f"Invalid attribute '{attr}' for step '{step_name}': "
                     f"valid attributes are {sorted(returns)}",
                     ref.location,
+                    rule_id="REF_INVALID_STEP_ATTRIBUTE",
                 )
 
     def _validate_yield(
@@ -1472,6 +1576,7 @@ class FFLValidator:
                 f"Invalid yield target '{target}': must be the containing facet or one of its mixins. "
                 f"Valid targets are: {sorted(valid_targets)}",
                 yield_stmt.location,
+                rule_id="YIELD_INVALID_TARGET",
             )
 
         # Validate references in yield arguments
@@ -1502,6 +1607,7 @@ class FFLValidator:
                 f"Schema instantiation '{call.name}' cannot have mixins. "
                 f"Schemas are simple data structures without mixin support.",
                 call.location,
+                rule_id="SCHEMA_INSTANTIATION_NO_MIXINS",
             )
 
         # Check that all provided arguments are valid schema fields
@@ -1511,6 +1617,7 @@ class FFLValidator:
                     f"Unknown field '{arg.name}' for schema '{call.name}'. "
                     f"Valid fields are: {sorted(schema_info.fields)}",
                     arg.location,
+                    rule_id="SCHEMA_UNKNOWN_FIELD",
                 )
 
     def _validate_schema_decl(self, schema: SchemaDecl) -> None:
@@ -1542,6 +1649,7 @@ class FFLValidator:
                     f"Implicit '{implicit.name}' passes unknown parameter "
                     f"'{arg.name}' to facet '{call.name}'",
                     implicit.location,
+                    rule_id="IMPLICIT_UNKNOWN_PARAM",
                 )
 
 

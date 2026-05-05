@@ -1,0 +1,15 @@
+// Workflow with two sequential steps in one andThen block.
+//
+// Steps inside the same andThen block see each other's results.
+// Reference a previous step's return as `step_name.attribute`.
+
+namespace etl {
+    event facet Fetch(url: String) => (body: String)
+    event facet Parse(body: String) => (count: Long)
+
+    workflow CountWords(url: String) => (count: Long) andThen {
+        fetched = Fetch(url = $.url)
+        parsed = Parse(body = fetched.body)
+        yield CountWords(count = parsed.count)
+    }
+}

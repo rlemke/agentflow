@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
@@ -76,7 +77,15 @@ def create_server(
         return [
             Tool(
                 name="fw_compile",
-                description="Parse FFL source code and return compiled JSON.",
+                description=(
+                    "Parse FFL source and return the compiled JSON AST "
+                    "({success, json}) or {success: false, errors: [...]} on "
+                    "parse failure. Use this when you need the structured AST "
+                    "(e.g. to inspect what a piece of FFL means). For "
+                    "correctness checks before presenting FFL to the user, "
+                    "prefer fw_validate — it returns rule_ids and docs_uris "
+                    "and catches semantic errors that compile alone misses."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -90,7 +99,14 @@ def create_server(
             ),
             Tool(
                 name="fw_validate",
-                description="Validate FFL source code semantically.",
+                description=(
+                    "Validate FFL source against grammar + semantic rules. "
+                    "Call this before showing FFL to the user. Returns "
+                    "{valid, errors, warnings} where each diagnostic has "
+                    "{message, rule_id, severity, line, column, docs_uri, "
+                    "suggested_fix}. On error, fetch afl://docs/rules/{rule_id} "
+                    "for paired wrong/right examples and a suggested fix."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -104,7 +120,16 @@ def create_server(
             ),
             Tool(
                 name="fw_execute_workflow",
-                description="Execute a workflow from FFL source code.",
+                description=(
+                    "Execute a workflow defined in FFL source against an "
+                    "in-memory store. Call fw_validate first — this tool will "
+                    "fail at runtime on semantic errors but won't tell you "
+                    "what's wrong as cleanly. Returns {success, workflow_id, "
+                    "status, iterations, outputs, error?}. NOTE: this runs "
+                    "synchronously with MemoryStore — for distributed "
+                    "execution against the real runner fleet, post a "
+                    "fw:execute task via the dashboard or scripts/ tooling."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -126,7 +151,14 @@ def create_server(
             ),
             Tool(
                 name="fw_continue_step",
-                description="Unblock an event-blocked step by providing a result.",
+                description=(
+                    "Unblock a step waiting in EventBlocked state by supplying "
+                    "its result. Use when a step's handler runs out-of-band "
+                    "(e.g. external agent, manual approval) and the workflow "
+                    "needs to be told the result. The result dict's keys must "
+                    "match the facet's declared return attributes. To retry a "
+                    "step that errored, use fw_retry_step instead."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -144,7 +176,14 @@ def create_server(
             ),
             Tool(
                 name="fw_retry_step",
-                description="Retry a failed step by resetting it to EVENT_TRANSMIT.",
+                description=(
+                    "Reset a single errored step to EventTransmit so the "
+                    "runner picks it up again. Use for transient failures "
+                    "(connection blip, timeout). For workflows stuck due to "
+                    "ancestor-block errors, dead-server tasks, or premature "
+                    "completion, use fw_repair_workflow — it diagnoses and "
+                    "fixes multiple issues in one pass."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -158,7 +197,14 @@ def create_server(
             ),
             Tool(
                 name="fw_resume_workflow",
-                description="Resume a paused workflow execution.",
+                description=(
+                    "Resume a paused/halted workflow execution from its last "
+                    "checkpoint, given the original FFL source and inputs. "
+                    "Use when a workflow was paused via fw_manage_runner "
+                    "(action='pause') or after the runner was stopped. To "
+                    "diagnose-then-fix a stuck workflow, run "
+                    "fw_repair_workflow first."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -184,7 +230,15 @@ def create_server(
             ),
             Tool(
                 name="fw_manage_runner",
-                description="Cancel, pause, or resume a runner.",
+                description=(
+                    "Change a runner's lifecycle state: cancel (terminal — "
+                    "stops scheduling new steps), pause (halts step dispatch "
+                    "while preserving state), or resume (returns a paused "
+                    "runner to running). Use cancel for unwanted/runaway "
+                    "runs. Use pause+resume for graceful intervention. To "
+                    "stop and reset running tasks back to pending across the "
+                    "fleet, prefer scripts/drain-runners."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -202,8 +256,57 @@ def create_server(
                 },
             ),
             Tool(
+                name="fw_list_handlers",
+                description=(
+                    "List registered handler facets the runtime knows how to "
+                    "execute. Call this BEFORE writing FFL that references "
+                    "handler facets — do not invent handler names. Returns "
+                    "an array of {facet_name, module_uri, entrypoint, version, "
+                    "timeout_ms, requirements, metadata, ...}. Use the optional "
+                    "namespace filter (e.g. 'osm') to scope results."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "namespace": {
+                            "type": "string",
+                            "description": (
+                                "Optional namespace prefix filter "
+                                "(matches facet_name starting with '{namespace}.')"
+                            ),
+                        },
+                    },
+                },
+            ),
+            Tool(
+                name="fw_describe_handler",
+                description=(
+                    "Get the full registration for a single handler facet: "
+                    "module_uri, entrypoint, version, timeout_ms, requirements, "
+                    "metadata, and timestamps. Call this when planning a step "
+                    "that uses a handler, to verify the handler exists and to "
+                    "see its declared metadata before writing the FFL step."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "facet_name": {
+                            "type": "string",
+                            "description": "Qualified facet name (e.g. 'osm.DownloadRegion')",
+                        },
+                    },
+                    "required": ["facet_name"],
+                },
+            ),
+            Tool(
                 name="fw_manage_handlers",
-                description="List, get, register, or delete handler registrations.",
+                description=(
+                    "Mutate the handler registry: register a new handler, "
+                    "update an existing one, or delete one. For READ access "
+                    "prefer fw_list_handlers / fw_describe_handler — those "
+                    "are dedicated tools with clearer contracts. The list/get "
+                    "actions here remain for backward compatibility."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -248,10 +351,16 @@ def create_server(
             Tool(
                 name="fw_repair_workflow",
                 description=(
-                    "Diagnose and repair a stuck workflow. Resets runner state if "
-                    "prematurely completed, drains orphaned tasks on dead servers, "
-                    "retries steps with transient errors (connection/timeout), and "
-                    "resets errored ancestor blocks. Use dry_run=true to preview."
+                    "Diagnose and repair a stuck workflow in one pass. Runs "
+                    "five checks: (1) resets runner state if prematurely "
+                    "completed/failed but with non-terminal work, (2) drains "
+                    "orphaned tasks on dead/shutdown servers to pending, (3) "
+                    "retries steps with transient errors (connection/timeout), "
+                    "(4) resets errored ancestor blocks so execution can "
+                    "resume, (5) resets steps marked Complete but with failed "
+                    "tasks. Pass dry_run=true to preview without changes. "
+                    "Prefer this over fw_retry_step for any stuck workflow — "
+                    "it covers all the common failure modes."
                 ),
                 inputSchema={
                     "type": "object",
@@ -271,14 +380,18 @@ def create_server(
             Tool(
                 name="fw_postgis_query",
                 description=(
-                    "Run a read-only SQL query against the PostGIS/OSM database. "
-                    "Tables: osm_nodes (osm_id, region, tags JSONB, geom Point), "
-                    "osm_ways (osm_id, region, tags JSONB, geom LineString), "
-                    "osm_import_log (region, node_count, way_count, imported_at). "
-                    "Use ST_* functions for spatial queries. "
-                    "Tags are JSONB — query with tags->>'key' or tags?'key'. "
-                    "Common tags: amenity, shop, highway, building, name, cuisine, etc. "
-                    "Results limited to 500 rows by default."
+                    "Run a read-only SQL query against the PostGIS/OSM "
+                    "database. Writes are blocked at two levels (SQL keyword "
+                    "filter + read-only transaction). Tables: osm_nodes "
+                    "(osm_id, region, tags JSONB, geom Point), osm_ways "
+                    "(osm_id, region, tags JSONB, geom LineString), "
+                    "osm_import_log (region, node_count, way_count, "
+                    "imported_at). osm2pgsql-compatible views with flattened "
+                    "tag columns: planet_osm_point, planet_osm_line, "
+                    "planet_osm_roads. Use ST_* for spatial queries. Tags are "
+                    "JSONB — query with tags->>'key' or tags?'key'. Common "
+                    "tags: amenity, shop, highway, building, name, cuisine. "
+                    "Results capped at 500 rows by default (max 5000)."
                 ),
                 inputSchema={
                     "type": "object",
@@ -313,6 +426,10 @@ def create_server(
             return _tool_resume_workflow(arguments, _get_store)
         elif name == "fw_manage_runner":
             return _tool_manage_runner(arguments, _get_store)
+        elif name == "fw_list_handlers":
+            return _tool_list_handlers(arguments, _get_store)
+        elif name == "fw_describe_handler":
+            return _tool_describe_handler(arguments, _get_store)
         elif name == "fw_manage_handlers":
             return _tool_manage_handlers(arguments, _get_store)
         elif name == "fw_repair_workflow":
@@ -394,6 +511,49 @@ def create_server(
                 name="Handler registration detail",
                 description="Handler registration detail by facet name",
             ),
+            # ---- Static documentation and canonical examples ----
+            Resource(
+                uri=AnyUrl("afl://docs/rules"),
+                name="Validation rules index",
+                description=(
+                    "List of all validator rule IDs with one-line summaries. "
+                    "Read this when you want to see what categories of "
+                    "validation errors exist."
+                ),
+            ),
+            Resource(
+                uri=AnyUrl("afl://docs/rules/{rule_id}"),
+                name="Validation rule details",
+                description=(
+                    "Paired wrong/right examples and a 'why' for a single "
+                    "rule_id. Fetch this URI from a fw_validate diagnostic's "
+                    "docs_uri field to see how to fix the error."
+                ),
+            ),
+            Resource(
+                uri=AnyUrl("afl://docs/grammar"),
+                name="FFL grammar reference",
+                description="Full FFL language grammar reference.",
+            ),
+            Resource(
+                uri=AnyUrl("afl://docs/execution-model"),
+                name="Runtime execution model",
+                description="How the runtime executes workflows, steps, and events.",
+            ),
+            Resource(
+                uri=AnyUrl("afl://examples/canonical"),
+                name="Canonical FFL examples index",
+                description=(
+                    "List of small, idiomatic FFL example files. Use these "
+                    "as templates when writing new workflows — they cover "
+                    "the canonical patterns the validator considers valid."
+                ),
+            ),
+            Resource(
+                uri=AnyUrl("afl://examples/canonical/{name}"),
+                name="Canonical FFL example",
+                description="A single canonical example file by name.",
+            ),
         ]
 
     @server.read_resource()
@@ -423,29 +583,51 @@ def _tool_compile(arguments: dict[str, Any]) -> list[TextContent]:
 
 
 def _tool_validate(arguments: dict[str, Any]) -> list[TextContent]:
-    """Validate FFL source semantically."""
+    """Validate FFL source semantically.
+
+    Returns structured diagnostics with rule_id, severity, location, and
+    docs_uri so callers can look up paired wrong/right examples and
+    repair guidance for each rule.
+    """
     source = arguments.get("source", "")
+
+    def _serialize(e: Any) -> dict[str, Any]:
+        return {
+            "message": e.message,
+            "rule_id": getattr(e, "rule_id", "UNKNOWN"),
+            "severity": getattr(e, "severity", "error"),
+            "line": e.line,
+            "column": e.column,
+            "docs_uri": getattr(e, "docs_uri", None),
+            "suggested_fix": getattr(e, "suggested_fix", None),
+        }
+
     try:
         from facetwork import parse, validate
 
         ast = parse(source)
         validation = validate(ast)
-        if validation.is_valid:
-            result = {"valid": True, "errors": []}
-        else:
-            result = {
-                "valid": False,
-                "errors": [
-                    {
-                        "message": e.message,
-                        "line": e.line,
-                        "column": e.column,
-                    }
-                    for e in validation.errors
-                ],
-            }
+        result: dict[str, Any] = {
+            "valid": validation.is_valid,
+            "errors": [_serialize(e) for e in validation.errors],
+            "warnings": [_serialize(w) for w in validation.warnings],
+        }
     except Exception as e:
-        result = {"valid": False, "errors": [{"message": str(e)}]}
+        result = {
+            "valid": False,
+            "errors": [
+                {
+                    "message": str(e),
+                    "rule_id": "PARSE_ERROR",
+                    "severity": "error",
+                    "line": None,
+                    "column": None,
+                    "docs_uri": "afl://docs/rules/PARSE_ERROR",
+                    "suggested_fix": None,
+                }
+            ],
+            "warnings": [],
+        }
     return [TextContent(type="text", text=json.dumps(result, default=str))]
 
 
@@ -620,6 +802,71 @@ def _tool_manage_runner(
     return [TextContent(type="text", text=json.dumps(result, default=str))]
 
 
+def _tool_list_handlers(
+    arguments: dict[str, Any],
+    get_store: Any,
+) -> list[TextContent]:
+    """List registered handlers, optionally filtered by namespace prefix."""
+    namespace = arguments.get("namespace")
+    try:
+        store = get_store()
+        handlers = store.list_handler_registrations()
+        if namespace:
+            prefix = f"{namespace}."
+            handlers = [h for h in handlers if h.facet_name.startswith(prefix)]
+        result: dict[str, Any] = {
+            "success": True,
+            "count": len(handlers),
+            "handlers": [serialize_handler_registration(h) for h in handlers],
+        }
+    except Exception as e:
+        result = {"success": False, "error": str(e)}
+    return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+
+def _tool_describe_handler(
+    arguments: dict[str, Any],
+    get_store: Any,
+) -> list[TextContent]:
+    """Return the full registration for a single handler facet."""
+    facet_name = arguments.get("facet_name", "")
+    if not facet_name:
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {"success": False, "error": "facet_name is required"}
+                ),
+            )
+        ]
+    try:
+        store = get_store()
+        handler = store.get_handler_registration(facet_name)
+        if not handler:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "success": False,
+                            "error": f"Handler '{facet_name}' not found",
+                            "hint": (
+                                "Call fw_list_handlers to see what is registered. "
+                                "Handler facet names are qualified (e.g. 'osm.DownloadRegion')."
+                            ),
+                        }
+                    ),
+                )
+            ]
+        result: dict[str, Any] = {
+            "success": True,
+            "handler": serialize_handler_registration(handler),
+        }
+    except Exception as e:
+        result = {"success": False, "error": str(e)}
+    return [TextContent(type="text", text=json.dumps(result, default=str))]
+
+
 def _tool_manage_handlers(
     arguments: dict[str, Any],
     get_store: Any,
@@ -774,8 +1021,15 @@ def _tool_manage_handlers(
 
 def _handle_resource(uri: str, get_store: Any) -> str:
     """Route a resource URI to its handler."""
-    store = get_store()
     parts = uri.replace("afl://", "").strip("/").split("/")
+
+    # Static resources — served from disk, no store needed.
+    if parts[0] == "docs":
+        return _handle_docs_resource(parts[1:])
+    if parts[0] == "examples":
+        return _handle_examples_resource(parts[1:])
+
+    store = get_store()
 
     if parts[0] == "runners":
         if len(parts) == 1:
@@ -839,6 +1093,147 @@ def _handle_resource(uri: str, get_store: Any) -> str:
         return json.dumps(serialize_handler_registration(handler), default=str)
 
     return json.dumps({"error": f"Unknown resource: {uri}"})
+
+
+# Repo root resolved from this file's path: facetwork/mcp/server.py -> repo/
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_RULES_DIR = _REPO_ROOT / "docs" / "reference" / "rules"
+_CANONICAL_DIR = _REPO_ROOT / "examples" / "canonical"
+_DOC_ALIASES = {
+    "grammar": _REPO_ROOT / "docs" / "reference" / "language" / "grammar.md",
+    "execution-model": _REPO_ROOT / "docs" / "reference" / "runtime.md",
+}
+
+
+def _read_text_file(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        return f"<error reading {path.name}: {e}>"
+
+
+def _handle_docs_resource(parts: list[str]) -> str:
+    """Serve afl://docs/* resources from on-disk files."""
+    if not parts:
+        return json.dumps({"error": "Empty docs path"})
+
+    if parts[0] == "rules":
+        # afl://docs/rules            -> index
+        # afl://docs/rules/{rule_id}  -> specific rule
+        if len(parts) == 1:
+            if not _RULES_DIR.exists():
+                return json.dumps(
+                    {
+                        "error": "Rules directory not found",
+                        "expected_path": str(_RULES_DIR),
+                        "hint": "Rule docs live at docs/reference/rules/{rule_id}.md",
+                    }
+                )
+            entries = []
+            for rule_path in sorted(_RULES_DIR.glob("*.md")):
+                rule_id = rule_path.stem
+                # Skip the README — it documents the directory itself.
+                if rule_id.lower() == "readme":
+                    continue
+                summary = _first_nonempty_line(rule_path) or ""
+                entries.append({"rule_id": rule_id, "summary": summary})
+            return json.dumps({"rules": entries, "count": len(entries)})
+        if len(parts) == 2:
+            rule_id = parts[1]
+            content = _read_text_file(_RULES_DIR / f"{rule_id}.md")
+            if content is None:
+                return json.dumps(
+                    {
+                        "error": f"Rule '{rule_id}' not documented",
+                        "hint": (
+                            "Read afl://docs/rules to see which rules have "
+                            "documentation. Some rule_ids are emitted by the "
+                            "validator before their docs file is written."
+                        ),
+                    }
+                )
+            return content
+
+    if len(parts) == 1 and parts[0] in _DOC_ALIASES:
+        content = _read_text_file(_DOC_ALIASES[parts[0]])
+        if content is None:
+            return json.dumps(
+                {
+                    "error": f"Doc '{parts[0]}' not found on disk",
+                    "expected_path": str(_DOC_ALIASES[parts[0]]),
+                }
+            )
+        return content
+
+    return json.dumps({"error": f"Unknown docs path: {'/'.join(parts)}"})
+
+
+def _handle_examples_resource(parts: list[str]) -> str:
+    """Serve afl://examples/* resources from on-disk files."""
+    if not parts or parts[0] != "canonical":
+        return json.dumps({"error": f"Unknown examples path: {'/'.join(parts)}"})
+
+    # afl://examples/canonical            -> index
+    # afl://examples/canonical/{name}     -> specific example file
+    if len(parts) == 1:
+        if not _CANONICAL_DIR.exists():
+            return json.dumps(
+                {
+                    "error": "Canonical examples directory not found",
+                    "expected_path": str(_CANONICAL_DIR),
+                    "hint": "Canonical examples live at examples/canonical/",
+                }
+            )
+        entries = []
+        for path in sorted(_CANONICAL_DIR.iterdir()):
+            if path.is_file() and not path.name.startswith("."):
+                summary = _first_nonempty_line(path) if path.suffix == ".md" else ""
+                entries.append({"name": path.name, "summary": summary})
+        return json.dumps({"examples": entries, "count": len(entries)})
+
+    if len(parts) == 2:
+        # Reject path traversal — names must be a single filename.
+        name = parts[1]
+        if "/" in name or ".." in name or name.startswith("."):
+            return json.dumps({"error": f"Invalid example name: {name}"})
+        # Allow lookup by exact name OR by stem (e.g. "workflow-simple" -> "workflow-simple.ffl")
+        path = _CANONICAL_DIR / name
+        if not path.exists():
+            stem_matches = list(_CANONICAL_DIR.glob(f"{name}.*"))
+            if len(stem_matches) == 1:
+                path = stem_matches[0]
+            else:
+                return json.dumps(
+                    {
+                        "error": f"Example '{name}' not found",
+                        "hint": "Read afl://examples/canonical for the index.",
+                    }
+                )
+        content = _read_text_file(path)
+        if content is None:
+            return json.dumps({"error": f"Example '{name}' could not be read"})
+        return content
+
+    return json.dumps({"error": f"Unknown examples path: {'/'.join(parts)}"})
+
+
+def _first_nonempty_line(path: Path) -> str | None:
+    """Return the first non-empty, non-heading-marker line from a file."""
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                # Drop leading '#' for markdown headings, return the title text.
+                if line.startswith("#"):
+                    return line.lstrip("#").strip()
+                return line
+    except OSError:
+        return None
+    return None
 
 
 # =============================================================================
