@@ -1217,7 +1217,7 @@ Each example can provide a `runner.env` file that overrides global
 defaults when that example is started via `scripts/start-runner`:
 
 ```bash
-# examples/osm-geocoder/runner.env
+# https://github.com/rlemke/osm/blob/main/runner.env.example
 AFL_TASK_EXECUTION_TIMEOUT_MS=14400000   # 4 hours for PostGIS imports
 ```
 

@@ -130,7 +130,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/runtime/test_hdfs_storage.py" = ["F811"]
-"examples/osm-geocoder/tests/real/py/test_osm_handlers_hdfs.py" = ["F811"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["facetwork"]

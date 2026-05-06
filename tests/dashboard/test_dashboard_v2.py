@@ -350,7 +350,7 @@ class TestV2HandlerDetail:
 
         return HandlerRegistration(
             facet_name=facet_name,
-            module_uri="examples.osm_geocoder.handlers.cache",
+            module_uri="my_pkg.handlers.cache",
             entrypoint="handle",
             version="1.0.0",
         )

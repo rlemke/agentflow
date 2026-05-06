@@ -1,0 +1,247 @@
+"""Discovery of Facetwork example packages.
+
+Two sources are merged:
+
+1. **Installed packages** declaring the ``facetwork.examples`` entry point.
+   Each entry point loads to an :class:`ExamplePackage` instance.
+2. **In-repo examples** under ``examples/<name>/`` with a ``handlers/`` package
+   exposing ``register_all_registry_handlers(runner)`` and (optionally) an
+   ``ffl/`` directory.
+
+When the same name appears in both, the installed package wins.
+"""
+
+from __future__ import annotations
+
+import importlib
+import importlib.metadata
+import logging
+import sys
+from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+ENTRY_POINT_GROUP = "facetwork.examples"
+
+
+@dataclass
+class ExamplePackage:
+    """A discoverable Facetwork example.
+
+    Both installed packages and in-repo example directories surface as this
+    type so callers can treat them uniformly.
+    """
+
+    name: str
+    ffl_dir: Path | None
+    register_handlers: Callable[[Any], None]
+    runner_env: dict[str, str] = field(default_factory=dict)
+    source: str = "entry_point"  # "entry_point" | "local"
+    handlers_path: Path | None = None  # set for "local" examples; needed for sys.path
+
+
+def _load_entry_point(ep: importlib.metadata.EntryPoint) -> ExamplePackage | None:
+    try:
+        obj = ep.load()
+    except Exception as e:
+        logger.warning("Failed to load example entry point %s: %s", ep.name, e)
+        return None
+    if not isinstance(obj, ExamplePackage):
+        logger.warning(
+            "Entry point %s did not resolve to ExamplePackage (got %s); skipping",
+            ep.name,
+            type(obj).__name__,
+        )
+        return None
+    return obj
+
+
+def discover_entry_point_examples() -> list[ExamplePackage]:
+    """Return examples registered via the ``facetwork.examples`` entry point."""
+    eps = importlib.metadata.entry_points(group=ENTRY_POINT_GROUP)
+    found: list[ExamplePackage] = []
+    for ep in eps:
+        pkg = _load_entry_point(ep)
+        if pkg is not None:
+            found.append(pkg)
+    return found
+
+
+def _parse_runner_env(path: Path) -> dict[str, str]:
+    """Parse a shell-style KEY=VALUE file.
+
+    Strips a trailing ``# comment`` from unquoted values (matching shell
+    assignment semantics where ``X=foo  # bar`` assigns ``foo``).
+    """
+    out: dict[str, str] = {}
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :]
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.lstrip()
+        if value[:1] in ('"', "'"):
+            quote = value[0]
+            end = value.find(quote, 1)
+            value = value[1:end] if end != -1 else value[1:]
+        else:
+            split_at = value.find(" #")
+            if split_at != -1:
+                value = value[:split_at]
+            value = value.rstrip()
+        if key:
+            out[key] = value
+    return out
+
+
+def _make_local_register(example_dir: Path) -> Callable[[Any], None]:
+    """Return a closure that imports ``handlers`` from ``example_dir`` and runs
+    its ``register_all_registry_handlers(runner)``.
+
+    Each call re-imports cleanly so multiple local examples can share the
+    package name ``handlers`` without collision.
+    """
+
+    def register(runner: Any) -> None:
+        path_str = str(example_dir)
+        added = False
+        if path_str not in sys.path:
+            sys.path.insert(0, path_str)
+            added = True
+        try:
+            for key in [k for k in sys.modules if k == "handlers" or k.startswith("handlers.")]:
+                del sys.modules[key]
+            module = importlib.import_module("handlers")
+            module.register_all_registry_handlers(runner)
+        finally:
+            if added and path_str in sys.path:
+                sys.path.remove(path_str)
+
+    return register
+
+
+def discover_local_examples(repo_root: Path) -> list[ExamplePackage]:
+    """Scan ``<repo_root>/examples/<name>/`` for in-repo example directories.
+
+    An example qualifies if it has either ``handlers/__init__.py`` or an
+    ``ffl/`` directory.
+    """
+    examples_dir = repo_root / "examples"
+    if not examples_dir.is_dir():
+        return []
+
+    found: list[ExamplePackage] = []
+    for entry in sorted(examples_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        handlers_init = entry / "handlers" / "__init__.py"
+        ffl_dir = entry / "ffl"
+        has_handlers = handlers_init.is_file()
+        has_ffl = ffl_dir.is_dir()
+        if not has_handlers and not has_ffl:
+            continue
+
+        runner_env_path = entry / "runner.env"
+        runner_env = _parse_runner_env(runner_env_path) if runner_env_path.is_file() else {}
+
+        register = _make_local_register(entry) if has_handlers else (lambda _r: None)
+
+        found.append(
+            ExamplePackage(
+                name=entry.name,
+                ffl_dir=ffl_dir if has_ffl else None,
+                register_handlers=register,
+                runner_env=runner_env,
+                source="local",
+                handlers_path=entry if has_handlers else None,
+            )
+        )
+    return found
+
+
+def discover_all_examples(repo_root: Path | None = None) -> list[ExamplePackage]:
+    """Return entry-point + local examples merged by name (entry-point wins)."""
+    by_name: dict[str, ExamplePackage] = {}
+    if repo_root is not None:
+        for pkg in discover_local_examples(repo_root):
+            by_name[pkg.name] = pkg
+    for pkg in discover_entry_point_examples():
+        by_name[pkg.name] = pkg
+    return sorted(by_name.values(), key=lambda p: p.name)
+
+
+def get_example(name: str, repo_root: Path | None = None) -> ExamplePackage | None:
+    for pkg in discover_all_examples(repo_root):
+        if pkg.name == name:
+            return pkg
+    return None
+
+
+def filter_examples(
+    examples: Iterable[ExamplePackage],
+    *,
+    include: list[str] | None = None,
+) -> Iterator[ExamplePackage]:
+    """Yield only examples whose names are in ``include`` (no filter if None)."""
+    if include is None:
+        for pkg in examples:
+            yield pkg
+        return
+    wanted = set(include)
+    for pkg in examples:
+        if pkg.name in wanted:
+            yield pkg
+
+
+def collect_ffl_files(pkg: ExamplePackage) -> list[Path]:
+    """Return all .ffl files for ``pkg``, deduped and sorted.
+
+    Walks two locations: the canonical ``ffl/`` directory directly, and any
+    nested ``*/ffl/*.ffl`` under the example/package root (the convention
+    used by domain pipelines like osm-geocoder, where per-domain FFL lives
+    alongside its handlers). Test fixtures are excluded except those under
+    ``tests/real/``.
+
+    Root selection:
+      * Local example — ``handlers_path`` is the example dir.
+      * Entry-point package — ``ffl_dir.parent`` is the installed package root.
+    """
+    if pkg.handlers_path is not None:
+        root = pkg.handlers_path
+    elif pkg.ffl_dir is not None:
+        root = pkg.ffl_dir.parent
+    else:
+        return []
+
+    files: list[Path] = []
+    if pkg.ffl_dir is not None and pkg.ffl_dir.is_dir():
+        files.extend(sorted(pkg.ffl_dir.rglob("*.ffl")))
+    files.extend(sorted(root.rglob("ffl/*.ffl")))
+
+    real_root = root.resolve()
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for f in files:
+        real_f = f.resolve()
+        try:
+            real_f.relative_to(real_root)
+        except ValueError:
+            continue
+        parts = real_f.parts
+        in_tests = "tests" in parts
+        in_real = "real" in parts and parts.index("real") == parts.index("tests") + 1
+        if in_tests and not in_real:
+            continue
+        if real_f in seen:
+            continue
+        seen.add(real_f)
+        unique.append(f)
+    return unique

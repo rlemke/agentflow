@@ -66,12 +66,13 @@ scripts/setup --check-only
 | `runner` | - | Yes | Distributed runner service |
 | `agent-addone` | - | Yes | Sample agent handling AddOne/Multiply/Greet events |
 
-### OSM Agents (started when count > 0)
+### Domain agents
 
-| Service | Scalable | Description |
-|---------|----------|-------------|
-| `agent-osm-geocoder` | Yes | Full OSM agent with Java, GraphHopper, pyosmium, shapely, folium |
-| `agent-osm-geocoder-lite` | Yes | Lightweight OSM agent (download, cache, region resolution only) |
+OSM agents (full + lite) live in the standalone osm-geocoder repo at
+[github.com/rlemke/osm](https://github.com/rlemke/osm). After
+`pip install -e ~/ffl_handlers/osm`, they're discoverable via
+`scripts/start-runner --example osm-geocoder` — no Docker container is
+shipped from this repo.
 
 ### Optional Services (profiles)
 
@@ -108,24 +109,6 @@ Verify scaling:
 docker compose ps runner         # Should list 3 instances
 docker compose ps agent-addone   # Should list 2 instances
 ```
-
-## OSM Agent Images
-
-Two Dockerfile variants exist for the OSM Geocoder agent:
-
-### Full Image (`Dockerfile.osm-geocoder`)
-Includes everything needed for geographic data processing and routing:
-- **Python**: pyosmium, shapely, pyproj, folium, requests
-- **System**: build-essential, cmake, libboost, libgeos, libproj
-- **Java**: default-jre-headless (for GraphHopper)
-- **GraphHopper**: JAR downloaded at build time to `/opt/graphhopper/`
-
-### Lite Image (`Dockerfile.osm-geocoder-lite`)
-Minimal image for basic operations (download, cache, region resolution):
-- **Python**: requests
-- No Java, no C++ build tools, no geospatial libraries
-
-Choose the full image when you need routing graph operations (BuildGraph, ComputePairwiseRoutes). Use the lite image for cache management and region resolution.
 
 ## Configuration
 
@@ -235,17 +218,3 @@ docker compose up -d
 docker compose down -v
 ```
 
-### Verifying OSM Dependencies
-
-```bash
-# Check Python packages in full OSM image
-docker compose exec agent-osm-geocoder python -c "import osmium; print('osmium OK')"
-docker compose exec agent-osm-geocoder python -c "import shapely; print('shapely OK')"
-docker compose exec agent-osm-geocoder python -c "import folium; print('folium OK')"
-
-# Check Java
-docker compose exec agent-osm-geocoder java -version
-
-# Check GraphHopper JAR
-docker compose exec agent-osm-geocoder ls -la /opt/graphhopper/graphhopper-web.jar
-```

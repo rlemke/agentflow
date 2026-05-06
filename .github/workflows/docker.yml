@@ -25,10 +25,6 @@ jobs:
             dockerfile: docker/Dockerfile.agent
           - image: seed
             dockerfile: docker/Dockerfile.seed
-          - image: osm-geocoder
-            dockerfile: docker/Dockerfile.osm-geocoder
-          - image: osm-geocoder-lite
-            dockerfile: docker/Dockerfile.osm-geocoder-lite
           - image: noaa-weather
             dockerfile: docker/Dockerfile.noaa-weather
           - image: mcp

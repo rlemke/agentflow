@@ -70,30 +70,9 @@ scripts/start-import-pg --stop     # stop and remove
 
 ### Source Adapter Pattern
 
-The OSM geocoder uses a **source adapter pattern** to decouple data extraction from analysis. Three source namespaces normalize different inputs into GeoJSON:
+The osm-geocoder example demonstrates a **source adapter pattern** that decouples data extraction (PBF / PostGIS / GeoJSON inputs) from analysis (statistics, filtering, rendering). The detailed contract — namespace layout, schema unification, and composed workflows — lives in the [osm-geocoder repo's CLAUDE.md](https://github.com/rlemke/osm/blob/main/CLAUDE.md).
 
-| Source Namespace | Input | Handler |
-|-----------------|-------|---------|
-| `osm.Source.PBF` | `.osm.pbf` files via osmium | `handlers/sources/pbf_source.py` |
-| `osm.Source.PostGIS` | SQL queries against `osm_nodes`/`osm_ways` | `handlers/sources/postgis_source.py` |
-| `osm.Source.GeoJSON` | Existing GeoJSON files | `handlers/sources/geojson_source.py` |
-
-Each source provides 8 extraction facets (routes, amenities, roads, parks, buildings, boundaries, population, POIs). All produce the same category-specific output schemas (`RouteFeatures`, `AmenityFeatures`, etc.) so downstream analysis facets work identically regardless of source:
-
-```
-Source Layer                        Algorithm Layer (unchanged)
-─────────────                       ──────────────────────────
-osm.Source.PBF.ExtractRoutes    ─┐
-osm.Source.PostGIS.ExtractRoutes ─┼→ GeoJSON → RouteStatistics / FilterRoutesByType / RenderMap
-osm.Source.GeoJSON.LoadRoutes   ─┘
-```
-
-Composed workflows in `osm.workflows.sourced` demonstrate the pattern:
-- `BicycleRoutesPBF` / `BicycleRoutesPostGIS` / `BicycleRoutesGeoJSON` — same pipeline, different sources
-- `HealthcareMapPostGIS`, `LargeCitiesPostGIS` — PostGIS-backed analysis
-- `RoadsAndParksPostGIS` — multi-layer concurrent extraction
-
-**PostGIS source** connects to the `osm` database (default: `AFL_POSTGIS_URL`). The `PostGISSource` schema takes `postgis_url` and `region` parameters. Queries use `tags JSONB` for filtering (e.g. `tags->>'amenity' = 'hospital'`).
+When building a new domain pipeline that ingests from multiple data sources, mirror this pattern: one source namespace per input format, all producing the same category-specific output schemas so downstream analysis is source-agnostic.
 
 ## Project Layout
 
@@ -153,11 +132,22 @@ Key constraints the rule docs cover (and the language enforces):
 
 When adding a new validator check, give it a `rule_id` AND write the matching `docs/reference/rules/{rule_id}.md` in the same change. Coverage is currently exact (41/41 emitted rule_ids documented); the script that diffs them lives in [docs/architecture/mcp-context-engineering.md](docs/architecture/mcp-context-engineering.md).
 
+## Standalone example packages
+
+Examples can live either in this repo under `examples/<name>/` or as
+separate pip-installable packages declaring the `facetwork.examples`
+entry point. Both are discovered by `scripts/start-runner --example <name>`
+and `scripts/seed-examples`. See `example-template/` for the standalone
+package layout. The osm-geocoder example was extracted into its own repo
+([github.com/rlemke/osm](https://github.com/rlemke/osm)); install it with
+`pip install -e ~/ffl_handlers/osm` and it surfaces as `--example osm-geocoder`
+exactly like an in-repo example.
+
 ## Domain pipelines — tools / handlers / cache pattern
 
-Every domain ingestion pipeline in `examples/` (osm-geocoder, noaa-weather, …) follows one contract: a `tools/` dir of Python CLIs + shell wrappers backed by `tools/_lib/`, FFL handlers that call into the same `_lib/` via a `handlers/shared/<domain>_utils.py` shim, and a sidecar-backed cache under `$AFL_CACHE_ROOT/<namespace>/`. Canonical examples:
+Every domain ingestion pipeline (osm-geocoder, noaa-weather, …) follows one contract: a `tools/` dir of Python CLIs + shell wrappers backed by `tools/_lib/`, FFL handlers that call into the same `_lib/` via a `handlers/shared/<domain>_utils.py` shim, and a sidecar-backed cache under `$AFL_CACHE_ROOT/<namespace>/`. Canonical examples:
 
-- `examples/osm-geocoder/tools/` — OSM PBF → GeoJSON → tiles → HTML maps
+- [github.com/rlemke/osm](https://github.com/rlemke/osm) — OSM PBF → GeoJSON → tiles → HTML maps (standalone repo)
 - `examples/noaa-weather/tools/` — NOAA GHCN → station CSVs → climate trends
 
 When building or modifying a domain pipeline, read [`agent-spec/tools-pattern.agent-spec.yaml`](agent-spec/tools-pattern.agent-spec.yaml) first — it defines the directory layout, CLI contract (argparse / stderr / stdout / exit codes), `_lib/` vs handler split, cache sidecar protocol, and test-writing rules.
@@ -314,7 +304,7 @@ Set `AFL_POSTGIS_URL` (e.g. `postgresql://afl:afl@afl-postgres:5432/afl_gis`) fo
 | `AFL_TASK_EXECUTION_TIMEOUT_MS` | `900000` (15min) | Per-task execution timeout; timed-out tasks reset to pending |
 | `AFL_LEASE_DURATION_MS` | `300000` (5min) | Task lease duration; renewed by handler heartbeat |
 
-Examples can override these defaults via `runner.env` files (e.g. `examples/osm-geocoder/runner.env` sets a 4-hour execution timeout for PostGIS imports). The `start-runner` script sources these automatically. Handlers that perform blocking I/O (where heartbeats cannot fire) should register with `timeout_ms=0` and rely on the global execution timeout instead.
+Examples can override these defaults — local examples via a `runner.env` file in their directory, standalone packages via `runner_env={...}` on their `ExamplePackage`. The `start-runner` script applies them automatically. Handlers that perform blocking I/O (where heartbeats cannot fire) should register with `timeout_ms=0` and rely on the global execution timeout instead.
 
 ### MCP server
 

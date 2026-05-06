@@ -29,16 +29,15 @@ exec env PYTHONPATH="$REPO_ROOT" "$PYTHON" - "$@" <<'PYEOF'
 """Inline Python script for seed-examples."""
 
 import argparse
-import glob
 import json
 import os
 import re
 import sys
 import time
+from pathlib import Path
 
 # PYTHONPATH is set to repo root by the bash wrapper.
-REPO_ROOT = os.environ.get("PYTHONPATH", ".").split(":")[0]
-EXAMPLES_DIR = os.path.join(REPO_ROOT, "examples")
+REPO_ROOT = Path(os.environ.get("PYTHONPATH", ".").split(":")[0])
 SEED_PATH = "cli:seed"
 
 
@@ -74,49 +73,23 @@ def _collect_workflows(node: dict, prefix: str = "") -> list[tuple[str, dict]]:
 def discover_examples(
     include: str | None,
     exclude: str | None,
-) -> list[tuple[str, list[str]]]:
-    """Discover example directories that contain FFL files.
+) -> list[tuple[str, list[str], object]]:
+    """Discover examples (entry-point + local) that ship FFL files.
 
-    Returns list of (example_name, [ffl_file_paths]) sorted by name.
+    Returns list of (example_name, [ffl_file_paths], package) sorted by name.
     """
-    results: list[tuple[str, list[str]]] = []
+    from facetwork.examples import collect_ffl_files, discover_all_examples
 
-    for entry in sorted(os.listdir(EXAMPLES_DIR)):
-        ffl_dir = os.path.join(EXAMPLES_DIR, entry, "ffl")
-        if not os.path.isdir(ffl_dir):
+    results: list[tuple[str, list[str], object]] = []
+    for pkg in discover_all_examples(REPO_ROOT):
+        if include and not re.search(include, pkg.name):
             continue
-
-        # Collect FFL files from root ffl/ and any subdirectory ffl/ folders
-        # (e.g. handlers/amenities/ffl/, handlers/cache/ffl/).
-        files = sorted(glob.glob(os.path.join(ffl_dir, "*.ffl")))
-        example_root = os.path.join(EXAMPLES_DIR, entry)
-        real_example_root = os.path.realpath(example_root)
-        files += sorted(glob.glob(os.path.join(example_root, "**", "ffl", "*.ffl"), recursive=True))
-        # Deduplicate by real path and exclude:
-        # - files that resolve outside the examples tree (e.g. via symlinks
-        #   to system paths); cross-example symlinks are allowed
-        # - files inside tests/ directories (test fixtures, not production AFL)
-        #   Exception: tests/real/ contains integration workflows meant to be seeded
-        real_examples_dir = os.path.realpath(EXAMPLES_DIR)
-        seen: set[str] = set()
-        unique: list[str] = []
-        for f in files:
-            real_f = os.path.realpath(f)
-            is_test = "/tests/" in real_f and "/tests/real/" not in real_f
-            if real_f not in seen and real_f.startswith(real_examples_dir) and not is_test:
-                seen.add(real_f)
-                unique.append(f)
-        files = unique
-
+        if exclude and re.search(exclude, pkg.name):
+            continue
+        files = [str(p) for p in collect_ffl_files(pkg)]
         if not files:
             continue
-
-        if include and not re.search(include, entry):
-            continue
-        if exclude and re.search(exclude, entry):
-            continue
-
-        results.append((entry, files))
+        results.append((pkg.name, files, pkg))
 
     return results
 
@@ -238,14 +211,15 @@ def clean_seeds(store) -> tuple[int, int]:
 
 
 def _register_example_handlers(
-    examples: list[tuple[str, list[str]]],
+    examples: list[tuple[str, list[str], object]],
     store,
 ) -> int:
     """Register handler implementations from examples that provide them.
 
-    Looks for ``handlers/__init__.py`` in each example directory and calls
-    ``register_all_registry_handlers(runner)`` if it exists.  Uses the
-    RegistryRunner so registrations are upserted via save_handler_registration.
+    Delegates to each ExamplePackage's ``register_handlers`` callback. For
+    in-repo examples this calls ``register_all_registry_handlers(runner)``
+    from the example's ``handlers/`` package; for installed packages the
+    callback was supplied via the ``facetwork.examples`` entry point.
 
     Returns total number of handlers registered.
     """
@@ -256,37 +230,18 @@ def _register_example_handlers(
     runner = RegistryRunner(store, evaluator)
 
     total = 0
-    for name, _afl_files in examples:
-        example_dir = os.path.join(EXAMPLES_DIR, name)
-        handlers_init = os.path.join(example_dir, "handlers", "__init__.py")
-        if not os.path.isfile(handlers_init):
+    for name, _afl_files, pkg in examples:
+        if pkg.handlers_path is None and pkg.source == "local":
             continue
-
-        if example_dir not in sys.path:
-            sys.path.insert(0, example_dir)
-
         try:
-            # Fresh import each time to avoid cross-example pollution
-            if "handlers" in sys.modules:
-                del sys.modules["handlers"]
-            to_remove = [k for k in sys.modules if k.startswith("handlers.")]
-            for k in to_remove:
-                del sys.modules[k]
-
-            from handlers import register_all_registry_handlers
-
             before = store._db.handler_registrations.count_documents({})
-            register_all_registry_handlers(runner)
-            after = store._db.handler_registrations.count_documents({})
-            count = after - before
+            pkg.register_handlers(runner)
+            count = store._db.handler_registrations.count_documents({}) - before
             total += count
             if count:
-                print(f"  {name:<20s} {count:>3} handlers registered")
+                print(f"  {name:<20s} {count:>3} handlers registered  [{pkg.source}]")
         except Exception as e:
             print(f"  {name:<20s} handlers ERROR: {e}")
-        finally:
-            if example_dir in sys.path:
-                sys.path.remove(example_dir)
 
     return total
 
@@ -353,7 +308,7 @@ def main() -> None:
     total_workflows = 0
     errors = 0
 
-    for name, afl_files in examples:
+    for name, afl_files, _pkg in examples:
         try:
             file_count, wf_count, warnings = seed_example(
                 name, afl_files, store, args.dry_run,

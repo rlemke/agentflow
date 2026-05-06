@@ -1,9 +1,0 @@
-# Docker Compose override for local Geofabrik mirror (DEPRECATED).
-#
-# Mirror support is now built into the base docker-compose.yml.
-# The host directory ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm} is
-# mounted read-only at /data/osm-mirror in runner and OSM agent containers.
-#
-# This file is kept for backward compatibility but has no effect.
-
-services: {}

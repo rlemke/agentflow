@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "example-template"
+version = "0.1.0"
+description = "Template for a standalone Facetwork example package"
+requires-python = ">=3.11"
+dependencies = [
+    "facetwork>=0.31.0",
+]
+
+[project.entry-points."facetwork.examples"]
+example-template = "example_template:example"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+example_template = ["ffl/*.ffl"]

@@ -1,1 +1,0 @@
-"""OSM geocoder shapefile handlers."""

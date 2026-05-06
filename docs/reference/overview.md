@@ -102,10 +102,8 @@ See `spec/70_examples.md` Examples 2–4 for detailed execution traces demonstra
 ### Docker terms
 - **Docker stack**: `docker-compose.yml` defining MongoDB, Dashboard, Runner, Agents, Seed, and MCP services
 - **Setup script**: `scripts/setup` — bootstraps Docker (install check, image build, service start with scaling)
-- **Scalable services**: Runner, AddOne agent, OSM geocoder agents — no `container_name`, support `--scale N`
-- **OSM Geocoder (full)**: `Dockerfile.osm-geocoder` — Python osmium, shapely, pyproj, folium + Java JRE + GraphHopper JAR
-- **OSM Geocoder (lite)**: `Dockerfile.osm-geocoder-lite` — requests only, no Java or geospatial C libraries
-- **GraphHopper JAR**: Downloaded at Docker build time from Maven Central to `/opt/graphhopper/graphhopper-web.jar`
+- **Scalable services**: Runner, AddOne agent — no `container_name`, support `--scale N`
+- **Domain agent images**: live in their own repos (e.g. https://github.com/rlemke/osm for OSM workflows). Install via `pip install -e <repo>` to register handlers with the runner.
 
 ### MCP terms
 - **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication

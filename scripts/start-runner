@@ -85,24 +85,43 @@ if ! [[ "$INSTANCES" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
-# Default: all examples that have handlers/__init__.py
-if [[ ${#EXAMPLES[@]} -eq 0 ]]; then
-    for init in "$REPO_ROOT"/examples/*/handlers/__init__.py; do
-        example_dir="$(dirname "$(dirname "$init")")"
-        EXAMPLES+=("$(basename "$example_dir")")
-    done
-fi
+# Resolve examples (entry-point + local repo). The python helper emits
+# tab-separated lines:  EXAMPLE\t<name>\t<handlers_path_or_->
+#                       ENV\t<KEY>\t<VALUE>
+RESOLVED=$(env PYTHONPATH="$REPO_ROOT" REPO_ROOT="$REPO_ROOT" "$PYTHON" -c "
+import os, sys
+from pathlib import Path
+from facetwork.examples import discover_all_examples, filter_examples
 
-# Source example-specific runner.env files (e.g. examples/osm-geocoder/runner.env).
-# These can override global defaults like AFL_TASK_EXECUTION_TIMEOUT_MS for
-# examples with specific runtime requirements (long imports, etc.).
-for ex in "${EXAMPLES[@]}"; do
-    runner_env="$REPO_ROOT/examples/$ex/runner.env"
-    if [[ -f "$runner_env" ]]; then
-        # shellcheck source=/dev/null
-        set -a; source "$runner_env"; set +a
-    fi
-done
+selected = sys.argv[1:] or None
+chosen = list(filter_examples(discover_all_examples(Path(os.environ['REPO_ROOT'])), include=selected))
+for pkg in chosen:
+    hp = str(pkg.handlers_path) if pkg.handlers_path else '-'
+    print(f'EXAMPLE\t{pkg.name}\t{hp}')
+for pkg in chosen:
+    for k, v in pkg.runner_env.items():
+        print(f'ENV\t{k}\t{v}')
+" "${EXAMPLES[@]}")
+
+EXAMPLES=()
+HANDLER_PATHS=()
+while IFS=$'\t' read -r kind a b; do
+    [[ -z "$kind" ]] && continue
+    case "$kind" in
+        EXAMPLE)
+            EXAMPLES+=("$a")
+            [[ "$b" != "-" ]] && HANDLER_PATHS+=("$b")
+            ;;
+        ENV)
+            export "$a=$b"
+            ;;
+    esac
+done <<< "$RESOLVED"
+
+if [[ ${#EXAMPLES[@]} -eq 0 ]]; then
+    echo "No examples found (checked entry points and examples/)." >&2
+    exit 1
+fi
 
 echo "=== Facetwork: Register Handlers & Start Runner ==="
 echo ""
@@ -118,77 +137,14 @@ if [[ -n "${AFL_STUCK_TIMEOUT_MS:-}" ]]; then
 fi
 echo ""
 
-# Register handlers via inline Python
-env PYTHONPATH="$REPO_ROOT" "$PYTHON" -c "
-import sys, os
+# Register handlers via the shared discovery API.
+env PYTHONPATH="$REPO_ROOT" REPO_ROOT="$REPO_ROOT" "$PYTHON" -m facetwork.examples "${EXAMPLES[@]}"
 
-repo = os.environ.get('REPO_ROOT', '$REPO_ROOT')
-examples = '${EXAMPLES[*]}'.split()
-
-from facetwork.runtime.mongo_store import MongoStore
-from facetwork.runtime import RegistryRunner, RegistryRunnerConfig, Evaluator, Telemetry
-
-mongo_url = os.environ.get('AFL_MONGODB_URL', 'mongodb://afl-mongodb:27017')
-store = MongoStore(mongo_url)
-telemetry = Telemetry()
-evaluator = Evaluator(store, telemetry)
-runner = RegistryRunner(store, evaluator)
-
-# Registrations use upsert (save_handler_registration) so no need to
-# wipe the collection — existing entries are updated in place and
-# registrations from other sources (Docker agents, etc.) are preserved.
-print('Registering handlers (upsert)...')
-print()
-
-total = 0
-for name in examples:
-    example_dir = os.path.join(repo, 'examples', name)
-    handlers_dir = os.path.join(example_dir, 'handlers')
-    if not os.path.isdir(handlers_dir):
-        print(f'  {name}: SKIP (no handlers/)')
-        continue
-
-    # Add example dir to path so 'handlers' package resolves
-    if example_dir not in sys.path:
-        sys.path.insert(0, example_dir)
-
-    # Import and call register_all_registry_handlers
-    try:
-        # Fresh import each time
-        if 'handlers' in sys.modules:
-            del sys.modules['handlers']
-        # Also clear submodules to avoid cross-example pollution
-        to_remove = [k for k in sys.modules if k.startswith('handlers.')]
-        for k in to_remove:
-            del sys.modules[k]
-
-        from handlers import register_all_registry_handlers
-        before = store._db.handler_registrations.count_documents({})
-        register_all_registry_handlers(runner)
-        after = store._db.handler_registrations.count_documents({})
-        count = after - before
-        total += count
-        print(f'  {name}: {count} handlers registered')
-    except Exception as e:
-        print(f'  {name}: ERROR — {e}')
-    finally:
-        # Clean up for next example
-        if example_dir in sys.path:
-            sys.path.remove(example_dir)
-
-print()
-print(f'Total: {total} handlers registered')
-print()
-"
-
-# Build PYTHONPATH that includes all example directories so the runner
-# can load handler modules from any registered example.
+# Build PYTHONPATH so the runner can import handler modules from local
+# examples (entry-point packages are already on sys.path via pip install).
 RUNNER_PYTHONPATH="$REPO_ROOT"
-for ex in "${EXAMPLES[@]}"; do
-    ex_dir="$REPO_ROOT/examples/$ex"
-    if [[ -d "$ex_dir/handlers" ]]; then
-        RUNNER_PYTHONPATH="$RUNNER_PYTHONPATH:$ex_dir"
-    fi
+for hp in "${HANDLER_PATHS[@]}"; do
+    RUNNER_PYTHONPATH="$RUNNER_PYTHONPATH:$hp"
 done
 
 # =========================================================================

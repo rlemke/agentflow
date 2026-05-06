@@ -551,7 +551,7 @@ cp .env.example .env
 scripts/easy.sh
 
 # Run 2-state analysis
-examples/osm-geocoder/tests/real/scripts/run_osm_analyze_states_02.sh
+https://github.com/rlemke/osm/blob/main/tests/real/scripts/run_osm_analyze_states_02.sh
 
 # Watch progress
 open http://localhost:8080

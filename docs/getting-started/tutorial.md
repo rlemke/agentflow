@@ -224,8 +224,10 @@ without qualification, as long as there is no ambiguity.
 
 ### Real-world example: OSM Geocoder
 
-The `examples/osm-geocoder/ffl/geocoder.ffl` file in this repository shows
-schemas and event facets working together:
+The standalone [osm-geocoder repo](https://github.com/rlemke/osm) ships a
+production-scale FFL project. Its
+[`geocoder.ffl`](https://github.com/rlemke/osm/blob/main/src/osm_geocoder/ffl/geocoder.ffl)
+shows schemas and event facets working together:
 
 ```afl
 namespace osm.geocode {
@@ -575,25 +577,26 @@ namespace analysis {
 
 ### Where to go from here
 
-The `examples/osm-geocoder/` directory contains a real-world FFL project with
-over 40 FFL files and hundreds of handler implementations.  Notable files:
+The standalone [osm-geocoder repo](https://github.com/rlemke/osm) is a
+real-world FFL project with 50+ FFL files and 100+ handler implementations.
+Notable files (under `src/osm_geocoder/`):
 
 | File | What it demonstrates |
 |------|---------------------|
-| `afl/geocoder.ffl` | Schemas, event facets, `andThen foreach` |
-| `afl/osmtypes.ffl` | Shared schema definitions across namespaces |
-| `afl/osmworkflows_composed.ffl` | Multi-stage pipeline composition patterns |
-| `afl/osmcontinents.ffl` | Parameterized regional workflows |
-| `afl/osmroutes.ffl` | Route extraction with parallel steps |
+| `ffl/geocoder.ffl` | Schemas, event facets, `andThen foreach` |
+| `handlers/cache/ffl/osmcache.ffl` | Parameterized regional workflows |
+| `handlers/routes/ffl/osmroutes.ffl` | Route extraction with parallel steps |
+| `handlers/composed_workflows/ffl/*.ffl` | Multi-stage pipeline composition patterns |
 
-To run a workflow, compile it and submit it to the runtime:
+To run a workflow from there, install the package and start the runner:
 
 ```bash
-# Compile
-afl examples/osm-geocoder/ffl/geocoder.ffl -o geocoder.json
+git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
+pip install -e ~/ffl_handlers/osm
 
-# Start the runtime runner (requires MongoDB)
-python -m afl.runtime.runner
+# Seed and run from the facetwork checkout
+scripts/seed-examples --include osm-geocoder
+scripts/start-runner --example osm-geocoder
 
 # Start the dashboard to monitor execution
 python -m afl.dashboard

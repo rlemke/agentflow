@@ -423,7 +423,7 @@ The decision isn't token cost — that's solved in either topology by the catalo
 
 #### 5.5.5 Worked example — surfacing `osm.geocode`
 
-The `osm.geocode` namespace (`examples/osm-geocoder/ffl/geocoder.ffl`) has one schema (`GeoCoordinate`), one event facet (`Geocode`), and two workflows (`GeocodeAddress`, `GeocodeAll`). What does surfacing it as a dedicated per-namespace MCP server look like end-to-end?
+The `osm.geocode` namespace (`https://github.com/rlemke/osm/blob/main/src/osm_geocoder/ffl/geocoder.ffl`) has one schema (`GeoCoordinate`), one event facet (`Geocode`), and two workflows (`GeocodeAddress`, `GeocodeAll`). What does surfacing it as a dedicated per-namespace MCP server look like end-to-end?
 
 **Client-side `.mcp.json`:**
 ```json

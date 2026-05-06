@@ -59,14 +59,7 @@ _compute_compose_args() {
         AFL_COMPOSE_FILES="$AFL_COMPOSE_FILES -f docker-compose.hdfs.yml"
         AFL_PROFILE_ARGS="$AFL_PROFILE_ARGS --profile hdfs"
     fi
-    if [ "${AFL_POSTGIS:-false}" = true ]; then
-        AFL_COMPOSE_FILES="$AFL_COMPOSE_FILES -f docker-compose.postgis.yml"
-        AFL_PROFILE_ARGS="$AFL_PROFILE_ARGS --profile postgis"
-    fi
     if [ "${AFL_JENKINS:-false}" = true ]; then
         AFL_PROFILE_ARGS="$AFL_PROFILE_ARGS --profile jenkins"
-    fi
-    if [ -n "${AFL_GEOFABRIK_MIRROR:-}" ]; then
-        AFL_COMPOSE_FILES="$AFL_COMPOSE_FILES -f docker-compose.mirror.yml"
     fi
 }

@@ -471,17 +471,8 @@ docker compose exec postgis pg_isready -U afl
 
 ### Building OSM Agents with PostGIS
 
-Use the `docker-compose.postgis.yml` override file to build OSM agent images with `psycopg2-binary` (required for PostGIS):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.postgis.yml --profile postgis build
-```
-
-Or use the setup script:
-
-```bash
-scripts/setup --postgis --osm-agents 2 --build
-```
+OSM agent images and their PostGIS-specific build args live in the
+standalone osm-geocoder repo: https://github.com/rlemke/osm.
 
 ### Environment Variables
 
@@ -527,16 +518,9 @@ scripts/setup --mongodb-data-dir /mnt/ssd/mongodb
 
 ### External Storage for GraphHopper
 
-By default, the OSM Geocoder agent uses a Docker named volume (`graphhopper_data`) for GraphHopper routing graphs. To place GraphHopper data on an external filesystem, set the `GRAPHHOPPER_DATA_DIR` environment variable:
-
-```bash
-# Use an external directory for GraphHopper data
-export GRAPHHOPPER_DATA_DIR=/mnt/ssd/graphhopper
-docker compose up -d agent-osm-geocoder
-
-# Or via the setup script
-scripts/setup --osm-agents 2 --graphhopper-data-dir /mnt/ssd/graphhopper
-```
+GraphHopper graph storage is configured by the OSM example package itself
+(see https://github.com/rlemke/osm) — set `GRAPHHOPPER_DATA_DIR` in your
+shell or `.env` and the OSM agent's docker-compose entry will mount it.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

@@ -217,4 +217,4 @@ task is at risk of being reaped.
 
 - [Agent SDK Specification](../reference/agent-sdk.md) — full handler API
 - [Runtime Reference](../reference/runtime.md) — task lifecycle and timeouts
-- [PostGIS importer](../../examples/osm-geocoder/handlers/downloads/postgis_importer.py) — production example of staging tables + batched merge
+- [PostGIS importer](https://github.com/rlemke/osm/blob/main/src/osm_geocoder/handlers/downloads/postgis_importer.py) — production example of staging tables + batched merge

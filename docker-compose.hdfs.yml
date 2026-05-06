@@ -1,4 +1,4 @@
-# Docker Compose override for HDFS-aware OSM agents.
+# Docker Compose override for HDFS-aware agents.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile agents up -d
@@ -7,28 +7,10 @@
 # This override:
 #   - Sets INSTALL_HDFS=true build arg so pyarrow gets installed
 #   - Adds extra_hosts for afl-hadoop-hdfs so agents can reach the HDFS server
-#   - HDFS paths are NOT hardcoded here — set AFL_CACHE_DIR, AFL_OSM_OUTPUT_BASE,
-#     etc. to hdfs:// URIs in .env when you want HDFS storage.
+#   - HDFS paths are NOT hardcoded here — set AFL_CACHE_DIR, etc. to hdfs:// URIs
+#     in .env when you want HDFS storage.
 
 services:
-  agent-osm-geocoder:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.osm-geocoder
-      args:
-        INSTALL_HDFS: "true"
-    extra_hosts:
-      - "afl-hadoop-hdfs:192.168.68.91"
-
-  agent-osm-geocoder-lite:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.osm-geocoder-lite
-      args:
-        INSTALL_HDFS: "true"
-    extra_hosts:
-      - "afl-hadoop-hdfs:192.168.68.91"
-
   runner:
     build:
       context: .

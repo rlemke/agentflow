@@ -1,182 +1,110 @@
 # Continental LZ Pipeline — User Guide
 
-> See also: [Examples Guide](../doc/GUIDE.md) | [README](README.md)
+> See also: [README](README.md)
 
 ## When to Use This Example
 
 Use this as your starting point if you are:
-- Deploying a **multi-service pipeline** with Docker Compose
-- Running **long-duration workflows** (hours) with MongoDB persistence
-- Orchestrating **regional parallel processing** across multiple geographies
-- Building on the **OSM geocoder infrastructure** for large-scale data processing
+- Composing FFL workflows that span **multiple continental regions** in parallel
+- Running **long-duration workflows** (hours) on a Facetwork deployment with MongoDB persistence
+- Combining handlers from a separately-installed package
+  (osm-geocoder) with your own workflow definitions
 
 ## What You'll Learn
 
-1. How to run Facetwork with a full Docker stack (MongoDB, dashboard, runner, agent)
-2. How to compose workflows that span multiple continental regions
-3. How to structure a Docker deployment with custom agent images
-4. How to use the seed pattern to load compiled workflows into MongoDB
-5. How to monitor long-running workflows via the dashboard
+1. How an FFL-only example composes handlers from an external package
+2. How `uses` declarations resolve cross-package types via the seeded flows
+3. How to orchestrate parallel pipelines across continental regions
+4. How to structure long-running workflows that span 12-30 hours
 
 ## Overview
 
-This example orchestrates Low-Zoom (LZ) road infrastructure building and GTFS transit analysis across 15+ regions:
+This example provides FFL workflows that orchestrate two pipelines across
+15+ regions:
 
-- **US, Canada, and 12 European countries** for road infrastructure
-- **11 transit agencies** (Amtrak, MBTA, CTA, MTA, TransLink, TTC, OC Transpo, Deutsche Bahn, SNCF, Renfe, Trenitalia)
+- **Low-Zoom (LZ) road infrastructure** for US, Canada, and 12 European countries
+- **GTFS transit analysis** for 11 agencies (Amtrak, MBTA, CTA, MTA, TransLink,
+  TTC, OC Transpo, Deutsche Bahn, SNCF, Renfe, Trenitalia)
 - **72+ GB of data** (PBF downloads + GraphHopper routing graphs)
 - **12-30 hours** for a full continental run
 
-## Architecture
+The handler implementations come from the [osm-geocoder](https://github.com/rlemke/osm)
+package — install that first, then this example's FFL workflows use its
+namespaces (`osm.cache.*`, `osm.GraphHopper.*`, `osm.Transit.GTFS.*`).
 
-```
-docker-compose.yml
-  mongodb (27019)      — isolated database (afl_continental_lz)
-  dashboard (8081)     — web monitoring UI
-  runner               — workflow evaluator
-  agent                — RegistryRunner with cache/GH/zoom/GTFS handlers
-  seed (profile: seed) — compiles FFL + seeds MongoDB
-```
+## Setup
 
-The agent image includes Java (for GraphHopper), Python geospatial stack, and all OSM handler modules (symlinked from `examples/osm-geocoder/handlers/`).
-
-## Step-by-Step Walkthrough
-
-### 1. Start the Stack
+### 1. Install osm-geocoder
 
 ```bash
-cd examples/continental-lz
-docker compose up -d
+git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
+pip install -e ~/ffl_handlers/osm
 ```
 
-This starts MongoDB, the dashboard, the runner, and the agent.
+This registers osm-geocoder's handlers via the `facetwork.examples` entry
+point. Facetwork's discovery picks them up automatically.
 
-### 2. Seed Workflows
+### 2. Seed both flows into MongoDB
 
 ```bash
-docker compose --profile seed run --rm seed
+scripts/seed-examples --include "^(continental-lz|osm-geocoder)$"
 ```
 
-The seed service compiles all FFL files and loads the compiled workflow definitions into MongoDB.
+The seeder compiles both flows. Continental-lz's `uses osm.cache.NorthAmerica`
+declarations resolve against osm-geocoder's seeded definitions.
 
-### 3. Monitor via Dashboard
-
-Open http://localhost:8081 to see workflow status, runner progress, and step execution.
-
-### 4. Smoke Test with a Small Region
-
-Before running the full continental pipeline, test with Belgium (~0.4 GB):
+### 3. Start the runner
 
 ```bash
-cd examples/continental-lz
-PYTHONPATH=../.. python scripts/run_region.py --region Belgium --output-dir /tmp/lz-belgium
+scripts/start-runner --example osm-geocoder -- --log-format text
 ```
 
-### 5. Run the Full Pipeline
+Note: pass `--example osm-geocoder` (not continental-lz). osm-geocoder's
+handlers are what executes; continental-lz contributes only the
+composition workflows.
 
-From the dashboard, start the `continental.FullContinentalPipeline` workflow, or trigger it via the MCP server or API.
+### 4. Run a workflow
 
-## Workflows
+Open http://localhost:8080, click **Workflows**, and pick one of:
 
-| Workflow | Description | Est. Time |
-|----------|-------------|-----------|
-| `BuildUSLowZoom` | US road infrastructure | 4-8 hrs |
-| `BuildCanadaLowZoom` | Canada road infrastructure | 1-3 hrs |
-| `BuildEuropeLowZoom` | 12 European countries (parallel) | 2-4 hrs |
-| `BuildContinentalLZ` | All three regions in parallel | 8-12 hrs |
-| `AnalyzeUSTransit` | 4 US transit agencies | 1-2 hrs |
-| `AnalyzeCanadaTransit` | 3 Canadian transit agencies | 30-60 min |
-| `AnalyzeEuropeTransit` | 4 European transit agencies | 1-2 hrs |
-| `ContinentalTransitAnalysis` | All 11 agencies | 2-4 hrs |
-| `FullContinentalPipeline` | LZ + Transit combined | 12-30 hrs |
+| Workflow | Purpose |
+|----------|---------|
+| `continental.lz.FullContinentalPipeline` | LZ + GTFS bundle |
+| `continental.lz.BuildContinentalLZ` | LZ across all 14 regions |
+| `continental.gtfs.ContinentalTransitAnalysis` | All 11 transit agencies |
 
-## Key Concepts
-
-### Self-Contained Docker Deployment
-
-This example has its own `docker-compose.yml` (separate from the root one) with an isolated MongoDB database (`afl_continental_lz`). It demonstrates the deployment pattern for a production Facetwork installation.
-
-### Seed Pattern
-
-The seed service is a one-shot container that:
-1. Compiles all FFL source files
-2. Loads the compiled JSON into MongoDB
-3. Exits
+Or via CLI:
 
 ```bash
-docker compose --profile seed run --rm seed
+scripts/run-workflow continental.lz.FullContinentalPipeline
 ```
 
-### Handler Reuse via Symlink
-
-The continental pipeline reuses the OSM geocoder handlers via a symlink:
+## Layout
 
 ```
-examples/continental-lz/handlers -> ../osm-geocoder/handlers
+continental-lz/
+├── ffl/
+│   ├── continental_types.ffl              # Shared region/agency schemas
+│   ├── continental_lz_workflows.ffl       # Per-region LZ pipelines
+│   ├── continental_gtfs_workflows.ffl     # Per-agency GTFS pipelines
+│   └── continental_full.ffl               # The bundled FullContinentalPipeline
+├── README.md
+└── USER_GUIDE.md
 ```
 
-No duplicate handler code — the agent image copies the symlink target.
+No Python — handlers live in osm-geocoder.
 
-### Resource Management
+## Why split this from osm-geocoder?
 
-- **Disk**: ~72 GB (28 GB PBF + 44 GB GraphHopper graphs)
-- **Memory**: 16 GB recommended (GraphHopper JVM needs 4-8 GB per graph build)
-- **Agent concurrency**: limited to 4 to manage memory pressure
+continental-lz is a **higher-level composition** of osm-geocoder facets
+into long-running, regionally-parallel workflows. Keeping it separate:
 
-### FFL File Organization
+- Lets osm-geocoder ship as a focused, reusable handler package
+- Keeps the continental-scale orchestration close to Facetwork's other
+  multi-pipeline examples
+- Avoids bloating osm-geocoder with workflow scenarios specific to one
+  use case (LZ road infrastructure)
 
-| File | Content |
-|------|---------|
-| `continental_types.ffl` | Shared schemas |
-| `continental_lz_workflows.ffl` | LZ road infrastructure workflows |
-| `continental_gtfs_workflows.ffl` | GTFS transit analysis workflows |
-| `continental_full.ffl` | Top-level combined pipeline |
-
-All workflows compose operations from the OSM geocoder FFL files (imported as library dependencies during seed compilation).
-
-## Adapting for Your Use Case
-
-### Add a new region
-
-1. Add the region to the appropriate workflow in `continental_lz_workflows.ffl`
-2. Ensure the region's cache facet exists in the OSM geocoder's `osmcache.ffl`
-3. Re-seed the database
-
-### Add a new transit agency
-
-1. Add the agency's GTFS feed URL to the transit workflow
-2. Ensure the GTFS handler can process the feed format
-3. Re-seed the database
-
-### Create a focused regional pipeline
-
-Instead of running the full continental pipeline, create a workflow for just your region of interest:
-
-```afl
-namespace myregion {
-    use osm.types
-    workflow BuildMyRegion() => (...) andThen {
-        cache = osm.cache.Europe.Netherlands()
-        download = osm.ops.DownloadPBF(cache = cache.cache)
-        graph = osm.GraphHopper.BuildGraph(pbf_path = download.downloadCache.path)
-        yield BuildMyRegion(...)
-    }
-}
-```
-
-### Deploy to a cloud environment
-
-The Docker Compose stack maps directly to cloud container services:
-
-| Service | Cloud Equivalent |
-|---------|-----------------|
-| MongoDB | MongoDB Atlas / DocumentDB |
-| Dashboard | ECS/EKS service with ALB |
-| Runner | ECS/EKS service (scalable) |
-| Agent | ECS/EKS service (scalable, GPU optional) |
-
-## Next Steps
-
-- **[osm-geocoder](../osm-geocoder/USER_GUIDE.md)** — understand the underlying handler infrastructure
-- **[aws-lambda](../aws-lambda/USER_GUIDE.md)** — cloud service integration patterns
-- **[genomics](../genomics/USER_GUIDE.md)** — foreach fan-out for batch processing
+If you need to extend this with a new region, edit
+`continental_lz_workflows.ffl` and add a new branch — the underlying
+handlers are reused unchanged.

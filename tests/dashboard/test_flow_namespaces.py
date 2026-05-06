@@ -85,7 +85,7 @@ def _seed_namespaced_flow(store):
 
     flow = FlowDefinition(
         uuid=flow_id,
-        name=FlowIdentity(name="osm-geocoder", path="test", uuid=flow_id),
+        name=FlowIdentity(name="demo-flow", path="test", uuid=flow_id),
         compiled_sources=[SourceText(name="source.ffl", content=VALID_AFL_SOURCE)],
     )
     store.save_flow(flow)
@@ -289,5 +289,5 @@ class TestFlowNamespaceView:
         flow, wfs = _seed_namespaced_flow(store)
         resp = tc.get(f"/flows/{flow.uuid}/ns/osm.Geocode")
         assert resp.status_code == 200
-        assert "osm-geocoder" in resp.text
+        assert "demo-flow" in resp.text
         assert "osm.Geocode" in resp.text

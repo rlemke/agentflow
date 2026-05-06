@@ -51,7 +51,7 @@ services:
       - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
       - AFL_GEOFABRIK_MIRROR=/data/osm-mirror
       - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - PYTHONPATH=/app:/app/examples/noaa-weather:/app/examples/osm-geocoder
+      - PYTHONPATH=/app:/app/examples/noaa-weather
     volumes:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
       - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
@@ -117,59 +117,9 @@ services:
     profiles:
       - agents
 
-  # OSM Geocoder agent — full image with Java/GraphHopper (scalable)
-  # Start with: docker compose --profile agents up -d agent-osm-geocoder
-  agent-osm-geocoder:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.osm-geocoder
-    environment:
-      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
-      - AFL_MONGODB_DATABASE=afl
-      - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
-      - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
-      - AFL_REAPER_TIMEOUT_MS=${AFL_REAPER_TIMEOUT_MS:-300000}
-      - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
-      - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
-      - AFL_GEOFABRIK_MIRROR=/data/osm-mirror
-      - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - AFL_LOCALIZE_MOUNTS=/data/osm-mirror
-    volumes:
-      - ${GRAPHHOPPER_DATA_DIR:-graphhopper_data}:/data/graphhopper
-      - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
-      - ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm}:/data/osm-mirror:ro
-    extra_hosts:
-      - "afl-mongodb:192.168.68.91"
-    restart: unless-stopped
-    profiles:
-      - agents
-
-  # OSM Geocoder agent — lite image, no Java/GraphHopper (scalable)
-  # Start with: docker compose --profile agents up -d agent-osm-geocoder-lite
-  agent-osm-geocoder-lite:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.osm-geocoder-lite
-    environment:
-      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
-      - AFL_MONGODB_DATABASE=afl
-      - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
-      - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
-      - AFL_REAPER_TIMEOUT_MS=${AFL_REAPER_TIMEOUT_MS:-300000}
-      - AFL_OSM_OUTPUT_BASE=${AFL_OSM_OUTPUT_BASE:-}
-      - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
-      - AFL_GEOFABRIK_MIRROR=/data/osm-mirror
-      - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-    volumes:
-      - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
-      - ${AFL_GEOFABRIK_MIRROR:-/Volumes/afl_data/osm}:/data/osm-mirror:ro
-    extra_hosts:
-      - "afl-mongodb:192.168.68.91"
-    restart: unless-stopped
-    profiles:
-      - agents
+  # OSM agents are defined in the standalone osm-geocoder repo
+  # (https://github.com/rlemke/osm). After `pip install -e ~/ffl_handlers/osm`
+  # they're discoverable via `scripts/start-runner --example osm-geocoder`.
 
   # MCP Server (Model Context Protocol for LLM agents)
   # MCP uses stdio transport, so run interactively:

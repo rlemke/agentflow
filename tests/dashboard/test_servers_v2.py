@@ -64,15 +64,15 @@ class TestGroupServersByGroup:
 
     def test_groups_by_server_group(self):
         servers = [
-            self._make_server("node-1", "osm-geocoder"),
-            self._make_server("node-2", "osm-geocoder"),
+            self._make_server("node-1", "group-b"),
+            self._make_server("node-2", "group-b"),
             self._make_server("node-3", "aws-lambda"),
         ]
         groups = group_servers_by_group(servers)
         assert len(groups) == 2
         assert groups[0]["group"] == "aws-lambda"
         assert groups[0]["total"] == 1
-        assert groups[1]["group"] == "osm-geocoder"
+        assert groups[1]["group"] == "group-b"
         assert groups[1]["total"] == 2
 
     def test_single_group(self):

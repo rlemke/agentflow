@@ -6,7 +6,6 @@
 # Usage:
 #   scripts/setup                          # Start with defaults
 #   scripts/setup --runners 3 --agents 2   # Scale runners and agents
-#   scripts/setup --osm-agents 2           # Include OSM geocoder agents
 #   scripts/setup --check-only             # Just verify Docker is available
 #   scripts/setup --build                  # Force rebuild before starting
 #   scripts/setup --clean                  # Drop MongoDB + clean HDFS caches
@@ -22,16 +21,9 @@ source "$SCRIPT_DIR/_env.sh"
 # Defaults (env vars from .env take precedence over these hardcoded values)
 RUNNERS="${AFL_RUNNERS:-1}"
 AGENTS="${AFL_AGENTS:-1}"
-OSM_AGENTS="${AFL_OSM_AGENTS:-0}"
-OSM_LITE_AGENTS="${AFL_OSM_LITE_AGENTS:-0}"
 WEATHER_AGENTS="${AFL_WEATHER_AGENTS:-0}"
 HDFS="${AFL_HDFS:-false}"
 JENKINS="${AFL_JENKINS:-false}"
-POSTGIS="${AFL_POSTGIS:-false}"
-MIRROR=false
-if [ -n "${AFL_GEOFABRIK_MIRROR:-}" ]; then
-    MIRROR=true
-fi
 CHECK_ONLY=false
 FORCE_BUILD=false
 CLEAN=false
@@ -45,22 +37,17 @@ Bootstrap the AgentFlow Docker stack.
 Options:
   --runners N          Number of runner instances (default: 1)
   --agents N           Number of AddOne agent instances (default: 1)
-  --osm-agents N       Number of OSM Geocoder agents — full image with
-                       Java/GraphHopper (default: 0)
-  --osm-lite-agents N  Number of OSM Geocoder lite agents — no Java/GraphHopper
-                       (default: 0)
   --weather-agents N   Number of NOAA Weather agents (default: 0)
   --hdfs               Enable HDFS overlay (pyarrow install in agent images)
   --jenkins            Start Jenkins CI/CD server
-  --postgis            Start PostGIS database and wire into OSM agents
-  --postgis-data-dir PATH   Use external directory for PostGIS data
   --jenkins-home-dir PATH   Use external directory for Jenkins home
-  --graphhopper-data-dir PATH  Use external directory for GraphHopper data
-  --mirror PATH        Use a local Geofabrik mirror directory (read-only)
   --clean              Drop MongoDB database and clean HDFS cache files
   --check-only         Verify Docker is available, then exit
   --build              Force rebuild of all images before starting
   -h, --help           Show this help message
+
+Domain agents (OSM, etc.) live in their own repos and are managed via
+`scripts/start-runner --example <name>` after `pip install -e <repo>`.
 EOF
 }
 
@@ -71,16 +58,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --runners)       RUNNERS="$2";          shift 2 ;;
         --agents)        AGENTS="$2";           shift 2 ;;
-        --osm-agents)    OSM_AGENTS="$2";       shift 2 ;;
-        --osm-lite-agents) OSM_LITE_AGENTS="$2"; shift 2 ;;
         --weather-agents) WEATHER_AGENTS="$2";  shift 2 ;;
         --hdfs)          HDFS=true;             shift ;;
         --jenkins)       JENKINS=true;          shift ;;
         --jenkins-home-dir) export JENKINS_HOME_DIR="$2"; JENKINS=true; shift 2 ;;
-        --postgis)       POSTGIS=true;          shift ;;
-        --postgis-data-dir) export POSTGIS_DATA_DIR="$2"; POSTGIS=true; shift 2 ;;
-        --graphhopper-data-dir) export GRAPHHOPPER_DATA_DIR="$2"; shift 2 ;;
-        --mirror)        export AFL_GEOFABRIK_MIRROR="$2"; MIRROR=true; shift 2 ;;
         --clean)         CLEAN=true;            shift ;;
         --check-only)    CHECK_ONLY=true;       shift ;;
         --build)         FORCE_BUILD=true;      shift ;;
@@ -216,7 +197,7 @@ if [ "$CLEAN" = true ]; then
     if docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
         ps --status running 2>/dev/null | grep -q namenode; then
         echo "Cleaning HDFS cache directories..."
-        for dir in /osm-cache /graphhopper /gtfs-cache; do
+        for dir in /afl-cache /graphhopper /gtfs-cache; do
             if docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
                 exec -T namenode hdfs dfs -test -d "$dir" 2>/dev/null; then
                 docker compose -f docker-compose.yml -f docker-compose.hdfs.yml --profile hdfs \
@@ -242,12 +223,6 @@ cd "$PROJECT_DIR"
 
 # Determine which services to build
 SERVICES="dashboard runner agent-addone"
-if [ "$OSM_AGENTS" -gt 0 ]; then
-    SERVICES="$SERVICES agent-osm-geocoder"
-fi
-if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
-    SERVICES="$SERVICES agent-osm-geocoder-lite"
-fi
 if [ "$WEATHER_AGENTS" -gt 0 ]; then
     SERVICES="$SERVICES agent-noaa-weather"
 fi
@@ -270,41 +245,14 @@ if [ "$JENKINS" = true ]; then
     fi
     echo ""
 fi
-if [ "$POSTGIS" = true ]; then
-    SERVICES="$SERVICES postgis"
-    PROFILE_ARGS="$PROFILE_ARGS --profile postgis"
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.postgis.yml"
-    echo "PostGIS enabled — OSM agents will use postgresql://afl:afl@postgis:5432/afl_gis"
-    if [ -n "${POSTGIS_DATA_DIR:-}" ]; then
-        echo "  PostGIS data dir: $POSTGIS_DATA_DIR"
-    fi
-    echo ""
-fi
-if [ -n "${GRAPHHOPPER_DATA_DIR:-}" ]; then
-    echo "GraphHopper external data dir: $GRAPHHOPPER_DATA_DIR"
-    echo ""
-fi
-if [ "$MIRROR" = true ]; then
-    echo "Geofabrik mirror: $AFL_GEOFABRIK_MIRROR"
-    echo "  Mounted read-only at /data/osm-mirror in OSM agent containers"
-    echo ""
-else
-    echo "Geofabrik mirror: /Volumes/afl_data/osm (default)"
-    echo "  Set AFL_GEOFABRIK_MIRROR in .env to override"
-    echo ""
-fi
 
 # Save active config so rebuild --up can use the same overlays
 cat > "$PROJECT_DIR/.afl-active-config" <<CFGEOF
 # Auto-generated by scripts/setup — do not edit
 AFL_HDFS=$HDFS
-AFL_POSTGIS=$POSTGIS
 AFL_JENKINS=$JENKINS
-AFL_GEOFABRIK_MIRROR=${AFL_GEOFABRIK_MIRROR:-}
 AFL_RUNNERS=$RUNNERS
 AFL_AGENTS=$AGENTS
-AFL_OSM_AGENTS=$OSM_AGENTS
-AFL_OSM_LITE_AGENTS=$OSM_LITE_AGENTS
 AFL_WEATHER_AGENTS=$WEATHER_AGENTS
 CFGEOF
 
@@ -320,12 +268,6 @@ fi
 SCALE_ARGS=""
 SCALE_ARGS="$SCALE_ARGS --scale runner=$RUNNERS"
 SCALE_ARGS="$SCALE_ARGS --scale agent-addone=$AGENTS"
-if [ "$OSM_AGENTS" -gt 0 ]; then
-    SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder=$OSM_AGENTS"
-fi
-if [ "$OSM_LITE_AGENTS" -gt 0 ]; then
-    SCALE_ARGS="$SCALE_ARGS --scale agent-osm-geocoder-lite=$OSM_LITE_AGENTS"
-fi
 if [ "$WEATHER_AGENTS" -gt 0 ]; then
     SCALE_ARGS="$SCALE_ARGS --scale agent-noaa-weather=$WEATHER_AGENTS"
 fi
@@ -333,12 +275,9 @@ fi
 echo "Starting AgentFlow stack..."
 echo "  Runners:          $RUNNERS"
 echo "  AddOne agents:    $AGENTS"
-echo "  OSM agents:       $OSM_AGENTS"
-echo "  OSM lite agents:  $OSM_LITE_AGENTS"
 echo "  Weather agents:   $WEATHER_AGENTS"
 echo "  HDFS:             $HDFS"
 echo "  Jenkins:          $JENKINS"
-echo "  PostGIS:          $POSTGIS"
 echo ""
 
 docker compose $COMPOSE_FILES $PROFILE_ARGS up -d $SCALE_ARGS $SERVICES
@@ -352,9 +291,6 @@ if [ "$HDFS" = true ]; then
 fi
 if [ "$JENKINS" = true ]; then
     echo "  Jenkins:   http://localhost:9090"
-fi
-if [ "$POSTGIS" = true ]; then
-    echo "  PostGIS:   localhost:5432 (afl_gis)"
 fi
 echo ""
 echo "Useful commands:"

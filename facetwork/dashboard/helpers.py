@@ -273,7 +273,7 @@ def group_servers_by_group(
     """Group servers by their server_group field.
 
     Returns a sorted list of dicts:
-        [{"group": "osm-geocoder", "servers": [...], "total": N}]
+        [{"group": "<group-name>", "servers": [...], "total": N}]
     """
     group_map: dict[str, list] = {}
     for s in servers:

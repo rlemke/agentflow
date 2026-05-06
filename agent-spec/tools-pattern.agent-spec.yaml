@@ -1,7 +1,7 @@
 # Canonical specification — the tools + handlers pattern.
 #
 # This is the reusable contract for every domain-specific example in the
-# repo (osm-geocoder, noaa-weather, and future siblings). It defines the
+# repo (https://github.com/rlemke/osm, noaa-weather, and future siblings). It defines the
 # directory layout, CLI contract, shared-library split, handler-side
 # shim, and cache conformance rules that make a domain pipeline
 # scriptable, testable, and reusable from the FFL runtime.
@@ -21,7 +21,7 @@ purpose: |
   between the two surfaces.
 
   Canonical examples in the repo:
-    - examples/osm-geocoder/ (OSM ingestion → vector tiles → HTML maps)
+    - https://github.com/rlemke/osm/ (OSM ingestion → vector tiles → HTML maps — https://github.com/rlemke/osm)
     - examples/noaa-weather/ (NOAA GHCN ingestion → climate trends)
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ tests:
 new_domain_checklist:
   step_1_scaffold:
     - "Create examples/<name>/{tools,handlers,ffl,tests}/ directories."
-    - "Copy examples/osm-geocoder/tools/_lib/{sidecar,storage}.py to examples/<name>/tools/_lib/ (they are namespace-agnostic)."
+    - "Copy https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/_lib/{sidecar,storage}.py to examples/<name>/tools/_lib/ (they are namespace-agnostic)."
     - "Add __init__.py files where needed."
 
   step_2_lib:
@@ -247,7 +247,7 @@ new_domain_checklist:
     - "Add smoke tests for every CLI (import + --help exit 0)."
 
   step_6_docs:
-    - "Add examples/<name>/tools/README.md with the pipeline diagram (see osm-geocoder for the template)."
+    - "Add examples/<name>/tools/README.md with the pipeline diagram (see https://github.com/rlemke/osm for the canonical template)."
     - "Reference this spec (tools-pattern.agent-spec.yaml) and cache-layout.agent-spec.yaml in the README."
 
 # ---------------------------------------------------------------------------
@@ -260,6 +260,6 @@ out_of_scope:
   - "Anything that must run inside a Facetwork task. If it needs the runtime, it's a handler, not a tool. (The handler may still call the tool's _lib function.)"
 
 human_docs:
-  - "examples/osm-geocoder/tools/README.md — canonical reference pipeline."
+  - "https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/README.md — canonical reference pipeline."
   - "examples/noaa-weather/tools/README.md — canonical second example."
   - "docs/architecture/overview.md — how tools + handlers fit into the broader runtime."

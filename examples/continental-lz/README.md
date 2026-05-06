@@ -1,8 +1,14 @@
 # Continental LZ Pipeline
 
-Self-contained example that orchestrates the Low-Zoom (LZ) road infrastructure
-pipeline and GTFS transit analysis across three continental regions, all running
-in Docker with MongoDB persistence.
+FFL workflows that orchestrate the OpenStreetMap **Low-Zoom (LZ) road
+infrastructure** pipeline and GTFS transit analysis across continental regions
+(US, Canada, Europe).
+
+This example is **FFL-only** — it provides the workflow definitions but
+relies on the standalone [osm-geocoder](https://github.com/rlemke/osm)
+package for the underlying handlers (region cache, OSM downloads,
+GraphHopper graph builds, GTFS extraction, population filters, zoom
+builders).
 
 ## Regions
 
@@ -30,111 +36,48 @@ in Docker with MongoDB persistence.
 **Canada**: TransLink (Vancouver), TTC (Toronto), OC Transpo (Ottawa)
 **Europe**: Deutsche Bahn, SNCF (France), Renfe (Spain), Trenitalia
 
-## Quick Start
+## Setup
+
+Install the osm-geocoder package so its handlers register with the runner:
 
 ```bash
-# 1. Start the stack
-docker compose up -d
-
-# 2. Seed workflows into MongoDB
-docker compose --profile seed run --rm seed
-
-# 3. View the dashboard
-open http://localhost:8081
+git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
+pip install -e ~/ffl_handlers/osm
 ```
 
-## Architecture
+Then seed both flows and start the runner:
 
-```
-docker-compose.yml
-  mongodb (27019)      — isolated database (afl_continental_lz)
-  dashboard (8081)     — web monitoring UI
-  runner               — workflow evaluator
-  agent                — RegistryRunner with cache/GH/zoom/GTFS handlers
-  seed (profile: seed) — compiles FFL + seeds MongoDB
+```bash
+scripts/seed-examples --include "^(continental-lz|osm-geocoder)$"
+scripts/start-runner --example osm-geocoder -- --log-format text
 ```
 
-The agent image includes:
-- Java runtime (for GraphHopper routing graph builds)
-- Python geospatial stack (osmium, shapely, pyproj, folium)
-- GraphHopper 8.0 JAR
-- Handler modules (symlinked from `examples/osm-geocoder/handlers/`)
+Continental-lz workflows reference osm namespaces (`osm.cache.NorthAmerica`,
+`osm.Transit.GTFS`, `osm.GraphHopper.*`) — the osm-geocoder package supplies
+those handlers so the workflows execute end-to-end.
 
 ## Workflows
 
-| Workflow | Description |
-|----------|-------------|
-| `continental.lz.BuildUSLowZoom` | LZ pipeline for full US |
-| `continental.lz.BuildCanadaLowZoom` | LZ pipeline for Canada |
-| `continental.lz.BuildEuropeLowZoom` | LZ for 12 European countries (parallel) |
-| `continental.lz.BuildContinentalLZ` | All three regions in parallel |
-| `continental.transit.AnalyzeUSTransit` | 4 US transit agencies |
-| `continental.transit.AnalyzeCanadaTransit` | 3 Canada transit agencies |
-| `continental.transit.AnalyzeEuropeTransit` | 4 Europe transit agencies |
-| `continental.transit.ContinentalTransitAnalysis` | All 11 agencies |
-| `continental.FullContinentalPipeline` | LZ + Transit combined |
+| Workflow | Purpose |
+|----------|---------|
+| `FullContinentalPipeline` | Bundle: LZ road infra + GTFS transit |
+| `BuildContinentalLZ` | LZ pipeline across all 14 regions |
+| `ContinentalTransitAnalysis` | GTFS feeds + transit stats for 11 agencies |
 
-## Smoke Test (Single Region)
+Run from the dashboard at http://localhost:8080 or via
+`scripts/run-workflow continental.lz.FullContinentalPipeline`.
 
-Test with a small region (Belgium ~0.4 GB) without Docker:
-
-```bash
-cd examples/continental-lz
-PYTHONPATH=../.. python scripts/run_region.py --region Belgium --output-dir /tmp/lz-belgium
-```
-
-## FFL Compilation Verification
-
-```bash
-cd examples/continental-lz
-python -c "
-from afl.parser import parse
-from afl.validator import validate
-from afl.emitter import emit_dict
-import sys; sys.path.insert(0, '../..')
-sources = ''
-for f in ['../osm-geocoder/ffl/osmtypes.ffl', '../osm-geocoder/ffl/osmoperations.ffl',
-          '../osm-geocoder/ffl/osmcache.ffl', '../osm-geocoder/ffl/osmgraphhopper.ffl',
-          '../osm-geocoder/ffl/osmgraphhoppercache.ffl', '../osm-geocoder/ffl/osmgtfs.ffl',
-          '../osm-geocoder/ffl/osmzoombuilder.ffl', '../osm-geocoder/ffl/osmfilters_population.ffl',
-          'afl/continental_types.ffl', 'afl/continental_lz_workflows.ffl',
-          'afl/continental_gtfs_workflows.ffl', 'afl/continental_full.ffl']:
-    with open(f) as fh: sources += fh.read() + '\n'
-ast = parse(sources)
-r = validate(ast)
-print(f'Valid: {r.is_valid}, errors: {r.errors}')
-compiled = emit_dict(ast)
-wfs = [f\"{ns['name']}.{wf['name']}\" for ns in compiled.get('namespaces',[]) for wf in ns.get('workflows',[])]
-print(f'Workflows: {len(wfs)}')
-for w in wfs: print(f'  {w}')
-"
-```
-
-## Resource Requirements
-
-- **Disk**: ~72 GB (28 GB PBF + 44 GB GraphHopper graphs)
-- **Memory**: 16 GB recommended (GraphHopper JVM needs 4-8 GB per graph build)
-- **Agent concurrency**: limited to 4 to manage memory pressure
-- **Time**: 12-30 hours for full continental run
-
-## File Structure
+## Layout
 
 ```
-examples/continental-lz/
-  afl/
-    continental_types.ffl           — shared schemas
-    continental_lz_workflows.ffl    — LZ road infrastructure workflows
-    continental_gtfs_workflows.ffl  — GTFS transit analysis workflows
-    continental_full.ffl            — top-level combined pipeline
-  docker/
-    Dockerfile.agent                — agent image (Java + GraphHopper)
-    Dockerfile.seed                 — seed image (compile + load)
-  scripts/
-    seed.py                         — compile FFL + seed MongoDB
-    run_region.py                   — single region smoke test
-  handlers -> ../osm-geocoder/handlers  (symlink)
-  agent.py                          — RegistryRunner entry point
-  requirements.txt                  — Python dependencies
-  docker-compose.yml                — full Docker stack
-  README.md                         — this file
+continental-lz/
+├── ffl/
+│   ├── continental_types.ffl
+│   ├── continental_lz_workflows.ffl
+│   ├── continental_gtfs_workflows.ffl
+│   └── continental_full.ffl
+├── README.md
+└── USER_GUIDE.md
 ```
+
+No Python handlers or scripts — those live in the osm-geocoder package.

@@ -1,0 +1,12 @@
+namespace example_template {
+
+    schema GreetResult {
+        message: String
+    }
+
+    event facet Greet(name: String) => (result: GreetResult)
+
+    workflow Hello(name: String = "world") => (greeting: GreetResult) andThen {
+        greeting = Greet(name = $.name)
+    }
+}
