@@ -66,7 +66,11 @@ def _resolve_step_names(tasks, store) -> dict[str, str]:
             for s in all_steps:
                 if s.id in needed:
                     step_names[s.id] = (
-                        getattr(s, "display_name", "") or s.statement_name or s.facet_name or ""
+                        getattr(s, "display_name", "")
+                        or s.statement_name
+                        or s.statement_id
+                        or s.facet_name
+                        or ""
                     )
         else:
             # No workflow_id — fall back to individual lookup

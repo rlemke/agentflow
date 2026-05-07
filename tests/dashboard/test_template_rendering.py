@@ -180,11 +180,12 @@ class TestTableRendering:
         assert resp.status_code == 200
         html = resp.text
         assert "<th>ID</th>" in html
-        assert "<th>Name</th>" in html
-        assert "<th>Step</th>" in html
-        assert "<th>State</th>" in html
-        assert "<th>Task List</th>" in html
-        assert "<th>Duration</th>" in html
+        assert "<th>Name / Step</th>" in html
+        assert "<th>State / List</th>" in html
+        assert "<th>Runner / Server</th>" in html
+        assert "<th>Duration / Ping</th>" in html
+        assert "<th>Retries</th>" in html
+        assert "<th>Created</th>" in html
 
     def test_flow_list_column_headers(self, client):
         tc, store = client
