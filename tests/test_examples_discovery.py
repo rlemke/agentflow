@@ -148,6 +148,64 @@ class TestFflCollection:
         rel = sorted(str(f.relative_to(ffl_root)) for f in files)
         assert rel == ["a.ffl", "sub/b.ffl"]
 
+    def test_extra_ffl_dirs_picked_up(self, tmp_path):
+        # Simulate an entry-point package whose installed src tree only sees
+        # the canonical ffl/, but the repo also ships fixtures at repo-root
+        # tests/real/ffl/ — caller declares them via extra_ffl_dirs.
+        pkg_root = tmp_path / "pkg"
+        ffl_root = pkg_root / "ffl"
+        ffl_root.mkdir(parents=True)
+        (ffl_root / "main.ffl").write_text("// stub\n")
+
+        repo_real = tmp_path / "tests" / "real" / "ffl"
+        repo_real.mkdir(parents=True)
+        (repo_real / "fixture_a.ffl").write_text("// stub\n")
+        (repo_real / "fixture_b.ffl").write_text("// stub\n")
+
+        pkg = ExamplePackage(
+            name="entry",
+            ffl_dir=ffl_root,
+            register_handlers=lambda r: None,
+            source="entry_point",
+            extra_ffl_dirs=[repo_real],
+        )
+        files = collect_ffl_files(pkg)
+        rel = sorted(str(f.relative_to(tmp_path)) for f in files)
+        assert rel == [
+            "pkg/ffl/main.ffl",
+            "tests/real/ffl/fixture_a.ffl",
+            "tests/real/ffl/fixture_b.ffl",
+        ]
+
+    def test_extra_ffl_dirs_dedupes_with_root_walk(self, tmp_path):
+        # If extra_ffl_dirs overlaps a path the default walk already covers,
+        # the file should only appear once.
+        ex = _make_local_example(tmp_path, "alpha", with_handlers=True, with_ffl=True)
+        nested = ex / "tests" / "real" / "ffl"
+        nested.mkdir(parents=True)
+        (nested / "shared.ffl").write_text("// stub\n")
+
+        [pkg] = discover_local_examples(tmp_path)
+        pkg.extra_ffl_dirs.append(nested)
+        files = collect_ffl_files(pkg)
+        shared_hits = [f for f in files if f.name == "shared.ffl"]
+        assert len(shared_hits) == 1
+
+    def test_extra_ffl_dirs_skips_missing_dir(self, tmp_path):
+        ffl_root = tmp_path / "pkg" / "ffl"
+        ffl_root.mkdir(parents=True)
+        (ffl_root / "main.ffl").write_text("// stub\n")
+
+        pkg = ExamplePackage(
+            name="entry",
+            ffl_dir=ffl_root,
+            register_handlers=lambda r: None,
+            source="entry_point",
+            extra_ffl_dirs=[tmp_path / "does-not-exist"],
+        )
+        files = collect_ffl_files(pkg)
+        assert [f.name for f in files] == ["main.ffl"]
+
 
 class _FakeEP:
     def __init__(self, name: str, target: ExamplePackage):

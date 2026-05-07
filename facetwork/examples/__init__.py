@@ -41,6 +41,11 @@ class ExamplePackage:
     runner_env: dict[str, str] = field(default_factory=dict)
     source: str = "entry_point"  # "entry_point" | "local"
     handlers_path: Path | None = None  # set for "local" examples; needed for sys.path
+    extra_ffl_dirs: list[Path] = field(default_factory=list)
+    # Extra directories to walk for *.ffl, in addition to ffl_dir and the
+    # default root scan. Used by entry-point packages that ship FFL fixtures
+    # outside their installed src/ tree (e.g. tests/real/ffl/ at the repo
+    # root). Each dir is rglob'd; the standard tests/ exclusion still applies.
 
 
 def _load_entry_point(ep: importlib.metadata.EntryPoint) -> ExamplePackage | None:
@@ -201,44 +206,63 @@ def filter_examples(
             yield pkg
 
 
+def _is_excluded_test_fixture(path: Path) -> bool:
+    """Skip files under ``tests/`` unless they're under ``tests/real/``."""
+    parts = path.parts
+    if "tests" not in parts:
+        return False
+    i = parts.index("tests")
+    return not (i + 1 < len(parts) and parts[i + 1] == "real")
+
+
 def collect_ffl_files(pkg: ExamplePackage) -> list[Path]:
     """Return all .ffl files for ``pkg``, deduped and sorted.
 
-    Walks two locations: the canonical ``ffl/`` directory directly, and any
-    nested ``*/ffl/*.ffl`` under the example/package root (the convention
-    used by domain pipelines like osm-geocoder, where per-domain FFL lives
-    alongside its handlers). Test fixtures are excluded except those under
-    ``tests/real/``.
+    Walks three locations:
+      1. ``pkg.ffl_dir`` (rglob).
+      2. ``*/ffl/*.ffl`` under the example/package root — the convention used
+         by domain pipelines like osm-geocoder where per-domain FFL lives
+         alongside its handlers. Files outside the root are dropped.
+      3. ``pkg.extra_ffl_dirs`` (each rglob'd) — explicit opt-in for FFL
+         fixtures that live outside the installed package tree, e.g. an
+         entry-point package's ``tests/real/ffl/`` at the repo root.
 
-    Root selection:
+    Test fixtures are excluded everywhere except under ``tests/real/``.
+
+    Root selection for (2):
       * Local example — ``handlers_path`` is the example dir.
       * Entry-point package — ``ffl_dir.parent`` is the installed package root.
     """
+    files: list[Path] = []
+
     if pkg.handlers_path is not None:
         root = pkg.handlers_path
     elif pkg.ffl_dir is not None:
         root = pkg.ffl_dir.parent
     else:
-        return []
+        root = None
 
-    files: list[Path] = []
     if pkg.ffl_dir is not None and pkg.ffl_dir.is_dir():
         files.extend(sorted(pkg.ffl_dir.rglob("*.ffl")))
-    files.extend(sorted(root.rglob("ffl/*.ffl")))
 
-    real_root = root.resolve()
+    if root is not None:
+        real_root = root.resolve()
+        for f in sorted(root.rglob("ffl/*.ffl")):
+            try:
+                f.resolve().relative_to(real_root)
+            except ValueError:
+                continue
+            files.append(f)
+
+    for extra in pkg.extra_ffl_dirs:
+        if extra.is_dir():
+            files.extend(sorted(extra.rglob("*.ffl")))
+
     seen: set[Path] = set()
     unique: list[Path] = []
     for f in files:
         real_f = f.resolve()
-        try:
-            real_f.relative_to(real_root)
-        except ValueError:
-            continue
-        parts = real_f.parts
-        in_tests = "tests" in parts
-        in_real = "real" in parts and parts.index("real") == parts.index("tests") + 1
-        if in_tests and not in_real:
+        if _is_excluded_test_fixture(real_f):
             continue
         if real_f in seen:
             continue
