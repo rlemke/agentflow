@@ -40,7 +40,7 @@ Two places specs live:
    carries a sibling file named `<basename>.agent-spec.yaml`. Example:
 
    ```
-   https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/_lib/
+   https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/
        pbf_download.py              ← the committed implementation
        pbf_download.agent-spec.yaml ← the spec it satisfies
    ```
@@ -71,7 +71,7 @@ find . -name '*.agent-spec.yaml' -o -path '*/agent-spec/*.yaml'
 
 | Spec | Location | Describes |
 |---|---|---|
-| [pbf_download](https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/_lib/pbf_download.agent-spec.yaml) | external repo | Geofabrik PBF downloader — MD5 verification, manifest-based caching, thread-safe per region. Pilot spec demonstrating the format on a concrete tool. |
+| [pbf_download](https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/pbf_download.agent-spec.yaml) | external repo | Geofabrik PBF downloader — MD5 verification, manifest-based caching, thread-safe per region. Pilot spec demonstrating the format on a concrete tool. |
 
 More per-component specs will appear alongside other tools (`pbf_extract`, `graphhopper_build`, `valhalla_build`, `osrm_build`, `vector_tiles_build`, `html_render`, etc.) as each is formally specified.
 

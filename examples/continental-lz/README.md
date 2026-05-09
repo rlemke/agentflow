@@ -5,7 +5,7 @@ infrastructure** pipeline and GTFS transit analysis across continental regions
 (US, Canada, Europe).
 
 This example is **FFL-only** — it provides the workflow definitions but
-relies on the standalone [osm-geocoder](https://github.com/rlemke/osm)
+relies on the standalone [osm-geocoder](https://github.com/rlemke/fwh_osm)
 package for the underlying handlers (region cache, OSM downloads,
 GraphHopper graph builds, GTFS extraction, population filters, zoom
 builders).
@@ -41,8 +41,8 @@ builders).
 Install the osm-geocoder package so its handlers register with the runner:
 
 ```bash
-git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
-pip install -e ~/ffl_handlers/osm
+git clone https://github.com/rlemke/fwh_osm.git ~/fw_handlers/fwh_osm
+pip install -e ~/fw_handlers/fwh_osm
 ```
 
 Then seed both flows and start the runner:

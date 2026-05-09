@@ -93,9 +93,9 @@ components:
 
   tools_cli:
     description: "Standalone CLI utilities for data operations outside the runtime. Share their library layer with FFL handlers so both surfaces drive the same caches."
-    spec: "https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/_lib/*.agent-spec.yaml"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/*.agent-spec.yaml"
     authoritative_docs:
-      - "https://github.com/rlemke/osm/blob/main/src/osm_geocoder/tools/README.md"
+      - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/README.md"
 
 # ---------------------------------------------------------------------------
 # System-wide invariants — properties that hold across components.

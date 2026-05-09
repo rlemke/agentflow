@@ -116,7 +116,7 @@ SMB (Samba/CIFS) volumes mounted on macOS (e.g. `/Volumes/afl_data/`) exhibit a 
 **Workarounds**:
 1. **Use a local APFS drive for the mirror** (recommended): Set `AFL_GEOFABRIK_MIRROR` to a local or directly-attached drive (e.g. `/Volumes/afl_data_local/osm`). SMB is fine for write targets (`AFL_CACHE_DIR`, `AFL_OSM_OUTPUT_BASE`, `AFL_LOCAL_OUTPUT_DIR`) since containers create those files.
 2. **NFS export from the NAS**: NFS does not have this VirtioFS bug. If your NAS supports NFS, export the data directory and mount via NFS on macOS.
-3. **readdir fallback**: The downloader (`https://github.com/rlemke/osm/blob/main/src/osm_geocoder/handlers/shared/downloader.py`) includes `_mirror_file_exists()` which falls back to `os.listdir()` when `os.path.isfile()` fails. This detects file presence but cannot fix the `open()` failure for actual reads.
+3. **readdir fallback**: The downloader (`https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/handlers/shared/downloader.py`) includes `_mirror_file_exists()` which falls back to `os.listdir()` when `os.path.isfile()` fails. This detects file presence but cannot fix the `open()` failure for actual reads.
 
 **Summary of storage type behavior in Docker Desktop (macOS)**:
 

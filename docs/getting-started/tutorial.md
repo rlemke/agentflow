@@ -224,9 +224,9 @@ without qualification, as long as there is no ambiguity.
 
 ### Real-world example: OSM Geocoder
 
-The standalone [osm-geocoder repo](https://github.com/rlemke/osm) ships a
+The standalone [osm-geocoder repo](https://github.com/rlemke/fwh_osm) ships a
 production-scale FFL project. Its
-[`geocoder.ffl`](https://github.com/rlemke/osm/blob/main/src/osm_geocoder/ffl/geocoder.ffl)
+[`geocoder.ffl`](https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/ffl/geocoder.ffl)
 shows schemas and event facets working together:
 
 ```afl
@@ -577,7 +577,7 @@ namespace analysis {
 
 ### Where to go from here
 
-The standalone [osm-geocoder repo](https://github.com/rlemke/osm) is a
+The standalone [osm-geocoder repo](https://github.com/rlemke/fwh_osm) is a
 real-world FFL project with 50+ FFL files and 100+ handler implementations.
 Notable files (under `src/osm_geocoder/`):
 
@@ -591,8 +591,8 @@ Notable files (under `src/osm_geocoder/`):
 To run a workflow from there, install the package and start the runner:
 
 ```bash
-git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
-pip install -e ~/ffl_handlers/osm
+git clone https://github.com/rlemke/fwh_osm.git ~/fw_handlers/fwh_osm
+pip install -e ~/fw_handlers/fwh_osm
 
 # Seed and run from the facetwork checkout
 scripts/seed-examples --include osm-geocoder

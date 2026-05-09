@@ -103,7 +103,7 @@ See `spec/70_examples.md` Examples 2–4 for detailed execution traces demonstra
 - **Docker stack**: `docker-compose.yml` defining MongoDB, Dashboard, Runner, Agents, Seed, and MCP services
 - **Setup script**: `scripts/setup` — bootstraps Docker (install check, image build, service start with scaling)
 - **Scalable services**: Runner, AddOne agent — no `container_name`, support `--scale N`
-- **Domain agent images**: live in their own repos (e.g. https://github.com/rlemke/osm for OSM workflows). Install via `pip install -e <repo>` to register handlers with the runner.
+- **Domain agent images**: live in their own repos (e.g. https://github.com/rlemke/fwh_osm for OSM workflows). Install via `pip install -e <repo>` to register handlers with the runner.
 
 ### MCP terms
 - **MCP**: Model Context Protocol — JSON-RPC 2.0 protocol for LLM agent ↔ tool server communication

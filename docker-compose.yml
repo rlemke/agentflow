@@ -118,7 +118,7 @@ services:
       - agents
 
   # OSM agents are defined in the standalone osm-geocoder repo
-  # (https://github.com/rlemke/osm). After `pip install -e ~/ffl_handlers/osm`
+  # (https://github.com/rlemke/fwh_osm). After `pip install -e ~/fw_handlers/fwh_osm`
   # they're discoverable via `scripts/start-runner --example osm-geocoder`.
 
   # MCP Server (Model Context Protocol for LLM agents)

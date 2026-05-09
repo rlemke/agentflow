@@ -69,8 +69,8 @@ scripts/setup --check-only
 ### Domain agents
 
 OSM agents (full + lite) live in the standalone osm-geocoder repo at
-[github.com/rlemke/osm](https://github.com/rlemke/osm). After
-`pip install -e ~/ffl_handlers/osm`, they're discoverable via
+[github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm). After
+`pip install -e ~/fw_handlers/fwh_osm`, they're discoverable via
 `scripts/start-runner --example osm-geocoder` — no Docker container is
 shipped from this repo.
 

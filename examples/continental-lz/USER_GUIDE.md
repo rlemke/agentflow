@@ -28,7 +28,7 @@ This example provides FFL workflows that orchestrate two pipelines across
 - **72+ GB of data** (PBF downloads + GraphHopper routing graphs)
 - **12-30 hours** for a full continental run
 
-The handler implementations come from the [osm-geocoder](https://github.com/rlemke/osm)
+The handler implementations come from the [osm-geocoder](https://github.com/rlemke/fwh_osm)
 package — install that first, then this example's FFL workflows use its
 namespaces (`osm.cache.*`, `osm.GraphHopper.*`, `osm.Transit.GTFS.*`).
 
@@ -37,8 +37,8 @@ namespaces (`osm.cache.*`, `osm.GraphHopper.*`, `osm.Transit.GTFS.*`).
 ### 1. Install osm-geocoder
 
 ```bash
-git clone https://github.com/rlemke/osm.git ~/ffl_handlers/osm
-pip install -e ~/ffl_handlers/osm
+git clone https://github.com/rlemke/fwh_osm.git ~/fw_handlers/fwh_osm
+pip install -e ~/fw_handlers/fwh_osm
 ```
 
 This registers osm-geocoder's handlers via the `facetwork.examples` entry

@@ -472,7 +472,7 @@ docker compose exec postgis pg_isready -U afl
 ### Building OSM Agents with PostGIS
 
 OSM agent images and their PostGIS-specific build args live in the
-standalone osm-geocoder repo: https://github.com/rlemke/osm.
+standalone osm-geocoder repo: https://github.com/rlemke/fwh_osm.
 
 ### Environment Variables
 
@@ -519,7 +519,7 @@ scripts/setup --mongodb-data-dir /mnt/ssd/mongodb
 ### External Storage for GraphHopper
 
 GraphHopper graph storage is configured by the OSM example package itself
-(see https://github.com/rlemke/osm) — set `GRAPHHOPPER_DATA_DIR` in your
+(see https://github.com/rlemke/fwh_osm) — set `GRAPHHOPPER_DATA_DIR` in your
 shell or `.env` and the OSM agent's docker-compose entry will mount it.
 
 | Variable | Default | Description |

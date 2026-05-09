@@ -386,7 +386,7 @@ See [examples/README.md](examples/README.md) for a complete overview of all 15+ 
 
 | Example | Highlights |
 |---------|-----------|
-| [osm-geocoder](https://github.com/rlemke/osm) | Standalone repo: full-scale OSM ingestion, 23 handler subpackages, PostGIS, pgRouting, GraphHopper |
+| [osm-geocoder](https://github.com/rlemke/fwh_osm) | Standalone repo: full-scale OSM ingestion, 23 handler subpackages, PostGIS, pgRouting, GraphHopper |
 | `examples/hiv-drug-resistance/` | Bioinformatics: QC branching, error recovery, batch processing |
 | `examples/noaa-weather/` | Real data: AWS S3, climate analysis, linear regression |
 | `examples/devops-deploy/` | Conditional branching, prompt/script blocks, mixins |
