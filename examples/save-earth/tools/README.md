@@ -1,6 +1,6 @@
 # Save Earth — Tools
 
-Standalone CLI utilities for fetching and mapping geolocated data from environmental-action sources: crowd-sourced litter observations, authoritative cleanup-site registries, and (in later PRs) tree-equity scores, 311 cleanup requests, coastal-cleanup chapters, and tree-planting projects. All outputs overlay cleanly on an OSM basemap and follow the same cache + handler pattern as `osm-geocoder` and `noaa-weather`.
+Standalone CLI utilities for fetching and mapping geolocated data from environmental-action sources: crowd-sourced litter observations, authoritative cleanup-site registries, and (in later PRs) tree-equity scores, 311 cleanup requests, coastal-cleanup chapters, and tree-planting projects. All outputs overlay cleanly on an OSM basemap and follow the same cache + handler pattern as the standalone [osm-geocoder](https://github.com/rlemke/fwh_osm) and [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) repos.
 
 Pattern contract: [`agent-spec/tools-pattern.agent-spec.yaml`](../../../agent-spec/tools-pattern.agent-spec.yaml)
 Cache layout contract: [`agent-spec/cache-layout.agent-spec.yaml`](../../../agent-spec/cache-layout.agent-spec.yaml)

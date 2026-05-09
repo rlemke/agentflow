@@ -138,17 +138,20 @@ Examples can live either in this repo under `examples/<name>/` or as
 separate pip-installable packages declaring the `facetwork.examples`
 entry point. Both are discovered by `scripts/start-runner --example <name>`
 and `scripts/seed-examples`. See `example-template/` for the standalone
-package layout. The osm-geocoder example was extracted into its own repo
-([github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm)); install it with
-`pip install -e ~/fw_handlers/fwh_osm` and it surfaces as `--example osm-geocoder`
-exactly like an in-repo example.
+package layout. The osm-geocoder
+([github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm)) and noaa-weather
+([github.com/rlemke/fwh_noaa_weather](https://github.com/rlemke/fwh_noaa_weather))
+examples were extracted into their own repos; install with `pip install -e
+~/fw_handlers/fwh_osm` / `pip install -e ~/fw_handlers/fwh_noaa_weather` and they
+surface as `--example osm-geocoder` / `--example noaa-weather` exactly like in-repo
+examples.
 
 ## Domain pipelines — tools / handlers / cache pattern
 
 Every domain ingestion pipeline (osm-geocoder, noaa-weather, …) follows one contract: a `tools/` dir of Python CLIs + shell wrappers backed by `tools/_lib/`, FFL handlers that call into the same `_lib/` via a `handlers/shared/<domain>_utils.py` shim, and a sidecar-backed cache under `$AFL_CACHE_ROOT/<namespace>/`. Canonical examples:
 
 - [github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm) — OSM PBF → GeoJSON → tiles → HTML maps (standalone repo)
-- `examples/noaa-weather/tools/` — NOAA GHCN → station CSVs → climate trends
+- [github.com/rlemke/fwh_noaa_weather](https://github.com/rlemke/fwh_noaa_weather) — NOAA GHCN → station CSVs → climate trends (standalone repo; `pip install -e ~/fw_handlers/fwh_noaa_weather`)
 
 When building or modifying a domain pipeline, read [`agent-spec/tools-pattern.agent-spec.yaml`](agent-spec/tools-pattern.agent-spec.yaml) first — it defines the directory layout, CLI contract (argparse / stderr / stdout / exit codes), `_lib/` vs handler split, cache sidecar protocol, and test-writing rules.
 

@@ -25,7 +25,7 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | [event-driven-etl](event-driven-etl/) | Event-driven ETL — extract/transform/load pipeline (3 schemas, 6 event facets, 2 workflows, foreach, schema instantiation) |
 | [devops-deploy](devops-deploy/) | DevOps deployment pipeline — first `andThen when` showcase (nested when, foreach, prompt/script blocks, mixins+implicits) |
 | [hiv-drug-resistance](hiv-drug-resistance/) | HIV drug resistance genotyping — bioinformatics pipeline (`andThen when` QC, `catch` error recovery, `foreach` batch, prompt+script blocks) |
-| [noaa-weather](noaa-weather/) | NOAA GHCN-Daily climate analysis — catalog-first real-data pipeline (AWS S3, linear regression trends, OSM geocoding, `catch`/`foreach`, 25+ workflows incl. international and cache warmup) |
+| [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | NOAA GHCN-Daily climate analysis — catalog-first real-data pipeline (AWS S3, linear regression trends, OSM geocoding, `catch`/`foreach`, 25+ workflows). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_noaa_weather`. |
 
 ## User Documentation
 
@@ -56,7 +56,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | event-driven-etl | *(coming soon)* |
 | devops-deploy | *(coming soon)* |
 | hiv-drug-resistance | *(coming soon)* |
-| noaa-weather | [USER_GUIDE.md](noaa-weather/USER_GUIDE.md) |
+| noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
 
 ## Running an Example
 

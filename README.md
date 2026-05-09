@@ -388,7 +388,7 @@ See [examples/README.md](examples/README.md) for a complete overview of all 15+ 
 |---------|-----------|
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | Standalone repo: full-scale OSM ingestion, 23 handler subpackages, PostGIS, pgRouting, GraphHopper |
 | `examples/hiv-drug-resistance/` | Bioinformatics: QC branching, error recovery, batch processing |
-| `examples/noaa-weather/` | Real data: AWS S3, climate analysis, linear regression |
+| [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Standalone repo: NOAA GHCN, NDBC buoys, ISD-Lite, climate trends, Nominatim geocoding |
 | `examples/devops-deploy/` | Conditional branching, prompt/script blocks, mixins |
 | `examples/research-agent/` | LLM integration: 8 prompt-block facets, Claude API |
 | `examples/aws-lambda/` | Real boto3: LocalStack, Step Functions, blue-green deploy |

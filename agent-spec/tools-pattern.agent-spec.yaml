@@ -21,8 +21,8 @@ purpose: |
   between the two surfaces.
 
   Canonical examples in the repo:
-    - https://github.com/rlemke/fwh_osm/ (OSM ingestion → vector tiles → HTML maps — https://github.com/rlemke/fwh_osm)
-    - examples/noaa-weather/ (NOAA GHCN ingestion → climate trends)
+    - https://github.com/rlemke/fwh_osm/ (OSM ingestion → vector tiles → HTML maps — standalone repo)
+    - https://github.com/rlemke/fwh_noaa_weather/ (NOAA GHCN ingestion → climate trends — standalone repo)
 
 # ---------------------------------------------------------------------------
 # Directory layout — every domain example under examples/<name>/.
@@ -261,5 +261,5 @@ out_of_scope:
 
 human_docs:
   - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/README.md — canonical reference pipeline."
-  - "examples/noaa-weather/tools/README.md — canonical second example."
+  - "https://github.com/rlemke/fwh_noaa_weather/blob/main/src/noaa_weather/tools/README.md — canonical second example."
   - "docs/architecture/overview.md — how tools + handlers fit into the broader runtime."

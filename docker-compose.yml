@@ -51,7 +51,7 @@ services:
       - AFL_CACHE_DIR=${AFL_CACHE_DIR:-}
       - AFL_GEOFABRIK_MIRROR=/data/osm-mirror
       - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - PYTHONPATH=/app:/app/examples/noaa-weather
+      - PYTHONPATH=/app
     volumes:
       - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
       - ${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}:${AFL_OSM_OUTPUT_BASE:-/Volumes/afl_data/osm-output}
@@ -94,28 +94,12 @@ services:
     profiles:
       - seed
 
-  # NOAA Weather agent — RegistryRunner with weather handlers (scalable)
-  # Start with: docker compose --profile agents up -d agent-noaa-weather
-  agent-noaa-weather:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.noaa-weather
-    environment:
-      - AFL_MONGODB_URL=mongodb://afl-mongodb:27017
-      - AFL_MONGODB_DATABASE=afl
-      - AFL_MAX_CONCURRENT=${AFL_MAX_CONCURRENT:-4}
-      - AFL_POLL_INTERVAL_MS=${AFL_POLL_INTERVAL_MS:-1000}
-      - AFL_REAPER_TIMEOUT_MS=${AFL_REAPER_TIMEOUT_MS:-300000}
-      - AFL_EXAMPLES_DATABASE=${AFL_EXAMPLES_DATABASE:-afl_examples}
-      - AFL_LOCAL_OUTPUT_DIR=${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-    volumes:
-      - ${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}:${AFL_LOCAL_OUTPUT_DIR:-/Volumes/afl_data/output}
-    extra_hosts:
-      - "afl-mongodb:192.168.68.91"
-    restart: unless-stopped
-    profiles:
-      - agents
+  # The noaa-weather agent has been extracted to its own repo
+  # (https://github.com/rlemke/fwh_noaa_weather). After `pip install -e
+  # ~/fw_handlers/fwh_noaa_weather`, register it with `scripts/start-runner
+  # --example noaa-weather`. The previous agent-noaa-weather Compose
+  # service + Dockerfile.noaa-weather are no longer maintained here.
+
 
   # OSM agents are defined in the standalone osm-geocoder repo
   # (https://github.com/rlemke/fwh_osm). After `pip install -e ~/fw_handlers/fwh_osm`
