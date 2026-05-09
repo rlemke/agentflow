@@ -143,7 +143,7 @@ env PYTHONPATH="$REPO_ROOT" REPO_ROOT="$REPO_ROOT" "$PYTHON" -m facetwork.exampl
 # Build PYTHONPATH so the runner can import handler modules from local
 # examples (entry-point packages are already on sys.path via pip install).
 RUNNER_PYTHONPATH="$REPO_ROOT"
-for hp in "${HANDLER_PATHS[@]}"; do
+for hp in ${HANDLER_PATHS[@]+"${HANDLER_PATHS[@]}"}; do
     RUNNER_PYTHONPATH="$RUNNER_PYTHONPATH:$hp"
 done
 
