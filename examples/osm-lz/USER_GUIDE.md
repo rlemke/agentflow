@@ -1,4 +1,4 @@
-# Continental LZ Pipeline — User Guide
+# OSM LZ Pipeline — User Guide
 
 > See also: [README](README.md)
 
@@ -47,7 +47,7 @@ point. Facetwork's discovery picks them up automatically.
 ### 2. Seed both flows into MongoDB
 
 ```bash
-scripts/seed-examples --include "^(continental-lz|osm-geocoder)$"
+scripts/seed-examples --include "^(osm-lz|osm-geocoder)$"
 ```
 
 The seeder compiles both flows. Continental-lz's `uses osm.cache.NorthAmerica`
@@ -59,8 +59,8 @@ declarations resolve against osm-geocoder's seeded definitions.
 scripts/start-runner --example osm-geocoder -- --log-format text
 ```
 
-Note: pass `--example osm-geocoder` (not continental-lz). osm-geocoder's
-handlers are what executes; continental-lz contributes only the
+Note: pass `--example osm-geocoder` (not osm-lz). osm-geocoder's
+handlers are what executes; osm-lz contributes only the
 composition workflows.
 
 ### 4. Run a workflow
@@ -82,7 +82,7 @@ scripts/run-workflow continental.lz.FullContinentalPipeline
 ## Layout
 
 ```
-continental-lz/
+osm-lz/
 ├── ffl/
 │   ├── continental_types.ffl              # Shared region/agency schemas
 │   ├── continental_lz_workflows.ffl       # Per-region LZ pipelines
@@ -96,7 +96,7 @@ No Python — handlers live in osm-geocoder.
 
 ## Why split this from osm-geocoder?
 
-continental-lz is a **higher-level composition** of osm-geocoder facets
+osm-lz is a **higher-level composition** of osm-geocoder facets
 into long-running, regionally-parallel workflows. Keeping it separate:
 
 - Lets osm-geocoder ship as a focused, reusable handler package

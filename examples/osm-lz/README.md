@@ -1,4 +1,4 @@
-# Continental LZ Pipeline
+# OSM LZ Pipeline
 
 FFL workflows that orchestrate the OpenStreetMap **Low-Zoom (LZ) road
 infrastructure** pipeline and GTFS transit analysis across continental regions
@@ -48,7 +48,7 @@ pip install -e ~/fw_handlers/fwh_osm
 Then seed both flows and start the runner:
 
 ```bash
-scripts/seed-examples --include "^(continental-lz|osm-geocoder)$"
+scripts/seed-examples --include "^(osm-lz|osm-geocoder)$"
 scripts/start-runner --example osm-geocoder -- --log-format text
 ```
 
@@ -71,7 +71,7 @@ Run from the dashboard at http://localhost:8080 or via
 ## Layout
 
 ```
-continental-lz/
+osm-lz/
 ├── ffl/
 │   ├── continental_types.ffl
 │   ├── continental_lz_workflows.ffl

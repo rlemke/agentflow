@@ -14,7 +14,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
 | [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/_lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | Advanced | Large-scale event facets, source adapters | 132+ | Production-scale OSM ingestion + PostGIS + routing graphs. **Standalone repo.** |
-| [continental-lz](../continental-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
+| [osm-lz](../osm-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
 | [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
 | [monte-carlo-risk](../monte-carlo-risk/) | Intermediate | Pure-Python math stubs | 8 | Financial risk simulation |
 | [ml-hyperparam-sweep](../ml-hyperparam-sweep/) | Intermediate | Statement-level andThen, prompt blocks | 6 | ML training pipelines |
@@ -66,7 +66,7 @@ Start simple and build up to more complex patterns:
        |                  + RegistryRunner-first
 9. osm-geocoder         Full production-scale agent (standalone repo: github.com/rlemke/fwh_osm)
        |
-10. continental-lz       Docker-orchestrated multi-region pipeline
+10. osm-lz       Docker-orchestrated multi-region pipeline
 ```
 
 > **Note on standalone repos.** The `jenkins`, `noaa-weather`, and
@@ -148,7 +148,7 @@ Use **[site-selection](../site-selection/)**. It combines OSM amenity extraction
 
 ### "I want to run a pipeline in Docker with MongoDB persistence"
 
-Start with **[continental-lz](../continental-lz/)**. It has its own `docker-compose.yml` with MongoDB, dashboard, runner, and agent services, demonstrating a complete deployment topology.
+Start with **[osm-lz](../osm-lz/)**. It has its own `docker-compose.yml` with MongoDB, dashboard, runner, and agent services, demonstrating a complete deployment topology.
 
 ## FFL Patterns by Example
 
@@ -373,7 +373,7 @@ Each example has its own detailed user guide:
 | census-us | [USER_GUIDE.md](../census-us/USER_GUIDE.md) |
 | noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
 | osm-geocoder | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm/blob/main/USER_GUIDE.md) — in standalone repo |
-| continental-lz | [USER_GUIDE.md](../continental-lz/USER_GUIDE.md) |
+| osm-lz | [USER_GUIDE.md](../osm-lz/USER_GUIDE.md) |
 | site-selection | [USER_GUIDE.md](../site-selection/USER_GUIDE.md) |
 | monte-carlo-risk | [USER_GUIDE.md](../monte-carlo-risk/USER_GUIDE.md) |
 | ml-hyperparam-sweep | [USER_GUIDE.md](../ml-hyperparam-sweep/USER_GUIDE.md) |
