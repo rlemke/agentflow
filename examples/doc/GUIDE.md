@@ -9,10 +9,11 @@ This guide helps you choose the right example as a starting point for your own F
 | [hello-agent](../hello-agent/) | Beginner | Single event facet + workflow | 1 (inline) | Learning the execution model |
 | [volcano-query](../volcano-query/) | Beginner | Cross-namespace composition | 0 (reuses OSM) | Composing existing facets into new workflows |
 | [genomics](../genomics/) | Intermediate | foreach fan-out, linear fan-in | 45 | Parallel batch processing pipelines |
-| [jenkins](../jenkins/) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth) |
+| [jenkins](https://github.com/rlemke/fwh_jenkins) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth). **Standalone repo.** |
 | [aws-lambda](../aws-lambda/) | Intermediate | Real cloud calls + mixins | 12 | Cloud service integration with LocalStack |
 | [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
-| [osm-geocoder](../osm-geocoder/) | Advanced | Large-scale event facets | 580+ | Production-scale agent with many namespaces |
+| [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/_lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
+| [osm-geocoder](https://github.com/rlemke/fwh_osm) | Advanced | Large-scale event facets, source adapters | 132+ | Production-scale OSM ingestion + PostGIS + routing graphs. **Standalone repo.** |
 | [continental-lz](../continental-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
 | [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
 | [monte-carlo-risk](../monte-carlo-risk/) | Intermediate | Pure-Python math stubs | 8 | Financial risk simulation |
@@ -63,10 +64,17 @@ Start simple and build up to more complex patterns:
        |
 8. sensor-monitoring     Unary negation + null literals + map indexing + mixin alias
        |                  + RegistryRunner-first
-9. osm-geocoder         Full production-scale agent
+9. osm-geocoder         Full production-scale agent (standalone repo: github.com/rlemke/fwh_osm)
        |
 10. continental-lz       Docker-orchestrated multi-region pipeline
 ```
+
+> **Note on standalone repos.** The `jenkins`, `noaa-weather`, and
+> `osm-geocoder` examples have been extracted into their own repositories
+> (`fwh_jenkins`, `fwh_noaa_weather`, `fwh_osm`). They surface in
+> Facetwork via the `facetwork.examples` entry point — install once with
+> `pip install -e ~/fw_handlers/<repo>` and they show up as
+> `--example <name>` exactly like the in-repo examples below.
 
 ## Choosing an Example
 
@@ -84,7 +92,7 @@ Use **[genomics](../genomics/)** as your template. It demonstrates `andThen fore
 
 ### "I want to add retry, timeout, or other cross-cutting concerns"
 
-Use **[jenkins](../jenkins/)** as your template. It demonstrates the `with` mixin composition pattern at both signature level and call time, plus implicit defaults.
+Use **[jenkins](https://github.com/rlemke/fwh_jenkins)** (standalone repo) as your template. It demonstrates the `with` mixin composition pattern at both signature level and call time, plus implicit defaults. Install with `pip install -e ~/fw_handlers/fwh_jenkins`.
 
 ### "I want to build an ETL pipeline with API and shapefile data"
 
@@ -96,7 +104,11 @@ Use **[aws-lambda](../aws-lambda/)** as your template. The handlers make real bo
 
 ### "I want to build a large-scale agent with many event facets"
 
-Study **[osm-geocoder](../osm-geocoder/)**. With 580+ handlers across 15 modules and 44 FFL files, it demonstrates how to organize a production-scale agent with factory-built handlers, geographic registries, and namespace-per-domain architecture.
+Study **[osm-geocoder](https://github.com/rlemke/fwh_osm)** (standalone repo). With 132+ handlers across 23 subpackages, it demonstrates how to organize a production-scale agent with factory-built handlers, geographic registries, source adapters (PBF / PostGIS / GeoJSON), and namespace-per-domain architecture. Install with `pip install -e ~/fw_handlers/fwh_osm`.
+
+### "I want a domain pipeline with both CLIs and FFL handlers backed by one library"
+
+Study **[noaa-weather](https://github.com/rlemke/fwh_noaa_weather)** (standalone repo). It is the canonical reference for the **tools / handlers / `_lib`** pattern: every operation has a CLI under `tools/` *and* an FFL handler, and both call into the same `tools/_lib/` modules via a `handlers/shared/<domain>_utils.py` shim. Run a single ingest step from the shell or thread it into a workflow — the cache + outputs are identical either way. Install with `pip install -e ~/fw_handlers/fwh_noaa_weather`.
 
 ### "I want to simulate financial risk or run pure-Python analytics"
 
@@ -227,10 +239,10 @@ Every intermediate-to-advanced example uses this pattern:
 | Example | Composed Facets | What They Hide |
 |---------|----------------|----------------|
 | [genomics](../genomics/) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
-| [jenkins](../jenkins/) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
+| [jenkins](https://github.com/rlemke/fwh_jenkins) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
 | [aws-lambda](../aws-lambda/) | `DeployFunction`, `UpdateAndVerify` | Lambda create→invoke→verify steps |
 | [census-us](../census-us/) | `AnalyzeState`, `AnalyzeStateWithDB` | Download→Extract→Join→Ingest pipeline per state |
-| [osm-geocoder](../osm-geocoder/) | `PrepareRegion`, `BuildRoutingData` | Cache→download→tile/graph pipeline |
+| [osm-geocoder](https://github.com/rlemke/fwh_osm) | `PrepareRegion`, `BuildRoutingData` | Cache→download→tile/graph pipeline |
 
 ### Cross-Namespace Composition
 
@@ -313,6 +325,8 @@ def register_handlers(runner):
 
 ## Running Any Example
 
+### In-repo examples
+
 ```bash
 # 1. Install dependencies
 source .venv/bin/activate
@@ -320,18 +334,30 @@ pip install -e ".[dev]"
 pip install -r examples/<name>/requirements.txt  # if exists
 
 # 2. Compile check
-python -m afl.cli examples/<name>/ffl/<file>.ffl --check
+afl examples/<name>/ffl/<file>.ffl --check
 
-# 3. Run the agent
+# 3. Register handlers + start the runner (recommended)
+scripts/start-runner --example <name> -- --log-format text
+
+# 4. Or run the legacy AgentPoller directly
 PYTHONPATH=. python examples/<name>/agent.py
-
-# 4. RegistryRunner mode
-AFL_USE_REGISTRY=1 PYTHONPATH=. python examples/<name>/agent.py
-
-# 5. With MongoDB persistence
-AFL_MONGODB_URL=mongodb://localhost:27017 AFL_MONGODB_DATABASE=afl \
-    PYTHONPATH=. python examples/<name>/agent.py
 ```
+
+### Standalone-repo examples (jenkins, noaa-weather, osm-geocoder)
+
+```bash
+# 1. Clone + install once
+git clone https://github.com/rlemke/<fwh_repo>.git ~/fw_handlers/<fwh_repo>
+pip install -e ~/fw_handlers/<fwh_repo>
+
+# 2. From a Facetwork checkout — same start-runner flag as in-repo examples
+scripts/start-runner --example <name> -- --log-format text
+```
+
+The `facetwork.examples` entry point declared in each standalone repo's
+`pyproject.toml` makes it discoverable without any edits to the
+Facetwork repo. Each standalone repo also ships a `tools/` directory
+with CLIs that call the same `_lib/` simulators the FFL handlers use.
 
 ## Detailed Documentation
 
@@ -345,7 +371,8 @@ Each example has its own detailed user guide:
 | jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](../aws-lambda/USER_GUIDE.md) |
 | census-us | [USER_GUIDE.md](../census-us/USER_GUIDE.md) |
-| osm-geocoder | [USER_GUIDE.md](../osm-geocoder/USER_GUIDE.md) |
+| noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
+| osm-geocoder | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm/blob/main/USER_GUIDE.md) — in standalone repo |
 | continental-lz | [USER_GUIDE.md](../continental-lz/USER_GUIDE.md) |
 | site-selection | [USER_GUIDE.md](../site-selection/USER_GUIDE.md) |
 | monte-carlo-risk | [USER_GUIDE.md](../monte-carlo-risk/USER_GUIDE.md) |
