@@ -11,7 +11,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [genomics](../genomics/) | Intermediate | foreach fan-out, linear fan-in | 45 | Parallel batch processing pipelines |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth). **Standalone repo.** |
 | [aws-lambda](../aws-lambda/) | Intermediate | Real cloud calls + mixins | 12 | Cloud service integration with LocalStack |
-| [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
+| [census-us](https://github.com/rlemke/fwh_census_us) | Intermediate | API + shapefile ETL, DB ingestion | 36 | US Census ACS + TIGER county demographics with dashboard map visualization. **Standalone repo.** |
 | [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/_lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | Advanced | Large-scale event facets, source adapters | 132+ | Production-scale OSM ingestion + PostGIS + routing graphs. **Standalone repo.** |
 | [osm-lz](https://github.com/rlemke/fwh_osm_lz) | Advanced | Pure-FFL composition (workflow catalog) | 0 (consumes fwh_osm) | Continental-scale OSM LZ road infra + GTFS transit. **Standalone repo, depends on fwh_osm.** |
@@ -96,7 +96,7 @@ Use **[jenkins](https://github.com/rlemke/fwh_jenkins)** (standalone repo) as yo
 
 ### "I want to build an ETL pipeline with API and shapefile data"
 
-Use **[census-us](../census-us/)** as your template. It downloads ACS demographics from the Census API and TIGER shapefiles, extracts and joins the data, ingests into MongoDB with GeoJSON indexes, and visualizes results on an interactive Leaflet.js map in the dashboard. The choropleth dropdown lets you color counties by population density, income, education, commuting, and more.
+Use **[census-us](https://github.com/rlemke/fwh_census_us)** (standalone repo) as your template. It downloads ACS demographics from the Census API and TIGER shapefiles, extracts and joins the data, ingests into MongoDB with GeoJSON indexes, and visualizes results on an interactive Leaflet.js map in the dashboard. The choropleth dropdown lets you color counties by population density, income, education, commuting, and more. Install with `pip install -e ~/fw_handlers/fwh_census_us`.
 
 ### "I want to integrate with real cloud services"
 
@@ -241,7 +241,7 @@ Every intermediate-to-advanced example uses this pattern:
 | [genomics](../genomics/) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
 | [aws-lambda](../aws-lambda/) | `DeployFunction`, `UpdateAndVerify` | Lambda create→invoke→verify steps |
-| [census-us](../census-us/) | `AnalyzeState`, `AnalyzeStateWithDB` | Download→Extract→Join→Ingest pipeline per state |
+| [census-us](https://github.com/rlemke/fwh_census_us) | `AnalyzeState`, `AnalyzeStateWithDB` | Download→Extract→Join→Ingest pipeline per state |
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | `PrepareRegion`, `BuildRoutingData` | Cache→download→tile/graph pipeline |
 
 ### Cross-Namespace Composition
@@ -370,7 +370,7 @@ Each example has its own detailed user guide:
 | genomics | [USER_GUIDE.md](../genomics/USER_GUIDE.md) |
 | jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](../aws-lambda/USER_GUIDE.md) |
-| census-us | [USER_GUIDE.md](../census-us/USER_GUIDE.md) |
+| census-us | [USER_GUIDE.md](https://github.com/rlemke/fwh_census_us/blob/main/USER_GUIDE.md) — in standalone repo |
 | noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
 | osm-geocoder | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm/blob/main/USER_GUIDE.md) — in standalone repo |
 | osm-lz | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm_lz/blob/main/USER_GUIDE.md) — in standalone repo |

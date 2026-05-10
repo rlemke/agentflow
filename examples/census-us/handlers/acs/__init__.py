@@ -1,1 +1,0 @@
-"""ACS extraction handlers."""

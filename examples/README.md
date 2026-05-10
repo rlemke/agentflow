@@ -10,7 +10,7 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | [genomics](genomics/) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_jenkins`. |
 | [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
-| [census-us](census-us/) | US Census ACS + TIGER county demographics with dashboard map visualization |
+| [census-us](https://github.com/rlemke/fwh_census_us) | US Census ACS + TIGER county demographics with dashboard map visualization. Standalone repo: install with `pip install -e ~/fw_handlers/fwh_census_us`. |
 | [osm-lz](https://github.com/rlemke/fwh_osm_lz) | Continental-scale OSM Low-Zoom road infrastructure + GTFS transit. Standalone repo (depends on fwh_osm): install with `pip install -e ~/fw_handlers/fwh_osm_lz`. |
 | [site-selection](site-selection/) | Restaurant site selection with OSM + Census scoring pipeline |
 | [monte-carlo-risk](monte-carlo-risk/) | Monte Carlo portfolio risk analysis (GBM simulation, VaR/CVaR, Greeks, stress testing) |
@@ -41,7 +41,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
-| census-us | [USER_GUIDE.md](census-us/USER_GUIDE.md) |
+| census-us | [USER_GUIDE.md](https://github.com/rlemke/fwh_census_us/blob/main/USER_GUIDE.md) — in standalone repo |
 | osm-lz | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm_lz/blob/main/USER_GUIDE.md) — in standalone repo |
 | site-selection | [USER_GUIDE.md](site-selection/USER_GUIDE.md) |
 | monte-carlo-risk | [USER_GUIDE.md](monte-carlo-risk/USER_GUIDE.md) |

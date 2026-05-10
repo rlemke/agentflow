@@ -180,6 +180,6 @@ Replace the restaurant extractor with your own OSM tag filter (e.g., `shop=super
 
 ## Next Steps
 
-- **[census-us](../census-us/USER_GUIDE.md)** — deeper Census ETL with 12 ACS tables and MongoDB ingestion
+- **[census-us](https://github.com/rlemke/fwh_census_us)** — deeper Census ETL with 12 ACS tables and MongoDB ingestion (standalone repo)
 - **[osm-geocoder](../osm-geocoder/USER_GUIDE.md)** — full production-scale OSM agent
 - **[osm-lz](https://github.com/rlemke/fwh_osm_lz)** — continental-scale OSM LZ + GTFS workflow catalog (standalone repo)
