@@ -332,5 +332,5 @@ def _lambda_client():
 ## Next Steps
 
 - **[jenkins](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md)** — more mixin composition patterns (standalone repo)
-- **[genomics](../genomics/USER_GUIDE.md)** — factory-built handlers for large-scale fan-out
+- **[genomics](https://github.com/rlemke/fwh_genomics)** — factory-built handlers for large-scale fan-out (standalone repo)
 - **[osm-geocoder](../osm-geocoder/USER_GUIDE.md)** — production-scale agent with 580+ handlers

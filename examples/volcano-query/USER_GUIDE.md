@@ -140,5 +140,5 @@ namespace myquery {
 ## Next Steps
 
 - **[hello-agent](../hello-agent/USER_GUIDE.md)** — if you need to understand the basic execution model first
-- **[genomics](../genomics/USER_GUIDE.md)** — for foreach parallel processing
-- **[jenkins](../jenkins/USER_GUIDE.md)** — for mixin composition patterns
+- **[genomics](https://github.com/rlemke/fwh_genomics)** — for foreach parallel processing (standalone repo)
+- **[jenkins](https://github.com/rlemke/fwh_jenkins)** — for mixin composition patterns (standalone repo)

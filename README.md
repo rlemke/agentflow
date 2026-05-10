@@ -393,7 +393,7 @@ See [examples/README.md](examples/README.md) for a complete overview of all 15+ 
 | `examples/research-agent/` | LLM integration: 8 prompt-block facets, Claude API |
 | `examples/aws-lambda/` | Real boto3: LocalStack, Step Functions, blue-green deploy |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | Standalone repo: CI/CD pipelines (mixin composition, 4 pipeline workflows, 17 simulator handlers + CLI tools) |
-| `examples/genomics/` | Bioinformatics: foreach fan-out, joint genotyping |
+| [genomics](https://github.com/rlemke/fwh_genomics) | Bioinformatics: foreach fan-out, joint genotyping (cohort analysis simulator). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_genomics`. |
 
 ## Specifications
 

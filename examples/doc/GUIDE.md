@@ -8,7 +8,7 @@ This guide helps you choose the right example as a starting point for your own F
 |---------|-----------|-------------|----------|----------|
 | [hello-agent](../hello-agent/) | Beginner | Single event facet + workflow | 1 (inline) | Learning the execution model |
 | [volcano-query](../volcano-query/) | Beginner | Cross-namespace composition | 0 (reuses OSM) | Composing existing facets into new workflows |
-| [genomics](../genomics/) | Intermediate | foreach fan-out, linear fan-in | 45 | Parallel batch processing pipelines |
+| [genomics](https://github.com/rlemke/fwh_genomics) | Intermediate | foreach fan-out, linear fan-in | 45 | Parallel batch processing pipelines. **Standalone repo.** |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth). **Standalone repo.** |
 | [aws-lambda](../aws-lambda/) | Intermediate | Real cloud calls + mixins | 12 | Cloud service integration with LocalStack |
 | [census-us](https://github.com/rlemke/fwh_census_us) | Intermediate | API + shapefile ETL, DB ingestion | 36 | US Census ACS + TIGER county demographics with dashboard map visualization. **Standalone repo.** |
@@ -88,7 +88,7 @@ Look at **[volcano-query](../volcano-query/)**. It has zero custom handlers — 
 
 ### "I want to process items in parallel"
 
-Use **[genomics](../genomics/)** as your template. It demonstrates `andThen foreach` for fan-out (per-sample processing) and linear `andThen` chains for fan-in (cohort analysis). The cache layer shows factory-built handlers from a resource registry.
+Use **[genomics](https://github.com/rlemke/fwh_genomics)** (standalone repo) as your template. It demonstrates `andThen foreach` for fan-out (per-sample processing) and linear `andThen` chains for fan-in (cohort analysis). The cache layer shows factory-built handlers from a resource registry. Install with `pip install -e ~/fw_handlers/fwh_genomics`.
 
 ### "I want to add retry, timeout, or other cross-cutting concerns"
 
@@ -238,7 +238,7 @@ Every intermediate-to-advanced example uses this pattern:
 
 | Example | Composed Facets | What They Hide |
 |---------|----------------|----------------|
-| [genomics](../genomics/) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
+| [genomics](https://github.com/rlemke/fwh_genomics) | `ProcessSample`, `AnalyzeCohort` | QC→Align→CallVariants chain, genotyping→annotation pipeline |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | `BuildAndTest`, `DeployWithNotification` | Credentials, timeouts, retries, notification channels |
 | [aws-lambda](../aws-lambda/) | `DeployFunction`, `UpdateAndVerify` | Lambda create→invoke→verify steps |
 | [census-us](https://github.com/rlemke/fwh_census_us) | `AnalyzeState`, `AnalyzeStateWithDB` | Download→Extract→Join→Ingest pipeline per state |
@@ -367,7 +367,7 @@ Each example has its own detailed user guide:
 |---------|-----------|
 | hello-agent | [USER_GUIDE.md](../hello-agent/USER_GUIDE.md) |
 | volcano-query | [USER_GUIDE.md](../volcano-query/USER_GUIDE.md) |
-| genomics | [USER_GUIDE.md](../genomics/USER_GUIDE.md) |
+| genomics | [USER_GUIDE.md](https://github.com/rlemke/fwh_genomics/blob/main/USER_GUIDE.md) — in standalone repo |
 | jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](../aws-lambda/USER_GUIDE.md) |
 | census-us | [USER_GUIDE.md](https://github.com/rlemke/fwh_census_us/blob/main/USER_GUIDE.md) — in standalone repo |
