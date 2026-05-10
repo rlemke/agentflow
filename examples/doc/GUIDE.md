@@ -14,7 +14,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [census-us](../census-us/) | Intermediate | API + shapefile ETL, DB ingestion | 30 | Census data pipeline with dashboard visualization |
 | [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/_lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | Advanced | Large-scale event facets, source adapters | 132+ | Production-scale OSM ingestion + PostGIS + routing graphs. **Standalone repo.** |
-| [osm-lz](../osm-lz/) | Advanced | Docker orchestration | Linked | Multi-region pipeline with Docker Compose |
+| [osm-lz](https://github.com/rlemke/fwh_osm_lz) | Advanced | Pure-FFL composition (workflow catalog) | 0 (consumes fwh_osm) | Continental-scale OSM LZ road infra + GTFS transit. **Standalone repo, depends on fwh_osm.** |
 | [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
 | [monte-carlo-risk](../monte-carlo-risk/) | Intermediate | Pure-Python math stubs | 8 | Financial risk simulation |
 | [ml-hyperparam-sweep](../ml-hyperparam-sweep/) | Intermediate | Statement-level andThen, prompt blocks | 6 | ML training pipelines |
@@ -66,7 +66,7 @@ Start simple and build up to more complex patterns:
        |                  + RegistryRunner-first
 9. osm-geocoder         Full production-scale agent (standalone repo: github.com/rlemke/fwh_osm)
        |
-10. osm-lz       Docker-orchestrated multi-region pipeline
+10. osm-lz              Continental-scale workflow catalog (standalone repo: github.com/rlemke/fwh_osm_lz; consumes fwh_osm handlers)
 ```
 
 > **Note on standalone repos.** The `jenkins`, `noaa-weather`, and
@@ -148,7 +148,7 @@ Use **[site-selection](../site-selection/)**. It combines OSM amenity extraction
 
 ### "I want to run a pipeline in Docker with MongoDB persistence"
 
-Start with **[osm-lz](../osm-lz/)**. It has its own `docker-compose.yml` with MongoDB, dashboard, runner, and agent services, demonstrating a complete deployment topology.
+Start with **[osm-lz](https://github.com/rlemke/fwh_osm_lz)** (standalone repo). It is the canonical demo of cross-package FFL composition — a pure workflow catalog that orchestrates `osm.cache.*`, `osm.cache.GraphHopper.*`, `osm.Roads.ZoomBuilder.*`, and `osm.Transit.GTFS.*` facets across 14 regions and 11 transit agencies, contributing zero handlers itself. Install with `pip install -e ~/fw_handlers/fwh_osm` (handlers) + `pip install -e ~/fw_handlers/fwh_osm_lz` (catalog).
 
 ## FFL Patterns by Example
 
@@ -373,7 +373,7 @@ Each example has its own detailed user guide:
 | census-us | [USER_GUIDE.md](../census-us/USER_GUIDE.md) |
 | noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
 | osm-geocoder | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm/blob/main/USER_GUIDE.md) — in standalone repo |
-| osm-lz | [USER_GUIDE.md](../osm-lz/USER_GUIDE.md) |
+| osm-lz | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm_lz/blob/main/USER_GUIDE.md) — in standalone repo |
 | site-selection | [USER_GUIDE.md](../site-selection/USER_GUIDE.md) |
 | monte-carlo-risk | [USER_GUIDE.md](../monte-carlo-risk/USER_GUIDE.md) |
 | ml-hyperparam-sweep | [USER_GUIDE.md](../ml-hyperparam-sweep/USER_GUIDE.md) |

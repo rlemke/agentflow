@@ -11,7 +11,7 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_jenkins`. |
 | [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
 | [census-us](census-us/) | US Census ACS + TIGER county demographics with dashboard map visualization |
-| [osm-lz](osm-lz/) | Continental-scale road infrastructure and GTFS transit analysis with Docker |
+| [osm-lz](https://github.com/rlemke/fwh_osm_lz) | Continental-scale OSM Low-Zoom road infrastructure + GTFS transit. Standalone repo (depends on fwh_osm): install with `pip install -e ~/fw_handlers/fwh_osm_lz`. |
 | [site-selection](site-selection/) | Restaurant site selection with OSM + Census scoring pipeline |
 | [monte-carlo-risk](monte-carlo-risk/) | Monte Carlo portfolio risk analysis (GBM simulation, VaR/CVaR, Greeks, stress testing) |
 | [ml-hyperparam-sweep](ml-hyperparam-sweep/) | ML hyperparameter sweep (statement-level andThen, prompt blocks, map literals, andThen foreach) |
@@ -42,7 +42,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
 | census-us | [USER_GUIDE.md](census-us/USER_GUIDE.md) |
-| osm-lz | [USER_GUIDE.md](osm-lz/USER_GUIDE.md) |
+| osm-lz | [USER_GUIDE.md](https://github.com/rlemke/fwh_osm_lz/blob/main/USER_GUIDE.md) — in standalone repo |
 | site-selection | [USER_GUIDE.md](site-selection/USER_GUIDE.md) |
 | monte-carlo-risk | [USER_GUIDE.md](monte-carlo-risk/USER_GUIDE.md) |
 | ml-hyperparam-sweep | [USER_GUIDE.md](ml-hyperparam-sweep/USER_GUIDE.md) |

@@ -215,4 +215,4 @@ The Census maps dashboard module reads from MongoDB collections populated by the
 
 - **[site-selection](../site-selection/USER_GUIDE.md)** — combines Census demographics with OSM amenity data for spatial scoring
 - **[osm-geocoder](../osm-geocoder/USER_GUIDE.md)** — full production-scale agent with 580+ handlers
-- **[osm-lz](../osm-lz/USER_GUIDE.md)** — Docker-orchestrated multi-region pipeline
+- **[osm-lz](https://github.com/rlemke/fwh_osm_lz)** — continental-scale OSM LZ + GTFS workflow catalog (standalone repo)

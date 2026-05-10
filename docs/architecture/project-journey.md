@@ -584,7 +584,7 @@ facetwork/
 │   │   └── tests/real/           # Scaling variants (2–45 states)
 │   ├── aws-lambda/               # Lambda deployment workflows
 │   ├── volcano-query/            # Cross-namespace composition
-│   ├── osm-lz/           # Landing zone patterns
+│   ├── (osm-lz/  → extracted to github.com/rlemke/fwh_osm_lz)
 │   ├── genomics/                 # Bioinformatics pipelines
 │   └── jenkins/                  # CI/CD workflows
 ├── tests/                        # 2,522 tests
