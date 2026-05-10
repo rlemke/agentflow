@@ -52,9 +52,10 @@ scripts/seed-examples --include "^(continental-lz|osm-geocoder)$"
 scripts/start-runner --example osm-geocoder -- --log-format text
 ```
 
-Continental-lz workflows reference osm namespaces (`osm.cache.NorthAmerica`,
-`osm.Transit.GTFS`, `osm.GraphHopper.*`) — the osm-geocoder package supplies
-those handlers so the workflows execute end-to-end.
+Continental-lz workflows reference osm namespaces (`osm.cache.<continent>.<country>`,
+`osm.cache.GraphHopper.<continent>.<country>`, `osm.Roads.ZoomBuilder.*`,
+`osm.Transit.GTFS.*`) — the osm-geocoder package supplies those handlers
+so the workflows execute end-to-end.
 
 ## Workflows
 
