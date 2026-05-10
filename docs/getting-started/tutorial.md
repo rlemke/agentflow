@@ -751,8 +751,9 @@ the composed facet needs updating.
 Composed facets can attach mixins to their internal steps, so callers
 never need to think about retry policies, timeouts, or credentials.
 
-The `examples/jenkins/` example demonstrates this with a `BuildAndTest` facet
-that bakes in credentials, timeouts, and retries:
+The standalone [jenkins](https://github.com/rlemke/fwh_jenkins) example
+(`pip install -e ~/fw_handlers/fwh_jenkins`) demonstrates this with a
+`BuildAndTest` facet that bakes in credentials, timeouts, and retries:
 
 ```afl
 facet BuildAndTest(repo: String, branch: String = "main",

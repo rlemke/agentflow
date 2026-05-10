@@ -392,7 +392,7 @@ See [examples/README.md](examples/README.md) for a complete overview of all 15+ 
 | `examples/devops-deploy/` | Conditional branching, prompt/script blocks, mixins |
 | `examples/research-agent/` | LLM integration: 8 prompt-block facets, Claude API |
 | `examples/aws-lambda/` | Real boto3: LocalStack, Step Functions, blue-green deploy |
-| `examples/jenkins/` | CI/CD: mixin composition, 4 pipeline workflows |
+| [jenkins](https://github.com/rlemke/fwh_jenkins) | Standalone repo: CI/CD pipelines (mixin composition, 4 pipeline workflows, 17 simulator handlers + CLI tools) |
 | `examples/genomics/` | Bioinformatics: foreach fan-out, joint genotyping |
 
 ## Specifications

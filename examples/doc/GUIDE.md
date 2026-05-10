@@ -342,7 +342,7 @@ Each example has its own detailed user guide:
 | hello-agent | [USER_GUIDE.md](../hello-agent/USER_GUIDE.md) |
 | volcano-query | [USER_GUIDE.md](../volcano-query/USER_GUIDE.md) |
 | genomics | [USER_GUIDE.md](../genomics/USER_GUIDE.md) |
-| jenkins | [USER_GUIDE.md](../jenkins/USER_GUIDE.md) |
+| jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](../aws-lambda/USER_GUIDE.md) |
 | census-us | [USER_GUIDE.md](../census-us/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](../osm-geocoder/USER_GUIDE.md) |

@@ -8,7 +8,7 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | [volcano-query](volcano-query/) | Cross-namespace composition using existing OSM event facets |
 | [osm-geocoder](osm-geocoder/) | Geocoding agent that resolves addresses to coordinates using the OpenStreetMap Nominatim API |
 | [genomics](genomics/) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows |
-| [jenkins](jenkins/) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.) |
+| [jenkins](https://github.com/rlemke/fwh_jenkins) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_jenkins`. |
 | [aws-lambda](aws-lambda/) | AWS Lambda + Step Functions with real boto3 calls against LocalStack |
 | [census-us](census-us/) | US Census ACS + TIGER county demographics with dashboard map visualization |
 | [continental-lz](continental-lz/) | Continental-scale road infrastructure and GTFS transit analysis with Docker |
@@ -38,7 +38,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | hello-agent | [USER_GUIDE.md](hello-agent/USER_GUIDE.md) |
 | volcano-query | [USER_GUIDE.md](volcano-query/USER_GUIDE.md) |
 | genomics | [USER_GUIDE.md](genomics/USER_GUIDE.md) |
-| jenkins | [USER_GUIDE.md](jenkins/USER_GUIDE.md) |
+| jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |
 | osm-geocoder | [USER_GUIDE.md](osm-geocoder/USER_GUIDE.md) |
 | census-us | [USER_GUIDE.md](census-us/USER_GUIDE.md) |
