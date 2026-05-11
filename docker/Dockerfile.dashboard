@@ -9,8 +9,10 @@ RUN pip install --no-cache-dir -e ".[dashboard,mongodb]" || \
     pip install --no-cache-dir fastapi uvicorn jinja2 pymongo python-multipart markdown && \
     pip install --no-cache-dir python-multipart
 
-# Copy application code
-COPY facetwork/ ./afl/
+# Copy application code. The package is `facetwork`, not `afl`; the
+# earlier `./afl/` rename was a relic of the project's rename and
+# broke imports like `from facetwork.logging import ...`.
+COPY facetwork/ ./facetwork/
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8080
@@ -19,4 +21,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-CMD ["python", "-m", "afl.dashboard", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "facetwork.dashboard", "--host", "0.0.0.0", "--port", "8080"]

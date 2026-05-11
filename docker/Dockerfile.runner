@@ -19,8 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # osm2geojson needed for boundary extraction (type=boundary relations)
 RUN pip install --no-cache-dir requests pyshp folium osm2geojson
 
-# Copy application code
-COPY facetwork/ ./afl/
+# Copy application code. The package is `facetwork`, not `afl`; the
+# earlier `./afl/` rename was a relic of the project's rename and
+# broke imports like `from facetwork.logging import ...`.
+COPY facetwork/ ./facetwork/
 
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "afl.runtime.runner", "--poll-interval", "1000"]
+CMD ["python", "-m", "facetwork.runtime.runner", "--poll-interval", "1000"]
