@@ -1,84 +1,80 @@
-"""Writing handlers — DraftReport, ReviewDraft."""
+"""Writing parser handlers — ParseDraft, ParseReview."""
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 from typing import Any
 
-from handlers.shared.research_utils import draft_report, review_draft
+from handlers.shared.research_utils import (
+    coerce_draft,
+    coerce_review,
+    extract_json_payload,
+    synthetic_draft,
+    synthetic_review,
+)
+
+log = logging.getLogger(__name__)
 
 NAMESPACE = "research.Writing"
 
 
-def handle_draft_report(params: dict[str, Any]) -> dict[str, Any]:
-    """Handle DraftReport event facet."""
-    topic = params.get("topic", {})
-    if isinstance(topic, str):
-        topic = json.loads(topic)
-    analysis = params.get("analysis", {})
-    if isinstance(analysis, str):
-        analysis = json.loads(analysis)
-    gaps = params.get("gaps", [])
-    if isinstance(gaps, str):
-        gaps = json.loads(gaps)
+def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
+    sl = params.get("_step_log")
+    if sl is None:
+        return
+    try:
+        sl.append({"message": message, "level": level})
+    except AttributeError:
+        sl(message)
 
-    draft = draft_report(topic, analysis, gaps)
 
-    step_log = params.get("_step_log")
-    if step_log:
-        step_log.append(
-            {
-                "message": f"Drafted report: {draft['title']} ({draft['word_count']} words)",
-                "level": "success",
-            }
+def handle_parse_draft(params: dict[str, Any]) -> dict[str, Any]:
+    text = params.get("text", "") or ""
+    topic_name = str(params.get("topic_name", "unknown"))
+
+    try:
+        parsed = extract_json_payload(text)
+        draft = coerce_draft(parsed, topic_name)
+        _step_log(
+            params,
+            f"ParseDraft: parsed '{draft['title']}' ({draft['word_count']} words)",
         )
-
+    except ValueError as e:
+        log.warning("ParseDraft falling back to synthetic for %r: %s", topic_name, e)
+        draft = synthetic_draft(topic_name)
+        _step_log(params, f"ParseDraft: synthetic fallback for '{topic_name}'", level="warning")
     return {"draft": draft}
 
 
-def handle_review_draft(params: dict[str, Any]) -> dict[str, Any]:
-    """Handle ReviewDraft event facet."""
-    draft = params.get("draft", {})
-    if isinstance(draft, str):
-        draft = json.loads(draft)
-    topic = params.get("topic", {})
-    if isinstance(topic, str):
-        topic = json.loads(topic)
-    analysis = params.get("analysis", {})
-    if isinstance(analysis, str):
-        analysis = json.loads(analysis)
+def handle_parse_review(params: dict[str, Any]) -> dict[str, Any]:
+    text = params.get("text", "") or ""
+    topic_name = str(params.get("topic_name", "unknown"))
 
-    review = review_draft(draft, topic, analysis)
-
-    step_log = params.get("_step_log")
-    if step_log:
+    try:
+        parsed = extract_json_payload(text)
+        review = coerce_review(parsed, topic_name)
         status = "approved" if review["approved"] else "needs revision"
-        step_log.append(
-            {
-                "message": f"Reviewed draft: score {review['score']}/100 ({status})",
-                "level": "success",
-            }
-        )
-
+        _step_log(params, f"ParseReview: score {review['score']}/100 ({status})")
+    except ValueError as e:
+        log.warning("ParseReview falling back to synthetic for %r: %s", topic_name, e)
+        review = synthetic_review(topic_name)
+        _step_log(params, f"ParseReview: synthetic fallback for '{topic_name}'", level="warning")
     return {"review": review}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.DraftReport": handle_draft_report,
-    f"{NAMESPACE}.ReviewDraft": handle_review_draft,
+    f"{NAMESPACE}.ParseDraft": handle_parse_draft,
+    f"{NAMESPACE}.ParseReview": handle_parse_review,
 }
 
 
 def handle(payload: dict) -> dict:
-    """RegistryRunner entrypoint."""
     facet = payload["_facet_name"]
-    handler = _DISPATCH[facet]
-    return handler(payload)
+    return _DISPATCH[facet](payload)
 
 
 def register_handlers(runner) -> None:
-    """Register with RegistryRunner."""
     for facet_name in _DISPATCH:
         runner.register_handler(
             facet_name=facet_name,
@@ -88,6 +84,5 @@ def register_handlers(runner) -> None:
 
 
 def register_writing_handlers(poller) -> None:
-    """Register with AgentPoller."""
     for facet_name, handler in _DISPATCH.items():
         poller.register(facet_name, handler)

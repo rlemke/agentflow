@@ -18,7 +18,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
 | [monte-carlo-risk](../monte-carlo-risk/) | Intermediate | Pure-Python math stubs | 8 | Financial risk simulation |
 | [ml-hyperparam-sweep](../ml-hyperparam-sweep/) | Intermediate | Statement-level andThen, prompt blocks | 6 | ML training pipelines |
-| [research-agent](../research-agent/) | Intermediate | Prompt blocks, ClaudeAgentRunner | 8 | LLM-driven research workflows |
+| [research-agent](../research-agent/) | Intermediate | Composed facets + typed parsers over `anthropic.messages.CreateMessage` (fwh_anthropic) | 8 parsers | LLM-driven research workflows |
 | [multi-agent-debate](../multi-agent-debate/) | Intermediate | Multi-agent personas, scoring/voting | 8 | Multi-agent interaction patterns |
 | [multi-round-debate](../multi-round-debate/) | Intermediate | Composed facets, cross-round state | 8 | Iterative rounds with convergence |
 | [tool-use-agent](../tool-use-agent/) | Intermediate | Tool-as-event-facet, planning | 8 | Tool-use agent orchestration |
@@ -121,7 +121,7 @@ Use **[ml-hyperparam-sweep](../ml-hyperparam-sweep/)**. It showcases statement-l
 
 ### "I want to build LLM-driven research workflows"
 
-Use **[research-agent](../research-agent/)**. Every event facet has a prompt block, making it the showcase for ClaudeAgentRunner / LLMHandler. It demonstrates chained LLM steps across planning, gathering, analysis, and writing.
+Use **[research-agent](../research-agent/)**. Each domain step is a composed facet that calls `anthropic.messages.CreateMessage` (from the [fwh_anthropic](https://github.com/rlemke/fwh_anthropic) standalone package) with a JSON-shape system prompt, then hands the response to a typed `Parse<Schema>` event facet. This is the canonical pattern for getting structured LLM data into a Facetwork workflow without resorting to prompt blocks or ClaudeAgentRunner.
 
 For more direct API surface coverage — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use — see the **[anthropic](https://github.com/rlemke/fwh_anthropic)** standalone repo. It is the multi-area home for Facetwork wrappers around the surfaces at github.com/anthropics, with 16 facets wired across 6 areas plus a cross-area `DocumentQA` composition workflow that demonstrates Files-API RAG (`UploadFile → CreateMessageWithFile`). Install with `pip install -e ~/fw_handlers/fwh_anthropic`. Unit tests mock at the SDK boundary; opt-in live tests (`pytest -m live --run-live`) exercise the real API.
 

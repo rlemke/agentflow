@@ -1,2 +1,15 @@
-# No external dependencies required.
-# All research utilities use only the Python standard library (hashlib, json).
+# research-agent depends on fwh_anthropic for the
+# anthropic.messages.CreateMessage facet. Install from a local
+# checkout (recommended for development) or git:
+#
+#   pip install -e ~/fw_handlers/fwh_anthropic
+#   # or
+#   pip install -e "git+https://github.com/rlemke/fwh_anthropic@main#egg=fwh-anthropic"
+#
+# The `anthropic` Python SDK comes in transitively. To exercise real
+# LLM calls, set ANTHROPIC_API_KEY in the runner environment.
+#
+# Tests stay stdlib-only: parsers fall back to deterministic stubs
+# when Claude responses can't be coerced, so the unit suite runs
+# without any API key.
+fwh-anthropic

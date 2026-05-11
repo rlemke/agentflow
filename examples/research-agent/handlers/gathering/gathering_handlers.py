@@ -1,71 +1,79 @@
-"""Gathering handlers — GatherSources, ExtractFindings."""
+"""Gathering parser handlers — ParseSources, ParseFindings."""
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 from typing import Any
 
-from handlers.shared.research_utils import extract_findings, gather_sources
+from handlers.shared.research_utils import (
+    coerce_findings,
+    coerce_sources,
+    extract_json_payload,
+    synthetic_findings,
+    synthetic_sources,
+)
+
+log = logging.getLogger(__name__)
 
 NAMESPACE = "research.Gathering"
 
 
-def handle_gather_sources(params: dict[str, Any]) -> dict[str, Any]:
-    """Handle GatherSources event facet."""
-    subtopic = params.get("subtopic", {})
-    if isinstance(subtopic, str):
-        subtopic = json.loads(subtopic)
+def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
+    sl = params.get("_step_log")
+    if sl is None:
+        return
+    try:
+        sl.append({"message": message, "level": level})
+    except AttributeError:
+        sl(message)
+
+
+def handle_parse_sources(params: dict[str, Any]) -> dict[str, Any]:
+    text = params.get("text", "") or ""
+    subtopic_name = str(params.get("subtopic_name", "unknown"))
     max_sources = int(params.get("max_sources", 5))
 
-    sources = gather_sources(subtopic, max_sources)
-
-    step_log = params.get("_step_log")
-    if step_log:
-        name = subtopic.get("name", "unknown") if isinstance(subtopic, dict) else str(subtopic)
-        step_log.append(
-            {"message": f"Gathered {len(sources)} sources for '{name}'", "level": "success"}
-        )
-
+    try:
+        parsed = extract_json_payload(text)
+        sources = coerce_sources(parsed, subtopic_name, max_sources)
+        _step_log(params, f"ParseSources: parsed {len(sources)} sources for '{subtopic_name}'")
+    except ValueError as e:
+        log.warning("ParseSources falling back to synthetic for %r: %s", subtopic_name, e)
+        sources = synthetic_sources(subtopic_name, max_sources)
+        _step_log(params, f"ParseSources: synthetic fallback for '{subtopic_name}'", level="warning")
     return {"sources": sources}
 
 
-def handle_extract_findings(params: dict[str, Any]) -> dict[str, Any]:
-    """Handle ExtractFindings event facet."""
-    subtopic = params.get("subtopic", {})
-    if isinstance(subtopic, str):
-        subtopic = json.loads(subtopic)
-    sources = params.get("sources", [])
-    if isinstance(sources, str):
-        sources = json.loads(sources)
+def handle_parse_findings(params: dict[str, Any]) -> dict[str, Any]:
+    text = params.get("text", "") or ""
+    subtopic_name = str(params.get("subtopic_name", "unknown"))
 
-    findings = extract_findings(subtopic, sources)
-
-    step_log = params.get("_step_log")
-    if step_log:
-        name = subtopic.get("name", "unknown") if isinstance(subtopic, dict) else str(subtopic)
-        step_log.append(
-            {"message": f"Extracted {len(findings)} findings for '{name}'", "level": "success"}
+    try:
+        parsed = extract_json_payload(text)
+        findings = coerce_findings(parsed, subtopic_name)
+        _step_log(params, f"ParseFindings: parsed {len(findings)} findings for '{subtopic_name}'")
+    except ValueError as e:
+        log.warning("ParseFindings falling back to synthetic for %r: %s", subtopic_name, e)
+        findings = synthetic_findings(subtopic_name)
+        _step_log(
+            params, f"ParseFindings: synthetic fallback for '{subtopic_name}'", level="warning"
         )
-
     return {"findings": findings}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.GatherSources": handle_gather_sources,
-    f"{NAMESPACE}.ExtractFindings": handle_extract_findings,
+    f"{NAMESPACE}.ParseSources": handle_parse_sources,
+    f"{NAMESPACE}.ParseFindings": handle_parse_findings,
 }
 
 
 def handle(payload: dict) -> dict:
-    """RegistryRunner entrypoint."""
     facet = payload["_facet_name"]
-    handler = _DISPATCH[facet]
-    return handler(payload)
+    return _DISPATCH[facet](payload)
 
 
 def register_handlers(runner) -> None:
-    """Register with RegistryRunner."""
     for facet_name in _DISPATCH:
         runner.register_handler(
             facet_name=facet_name,
@@ -75,6 +83,5 @@ def register_handlers(runner) -> None:
 
 
 def register_gathering_handlers(poller) -> None:
-    """Register with AgentPoller."""
     for facet_name, handler in _DISPATCH.items():
         poller.register(facet_name, handler)

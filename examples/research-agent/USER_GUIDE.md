@@ -5,48 +5,65 @@
 ## When to Use This Example
 
 Use this as your starting point if you are:
-- Building **LLM-driven workflows** where every step is powered by a prompt block
-- Using **ClaudeAgentRunner** and **ToolRegistry** for in-process LLM execution
+- Building **LLM-driven workflows** where each step calls Claude via fwh_anthropic's `anthropic.messages.CreateMessage` facet
+- Composing **cross-package FFL** — a domain example that consumes facets from a separate package (`fwh_anthropic`)
 - Designing **chained AI research pipelines** (plan → gather → analyze → write → review)
-- Learning how **statement-level andThen** parallelizes per-subtopic research
-- Using **array indexing** (`decomp.subtopics[0]`) in step arguments
+- Learning the **composed-facet + typed-parser** pattern for getting structured data out of an LLM
+- Using **statement-level andThen** to parallelize per-subtopic research and **array indexing** to thread step results
 
 ## What You'll Learn
 
-1. How every event facet uses a `prompt` block to define LLM behavior
-2. How statement-level andThen chains `GatherSources → ExtractFindings` per subtopic
-3. How array indexing (`subtopics[0]`, `subtopics[1]`) selects items from step results
-4. How array literals collect findings from parallel research branches
-5. How `ClaudeAgentRunner` and `ToolRegistry` wire handlers for LLM execution
+1. How to compose a domain workflow against `anthropic.messages.CreateMessage` from `fwh_anthropic`
+2. The **composed facet + typed parser** pattern — wrap a `CreateMessage` call and a `Parse<Schema>` event facet inside a regular `facet`, exposing a clean typed interface upstream
+3. How statement-level andThen chains `GatherSources → ExtractFindings` per subtopic
+4. How array indexing (`subtopics[0]`, `subtopics[1]`) selects items from step results
+5. How array literals collect findings from parallel research branches
 6. How call-site mixins (`with Retry() with Citation()`) configure individual steps
+7. How to write tolerant JSON parsers that handle fences, prefatory prose, and the occasional bad response
 
 ## Step-by-Step Walkthrough
 
 ### 1. The Problem
 
-Given a research topic, you want an AI pipeline to plan the investigation, decompose it into subtopics, gather sources for each, extract findings, synthesize across all subtopics, identify gaps, draft a report, and review the draft. Each step should be driven by an LLM with a clear system prompt.
+Given a research topic, you want an AI pipeline to plan the investigation, decompose it into subtopics, gather sources for each, extract findings, synthesize across subtopics, identify gaps, draft a report, and review the draft. Each step is one Claude call returning JSON; the framework parses and types the response.
 
-### 2. Prompt Blocks on Every Event Facet
+### 2. Composed Facet + Typed Parser
 
-Every event facet defines exactly what the LLM should do:
+Each domain step is a regular **composed facet** (not `event facet`) that:
+1. calls `anthropic.messages.CreateMessage` with a domain-specific system prompt that asks for JSON,
+2. hands the response `text` to a small `Parse<X>` event facet whose only job is JSON-to-schema conversion.
 
 ```afl
-event facet PlanResearch(
-    topic: String,
-    depth: Long = 3,
-    max_subtopics: Long = 5
-) => (plan: Topic) prompt {
-    system "You are a research planning assistant. Create detailed research plans with clear subtopic breakdowns."
-    template "Plan a research investigation on '{topic}' at depth {depth}. Identify up to {max_subtopics} key subtopics."
-    model "claude-sonnet-4-20250514"
+namespace research.Planning {
+    use anthropic.messages
+    use research.types
+
+    event facet ParseTopic(
+        text: String, topic_name: String, depth: Long, max_subtopics: Long
+    ) => (plan: Topic)
+
+    facet PlanResearch(
+        topic: String, depth: Long = 3, max_subtopics: Long = 5
+    ) => (plan: Topic) andThen {
+        reply = anthropic.messages.CreateMessage(
+            system = "You are a research planning assistant. Reply with one JSON object only ...",
+            prompt = "Plan a research investigation on '" ++ $.topic ++ "' ...",
+            max_tokens = 1024)
+        parsed = ParseTopic(
+            text = reply.result.text,
+            topic_name = $.topic,
+            depth = $.depth,
+            max_subtopics = $.max_subtopics)
+        yield PlanResearch(plan = parsed.plan)
+    }
 }
 ```
 
-The `prompt` block is the single source of truth — stubs use it for testing, `ClaudeAgentRunner` uses it for real LLM dispatch.
+Upstream workflows still call `PlanResearch(topic = ...)` and receive a typed `Topic`. The two-step internal mechanics (CreateMessage + ParseTopic) are an implementation detail.
 
 ### 3. Parallel Gathering with Statement-Level andThen
 
-Three subtopics are researched in parallel, each with its own gather+extract chain:
+Three subtopics research in parallel, each with its own gather+extract chain:
 
 ```afl
 g0 = GatherSources(subtopic = decomp.subtopics[0], max_sources = $.sources_per_subtopic)
@@ -61,13 +78,11 @@ g2 = GatherSources(subtopic = decomp.subtopics[2], ...) andThen {
 }
 ```
 
-Each `GatherSources` step starts as soon as `decomp` completes. The inline `andThen` block on each gather triggers extraction immediately — without waiting for other subtopics. All three chains run concurrently.
+Each `GatherSources` step starts as soon as `decomp` completes. The inline `andThen` block triggers extraction immediately — without waiting for other subtopics. All three chains run concurrently.
 
 ### 4. Array Indexing and Collection
 
-Array indexing selects specific subtopics: `decomp.subtopics[0]`, `decomp.subtopics[1]`, `decomp.subtopics[2]`.
-
-After extraction, results are collected into an array for synthesis:
+Array indexing selects specific subtopics: `decomp.subtopics[0]`, `decomp.subtopics[1]`, `decomp.subtopics[2]`. After extraction, results are collected into an array for synthesis:
 
 ```afl
 synth = SynthesizeFindings(topic = plan.plan, all_findings = [f0.findings, f1.findings, f2.findings])
@@ -114,45 +129,51 @@ Unlike `ResearchTopic`'s fixed 3 subtopics, `DeepDive` handles any number from t
 ### 7. Running
 
 ```bash
-# From repo root
+# Install fwh_anthropic so anthropic.messages.* facets are discoverable
+pip install -e ~/fw_handlers/fwh_anthropic
+
+# From the facetwork repo
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Compile check
-afl examples/research-agent/ffl/research.ffl --check
+# Compile check (research.ffl references anthropic.messages.* — pass it as a library)
+afl --primary examples/research-agent/ffl/research.ffl \
+    --library ~/fw_handlers/fwh_anthropic/src/anthropic_handlers/ffl/messages.ffl \
+    --check
 
-# Run tests
+# Run tests (no API key needed — parsers fall back to synthetic when text isn't JSON)
 pytest examples/research-agent/tests/ -v
-```
 
-No external dependencies — all research utilities use Python stdlib stubs.
+# Real run requires ANTHROPIC_API_KEY (fwh_anthropic's CreateMessage handler uses it)
+export ANTHROPIC_API_KEY=sk-...
+scripts/start-runner --example anthropic -- --log-format text
+# then trigger the workflow from the dashboard
+```
 
 ## Key Concepts
 
-### ClaudeAgentRunner Integration
+### Why typed parsers instead of free-form prompt blocks
 
-The test suite demonstrates how to wire handlers for LLM execution:
+The original version of this example used `prompt { ... }` blocks on every event facet. That ties the example to `ClaudeAgentRunner` (which dispatches prompt blocks against Claude) and the response is opaque text — the workflow has nothing to type-check against.
 
-```python
-from afl.runtime.agent import ClaudeAgentRunner, ToolRegistry
+The current version pushes prompt + JSON-shape contract into the system prompt, then declares a typed parser event facet (`ParseTopic`, `ParseSubtopics`, …) that mediates the conversion. Benefits:
 
-registry = ToolRegistry()
-registry.register("PlanResearch", handle_plan_research)
-# ... register other handlers ...
+- **Typed handoff.** `ParseTopic.plan: Topic` — downstream steps get a real schema, not a string.
+- **Runner-agnostic.** Any `RegistryRunner` works; no special `ClaudeAgentRunner` wiring needed.
+- **Auditable.** When Claude returns garbage, the parser falls back to a deterministic synthetic shape and emits a `synthetic fallback` step-log entry — workflow keeps moving, you see exactly which step degraded.
 
-runner = ClaudeAgentRunner(
-    evaluator=evaluator,
-    persistence=store,
-    tool_registry=registry,
-)
-result = runner.run(workflow_ast, inputs={"topic": "AI safety"}, program_ast=program_ast)
-```
+### Tolerant JSON extraction
 
-In production, `ClaudeAgentRunner` uses the prompt blocks to call Claude directly. For testing, the registered handler functions provide deterministic stubs.
+`extract_json_payload(text)` tries, in order:
+1. Bare `json.loads(text)`.
+2. ```` ```json ... ``` ```` (or unlabelled) code-fence content.
+3. The first balanced `{...}` or `[...]` substring that parses.
+
+This handles the common shapes Claude actually returns: bare JSON, fenced JSON, JSON with prefatory prose ("Sure! Here's the JSON: ..."). When all three fail, the parser handler falls back to a deterministic stub and warns.
 
 ### Call-Site Mixin Composition
 
-Mixins decorate specific calls without modifying the event facet:
+Mixins decorate specific calls without modifying the composed facet:
 
 ```afl
 plan = PlanResearch(...) with Retry(max_attempts = 3, backoff_ms = 2000) with Citation(style = "apa", include_urls = true)
@@ -160,46 +181,26 @@ plan = PlanResearch(...) with Retry(max_attempts = 3, backoff_ms = 2000) with Ci
 
 The handler receives mixin values in `params` and can use them to control behavior. Implicit defaults (`defaultRetry`, `defaultCitation`) provide fallback values.
 
-### JSON Serialization of Schema Types
-
-Handlers defensively handle both dict and JSON-string inputs:
-
-```python
-topic = params.get("topic", {})
-if isinstance(topic, str):
-    topic = json.loads(topic)
-```
-
-This is necessary because the runtime may serialize structured types as JSON strings when passing between steps.
-
-### Deterministic Stubs
-
-All utility functions produce reproducible output via MD5 hashing:
-
-```python
-def gather_sources(subtopic, max_sources=5):
-    seed = f"{subtopic['name']}_source_{i}"
-    relevance = _hash_float(seed, 0.4, 1.0)  # deterministic from seed
-    return [{"title": f"Source {i}: {subtopic['name']}", "relevance_score": relevance, ...}]
-```
-
 ## Adapting for Your Use Case
 
-### Connect to Claude API
+### Tighter schema enforcement
 
-Replace stubs with real Anthropic API calls. The prompt blocks already define system prompts, templates, and models — `ClaudeAgentRunner` uses them directly.
+Strengthen `coerce_*` helpers in `handlers/shared/research_utils.py` to raise on missing keys instead of filling defaults. The parser handlers will catch the `ValueError` and emit a warning step-log entry — adjust to taste.
 
 ### Add more research phases
 
-Define new event facets with prompt blocks:
+Define a new composed facet + parser pair in the matching namespace, e.g. a `FactCheck` step under `research.Analysis`:
 
 ```afl
-namespace research.Analysis {
-    event facet FactCheck(findings: Json, sources: Json) => (verified: Json, confidence: Double) prompt {
-        system "You are a fact-checking agent."
-        template "Verify these findings against sources: {findings}"
-        model "claude-sonnet-4-20250514"
-    }
+event facet ParseFactCheck(text: String, topic_name: String) => (verified: Json, confidence: Double)
+
+facet FactCheck(findings: Json, sources: Json) => (verified: Json, confidence: Double) andThen {
+    reply = anthropic.messages.CreateMessage(
+        system = "You are a fact-checking agent. Return JSON {\"verified\": [...], \"confidence\": number}.",
+        prompt = "Verify these findings against the sources: ...",
+        max_tokens = 1024)
+    parsed = ParseFactCheck(text = reply.result.text, topic_name = "fact-check")
+    yield FactCheck(verified = parsed.verified, confidence = parsed.confidence)
 }
 ```
 
@@ -212,3 +213,4 @@ Adjust `max_subtopics` and `sources_per_subtopic` in the workflow call, or use `
 - **[multi-agent-debate](../multi-agent-debate/USER_GUIDE.md)** — multi-agent personas with scoring and voting
 - **[multi-round-debate](../multi-round-debate/USER_GUIDE.md)** — composed facets for iterative rounds
 - **[tool-use-agent](../tool-use-agent/USER_GUIDE.md)** — tool-as-event-facet pattern with planning
+- **[fwh_anthropic](https://github.com/rlemke/fwh_anthropic)** — the package this example consumes
