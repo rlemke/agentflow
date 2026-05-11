@@ -394,6 +394,7 @@ See [examples/README.md](examples/README.md) for a complete overview of all 15+ 
 | `examples/aws-lambda/` | Real boto3: LocalStack, Step Functions, blue-green deploy |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | Standalone repo: CI/CD pipelines (mixin composition, 4 pipeline workflows, 17 simulator handlers + CLI tools) |
 | [genomics](https://github.com/rlemke/fwh_genomics) | Bioinformatics: foreach fan-out, joint genotyping (cohort analysis simulator). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_genomics`. |
+| [anthropic](https://github.com/rlemke/fwh_anthropic) | Multi-area home for Facetwork wrappers around the surfaces at [github.com/anthropics](https://github.com/anthropics) — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP. Currently a scaffold; handlers are added one area at a time. Standalone repo: install with `pip install -e ~/fw_handlers/fwh_anthropic`. |
 
 ## Specifications
 

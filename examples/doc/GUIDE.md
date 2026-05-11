@@ -24,6 +24,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [tool-use-agent](../tool-use-agent/) | Intermediate | Tool-as-event-facet, planning | 8 | Tool-use agent orchestration |
 | [data-quality-pipeline](../data-quality-pipeline/) | Intermediate | Schema instantiation, array types, `(expr)` | 8 | Data quality assessment pipelines |
 | [sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring) | Intermediate | Unary negation, null literals, map indexing, mixin alias | 6 | Sensor monitoring with RegistryRunner. **Standalone repo.** |
+| [anthropic](https://github.com/rlemke/fwh_anthropic) | Foundation | Multi-area integration package, per-area `_lib/` + handlers/ subpackages | 0 (scaffold) | Home for Facetwork wrappers around the surfaces at github.com/anthropics (Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP). **Standalone repo.** |
 
 ## Learning Path
 
@@ -121,6 +122,8 @@ Use **[ml-hyperparam-sweep](../ml-hyperparam-sweep/)**. It showcases statement-l
 ### "I want to build LLM-driven research workflows"
 
 Use **[research-agent](../research-agent/)**. Every event facet has a prompt block, making it the showcase for ClaudeAgentRunner / LLMHandler. It demonstrates chained LLM steps across planning, gathering, analysis, and writing.
+
+For more direct API surface coverage — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP — see the **[anthropic](https://github.com/rlemke/fwh_anthropic)** standalone repo. It's the multi-area home for Facetwork wrappers around every surface published at github.com/anthropics. Currently a scaffold; each area is wired up independently.
 
 ### "I want to build multi-agent interaction patterns"
 
