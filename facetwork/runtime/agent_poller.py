@@ -656,7 +656,7 @@ class AgentPoller:
         """Save task state with retries to survive transient DB failures."""
         for attempt in range(retries):
             try:
-                self._safe_save_task(task)
+                self._persistence.save_task(task)
                 return
             except Exception:
                 if attempt < retries - 1:
