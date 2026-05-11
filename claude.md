@@ -138,13 +138,18 @@ Examples can live either in this repo under `examples/<name>/` or as
 separate pip-installable packages declaring the `facetwork.examples`
 entry point. Both are discovered by `scripts/start-runner --example <name>`
 and `scripts/seed-examples`. See `example-template/` for the standalone
-package layout. The osm-geocoder
-([github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm)) and noaa-weather
-([github.com/rlemke/fwh_noaa_weather](https://github.com/rlemke/fwh_noaa_weather))
-examples were extracted into their own repos; install with `pip install -e
-~/fw_handlers/fwh_osm` / `pip install -e ~/fw_handlers/fwh_noaa_weather` and they
-surface as `--example osm-geocoder` / `--example noaa-weather` exactly like in-repo
-examples.
+package layout. The following examples have been extracted into their
+own repos — install with `pip install -e ~/fw_handlers/<repo>` and they
+surface as `--example <name>` exactly like in-repo examples:
+
+- [osm-geocoder](https://github.com/rlemke/fwh_osm) — production-scale OSM ingestion
+- [osm-lz](https://github.com/rlemke/fwh_osm_lz) — pure-FFL workflow catalog over `fwh_osm`
+- [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) — NOAA GHCN/NDBC climate trends
+- [jenkins](https://github.com/rlemke/fwh_jenkins) — CI/CD mixin composition demo
+- [census-us](https://github.com/rlemke/fwh_census_us) — US Census ACS + TIGER
+- [genomics](https://github.com/rlemke/fwh_genomics) — foreach fan-out, joint genotyping
+- [sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring) — sensor pipelines, RegistryRunner-first
+- [anthropic](https://github.com/rlemke/fwh_anthropic) — multi-area wrappers for surfaces at github.com/anthropics (16 facets across Messages / Batch / Files / Agent SDK / Claude Code / Computer Use + `DocumentQA` composition workflow + opt-in live tests)
 
 ## Domain pipelines — tools / handlers / cache pattern
 

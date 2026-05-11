@@ -24,7 +24,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [tool-use-agent](../tool-use-agent/) | Intermediate | Tool-as-event-facet, planning | 8 | Tool-use agent orchestration |
 | [data-quality-pipeline](../data-quality-pipeline/) | Intermediate | Schema instantiation, array types, `(expr)` | 8 | Data quality assessment pipelines |
 | [sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring) | Intermediate | Unary negation, null literals, map indexing, mixin alias | 6 | Sensor monitoring with RegistryRunner. **Standalone repo.** |
-| [anthropic](https://github.com/rlemke/fwh_anthropic) | Foundation | Multi-area integration package, per-area `_lib/` + handlers/ subpackages | 0 (scaffold) | Home for Facetwork wrappers around the surfaces at github.com/anthropics (Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP). **Standalone repo.** |
+| [anthropic](https://github.com/rlemke/fwh_anthropic) | Foundation | Multi-area integration package, per-area `_lib/` + handlers/ subpackages, JSON-bridge fields for cross-area composition, opt-in live tests | 16 | Home for Facetwork wrappers around the surfaces at github.com/anthropics (Messages 6, Batch 4, Files 3, Agent SDK 1, Claude Code 1, Computer Use 1) + `DocumentQA` cross-area composition workflow. **Standalone repo.** |
 
 ## Learning Path
 
@@ -123,7 +123,7 @@ Use **[ml-hyperparam-sweep](../ml-hyperparam-sweep/)**. It showcases statement-l
 
 Use **[research-agent](../research-agent/)**. Every event facet has a prompt block, making it the showcase for ClaudeAgentRunner / LLMHandler. It demonstrates chained LLM steps across planning, gathering, analysis, and writing.
 
-For more direct API surface coverage — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP — see the **[anthropic](https://github.com/rlemke/fwh_anthropic)** standalone repo. It's the multi-area home for Facetwork wrappers around every surface published at github.com/anthropics. Currently a scaffold; each area is wired up independently.
+For more direct API surface coverage — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use — see the **[anthropic](https://github.com/rlemke/fwh_anthropic)** standalone repo. It is the multi-area home for Facetwork wrappers around the surfaces at github.com/anthropics, with 16 facets wired across 6 areas plus a cross-area `DocumentQA` composition workflow that demonstrates Files-API RAG (`UploadFile → CreateMessageWithFile`). Install with `pip install -e ~/fw_handlers/fwh_anthropic`. Unit tests mock at the SDK boundary; opt-in live tests (`pytest -m live --run-live`) exercise the real API.
 
 ### "I want to build multi-agent interaction patterns"
 
@@ -386,3 +386,4 @@ Each example has its own detailed user guide:
 | tool-use-agent | [USER_GUIDE.md](../tool-use-agent/USER_GUIDE.md) |
 | data-quality-pipeline | [USER_GUIDE.md](../data-quality-pipeline/USER_GUIDE.md) |
 | sensor-monitoring | [USER_GUIDE.md](https://github.com/rlemke/fwh_sensor_monitoring/blob/main/USER_GUIDE.md) — in standalone repo |
+| anthropic | [README.md](https://github.com/rlemke/fwh_anthropic/blob/main/README.md) + [CLAUDE.md](https://github.com/rlemke/fwh_anthropic/blob/main/CLAUDE.md) — in standalone repo |

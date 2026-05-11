@@ -26,7 +26,7 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | [devops-deploy](devops-deploy/) | DevOps deployment pipeline — first `andThen when` showcase (nested when, foreach, prompt/script blocks, mixins+implicits) |
 | [hiv-drug-resistance](hiv-drug-resistance/) | HIV drug resistance genotyping — bioinformatics pipeline (`andThen when` QC, `catch` error recovery, `foreach` batch, prompt+script blocks) |
 | [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | NOAA GHCN-Daily climate analysis — catalog-first real-data pipeline (AWS S3, linear regression trends, OSM geocoding, `catch`/`foreach`, 25+ workflows). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_noaa_weather`. |
-| [anthropic](https://github.com/rlemke/fwh_anthropic) | Multi-area home for Facetwork wrappers around [github.com/anthropics](https://github.com/anthropics) — Messages, Batch, Files, Agent SDK, Claude Code, Computer Use, MCP. Currently a scaffold; handlers are added one area at a time. Standalone repo: install with `pip install -e ~/fw_handlers/fwh_anthropic`. |
+| [anthropic](https://github.com/rlemke/fwh_anthropic) | Multi-area home for Facetwork wrappers around [github.com/anthropics](https://github.com/anthropics) — Messages (6), Batch (4), Files (3), Agent SDK (1), Claude Code (1), Computer Use (1) — 16 facets across 6 areas, plus the cross-area `DocumentQA` composition workflow (Files-API RAG) and opt-in live tests against the real API. Standalone repo: install with `pip install -e ~/fw_handlers/fwh_anthropic`. |
 
 ## User Documentation
 
@@ -58,7 +58,7 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | devops-deploy | *(coming soon)* |
 | hiv-drug-resistance | *(coming soon)* |
 | noaa-weather | [USER_GUIDE.md](https://github.com/rlemke/fwh_noaa_weather/blob/main/USER_GUIDE.md) — in standalone repo |
-| anthropic | [README.md](https://github.com/rlemke/fwh_anthropic/blob/main/README.md) — in standalone repo (scaffold; CLAUDE.md describes the per-area authoring contract) |
+| anthropic | [README.md](https://github.com/rlemke/fwh_anthropic/blob/main/README.md) + [CLAUDE.md](https://github.com/rlemke/fwh_anthropic/blob/main/CLAUDE.md) — in standalone repo |
 
 ## Running an Example
 
