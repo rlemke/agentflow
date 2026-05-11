@@ -36,6 +36,7 @@ You don't need to be a developer to use Facetwork — if you can fill in a form,
 |--------------|------------|
 | **Run workflows** from the web UI | [Beginner's Guide](docs/getting-started/beginners-guide.md) |
 | **Set up a local server** quickly | [Quick Start](#quick-start) (below) |
+| **Run every example (8 standalone repos) in Docker** | [Full-stack Docker Compose](docs/operations/full-stack-compose.md) |
 | **Write my own workflows** in FFL | [FFL Tutorial](docs/getting-started/tutorial.md) |
 | **Build handlers** in Python | [Agent SDK](spec/60_agent_sdk.md) |
 | **Build agents** in other languages | [Agent Libraries](#agent-integration-libraries) |

@@ -1,0 +1,412 @@
+# Full-stack Docker Compose
+
+A one-command development environment: MongoDB + PostGIS + Jenkins +
+the Facetwork dashboard + the main runner + **one dedicated runner per
+fwh_\* example repo**. Everything wired together on a single Docker
+network, with `/Volumes/afl_data` (or your chosen path) mounted into
+every service that needs it.
+
+| Group | Services |
+|-------|----------|
+| Infrastructure | `mongodb`, `postgis`, `jenkins` |
+| Facetwork core | `dashboard` (port 8080), `runner` (for in-repo examples), `seed` (one-shot) |
+| Per fwh_* repo | `runner-anthropic`, `runner-osm-geocoder`, `runner-osm-lz`, `runner-noaa-weather`, `runner-jenkins-example`, `runner-census-us`, `runner-genomics`, `runner-sensor-monitoring` |
+
+The compose file is [`docker-compose.full-stack.yml`](../../docker-compose.full-stack.yml);
+the wrapper script is [`scripts/full-stack`](../../scripts/full-stack).
+
+## Why one runner per example
+
+Each standalone `fwh_*` repo has its own pip dependencies (e.g.
+`fwh_osm` pulls `osmium`, `shapely`, `pyproj`, `folium`; `fwh_anthropic`
+pulls `anthropic` + optional `claude-agent-sdk` + `mcp`). Combining
+them into one container would force the union of everyone's deps on
+every restart and couple their upgrade schedules. Per-runner containers
+keep each example's environment small, independently rebuildable, and
+runnable in isolation (you can `docker compose up runner-anthropic`
+without booting the rest).
+
+Each example runner uses one generic image
+(`docker/Dockerfile.example-runner`) and bind-mounts
+`~/fw_handlers/<repo>` into `/handlers/<repo>`. At container startup
+the entrypoint (`docker/entrypoint-example-runner.sh`) does:
+
+1. `pip install -e /handlers/<repo>[<extras>]` (editable, so handler
+   edits on the host land in the container with no rebuild)
+2. `python -m facetwork.examples <name>` — registers handler routing
+   in MongoDB
+3. `exec python -m facetwork.runtime.runner --registry`
+
+## Prerequisites
+
+- **Docker** with `docker compose` (Docker Desktop on macOS works; the
+  stack uses ~3 GB of images on first build).
+- **`~/fw_handlers/fwh_*` directories** — clone the standalone example
+  repos with the install helper:
+
+  ```bash
+  scripts/install-example --all
+  ```
+
+  Each fwh_* repo can be in any state (clean clone, dirty edits, etc.).
+  The example runner mounts it read-write so pip can write its
+  `egg-info`. See [Installing example packages](#installing-example-packages)
+  below.
+
+- **External data dir** — `/Volumes/afl_data` on macOS by default, or
+  any host path with enough space. Override via `AFL_DATA_DIR` in
+  `.env.full-stack`. Subdirs the runners use:
+
+  | Path | Used by |
+  |------|---------|
+  | `cache/` | Generic handler caches |
+  | `output/` | All workflow outputs (visible in the dashboard) |
+  | `osm/` | Geofabrik PBF mirror (fwh_osm) |
+  | `osm-output/` | OSM-derived artifacts (fwh_osm) |
+
+## First-time setup
+
+```bash
+# 1. Clone + install every example
+scripts/install-example --all
+
+# 2. (Optional) Copy the env template and edit for secrets
+cp .env.full-stack.example .env.full-stack
+$EDITOR .env.full-stack         # set ANTHROPIC_API_KEY, CENSUS_API_KEY, etc.
+
+# 3. Bring up the full stack (builds images on first run)
+scripts/full-stack up
+
+# 4. Open the dashboard
+open http://localhost:8080
+```
+
+First boot pulls `mongo:7`, `postgis/postgis:16-3.4`, and
+`jenkins/jenkins:lts`, then builds three custom images (dashboard,
+runner, example-runner) — count on 3–5 minutes. Subsequent `up`
+runs use cached images and are fast.
+
+After `up`, each example runner spends ~10–30 seconds pip-installing
+its bind-mounted repo. Watch the progress with:
+
+```bash
+scripts/full-stack logs            # tail all services
+scripts/full-stack logs runner-anthropic   # one service
+```
+
+## scripts/full-stack
+
+One entry point for everything. Picks `.env.full-stack` from the repo
+root when present, otherwise falls back to the checked-in
+`.env.full-stack.example`.
+
+```text
+scripts/full-stack                       start every service (detached) [default]
+scripts/full-stack up                    same as no args
+scripts/full-stack up runner-anthropic   start specific services only
+scripts/full-stack down                  stop + remove containers (keeps named volumes)
+scripts/full-stack down --volumes        also wipe mongodb/postgis/jenkins data
+scripts/full-stack stop [SERVICE...]     stop without removing
+scripts/full-stack restart [SERVICE...]  restart selected (or all) services
+scripts/full-stack status                ps with service / status / ports
+scripts/full-stack logs                  tail -f all services
+scripts/full-stack logs SERVICE          tail -f one service
+scripts/full-stack logs --tail 100 SVC   snapshot
+scripts/full-stack build [SERVICE...]    docker compose build
+scripts/full-stack pull                  pull mongo / postgis / jenkins images
+scripts/full-stack config                resolved compose config (env expanded)
+scripts/full-stack exec SERVICE          /bin/bash shell inside a container
+scripts/full-stack exec SERVICE -- CMD   run a one-shot command
+scripts/full-stack help                  this list
+```
+
+### Environment knobs
+
+All defaults documented in [`.env.full-stack.example`](../../.env.full-stack.example).
+Copy that file to `.env.full-stack` and edit; the wrapper picks it up
+automatically.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FWH_HANDLERS_ROOT` | `$HOME/fw_handlers` | Where the fwh_* clones live |
+| `AFL_DATA_DIR` | `/Volumes/afl_data` | External disk mount point |
+| `AFL_MONGODB_DATABASE` | `facetwork` | Mongo DB used by all services |
+| `DASHBOARD_PORT` | `8080` | Dashboard UI |
+| `AFL_MONGODB_PORT` | `27017` | MongoDB |
+| `POSTGRES_PORT` | `5432` | PostGIS |
+| `JENKINS_UI_PORT` | `9090` | Jenkins web UI |
+| `JENKINS_AGENT_PORT` | `50000` | Jenkins agent port |
+| `POSTGRES_DB / USER / PASSWORD` | `afl_gis` / `afl` / `afl` | PostGIS creds |
+| `AFL_MAX_CONCURRENT` | `4` | Max concurrent tasks per runner |
+| `AFL_POLL_INTERVAL_MS` | `1000` | Runner poll interval |
+| `ANTHROPIC_API_KEY` | _(unset)_ | Required for live Claude calls |
+| `ANTHROPIC_EXTRAS` | `agent_sdk,mcp` | fwh_anthropic pip extras |
+| `CENSUS_API_KEY` | _(unset)_ | Required for fwh_census_us live calls |
+
+## Installing example packages
+
+The full stack needs the 8 standalone `fwh_*` repos cloned under
+`$FWH_HANDLERS_ROOT`. Two helpers handle this:
+
+### scripts/install-example
+
+Registry-driven; knows all 8 example repos.
+
+```bash
+scripts/install-example --list              # see the registry
+scripts/install-example anthropic --check   # clone, pip install -e, verify
+scripts/install-example --all               # clone+install every example
+scripts/install-example osm-geocoder noaa-weather   # one or more by name
+scripts/install-example anthropic --extras agent_sdk,mcp
+scripts/install-example --pull-only anthropic       # just clone/git-pull
+scripts/install-example --skip-pull anthropic       # pip install existing clone only
+```
+
+Defaults clone into `~/fw_handlers/` and pip-install into the local
+`.venv/` (auto-detected). With `--check`, verifies the example is
+discoverable via `facetwork.examples.discover_entry_point_examples()`.
+
+### scripts/install-anthropic
+
+Thin wrapper for `fwh_anthropic` specifically. Maps `--agent-sdk` /
+`--mcp` / `--all` to the matching pip extras, then (with `--check`)
+also reports whether the `claude` CLI is on `PATH` and whether
+`ANTHROPIC_API_KEY` is set — the two things that aren't pip-installable
+but the package needs at runtime.
+
+```bash
+scripts/install-anthropic                   # core (anthropic SDK only)
+scripts/install-anthropic --all --check     # + agent_sdk + mcp + env probes
+scripts/install-anthropic --mcp             # core + mcp extras only
+```
+
+## Service architecture
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ host                                                                 │
+│                                                                      │
+│   ~/fw_handlers/                              /Volumes/afl_data/     │
+│     ├ fwh_anthropic/                            ├ cache/             │
+│     ├ fwh_osm/                                  ├ output/            │
+│     ├ fwh_osm_lz/                               ├ osm/               │
+│     ├ fwh_noaa_weather/                         └ osm-output/        │
+│     ├ fwh_jenkins/                                                   │
+│     ├ fwh_census_us/                                                 │
+│     ├ fwh_genomics/                                                  │
+│     └ fwh_sensor_monitoring/                                         │
+│       │                                                              │
+│       │ bind-mount  (rw)                                             │
+│       ▼                                                              │
+│ ┌────────────────────────────────────────────────────────────────┐   │
+│ │ docker network: facetwork_default                              │   │
+│ │                                                                │   │
+│ │  mongodb ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │   │
+│ │     ▲                                                          │   │
+│ │     │  reads handler_registrations / flows / workflows         │   │
+│ │     │                                                          │   │
+│ │  dashboard ◄──── HTTP :8080 ─────── host                       │   │
+│ │     │                                                          │   │
+│ │     │ AFL_POSTGIS_URL                                          │   │
+│ │     ▼                                                          │   │
+│ │  postgis ─◄── osm-geocoder / osm-lz runners write here         │   │
+│ │     │                                                          │   │
+│ │     │  init scripts in docker/postgis-init/ create empty       │   │
+│ │     │  osm_import_log + osm_nodes + osm_ways tables            │   │
+│ │     │                                                          │   │
+│ │  jenkins ─── runner-jenkins-example talks to it via            │   │
+│ │     │       JENKINS_URL=http://jenkins:8080                    │   │
+│ │     │                                                          │   │
+│ │  runner ─── built-in examples (hello-agent, aws-lambda, etc.)  │   │
+│ │                                                                │   │
+│ │  runner-anthropic, runner-osm-geocoder, runner-osm-lz,         │   │
+│ │  runner-noaa-weather, runner-jenkins-example, runner-census-us,│   │
+│ │  runner-genomics, runner-sensor-monitoring                     │   │
+│ │     │                                                          │   │
+│ │     │ each one pip-installs its bind-mounted fwh_* repo,       │   │
+│ │     │ registers handlers in MongoDB, then polls for tasks      │   │
+│ │     ▼                                                          │   │
+│ │  seed (one-shot) ─── seeds 18 flows + 41 workflows on first   │   │
+│ │                       boot so the dashboard isn't empty        │   │
+│ └────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## Common operations
+
+### Run a workflow
+
+1. Open http://localhost:8080
+2. Click **Workflows** → pick one (any from a discoverable example)
+3. **New** to create a run, fill parameters, **Run**
+4. Watch step-by-step progress on the detail page
+
+The dashboard dispatches tasks to MongoDB; the matching example runner
+picks them up automatically.
+
+### Tail logs across runners
+
+```bash
+scripts/full-stack logs                    # everything
+scripts/full-stack logs runner-anthropic   # one service
+scripts/full-stack logs --tail 200 runner  # built-in runner snapshot
+```
+
+### Shell into a runner
+
+```bash
+scripts/full-stack exec runner-anthropic              # /bin/bash
+scripts/full-stack exec runner-osm-geocoder -- python -c \
+    "from osm_geocoder.handlers.downloads.postgis_importer import *; print('ok')"
+```
+
+### Rebuild an image after editing facetwork itself
+
+```bash
+scripts/full-stack build dashboard runner    # rebuild specific
+scripts/full-stack up --no-deps dashboard    # restart with new image
+```
+
+Editing files inside `~/fw_handlers/<repo>` does **not** require a
+rebuild — they're bind-mounted as editable installs. Just restart the
+specific runner:
+
+```bash
+scripts/full-stack restart runner-anthropic
+```
+
+### Tear down
+
+```bash
+scripts/full-stack down              # stop + remove containers, KEEP volumes
+scripts/full-stack down --volumes    # also wipe mongo / postgis / jenkins data
+```
+
+Named volumes (`facetwork_mongodb_data`, `facetwork_postgis_data`,
+`facetwork_jenkins_home`) persist handler registrations, seeded flows,
+imported OSM data, and Jenkins job history across restarts. Use
+`--volumes` for a clean slate.
+
+## Per-runner notes
+
+### runner-anthropic
+
+- Pulls `anthropic` Python SDK transitively. Extras gated by
+  `ANTHROPIC_EXTRAS` (default `agent_sdk,mcp`).
+- Set `ANTHROPIC_API_KEY` for live API calls. Without it, the runner
+  starts fine but Claude-calling workflows fail at dispatch.
+- Registers 16 facets across Messages / Batch / Files / Agent SDK /
+  Claude Code / Computer Use + the `DocumentQA` composition workflow.
+
+### runner-osm-geocoder / runner-osm-lz
+
+- Both runners get `AFL_POSTGIS_URL=postgresql://afl:afl@postgis:5432/afl_gis`.
+- `runner-osm-lz` is a pure workflow catalog (0 handlers); it
+  dispatches to handlers registered by `runner-osm-geocoder`, so the
+  compose `depends_on:` orders them correctly.
+- `/Volumes/afl_data/osm/` should contain the Geofabrik PBFs you want
+  to import (the runner won't fetch them — there are dedicated handler
+  facets for that).
+
+### runner-jenkins-example
+
+- Talks to the in-stack Jenkins via `JENKINS_URL=http://jenkins:8080`.
+- For local-only Jenkins testing, default creds work out of the box;
+  for a real CI server, mount Jenkins config or set `JENKINS_USER` +
+  `JENKINS_TOKEN`.
+
+### runner-census-us
+
+- `CENSUS_API_KEY` needed for live API calls. Free key from
+  https://api.census.gov/data/key_signup.html.
+
+## Troubleshooting
+
+### Dashboard is empty (no flows / no handlers)
+
+Check that the seed service finished and the runners registered:
+
+```bash
+scripts/full-stack logs seed | tail -20
+docker exec facetwork-mongodb mongosh --quiet facetwork --eval \
+    'print("flows:", db.flows.countDocuments(),
+           "workflows:", db.workflows.countDocuments(),
+           "handler_registrations:", db.handler_registrations.countDocuments())'
+```
+
+If counts are non-zero but the dashboard is still empty, hard-refresh
+the browser tab (Cmd+R or Ctrl+R).
+
+### PostGIS panel shows "could not connect"
+
+```bash
+# Are the OSM tables present?
+docker exec facetwork-postgis psql -U afl -d afl_gis -c "\dt"
+# Should list osm_import_log, osm_nodes, osm_ways, spatial_ref_sys.
+```
+
+If those are missing, the postgis-init scripts didn't run. Recreate
+the postgis volume:
+
+```bash
+scripts/full-stack down --volumes
+scripts/full-stack up
+```
+
+Init scripts in `docker/postgis-init/` only run on first volume
+init — they're idempotent across container restarts but ignored if
+the volume already has a database.
+
+### Runner can't reach MongoDB / PostGIS
+
+Service-to-service traffic uses the in-stack network. Use service
+names (`mongodb`, `postgis`, `jenkins`) — not `localhost` or
+`afl-mongodb` — in connection strings inside containers. From the
+host, use `localhost:<port>` where `<port>` is whatever's mapped in
+`.env.full-stack`.
+
+### Example runner keeps restarting
+
+```bash
+scripts/full-stack logs runner-anthropic | tail -50
+```
+
+Common causes:
+1. `~/fw_handlers/fwh_<name>/` doesn't exist (run
+   `scripts/install-example <name>`).
+2. The bind-mount source path is wrong (check `FWH_HANDLERS_ROOT`).
+3. Pip install failed — usually network issue or a syntax error in
+   the example's source. Fix on the host, then
+   `scripts/full-stack restart runner-<name>`.
+
+### "Container name already in use" on up
+
+A prior `docker compose down` left an orphan container. Clean up:
+
+```bash
+docker rm -f $(docker ps -aq --filter "name=facetwork-")
+scripts/full-stack up
+```
+
+### Need to point at a remote MongoDB / PostGIS
+
+Edit `.env.full-stack`:
+
+```bash
+# Skip the in-stack mongodb/postgis services
+AFL_MONGODB_URL=mongodb://my-mongo-host:27017
+AFL_POSTGIS_URL=postgresql://user:pass@my-postgis-host:5432/afl_gis
+```
+
+Then start only the services you need (omit `mongodb` / `postgis`):
+
+```bash
+scripts/full-stack up dashboard runner runner-anthropic
+```
+
+## Related
+
+- [`docs/operations/deployment.md`](deployment.md) — non-Docker / multi-host deployment
+- [`docs/getting-started/beginners-guide.md`](../getting-started/beginners-guide.md) — workflow basics
+- [`scripts/install-example`](../../scripts/install-example) — registry of standalone example repos
+- [`docker-compose.full-stack.yml`](../../docker-compose.full-stack.yml) — the source of truth

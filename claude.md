@@ -104,6 +104,7 @@ When building a new domain pipeline that ingests from multiple data sources, mir
 | Non-functional requirements | [docs/reference/nonfunctional.md](docs/reference/nonfunctional.md) |
 | Architecture overview | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Deployment guide | [docs/operations/deployment.md](docs/operations/deployment.md) |
+| Full-stack Docker Compose (one runner per fwh_* example) | [docs/operations/full-stack-compose.md](docs/operations/full-stack-compose.md) |
 | Tutorial | [docs/getting-started/tutorial.md](docs/getting-started/tutorial.md) |
 | Tools + handlers pattern (per-domain CLI + `_lib/` + shim) | [agent-spec/tools-pattern.agent-spec.yaml](agent-spec/tools-pattern.agent-spec.yaml) |
 | Cache layout (sidecars, namespaces, cache types) | [agent-spec/cache-layout.agent-spec.yaml](agent-spec/cache-layout.agent-spec.yaml) |

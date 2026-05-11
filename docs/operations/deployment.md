@@ -83,6 +83,22 @@ scripts/easy.sh
 open http://localhost:8080
 ```
 
+For a richer dev environment that runs **one container per
+standalone `fwh_*` example** (anthropic, osm-geocoder, osm-lz,
+noaa-weather, jenkins, census-us, genomics, sensor-monitoring) on
+top of MongoDB + PostGIS + Jenkins + the dashboard, use the
+**full-stack compose**:
+
+```bash
+scripts/install-example --all     # clone + pip install every fwh_* repo
+scripts/full-stack up             # boots all 13 services
+open http://localhost:8080
+```
+
+See [Full-stack Docker Compose](full-stack-compose.md) for the full
+guide (architecture, scripts, env knobs, per-runner notes,
+troubleshooting).
+
 ### Comparing Docker vs Local Mode
 
 | Aspect | Docker Mode | Local Mode |
