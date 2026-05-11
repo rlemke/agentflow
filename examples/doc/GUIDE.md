@@ -23,7 +23,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [multi-round-debate](../multi-round-debate/) | Intermediate | Composed facets, cross-round state | 8 | Iterative rounds with convergence |
 | [tool-use-agent](../tool-use-agent/) | Intermediate | Tool-as-event-facet, planning | 8 | Tool-use agent orchestration |
 | [data-quality-pipeline](../data-quality-pipeline/) | Intermediate | Schema instantiation, array types, `(expr)` | 8 | Data quality assessment pipelines |
-| [sensor-monitoring](../sensor-monitoring/) | Intermediate | Unary negation, null literals, map indexing, mixin alias | 6 | Sensor monitoring with RegistryRunner |
+| [sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring) | Intermediate | Unary negation, null literals, map indexing, mixin alias | 6 | Sensor monitoring with RegistryRunner. **Standalone repo.** |
 
 ## Learning Path
 
@@ -140,7 +140,7 @@ Use **[data-quality-pipeline](../data-quality-pipeline/)**. It is the first exam
 
 ### "I want to use unary negation, null literals, computed map keys, or mixin aliases"
 
-Use **[sensor-monitoring](../sensor-monitoring/)**. It is the first example to showcase unary negation (`-10.0`, `-40.0`), null literals as call arguments (`last_reading = null`), computed map indexing (`$.configs[step.field]`), and mixin aliases (`with RetryPolicy() as retry`). It also demonstrates RegistryRunner as the primary agent entry point.
+Use **[sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring)** (standalone repo). It is the first example to showcase unary negation (`-10.0`, `-40.0`), null literals as call arguments (`last_reading = null`), computed map indexing (`$.configs[step.field]`), and mixin aliases (`with RetryPolicy() as retry`). It also demonstrates RegistryRunner as the primary agent entry point. Install with `pip install -e ~/fw_handlers/fwh_sensor_monitoring`.
 
 ### "I want to score and rank spatial locations"
 
@@ -382,4 +382,4 @@ Each example has its own detailed user guide:
 | multi-round-debate | [USER_GUIDE.md](../multi-round-debate/USER_GUIDE.md) |
 | tool-use-agent | [USER_GUIDE.md](../tool-use-agent/USER_GUIDE.md) |
 | data-quality-pipeline | [USER_GUIDE.md](../data-quality-pipeline/USER_GUIDE.md) |
-| sensor-monitoring | [USER_GUIDE.md](../sensor-monitoring/USER_GUIDE.md) |
+| sensor-monitoring | [USER_GUIDE.md](https://github.com/rlemke/fwh_sensor_monitoring/blob/main/USER_GUIDE.md) — in standalone repo |
