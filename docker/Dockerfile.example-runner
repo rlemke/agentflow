@@ -1,0 +1,45 @@
+# Generic per-example Facetwork runner.
+#
+# One image; the example to run is passed via AFL_EXAMPLE_NAME. The
+# example's source (one of the fwh_* repos) is bind-mounted at
+# /handlers/$AFL_EXAMPLE_REPO and pip-installed at container start by
+# entrypoint-example-runner.sh.
+#
+# Why bind-mount + install at start, instead of baking the example
+# into the image? Two reasons:
+#   1. Each runner stays in lockstep with the developer's local checkout
+#      under ~/fw_handlers — no rebuild needed for handler edits.
+#   2. One image works for all 8+ examples — compose just picks the
+#      name via env var. New examples added to the registry need no
+#      Dockerfile change.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Build-time system packages.  osmium-tool is needed by the OSM
+# example pipelines; git is needed only if the entrypoint falls back
+# to `git clone` for an example whose source dir isn't bind-mounted.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        osmium-tool \
+        git \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install facetwork from the build context.  Optional extras commonly
+# needed across examples (folium / pyshp / osm2geojson / requests)
+# come along for free.
+COPY pyproject.toml .
+COPY facetwork/ ./facetwork/
+RUN pip install --no-cache-dir -e ".[mongodb]" \
+    && pip install --no-cache-dir requests pyshp folium osm2geojson
+
+# Entrypoint installs the named example then starts the runner.
+COPY docker/entrypoint-example-runner.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENV PYTHONUNBUFFERED=1
+ENV AFL_HANDLERS_ROOT=/handlers
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
