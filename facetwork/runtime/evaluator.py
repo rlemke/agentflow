@@ -43,6 +43,17 @@ from .telemetry import Telemetry
 from .types import BlockId, ObjectType, StepId, WorkflowId, generate_id, workflow_id
 
 
+def _has_returns(step: StepDefinition) -> bool:
+    """True iff *step* has at least one return value set.
+
+    Used to decide whether a step's outputs are referenceable even if
+    the step hasn't reached STATEMENT_COMPLETE yet — necessary for
+    inline-andThen bodies that read the parent step's outputs.
+    """
+    rets = getattr(step.attributes, "returns", None)
+    return bool(rets)
+
+
 class ExecutionStatus:
     """Status constants for execution results."""
 
@@ -448,18 +459,38 @@ class ExecutionContext:
                 if s.id == pending.id:
                     all_steps[i] = pending
 
-        # Find by name
+        # Find by name.
+        #
+        # A step's outputs become available after its handler returns
+        # (state >= STATEMENT_BLOCKS_BEGIN) — not only at STATEMENT_COMPLETE.
+        # This matters for inline-andThen bodies that reference the parent
+        # step's outputs:
+        #
+        #   g0 = GatherSources(...) andThen {
+        #       f0 = ExtractFindings(sources = g0.sources)   // ← reads g0's output
+        #   }
+        #
+        # g0 cannot reach STATEMENT_COMPLETE until f0 finishes (the
+        # inline andThen is part of g0's lifecycle), and f0 cannot start
+        # until g0.sources resolves.  Requiring full completion creates
+        # an unresolvable deadlock.  Accept any step whose returns have
+        # been populated.
         for step in all_steps:
-            if step.statement_id and step.is_complete:
-                # Check statement_name directly (persisted on step)
-                if step.statement_name == step_name:
+            if not step.statement_id:
+                continue
+            if not (step.is_complete or _has_returns(step)):
+                continue
+            # Check statement_name directly (persisted on step)
+            if step.statement_name == step_name:
+                if step.is_complete:
                     self._completed_step_cache[cache_key] = step
-                    return step
-                # Fall back to AST-based name lookup (needs dependency graph)
-                stmt = self.get_statement_definition(step)
-                if stmt and stmt.name == step_name:
+                return step
+            # Fall back to AST-based name lookup (needs dependency graph)
+            stmt = self.get_statement_definition(step)
+            if stmt and stmt.name == step_name:
+                if step.is_complete:
                     self._completed_step_cache[cache_key] = step
-                    return step
+                return step
 
         return None
 
@@ -1882,7 +1913,42 @@ class Evaluator:
                 # prevent the block from creating newly-ready sibling
                 # steps (e.g. MergeSummaries after SummarizeChunk foreach
                 # completes).
-                work_queue = list(context._dirty_blocks)
+                next_queue: list[str] = list(context._dirty_blocks)
+
+                # Also re-queue stuck sibling steps of dirty containers.
+                # When a step at FACET_INIT_BEGIN raises _StepNotReady
+                # (waiting on a cross-block reference like `q0.out` where
+                # `q0` is in a different sub-block), or when a foreach
+                # block at BLOCK_EXECUTION_BEGIN waits for a sibling
+                # block's output (`m.items` from a prior `andThen`), the
+                # step sets push_me=True but does NOT mark a parent
+                # dirty.  Without re-queuing it explicitly, the resume
+                # cascade leaves it stranded even after its dependencies
+                # complete.  Full resume() avoids this by sweeping all
+                # actionable steps every iteration — resume_step is
+                # event-driven, so we have to surface waiting siblings
+                # here.
+                #
+                # Look for stuck siblings via BOTH `block_id` (steps
+                # within a block) and `container_id` (block-children of
+                # a workflow root or composed-facet step) — multi-block
+                # workflow bodies attach their AndThen blocks to the
+                # root via container_id, not block_id.
+                seen = set(next_queue)
+                stuck_predicate = (
+                    lambda s: not s.is_terminal and s.transition.push_me
+                )
+                for dirty_id in list(context._dirty_blocks):
+                    for sibling in self.persistence.get_steps_by_block(dirty_id):
+                        if sibling.id not in seen and stuck_predicate(sibling):
+                            next_queue.append(sibling.id)
+                            seen.add(sibling.id)
+                    for sibling in self.persistence.get_steps_by_container(dirty_id):
+                        if sibling.id not in seen and stuck_predicate(sibling):
+                            next_queue.append(sibling.id)
+                            seen.add(sibling.id)
+
+                work_queue = next_queue
 
             logger.info(
                 "resume_step done: workflow_id=%s iterations=%d",

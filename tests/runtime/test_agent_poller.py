@@ -799,3 +799,179 @@ class TestAgentPollerASTSnapshot:
         # MemoryStore has no get_workflow/get_flow, so fallback returns None
         result = poller._load_workflow_ast("wf-noast")
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Multi-step fan-out via AgentPoller — regression for sibling re-queue and
+# in-flight step output access from inline-andThen bodies.
+# ---------------------------------------------------------------------------
+
+
+class TestAgentPollerMultiStep:
+    """Drive multi-step workflows end-to-end through AgentPoller.
+
+    Catches two related runtime regressions:
+
+    1. ``resume_step`` (event-driven) must re-queue stuck sibling steps
+       of a dirty block.  Previously a step at FACET_INIT_BEGIN that
+       had raised ``_StepNotReady`` was never retried once its
+       dependencies completed in another sub-block.
+    2. ``get_completed_step_by_name`` must surface a step's outputs
+       once they're populated (after the handler returns), not only
+       after STATEMENT_COMPLETE.  Inline-andThen bodies that reference
+       the parent step's outputs (e.g. ``g0 = Gather(...) andThen {
+       f0 = Extract(sources = g0.sources) }``) would otherwise deadlock.
+    """
+
+    def _drive(self, src: str, workflow_name: str, handlers: dict, inputs: dict):
+        from facetwork import FFLParser, emit_dict
+        from facetwork.ast_utils import find_workflow
+        from facetwork.runtime import (
+            Evaluator,
+            MemoryStore,
+            Telemetry,
+        )
+        from facetwork.runtime.agent_poller import AgentPoller, AgentPollerConfig
+
+        program = emit_dict(FFLParser().parse(src))
+        workflow_ast = find_workflow(program, workflow_name)
+        store = MemoryStore()
+        evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+        poller = AgentPoller(
+            persistence=store,
+            evaluator=evaluator,
+            config=AgentPollerConfig(service_name="multi-step-test"),
+        )
+        for facet_name, fn in handlers.items():
+            poller.register(facet_name, fn)
+
+        result = evaluator.execute(workflow_ast, inputs=inputs, program_ast=program)
+        poller.cache_workflow_ast(result.workflow_id, workflow_ast, program_ast=program)
+
+        idle = 0
+        for _ in range(200):
+            root = store.get_workflow_root(result.workflow_id)
+            if root and (root.is_complete or root.is_error):
+                break
+            n = poller.poll_once()
+            if n == 0:
+                idle += 1
+                if idle > 30:
+                    break
+            else:
+                idle = 0
+
+        root = store.get_workflow_root(result.workflow_id)
+        assert root is not None, "workflow root not found"
+        assert root.is_complete, (
+            f"workflow did not complete: is_error={root.is_error}, "
+            f"transition={root.transition}"
+        )
+        return {name: attr.value for name, attr in root.attributes.returns.items()}
+
+    def test_statement_level_andthen_fanout_completes(self):
+        """Fan-out with three parallel statement-level andThen branches.
+
+        Without the sibling-requeue fix, Sum stays stuck at
+        FACET_INIT_BEGIN because q0/q1/q2 (in different sub-blocks)
+        complete without notifying Sum's block as dirty.
+        """
+        src = """
+        namespace t {
+            event facet Make(n: Long) => (items: Json)
+            event facet Pick(item: Json) => (out: String)
+            event facet Sum(xs: Json) => (total: String)
+
+            workflow Run(n: Long) => (total: String) andThen {
+                m = Make(n = $.n)
+                p0 = Pick(item = m.items[0]) andThen {
+                    q0 = Pick(item = m.items[0])
+                }
+                p1 = Pick(item = m.items[1]) andThen {
+                    q1 = Pick(item = m.items[1])
+                }
+                p2 = Pick(item = m.items[2]) andThen {
+                    q2 = Pick(item = m.items[2])
+                }
+                s = Sum(xs = [q0.out, q1.out, q2.out])
+                yield Run(total = s.total)
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Make": lambda p: {"items": [{"x": "a"}, {"x": "b"}, {"x": "c"}]},
+                "t.Pick": lambda p: {"out": str(p["item"].get("x", "?"))},
+                "t.Sum": lambda p: {"total": "+".join(p["xs"])},
+            },
+            {"n": 3},
+        )
+        assert outputs == {"total": "a+b+c"}
+
+    def test_andthen_foreach_iterates(self):
+        """Foreach fan-out over a sibling-block step's output.
+
+        Without the container-children re-queue, the foreach block at
+        BLOCK_EXECUTION_BEGIN never advances after the first block
+        completes — its `m.items` reference is in a prior sibling block.
+        """
+        src = """
+        namespace t {
+            event facet Make(n: Long) => (items: Json)
+            event facet Pick(item: Json) => (out: String)
+
+            workflow Run(n: Long) => (last: String) andThen {
+                m = Make(n = $.n)
+                yield Run(last = "ok")
+            } andThen foreach item in m.items {
+                p = Pick(item = $.item)
+                yield Run(last = p.out)
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Make": lambda p: {"items": [{"x": "a"}, {"x": "b"}, {"x": "c"}]},
+                "t.Pick": lambda p: {"out": str(p["item"].get("x", "?"))},
+            },
+            {"n": 3},
+        )
+        # The foreach yields update `last` per iteration; the final value
+        # depends on dispatch order but must be one of the items.
+        assert outputs["last"] in {"a", "b", "c"}
+
+    def test_inline_andthen_reads_parent_outputs(self):
+        """Inline-andThen body references parent step's outputs.
+
+        ``g0 = Gather(...) andThen { f0 = Extract(sources = g0.sources) }``
+        works only if `g0.sources` is readable while g0 is still inside
+        its STATEMENT_BLOCKS_CONTINUE state (i.e. before g0 reaches
+        STATEMENT_COMPLETE — which can't happen until f0 finishes).
+        """
+        src = """
+        namespace t {
+            event facet Gather(name: String) => (sources: Json)
+            event facet Extract(sources: Json) => (count: Long)
+
+            workflow Run(name: String) => (count: Long) andThen {
+                g = Gather(name = $.name) andThen {
+                    f = Extract(sources = g.sources)
+                }
+                yield Run(count = f.count)
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Gather": lambda p: {"sources": ["a", "b", "c"]},
+                "t.Extract": lambda p: {"count": len(p["sources"])},
+            },
+            {"name": "demo"},
+        )
+        assert outputs == {"count": 3}

@@ -424,8 +424,8 @@ class TestCompilation:
         workflows = []
         for ns in parsed_ast.namespaces:
             workflows.extend(ns.workflows)
-        # ResearchTopic + ResearchTopicLinear (smoke-run target) + DeepDive
-        assert len(workflows) == 3
+        # ResearchTopic + DeepDive
+        assert len(workflows) == 2
 
     def test_mixin_facet_count(self, parsed_ast):
         mixins_ns = [ns for ns in parsed_ast.namespaces if ns.name == "research.mixins"][0]
@@ -443,8 +443,8 @@ class TestCompilation:
         has_foreach = any(block.foreach is not None for block in deep_dive.body)
         assert has_foreach
 
-    def test_linear_smoke_workflow_present(self, parsed_ast):
-        """run.py drives ResearchTopicLinear; tests assert it exists."""
+    def test_research_topic_workflow_present(self, parsed_ast):
+        """run.py drives ResearchTopic (with statement-level andThen fan-out)."""
         workflows_ns = [ns for ns in parsed_ast.namespaces if ns.name == "research.workflows"][0]
         names = {w.sig.name for w in workflows_ns.workflows}
-        assert "ResearchTopicLinear" in names
+        assert "ResearchTopic" in names

@@ -157,7 +157,7 @@ def _compile_workflow():
     from facetwork.ast_utils import find_workflow
 
     program = emit_dict(FFLParser().parse(RESEARCH_FFL.read_text()))
-    workflow_ast = find_workflow(program, "ResearchTopicLinear")
+    workflow_ast = find_workflow(program, "ResearchTopic")
     return program, workflow_ast
 
 
@@ -222,7 +222,7 @@ def main() -> int:
         inputs = {
             "topic": "quantum sensing",
             "depth": 3,
-            "max_subtopics": 1,
+            "max_subtopics": 3,
             "sources_per_subtopic": 3,
         }
         result = evaluator.execute(workflow_ast, inputs=inputs, program_ast=program)

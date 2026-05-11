@@ -234,36 +234,6 @@ namespace research.workflows {
         )
     }
 
-    /**
-     * Linear single-subtopic variant used by `run.py` for end-to-end
-     * smoke testing. The full `ResearchTopic` workflow above uses
-     * statement-level `andThen` fan-out (g0/g1/g2 in parallel), which
-     * the current Facetwork runtime cannot drive to completion via
-     * `AgentPoller` against `MemoryStore` (workflow gets stuck partway
-     * through). The fix lives in the runtime — until it lands, this
-     * linear shape exercises the same handler chain top-to-bottom.
-     */
-    workflow ResearchTopicLinear(
-        topic: String,
-        depth: Long = 3,
-        max_subtopics: Long = 1,
-        sources_per_subtopic: Long = 3
-    ) => (
-        report: Draft,
-        review: ReviewResult,
-        summary: String
-    ) andThen {
-        planned = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics)
-        decomp = DecomposeIntoSubtopics(topic = planned.plan, max_subtopics = $.max_subtopics)
-        g0 = GatherSources(subtopic = decomp.subtopics[0], max_sources = $.sources_per_subtopic)
-        f0 = ExtractFindings(subtopic = decomp.subtopics[0], sources = g0.sources)
-        synth = SynthesizeFindings(topic = planned.plan, all_findings = f0.findings)
-        gapcheck = IdentifyGaps(analysis = synth.analysis, topic = planned.plan)
-        report = DraftReport(topic = planned.plan, analysis = synth.analysis, gaps = gapcheck.gaps)
-        rev = ReviewDraft(draft = report.draft, topic = planned.plan, analysis = synth.analysis)
-        yield ResearchTopicLinear(report = report.draft, review = rev.review, summary = "linear smoke run")
-    }
-
     /** Deep-dive: foreach fan-out for parallel subtopic investigation. */
     workflow DeepDive(
         topic: String,
