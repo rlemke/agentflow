@@ -1,7 +1,8 @@
-"""Writing parser handlers — ParseDraft, ParseReview."""
+"""Writing handlers — DraftReport, ReviewDraft."""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 from handlers.shared.research_utils import (
     coerce_draft,
     coerce_review,
-    extract_json_payload,
+    run_step_or_fallback,
     synthetic_draft,
     synthetic_review,
 )
@@ -19,53 +20,69 @@ log = logging.getLogger(__name__)
 NAMESPACE = "research.Writing"
 
 
-def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
-    sl = params.get("_step_log")
-    if sl is None:
-        return
-    try:
-        sl.append({"message": message, "level": level})
-    except AttributeError:
-        sl(message)
+def _ensure(value: Any, expect: type) -> Any:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return expect()
+    return value if isinstance(value, expect) else expect()
 
 
-def handle_parse_draft(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    topic_name = str(params.get("topic_name", "unknown"))
+def handle_draft_report(params: dict[str, Any]) -> dict[str, Any]:
+    topic = _ensure(params.get("topic", {}), dict)
+    analysis = _ensure(params.get("analysis", {}), dict)
+    gaps = _ensure(params.get("gaps", []), list)
+    name = str(topic.get("name", "unknown"))
+    themes = analysis.get("themes") or []
 
-    try:
-        parsed = extract_json_payload(text)
-        draft = coerce_draft(parsed, topic_name)
-        _step_log(
-            params,
-            f"ParseDraft: parsed '{draft['title']}' ({draft['word_count']} words)",
-        )
-    except ValueError as e:
-        log.warning("ParseDraft falling back to synthetic for %r: %s", topic_name, e)
-        draft = synthetic_draft(topic_name)
-        _step_log(params, f"ParseDraft: synthetic fallback for '{topic_name}'", level="warning")
+    draft = run_step_or_fallback(
+        system=(
+            "You are a technical writer. Reply with one JSON object: "
+            '{"title": string, "sections": [{"title": string, "content": '
+            'string}], "word_count": int, "citations": [string]}.'
+        ),
+        prompt=(
+            f"Draft a research report on '{name}'. Themes: {themes}. "
+            f"Gaps: {json.dumps(gaps)[:800]}. Be concise. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_draft(parsed, name),
+        fallback=lambda: synthetic_draft(name, theme_count=len(themes) or 3),
+        step_log=params.get("_step_log"),
+        label=f"DraftReport[{name}]",
+        max_tokens=2048,
+    )
     return {"draft": draft}
 
 
-def handle_parse_review(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    topic_name = str(params.get("topic_name", "unknown"))
+def handle_review_draft(params: dict[str, Any]) -> dict[str, Any]:
+    draft = _ensure(params.get("draft", {}), dict)
+    topic = _ensure(params.get("topic", {}), dict)
+    name = str(topic.get("name", "unknown"))
+    title = str(draft.get("title", "Untitled"))
+    word_count = int(draft.get("word_count", 0))
 
-    try:
-        parsed = extract_json_payload(text)
-        review = coerce_review(parsed, topic_name)
-        status = "approved" if review["approved"] else "needs revision"
-        _step_log(params, f"ParseReview: score {review['score']}/100 ({status})")
-    except ValueError as e:
-        log.warning("ParseReview falling back to synthetic for %r: %s", topic_name, e)
-        review = synthetic_review(topic_name)
-        _step_log(params, f"ParseReview: synthetic fallback for '{topic_name}'", level="warning")
+    review = run_step_or_fallback(
+        system=(
+            "You are a peer reviewer. Reply with one JSON object: "
+            '{"score": int 0-100, "approved": bool, "feedback": [string], '
+            '"suggested_edits": [{"section": string, "suggestion": string}]}.'
+        ),
+        prompt=(
+            f"Review '{title}' ({word_count} words) on '{name}'. "
+            "Score 0-100. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_review(parsed, name),
+        fallback=lambda: synthetic_review(name, draft_title=title),
+        step_log=params.get("_step_log"),
+        label=f"ReviewDraft[{name}]",
+    )
     return {"review": review}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.ParseDraft": handle_parse_draft,
-    f"{NAMESPACE}.ParseReview": handle_parse_review,
+    f"{NAMESPACE}.DraftReport": handle_draft_report,
+    f"{NAMESPACE}.ReviewDraft": handle_review_draft,
 }
 
 

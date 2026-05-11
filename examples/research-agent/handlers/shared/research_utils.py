@@ -1,29 +1,60 @@
-"""JSON parsing utilities for the research-agent parser handlers.
+"""Shared utilities for research-agent handlers.
 
-The agent's FFL is composed against ``anthropic.messages.CreateMessage`` —
-each domain step asks Claude for one JSON object/array, then hands the
-``text`` to a ``Parse<X>`` event facet. The functions here turn that
-text into the schema-shaped dicts the workflow expects.
+Each handler builds a domain-specific Anthropic Messages request via
+fwh_anthropic's pure-function ``create_message``, then turns the
+returned text into the workflow's schema shape. The helpers here keep
+that logic in one place:
 
-Goals:
+- ``call_claude_for_json``    — request + JSON-shape extraction
+- ``extract_json_payload``    — tolerant text → JSON
+- ``coerce_*``                — JSON → strict schema dict
+- ``synthetic_*``             — deterministic fallback when parsing
+                                fails (workflow keeps running, log
+                                shows a warning)
 
-- **Tolerant input** — Claude often wraps JSON in ``` ```json fences,
-  prefatory prose ("Here is the JSON: ..."), or trailing apologies.
-  ``extract_json_payload`` strips all of that.
-- **Deterministic fallbacks** — when the response can't be coerced
-  into the target schema, we return a placeholder that keeps the
-  workflow alive so callers get a clear failure mode + an
-  ``input_text`` field they can audit. The synthetic stubs used by
-  the original deterministic example live here under
-  ``synthetic_*`` names; they double as test fixtures.
+The synthetic fallbacks double as test fixtures — the unit suite
+exercises them without a live API call.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from typing import Any
+
+log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Anthropic call wrapper
+# ---------------------------------------------------------------------------
+
+
+def call_claude_for_json(
+    *,
+    system: str,
+    prompt: str,
+    max_tokens: int = 1024,
+    model: str | None = None,
+) -> Any:
+    """Call Claude via fwh_anthropic and return parsed JSON.
+
+    Imports are lazy so the handler module can be imported in test
+    environments without fwh_anthropic installed (the test path goes
+    through ``synthetic_*`` directly).
+    """
+    from anthropic_handlers.tools._lib.messages import create_message
+
+    out = create_message(
+        prompt=prompt,
+        system=system,
+        max_tokens=max_tokens,
+        model=model,
+        temperature=0.0,
+    )
+    return extract_json_payload(out["text"])
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +95,6 @@ def extract_json_payload(text: str) -> Any:
         except json.JSONDecodeError:
             pass
 
-    # Greedy fallback: scan for the first balanced { or [.
     for opener, closer in (("{", "}"), ("[", "]")):
         start = s.find(opener)
         if start < 0:
@@ -90,20 +120,17 @@ def extract_json_payload(text: str) -> Any:
 
 
 def _hash_int(seed: str, low: int = 0, high: int = 100) -> int:
-    """Deterministic integer from seed string."""
     h = int(hashlib.md5(seed.encode()).hexdigest(), 16)
     return low + (h % (high - low + 1))
 
 
 def _hash_float(seed: str, low: float = 0.0, high: float = 1.0) -> float:
-    """Deterministic float from seed string."""
     h = int(hashlib.md5(seed.encode()).hexdigest()[:8], 16)
     ratio = h / 0xFFFFFFFF
     return low + ratio * (high - low)
 
 
 def synthetic_topic(topic: str, depth: int = 3, max_subtopics: int = 5) -> dict[str, Any]:
-    """Deterministic Topic dict for tests / offline fallback."""
     h = hashlib.md5(topic.encode()).hexdigest()
     keywords = [f"kw_{h[i : i + 4]}" for i in range(0, min(depth * 4, 16), 4)]
     return {
@@ -116,7 +143,6 @@ def synthetic_topic(topic: str, depth: int = 3, max_subtopics: int = 5) -> dict[
 
 
 def synthetic_subtopics(parent_topic: str, max_subtopics: int = 5) -> list[dict[str, Any]]:
-    """Deterministic Subtopic list for tests / offline fallback."""
     subtopics = []
     for i in range(max_subtopics):
         h = hashlib.md5(f"{parent_topic}_sub_{i}".encode()).hexdigest()
@@ -132,7 +158,6 @@ def synthetic_subtopics(parent_topic: str, max_subtopics: int = 5) -> list[dict[
 
 
 def synthetic_sources(subtopic_name: str, max_sources: int = 5) -> list[dict[str, Any]]:
-    """Deterministic Source list, capped at 5."""
     count = min(max_sources, 5)
     sources = []
     for i in range(count):
@@ -149,7 +174,6 @@ def synthetic_sources(subtopic_name: str, max_sources: int = 5) -> list[dict[str
 
 
 def synthetic_findings(subtopic_name: str, sources_count: int = 3) -> list[dict[str, Any]]:
-    """Deterministic Finding list."""
     findings = []
     for i in range(sources_count):
         seed = f"{subtopic_name}_finding_{i}"
@@ -165,7 +189,6 @@ def synthetic_findings(subtopic_name: str, sources_count: int = 3) -> list[dict[
 
 
 def synthetic_analysis(topic_name: str, finding_count: int = 0) -> dict[str, Any]:
-    """Deterministic Analysis dict."""
     n = max(finding_count, 1)
     seed = f"{topic_name}_synth_{n}"
     themes = [f"Theme {i}: Pattern in {topic_name}" for i in range(min(n, 3))]
@@ -180,8 +203,9 @@ def synthetic_analysis(topic_name: str, finding_count: int = 0) -> dict[str, Any
     }
 
 
-def synthetic_gaps_and_recs(topic_name: str, gap_count: int = 1) -> dict[str, Any]:
-    """Deterministic (gaps, recommendations) pair."""
+def synthetic_gaps_and_recs(topic_name: str, gap_count: int = 1) -> tuple[
+    list[dict[str, Any]], list[dict[str, Any]]
+]:
     gaps = []
     recs = []
     for i in range(max(gap_count, 1)):
@@ -200,11 +224,10 @@ def synthetic_gaps_and_recs(topic_name: str, gap_count: int = 1) -> dict[str, An
                 "estimated_effort": ["low", "medium", "high"][i % 3],
             }
         )
-    return {"gaps": gaps, "recommendations": recs}
+    return gaps, recs
 
 
 def synthetic_draft(topic_name: str, theme_count: int = 3) -> dict[str, Any]:
-    """Deterministic Draft dict."""
     sections = [
         {"title": "Introduction", "content": f"This report examines {topic_name}."},
         {"title": "Methodology", "content": f"Analysis covered {theme_count} themes."},
@@ -222,7 +245,6 @@ def synthetic_draft(topic_name: str, theme_count: int = 3) -> dict[str, Any]:
 
 
 def synthetic_review(topic_name: str, draft_title: str = "Untitled") -> dict[str, Any]:
-    """Deterministic ReviewResult dict (score range 55–94, approved if >= 70)."""
     seed = f"{topic_name}_{draft_title}_review"
     score = _hash_int(seed, 55, 94)
     feedback = []
@@ -249,7 +271,6 @@ def synthetic_review(topic_name: str, draft_title: str = "Untitled") -> dict[str
 
 
 def coerce_topic(parsed: Any, topic_name: str, depth: int, max_subtopics: int) -> dict[str, Any]:
-    """Force a parsed value into the Topic schema shape."""
     if not isinstance(parsed, dict):
         return synthetic_topic(topic_name, depth, max_subtopics)
     return {
@@ -261,10 +282,7 @@ def coerce_topic(parsed: Any, topic_name: str, depth: int, max_subtopics: int) -
     }
 
 
-def coerce_subtopics(
-    parsed: Any, parent_topic: str, max_subtopics: int
-) -> list[dict[str, Any]]:
-    """Force a parsed value into a list of Subtopic dicts (capped)."""
+def coerce_subtopics(parsed: Any, parent_topic: str, max_subtopics: int) -> list[dict[str, Any]]:
     if not isinstance(parsed, list):
         return synthetic_subtopics(parent_topic, max_subtopics)
     out: list[dict[str, Any]] = []
@@ -330,7 +348,9 @@ def coerce_analysis(parsed: Any, topic_name: str) -> dict[str, Any]:
     }
 
 
-def coerce_gaps_and_recs(parsed: Any, topic_name: str) -> dict[str, Any]:
+def coerce_gaps_and_recs(parsed: Any, topic_name: str) -> tuple[
+    list[dict[str, Any]], list[dict[str, Any]]
+]:
     if not isinstance(parsed, dict):
         return synthetic_gaps_and_recs(topic_name)
     gaps_raw = parsed.get("gaps")
@@ -339,7 +359,7 @@ def coerce_gaps_and_recs(parsed: Any, topic_name: str) -> dict[str, Any]:
     recs = recs_raw if isinstance(recs_raw, list) else []
     if not gaps and not recs:
         return synthetic_gaps_and_recs(topic_name)
-    return {"gaps": gaps, "recommendations": recs}
+    return gaps, recs
 
 
 def coerce_draft(parsed: Any, topic_name: str) -> dict[str, Any]:
@@ -369,3 +389,44 @@ def coerce_review(parsed: Any, topic_name: str) -> dict[str, Any]:
         "feedback": parsed.get("feedback") or [],
         "suggested_edits": parsed.get("suggested_edits") or [],
     }
+
+
+# ---------------------------------------------------------------------------
+# Single-step driver — call Claude, coerce result, fall back on errors
+# ---------------------------------------------------------------------------
+
+
+def run_step_or_fallback(
+    *,
+    system: str,
+    prompt: str,
+    coerce,
+    fallback,
+    step_log=None,
+    label: str = "step",
+    max_tokens: int = 1024,
+) -> Any:
+    """Run one Claude → JSON → coerce cycle with a safe fallback.
+
+    *coerce* and *fallback* are zero-arg callables: *coerce* receives
+    the parsed JSON (passed in as a closure), *fallback* receives
+    nothing (the synthetic stub for this step).
+    """
+    try:
+        parsed = call_claude_for_json(system=system, prompt=prompt, max_tokens=max_tokens)
+        out = coerce(parsed)
+        _log(step_log, f"{label}: parsed Claude response", level="success")
+        return out
+    except Exception as e:
+        log.warning("%s: falling back to synthetic — %s", label, e)
+        _log(step_log, f"{label}: synthetic fallback ({e})", level="warning")
+        return fallback()
+
+
+def _log(step_log, message: str, level: str = "success") -> None:
+    if step_log is None:
+        return
+    try:
+        step_log.append({"message": message, "level": level})
+    except AttributeError:
+        step_log(message)

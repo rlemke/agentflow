@@ -1,7 +1,8 @@
-"""Gathering parser handlers — ParseSources, ParseFindings."""
+"""Gathering handlers — GatherSources, ExtractFindings."""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 from handlers.shared.research_utils import (
     coerce_findings,
     coerce_sources,
-    extract_json_payload,
+    run_step_or_fallback,
     synthetic_findings,
     synthetic_sources,
 )
@@ -19,52 +20,67 @@ log = logging.getLogger(__name__)
 NAMESPACE = "research.Gathering"
 
 
-def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
-    sl = params.get("_step_log")
-    if sl is None:
-        return
-    try:
-        sl.append({"message": message, "level": level})
-    except AttributeError:
-        sl(message)
+def _ensure(value: Any, expect: type) -> Any:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return expect()
+    return value if isinstance(value, expect) else expect()
 
 
-def handle_parse_sources(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    subtopic_name = str(params.get("subtopic_name", "unknown"))
+def handle_gather_sources(params: dict[str, Any]) -> dict[str, Any]:
+    subtopic = _ensure(params.get("subtopic", {}), dict)
+    name = str(subtopic.get("name", "unknown"))
+    description = str(subtopic.get("description", ""))
     max_sources = int(params.get("max_sources", 5))
 
-    try:
-        parsed = extract_json_payload(text)
-        sources = coerce_sources(parsed, subtopic_name, max_sources)
-        _step_log(params, f"ParseSources: parsed {len(sources)} sources for '{subtopic_name}'")
-    except ValueError as e:
-        log.warning("ParseSources falling back to synthetic for %r: %s", subtopic_name, e)
-        sources = synthetic_sources(subtopic_name, max_sources)
-        _step_log(params, f"ParseSources: synthetic fallback for '{subtopic_name}'", level="warning")
+    sources = run_step_or_fallback(
+        system=(
+            "You are a research librarian. Reply with one JSON array of "
+            "source objects, no prose. Each: "
+            '{"title": string, "url": string, "relevance_score": number, '
+            '"source_type": string}.'
+        ),
+        prompt=(
+            f"Find up to {max_sources} authoritative sources for subtopic "
+            f"'{name}' ({description}). Prefer peer-reviewed. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_sources(parsed, name, max_sources),
+        fallback=lambda: synthetic_sources(name, max_sources),
+        step_log=params.get("_step_log"),
+        label=f"GatherSources[{name}]",
+    )
     return {"sources": sources}
 
 
-def handle_parse_findings(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    subtopic_name = str(params.get("subtopic_name", "unknown"))
+def handle_extract_findings(params: dict[str, Any]) -> dict[str, Any]:
+    subtopic = _ensure(params.get("subtopic", {}), dict)
+    name = str(subtopic.get("name", "unknown"))
+    sources = _ensure(params.get("sources", []), list)
 
-    try:
-        parsed = extract_json_payload(text)
-        findings = coerce_findings(parsed, subtopic_name)
-        _step_log(params, f"ParseFindings: parsed {len(findings)} findings for '{subtopic_name}'")
-    except ValueError as e:
-        log.warning("ParseFindings falling back to synthetic for %r: %s", subtopic_name, e)
-        findings = synthetic_findings(subtopic_name)
-        _step_log(
-            params, f"ParseFindings: synthetic fallback for '{subtopic_name}'", level="warning"
-        )
+    findings = run_step_or_fallback(
+        system=(
+            "You are a research analyst. Reply with one JSON array of "
+            "finding objects, no prose. Each: "
+            '{"claim": string, "evidence": string, "confidence": '
+            'number (0-1), "source_title": string}.'
+        ),
+        prompt=(
+            f"Extract key findings about '{name}' from these sources: "
+            f"{json.dumps(sources)[:1500]}. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_findings(parsed, name),
+        fallback=lambda: synthetic_findings(name, sources_count=len(sources) or 3),
+        step_log=params.get("_step_log"),
+        label=f"ExtractFindings[{name}]",
+    )
     return {"findings": findings}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.ParseSources": handle_parse_sources,
-    f"{NAMESPACE}.ParseFindings": handle_parse_findings,
+    f"{NAMESPACE}.GatherSources": handle_gather_sources,
+    f"{NAMESPACE}.ExtractFindings": handle_extract_findings,
 }
 
 

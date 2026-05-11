@@ -1,17 +1,24 @@
 // AI Research Agent — fwh_anthropic-powered version
 //
-// Each domain step is a composed facet (not event) that
-//   (a) calls anthropic.messages.CreateMessage with a domain prompt
-//   (b) hands the response text to a typed `Parse<X>` event facet
-// The parsers are the only handlers — pure JSON-to-schema conversion,
-// with no Claude knowledge. The workflow body is unchanged from the
-// original prompt-block version: it still calls PlanResearch(...),
-// GatherSources(...), etc.
+// Each event facet's handler calls `anthropic.messages.create_message`
+// (via fwh_anthropic's Python lib) with a domain-specific system
+// prompt that asks Claude to return JSON in a documented shape, then
+// parses the response into the schema-typed result. The FFL surface
+// stays simple — 8 event facets, one per research stage — while the
+// fwh_anthropic dependency lives at the handler boundary.
+//
+// Why not composed facets calling `anthropic.messages.CreateMessage`
+// from FFL directly? That's the cleaner architecture, but the
+// facetwork runtime currently doesn't propagate composed-facet yield
+// outputs when the body contains an event facet (which pauses for
+// the agent). See the project's lessons-learned doc for the planned
+// fix. Until then, handler-level use of fwh_anthropic is the working
+// path — and it still proves "research-agent runs on top of
+// fwh_anthropic" end-to-end.
 //
 // Demonstrates:
-//   - Cross-package FFL composition (depends on fwh_anthropic for
-//     anthropic.messages.* facets)
-//   - Composed facets wrapping event facets from another namespace
+//   - Cross-package Python dependency (handlers import
+//     `anthropic_handlers.tools._lib.messages`)
 //   - Statement-level andThen, andThen foreach, mixins, implicits,
 //     array literals, schemas, doc comments — same surface as before
 
@@ -77,12 +84,6 @@ namespace research.types {
         feedback: Json,
         suggested_edits: Json
     }
-
-    /** Pair returned by IdentifyGaps. */
-    schema GapsAndRecs {
-        gaps: Json,
-        recommendations: Json
-    }
 }
 
 // -----------------------------------------------------------------------
@@ -104,55 +105,20 @@ namespace research.mixins {
 // -----------------------------------------------------------------------
 /** Research planning and topic decomposition. */
 namespace research.Planning {
-    use anthropic.messages
     use research.types
 
-    /** Parse Claude's planning JSON into a Topic. */
-    event facet ParseTopic(
-        text: String,
-        topic_name: String,
-        depth: Long,
-        max_subtopics: Long) => (plan: Topic)
-
-    /** Parse Claude's decomposition JSON into a Subtopic list. */
-    event facet ParseSubtopics(
-        text: String,
-        parent_topic: String,
-        max_subtopics: Long) => (subtopics: Json)
-
     /** Plan a research investigation by asking Claude to return JSON. */
-    facet PlanResearch(
+    event facet PlanResearch(
         topic: String,
         depth: Long = 3,
         max_subtopics: Long = 5
-    ) => (plan: Topic) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research planning assistant. Reply with one JSON object only, no prose. Schema: {\"name\": string, \"depth\": int, \"keywords\": [string], \"summary\": string, \"max_subtopics\": int}.",
-            prompt = "Plan a research investigation on '" ++ $.topic ++ "'. Identify up to " ++ $.max_subtopics ++ " key subtopics. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseTopic(
-            text = reply.result.text,
-            topic_name = $.topic,
-            depth = $.depth,
-            max_subtopics = $.max_subtopics)
-        yield PlanResearch(plan = parsed.plan)
-    }
+    ) => (plan: Topic)
 
     /** Decompose a topic into focused subtopics for parallel investigation. */
-    facet DecomposeIntoSubtopics(
+    event facet DecomposeIntoSubtopics(
         topic: Topic,
         max_subtopics: Long = 5
-    ) => (subtopics: Json) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research decomposition expert. Reply with one JSON array of subtopic objects, no prose. Each: {\"name\": string, \"parent_topic\": string, \"description\": string, \"priority\": int}.",
-            prompt = "Decompose '" ++ $.topic.name ++ "' into at most " ++ $.max_subtopics ++ " subtopics. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseSubtopics(
-            text = reply.result.text,
-            parent_topic = $.topic.name,
-            max_subtopics = $.max_subtopics)
-        yield DecomposeIntoSubtopics(subtopics = parsed.subtopics)
-    }
+    ) => (subtopics: Json)
 }
 
 // -----------------------------------------------------------------------
@@ -160,50 +126,19 @@ namespace research.Planning {
 // -----------------------------------------------------------------------
 /** Source gathering and finding extraction. */
 namespace research.Gathering {
-    use anthropic.messages
     use research.types
 
-    /** Parse Claude's source-list JSON into a Source list. */
-    event facet ParseSources(
-        text: String,
-        subtopic_name: String,
-        max_sources: Long) => (sources: Json)
-
-    /** Parse Claude's findings JSON into a Finding list. */
-    event facet ParseFindings(
-        text: String,
-        subtopic_name: String) => (findings: Json)
-
     /** Ask Claude to suggest authoritative sources for a subtopic. */
-    facet GatherSources(
+    event facet GatherSources(
         subtopic: Subtopic,
         max_sources: Long = 5
-    ) => (sources: Json) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research librarian. Reply with one JSON array of source objects, no prose. Each: {\"title\": string, \"url\": string, \"relevance_score\": number, \"source_type\": string}.",
-            prompt = "Find up to " ++ $.max_sources ++ " authoritative sources for subtopic '" ++ $.subtopic.name ++ "' (" ++ $.subtopic.description ++ "). Prefer peer-reviewed. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseSources(
-            text = reply.result.text,
-            subtopic_name = $.subtopic.name,
-            max_sources = $.max_sources)
-        yield GatherSources(sources = parsed.sources)
-    }
+    ) => (sources: Json)
 
     /** Extract structured findings from a list of sources. */
-    facet ExtractFindings(
+    event facet ExtractFindings(
         subtopic: Subtopic,
         sources: Json
-    ) => (findings: Json) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research analyst. Reply with one JSON array of finding objects, no prose. Each: {\"claim\": string, \"evidence\": string, \"confidence\": number (0-1), \"source_title\": string}.",
-            prompt = "Extract key findings about '" ++ $.subtopic.name ++ "' from these sources. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseFindings(
-            text = reply.result.text,
-            subtopic_name = $.subtopic.name)
-        yield ExtractFindings(findings = parsed.findings)
-    }
+    ) => (findings: Json)
 }
 
 // -----------------------------------------------------------------------
@@ -211,50 +146,19 @@ namespace research.Gathering {
 // -----------------------------------------------------------------------
 /** Finding synthesis and gap identification. */
 namespace research.Analysis {
-    use anthropic.messages
     use research.types
 
-    /** Parse Claude's synthesis JSON into an Analysis. */
-    event facet ParseAnalysis(
-        text: String,
-        topic_name: String) => (analysis: Analysis)
-
-    /** Parse Claude's gaps + recommendations JSON. */
-    event facet ParseGaps(
-        text: String,
-        topic_name: String) => (result: GapsAndRecs)
-
     /** Synthesize findings across subtopics into a cohesive analysis. */
-    facet SynthesizeFindings(
+    event facet SynthesizeFindings(
         topic: Topic,
         all_findings: Json
-    ) => (analysis: Analysis) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research synthesizer. Reply with one JSON object: {\"themes\": [string], \"contradictions\": [string], \"gaps\": [string], \"summary\": string, \"confidence_score\": number (0-1)}.",
-            prompt = "Synthesize findings for '" ++ $.topic.name ++ "'. Identify themes, contradictions across sources, and remaining gaps. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseAnalysis(
-            text = reply.result.text,
-            topic_name = $.topic.name)
-        yield SynthesizeFindings(analysis = parsed.analysis)
-    }
+    ) => (analysis: Analysis)
 
     /** Identify methodological gaps and recommend concrete next steps. */
-    facet IdentifyGaps(
+    event facet IdentifyGaps(
         analysis: Analysis,
         topic: Topic
-    ) => (gaps: Json, recommendations: Json) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a research quality reviewer. Reply with one JSON object: {\"gaps\": [{\"description\": string, \"severity\": \"high\"|\"medium\"|\"low\", \"area\": string}], \"recommendations\": [{\"action\": string, \"priority\": string, \"estimated_effort\": string}]}.",
-            prompt = "Review the analysis of '" ++ $.topic.name ++ "' (confidence " ++ $.analysis.confidence_score ++ "). Suggest concrete next steps. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseGaps(
-            text = reply.result.text,
-            topic_name = $.topic.name)
-        yield IdentifyGaps(
-            gaps = parsed.result.gaps,
-            recommendations = parsed.result.recommendations)
-    }
+    ) => (gaps: Json, recommendations: Json)
 }
 
 // -----------------------------------------------------------------------
@@ -262,50 +166,21 @@ namespace research.Analysis {
 // -----------------------------------------------------------------------
 /** Report drafting and peer review. */
 namespace research.Writing {
-    use anthropic.messages
     use research.types
 
-    /** Parse Claude's draft JSON into a Draft. */
-    event facet ParseDraft(
-        text: String,
-        topic_name: String) => (draft: Draft)
-
-    /** Parse Claude's review JSON into a ReviewResult. */
-    event facet ParseReview(
-        text: String,
-        topic_name: String) => (review: ReviewResult)
-
     /** Draft a research report from the analysis. */
-    facet DraftReport(
+    event facet DraftReport(
         topic: Topic,
         analysis: Analysis,
         gaps: Json
-    ) => (draft: Draft) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a technical writer. Reply with one JSON object: {\"title\": string, \"sections\": [{\"title\": string, \"content\": string}], \"word_count\": int, \"citations\": [string]}.",
-            prompt = "Draft a research report on '" ++ $.topic.name ++ "'. Use the analysis themes and gaps. Be concise. Return JSON only.",
-            max_tokens = 2048)
-        parsed = ParseDraft(
-            text = reply.result.text,
-            topic_name = $.topic.name)
-        yield DraftReport(draft = parsed.draft)
-    }
+    ) => (draft: Draft)
 
     /** Peer-review a draft for quality, accuracy, and completeness. */
-    facet ReviewDraft(
+    event facet ReviewDraft(
         draft: Draft,
         topic: Topic,
         analysis: Analysis
-    ) => (review: ReviewResult) andThen {
-        reply = anthropic.messages.CreateMessage(
-            system = "You are a peer reviewer. Reply with one JSON object: {\"score\": int 0-100, \"approved\": bool, \"feedback\": [string], \"suggested_edits\": [{\"section\": string, \"suggestion\": string}]}.",
-            prompt = "Review '" ++ $.draft.title ++ "' (" ++ $.draft.word_count ++ " words) on '" ++ $.topic.name ++ "'. Score 0-100. Return JSON only.",
-            max_tokens = 1024)
-        parsed = ParseReview(
-            text = reply.result.text,
-            topic_name = $.topic.name)
-        yield ReviewDraft(review = parsed.review)
-    }
+    ) => (review: ReviewResult)
 }
 
 // -----------------------------------------------------------------------
@@ -335,8 +210,8 @@ namespace research.workflows {
         result["total_sources"] = int(params.get("max_subtopics", 3)) * int(params.get("sources_per_subtopic", 3))
         result["summary"] = "Research pipeline for: " + params.get("topic", "unknown")
     } andThen {
-        plan = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics) with Retry(max_attempts = 3, backoff_ms = 2000) with Citation(style = "apa", include_urls = true)
-        decomp = DecomposeIntoSubtopics(topic = plan.plan, max_subtopics = $.max_subtopics)
+        planned = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics) with Retry(max_attempts = 3, backoff_ms = 2000) with Citation(style = "apa", include_urls = true)
+        decomp = DecomposeIntoSubtopics(topic = planned.plan, max_subtopics = $.max_subtopics)
         g0 = GatherSources(subtopic = decomp.subtopics[0], max_sources = $.sources_per_subtopic) with Retry(max_attempts = 3) andThen {
             f0 = ExtractFindings(subtopic = decomp.subtopics[0], sources = g0.sources)
         }
@@ -346,10 +221,10 @@ namespace research.workflows {
         g2 = GatherSources(subtopic = decomp.subtopics[2], max_sources = $.sources_per_subtopic) with Retry(max_attempts = 3) andThen {
             f2 = ExtractFindings(subtopic = decomp.subtopics[2], sources = g2.sources)
         }
-        synth = SynthesizeFindings(topic = plan.plan, all_findings = [f0.findings, f1.findings, f2.findings])
-        gapcheck = IdentifyGaps(analysis = synth.analysis, topic = plan.plan)
-        report = DraftReport(topic = plan.plan, analysis = synth.analysis, gaps = gapcheck.gaps)
-        rev = ReviewDraft(draft = report.draft, topic = plan.plan, analysis = synth.analysis)
+        synth = SynthesizeFindings(topic = planned.plan, all_findings = [f0.findings, f1.findings, f2.findings])
+        gapcheck = IdentifyGaps(analysis = synth.analysis, topic = planned.plan)
+        report = DraftReport(topic = planned.plan, analysis = synth.analysis, gaps = gapcheck.gaps)
+        rev = ReviewDraft(draft = report.draft, topic = planned.plan, analysis = synth.analysis)
         yield ResearchTopic(report = report.draft, review = rev.review, total_sources = $.total_sources, summary = $.summary)
     } andThen script {
         result["summary"] = (
@@ -357,6 +232,36 @@ namespace research.workflows {
             + " with " + str(params.get("total_sources", 0))
             + " total sources"
         )
+    }
+
+    /**
+     * Linear single-subtopic variant used by `run.py` for end-to-end
+     * smoke testing. The full `ResearchTopic` workflow above uses
+     * statement-level `andThen` fan-out (g0/g1/g2 in parallel), which
+     * the current Facetwork runtime cannot drive to completion via
+     * `AgentPoller` against `MemoryStore` (workflow gets stuck partway
+     * through). The fix lives in the runtime — until it lands, this
+     * linear shape exercises the same handler chain top-to-bottom.
+     */
+    workflow ResearchTopicLinear(
+        topic: String,
+        depth: Long = 3,
+        max_subtopics: Long = 1,
+        sources_per_subtopic: Long = 3
+    ) => (
+        report: Draft,
+        review: ReviewResult,
+        summary: String
+    ) andThen {
+        planned = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics)
+        decomp = DecomposeIntoSubtopics(topic = planned.plan, max_subtopics = $.max_subtopics)
+        g0 = GatherSources(subtopic = decomp.subtopics[0], max_sources = $.sources_per_subtopic)
+        f0 = ExtractFindings(subtopic = decomp.subtopics[0], sources = g0.sources)
+        synth = SynthesizeFindings(topic = planned.plan, all_findings = f0.findings)
+        gapcheck = IdentifyGaps(analysis = synth.analysis, topic = planned.plan)
+        report = DraftReport(topic = planned.plan, analysis = synth.analysis, gaps = gapcheck.gaps)
+        rev = ReviewDraft(draft = report.draft, topic = planned.plan, analysis = synth.analysis)
+        yield ResearchTopicLinear(report = report.draft, review = rev.review, summary = "linear smoke run")
     }
 
     /** Deep-dive: foreach fan-out for parallel subtopic investigation. */
@@ -369,9 +274,9 @@ namespace research.workflows {
         plan: Topic,
         subtopics: Json
     ) andThen {
-        plan = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics) with Citation(style = "ieee", include_urls = true)
-        decomp = DecomposeIntoSubtopics(topic = plan.plan, max_subtopics = $.max_subtopics)
-        yield DeepDive(plan = plan.plan, subtopics = decomp.subtopics)
+        planned = PlanResearch(topic = $.topic, depth = $.depth, max_subtopics = $.max_subtopics) with Citation(style = "ieee", include_urls = true)
+        decomp = DecomposeIntoSubtopics(topic = planned.plan, max_subtopics = $.max_subtopics)
+        yield DeepDive(plan = planned.plan, subtopics = decomp.subtopics)
     } andThen foreach sub in $.subtopics {
         g = GatherSources(subtopic = $.sub, max_sources = $.max_sources) with Retry(max_attempts = 5, backoff_ms = 3000) andThen {
             f = ExtractFindings(subtopic = $.sub, sources = g.sources)

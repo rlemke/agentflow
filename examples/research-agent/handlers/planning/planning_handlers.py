@@ -1,18 +1,14 @@
-"""Planning parser handlers — ParseTopic, ParseSubtopics.
+"""Planning handlers — PlanResearch, DecomposeIntoSubtopics.
 
-These are pure JSON-to-schema converters. The Messages-API call lives
-upstream in the FFL composed facets (`PlanResearch`,
-`DecomposeIntoSubtopics`), which run via `anthropic.messages.CreateMessage`
-and hand the response text to these parsers.
-
-When Claude returns malformed JSON, the parsers fall back to the
-deterministic stubs in ``handlers.shared.research_utils`` so the
-workflow still produces a schema-shaped result (with a clear log
-entry) rather than failing the run.
+Each handler asks Claude for one JSON object/array via fwh_anthropic's
+``create_message``, then coerces the response into the workflow's
+schema shape. Malformed responses fall back to a deterministic stub
+so the workflow keeps running.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -20,7 +16,7 @@ from typing import Any
 from handlers.shared.research_utils import (
     coerce_subtopics,
     coerce_topic,
-    extract_json_payload,
+    run_step_or_fallback,
     synthetic_subtopics,
     synthetic_topic,
 )
@@ -30,59 +26,67 @@ log = logging.getLogger(__name__)
 NAMESPACE = "research.Planning"
 
 
-def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
-    sl = params.get("_step_log")
-    if sl is None:
-        return
-    # Accept either a list-append step log (original style) or a callable.
-    try:
-        sl.append({"message": message, "level": level})
-    except AttributeError:
-        sl(message)
+def _ensure_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return value if isinstance(value, dict) else {}
 
 
-def handle_parse_topic(params: dict[str, Any]) -> dict[str, Any]:
-    """Parse Claude's planning response text into a Topic."""
-    text = params.get("text", "") or ""
-    topic_name = str(params.get("topic_name", "unknown"))
+def handle_plan_research(params: dict[str, Any]) -> dict[str, Any]:
+    topic_name = str(params.get("topic", "unknown"))
     depth = int(params.get("depth", 3))
     max_subtopics = int(params.get("max_subtopics", 5))
 
-    try:
-        parsed = extract_json_payload(text)
-        plan = coerce_topic(parsed, topic_name, depth, max_subtopics)
-        _step_log(params, f"ParseTopic: parsed plan for '{topic_name}'")
-    except ValueError as e:
-        log.warning("ParseTopic falling back to synthetic for %r: %s", topic_name, e)
-        plan = synthetic_topic(topic_name, depth, max_subtopics)
-        _step_log(params, f"ParseTopic: synthetic fallback for '{topic_name}'", level="warning")
+    plan = run_step_or_fallback(
+        system=(
+            "You are a research planning assistant. Reply with one JSON "
+            "object only, no prose. Schema: "
+            '{"name": string, "depth": int, "keywords": [string], '
+            '"summary": string, "max_subtopics": int}.'
+        ),
+        prompt=(
+            f"Plan a research investigation on '{topic_name}' at depth {depth}. "
+            f"Identify up to {max_subtopics} key subtopics. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_topic(parsed, topic_name, depth, max_subtopics),
+        fallback=lambda: synthetic_topic(topic_name, depth, max_subtopics),
+        step_log=params.get("_step_log"),
+        label=f"PlanResearch[{topic_name}]",
+    )
     return {"plan": plan}
 
 
-def handle_parse_subtopics(params: dict[str, Any]) -> dict[str, Any]:
-    """Parse Claude's decomposition response text into a Subtopic list."""
-    text = params.get("text", "") or ""
-    parent_topic = str(params.get("parent_topic", "unknown"))
+def handle_decompose_into_subtopics(params: dict[str, Any]) -> dict[str, Any]:
+    topic = _ensure_dict(params.get("topic", {}))
+    parent_topic = str(topic.get("name", "unknown"))
+    keywords = topic.get("keywords") or []
     max_subtopics = int(params.get("max_subtopics", 5))
 
-    try:
-        parsed = extract_json_payload(text)
-        subtopics = coerce_subtopics(parsed, parent_topic, max_subtopics)
-        _step_log(params, f"ParseSubtopics: parsed {len(subtopics)} subtopics for '{parent_topic}'")
-    except ValueError as e:
-        log.warning("ParseSubtopics falling back to synthetic for %r: %s", parent_topic, e)
-        subtopics = synthetic_subtopics(parent_topic, max_subtopics)
-        _step_log(
-            params,
-            f"ParseSubtopics: synthetic fallback for '{parent_topic}'",
-            level="warning",
-        )
+    subtopics = run_step_or_fallback(
+        system=(
+            "You are a research decomposition expert. Reply with one JSON "
+            "array of subtopic objects, no prose. Each: "
+            '{"name": string, "parent_topic": string, "description": string, '
+            '"priority": int}.'
+        ),
+        prompt=(
+            f"Decompose '{parent_topic}' into at most {max_subtopics} subtopics. "
+            f"Keywords: {keywords}. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_subtopics(parsed, parent_topic, max_subtopics),
+        fallback=lambda: synthetic_subtopics(parent_topic, max_subtopics),
+        step_log=params.get("_step_log"),
+        label=f"DecomposeIntoSubtopics[{parent_topic}]",
+    )
     return {"subtopics": subtopics}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.ParseTopic": handle_parse_topic,
-    f"{NAMESPACE}.ParseSubtopics": handle_parse_subtopics,
+    f"{NAMESPACE}.PlanResearch": handle_plan_research,
+    f"{NAMESPACE}.DecomposeIntoSubtopics": handle_decompose_into_subtopics,
 }
 
 
@@ -92,7 +96,6 @@ def handle(payload: dict) -> dict:
 
 
 def register_handlers(runner) -> None:
-    """Register with RegistryRunner."""
     for facet_name in _DISPATCH:
         runner.register_handler(
             facet_name=facet_name,
@@ -102,6 +105,5 @@ def register_handlers(runner) -> None:
 
 
 def register_planning_handlers(poller) -> None:
-    """Register with AgentPoller."""
     for facet_name, handler in _DISPATCH.items():
         poller.register(facet_name, handler)

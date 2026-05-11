@@ -1,7 +1,8 @@
-"""Analysis parser handlers — ParseAnalysis, ParseGaps."""
+"""Analysis handlers — SynthesizeFindings, IdentifyGaps."""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 from handlers.shared.research_utils import (
     coerce_analysis,
     coerce_gaps_and_recs,
-    extract_json_payload,
+    run_step_or_fallback,
     synthetic_analysis,
     synthetic_gaps_and_recs,
 )
@@ -19,56 +20,73 @@ log = logging.getLogger(__name__)
 NAMESPACE = "research.Analysis"
 
 
-def _step_log(params: dict[str, Any], message: str, level: str = "success") -> None:
-    sl = params.get("_step_log")
-    if sl is None:
-        return
-    try:
-        sl.append({"message": message, "level": level})
-    except AttributeError:
-        sl(message)
+def _ensure(value: Any, expect: type) -> Any:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return expect()
+    return value if isinstance(value, expect) else expect()
 
 
-def handle_parse_analysis(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    topic_name = str(params.get("topic_name", "unknown"))
+def handle_synthesize_findings(params: dict[str, Any]) -> dict[str, Any]:
+    topic = _ensure(params.get("topic", {}), dict)
+    name = str(topic.get("name", "unknown"))
+    all_findings = _ensure(params.get("all_findings", []), list)
+    finding_count = sum(
+        len(g) if isinstance(g, list) else 1 for g in all_findings
+    )
 
-    try:
-        parsed = extract_json_payload(text)
-        analysis = coerce_analysis(parsed, topic_name)
-        _step_log(
-            params,
-            f"ParseAnalysis: parsed analysis for '{topic_name}' "
-            f"({len(analysis['themes'])} themes)",
-        )
-    except ValueError as e:
-        log.warning("ParseAnalysis falling back to synthetic for %r: %s", topic_name, e)
-        analysis = synthetic_analysis(topic_name)
-        _step_log(params, f"ParseAnalysis: synthetic fallback for '{topic_name}'", level="warning")
+    analysis = run_step_or_fallback(
+        system=(
+            "You are a research synthesizer. Reply with one JSON object: "
+            '{"themes": [string], "contradictions": [string], "gaps": '
+            '[string], "summary": string, "confidence_score": number (0-1)}.'
+        ),
+        prompt=(
+            f"Synthesize findings for '{name}'. Identify themes, "
+            "contradictions across sources, and remaining gaps. "
+            f"Findings: {json.dumps(all_findings)[:1500]}. Return JSON only."
+        ),
+        coerce=lambda parsed: coerce_analysis(parsed, name),
+        fallback=lambda: synthetic_analysis(name, finding_count=finding_count),
+        step_log=params.get("_step_log"),
+        label=f"SynthesizeFindings[{name}]",
+    )
     return {"analysis": analysis}
 
 
-def handle_parse_gaps(params: dict[str, Any]) -> dict[str, Any]:
-    text = params.get("text", "") or ""
-    topic_name = str(params.get("topic_name", "unknown"))
+def handle_identify_gaps(params: dict[str, Any]) -> dict[str, Any]:
+    analysis = _ensure(params.get("analysis", {}), dict)
+    topic = _ensure(params.get("topic", {}), dict)
+    topic_name = str(topic.get("name", "unknown"))
+    confidence = float(analysis.get("confidence_score", 0.5) or 0.0)
 
-    try:
-        parsed = extract_json_payload(text)
-        result = coerce_gaps_and_recs(parsed, topic_name)
-        _step_log(
-            params,
-            f"ParseGaps: parsed {len(result['gaps'])} gaps for '{topic_name}'",
-        )
-    except ValueError as e:
-        log.warning("ParseGaps falling back to synthetic for %r: %s", topic_name, e)
-        result = synthetic_gaps_and_recs(topic_name)
-        _step_log(params, f"ParseGaps: synthetic fallback for '{topic_name}'", level="warning")
-    return {"result": result}
+    parsed = run_step_or_fallback(
+        system=(
+            "You are a research quality reviewer. Reply with one JSON "
+            "object: "
+            '{"gaps": [{"description": string, "severity": '
+            '"high"|"medium"|"low", "area": string}], '
+            '"recommendations": [{"action": string, "priority": string, '
+            '"estimated_effort": string}]}.'
+        ),
+        prompt=(
+            f"Review the analysis of '{topic_name}' (confidence "
+            f"{confidence:.2f}). Suggest concrete next steps. Return JSON only."
+        ),
+        coerce=lambda p: coerce_gaps_and_recs(p, topic_name),
+        fallback=lambda: synthetic_gaps_and_recs(topic_name),
+        step_log=params.get("_step_log"),
+        label=f"IdentifyGaps[{topic_name}]",
+    )
+    gaps, recommendations = parsed
+    return {"gaps": gaps, "recommendations": recommendations}
 
 
 _DISPATCH: dict[str, Any] = {
-    f"{NAMESPACE}.ParseAnalysis": handle_parse_analysis,
-    f"{NAMESPACE}.ParseGaps": handle_parse_gaps,
+    f"{NAMESPACE}.SynthesizeFindings": handle_synthesize_findings,
+    f"{NAMESPACE}.IdentifyGaps": handle_identify_gaps,
 }
 
 
