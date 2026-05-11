@@ -3,11 +3,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies. psycopg2-binary is needed for the PostGIS
+# summary panel in dashboard/routes/v2/dashboard_v2.py — without it
+# the panel hard-fails with "could not connect to the database" even
+# when the postgis service is reachable on the network.
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[dashboard,mongodb]" || \
     pip install --no-cache-dir fastapi uvicorn jinja2 pymongo python-multipart markdown && \
-    pip install --no-cache-dir python-multipart
+    pip install --no-cache-dir python-multipart psycopg2-binary
+RUN pip install --no-cache-dir psycopg2-binary
 
 # Copy application code. The package is `facetwork`, not `afl`; the
 # earlier `./afl/` rename was a relic of the project's rename and

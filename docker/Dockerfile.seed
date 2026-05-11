@@ -8,8 +8,11 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[mongodb]" || \
     pip install --no-cache-dir lark pymongo
 
-# Copy application code
-COPY facetwork/ ./afl/
+# Copy application code. The package is `facetwork`, not `afl`; the
+# earlier `./afl/` rename was a relic of the project's rename and
+# broke imports like `from facetwork.runtime.mongo_store import ...`
+# inside seed.py.
+COPY facetwork/ ./facetwork/
 COPY docker/seed/ ./seed/
 COPY examples/ ./examples/
 

@@ -102,8 +102,9 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLES_DATABASE: ${AFL_EXAMPLES_DATABASE:-afl_examples}
+      AFL_POSTGIS_URL: postgresql://${POSTGRES_USER:-afl}:${POSTGRES_PASSWORD:-afl}@postgis:5432/${POSTGRES_DB:-afl_gis}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
     ports:
       - "${DASHBOARD_PORT:-8080}:8080"
@@ -130,7 +131,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_MAX_CONCURRENT: ${AFL_MAX_CONCURRENT:-4}
       AFL_POLL_INTERVAL_MS: ${AFL_POLL_INTERVAL_MS:-1000}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
@@ -155,7 +156,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: anthropic
       AFL_EXAMPLE_REPO: fwh_anthropic
       AFL_EXAMPLE_EXTRAS: ${ANTHROPIC_EXTRAS:-agent_sdk,mcp}
@@ -178,7 +179,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: osm-geocoder
       AFL_EXAMPLE_REPO: fwh_osm
       AFL_POSTGIS_URL: postgresql://${POSTGRES_USER:-afl}:${POSTGRES_PASSWORD:-afl}@postgis:5432/${POSTGRES_DB:-afl_gis}
@@ -205,7 +206,7 @@ services:
         condition: service_started
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: osm-lz
       AFL_EXAMPLE_REPO: fwh_osm_lz
       AFL_POSTGIS_URL: postgresql://${POSTGRES_USER:-afl}:${POSTGRES_PASSWORD:-afl}@postgis:5432/${POSTGRES_DB:-afl_gis}
@@ -226,7 +227,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: noaa-weather
       AFL_EXAMPLE_REPO: fwh_noaa_weather
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
@@ -245,7 +246,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: jenkins
       AFL_EXAMPLE_REPO: fwh_jenkins
       JENKINS_URL: http://jenkins:8080
@@ -265,7 +266,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: census-us
       AFL_EXAMPLE_REPO: fwh_census_us
       CENSUS_API_KEY: ${CENSUS_API_KEY:-}
@@ -285,7 +286,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: genomics
       AFL_EXAMPLE_REPO: fwh_genomics
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
@@ -304,7 +305,7 @@ services:
         condition: service_healthy
     environment:
       AFL_MONGODB_URL: mongodb://mongodb:27017
-      AFL_MONGODB_DATABASE: afl
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
       AFL_EXAMPLE_NAME: sensor-monitoring
       AFL_EXAMPLE_REPO: fwh_sensor_monitoring
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
@@ -312,6 +313,26 @@ services:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_sensor_monitoring:/handlers/fwh_sensor_monitoring
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
     restart: unless-stopped
+
+  # =====================================================================
+  # One-shot seed: populates FlowDefinition + WorkflowDefinition entities
+  # so the dashboard's "Flows" tab has something to show.
+  #
+  # Started automatically via `up`; exits 0 once seeding completes.
+  # `restart: "no"` keeps it from looping after success.
+  # =====================================================================
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.seed
+    container_name: facetwork-seed
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      AFL_MONGODB_URL: mongodb://mongodb:27017
+      AFL_MONGODB_DATABASE: ${AFL_MONGODB_DATABASE:-facetwork}
+    restart: "no"
 
 # Persistent volumes for MongoDB, PostGIS, and Jenkins state.
 volumes:

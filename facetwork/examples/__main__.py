@@ -15,6 +15,7 @@ import os
 import sys
 from pathlib import Path
 
+from facetwork.config import MongoDBConfig
 from facetwork.examples import discover_all_examples, filter_examples
 from facetwork.runtime import Evaluator, RegistryRunner, Telemetry
 from facetwork.runtime.mongo_store import MongoStore
@@ -31,8 +32,13 @@ def main(argv: list[str] | None = None) -> int:
         print("No examples found (checked entry points and examples/).", file=sys.stderr)
         return 1
 
-    mongo_url = os.environ.get("AFL_MONGODB_URL", "mongodb://afl-mongodb:27017")
-    store = MongoStore(mongo_url)
+    # Honor AFL_MONGODB_URL + AFL_MONGODB_DATABASE consistently with the
+    # runner and dashboard.  Without this the script wrote to the
+    # default "facetwork" database while AFL_MONGODB_DATABASE was
+    # respected by the other components — handler registrations
+    # vanished from the dashboard's view.
+    cfg = MongoDBConfig.from_env()
+    store = MongoStore(cfg.url, database_name=cfg.database)
     runner = RegistryRunner(store, Evaluator(store, Telemetry()))
 
     print("Registering handlers (upsert)...")
