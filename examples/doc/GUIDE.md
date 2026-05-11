@@ -70,12 +70,25 @@ Start simple and build up to more complex patterns:
 10. osm-lz              Continental-scale workflow catalog (standalone repo: github.com/rlemke/fwh_osm_lz; consumes fwh_osm handlers)
 ```
 
-> **Note on standalone repos.** The `jenkins`, `noaa-weather`, and
-> `osm-geocoder` examples have been extracted into their own repositories
-> (`fwh_jenkins`, `fwh_noaa_weather`, `fwh_osm`). They surface in
-> Facetwork via the `facetwork.examples` entry point — install once with
-> `pip install -e ~/fw_handlers/<repo>` and they show up as
-> `--example <name>` exactly like the in-repo examples below.
+> **Note on standalone repos.** Most examples now live in their own
+> GitHub repos (`fwh_anthropic`, `fwh_osm`, `fwh_jenkins`, …). They
+> surface in Facetwork via the `facetwork.examples` entry point and
+> show up as `--example <name>` exactly like the in-repo examples
+> below. Install one (or all) with the registry-driven helper:
+>
+> ```bash
+> scripts/install-example --list              # see what's registered
+> scripts/install-example anthropic --check   # clone + pip install + verify
+> scripts/install-example --all               # install everything
+> scripts/install-anthropic --all --check     # convenience wrapper for the
+>                                             # anthropic package (handles
+>                                             # agent_sdk/mcp extras and
+>                                             # reports env readiness)
+> ```
+>
+> The script clones into `~/fw_handlers/` (override via `--dir` or
+> `FWH_HANDLERS_ROOT`), `pip install -e`s each repo, and (with
+> `--check`) verifies the entry point is discoverable.
 
 ## Choosing an Example
 

@@ -138,8 +138,26 @@ Examples can live either in this repo under `examples/<name>/` or as
 separate pip-installable packages declaring the `facetwork.examples`
 entry point. Both are discovered by `scripts/start-runner --example <name>`
 and `scripts/seed-examples`. See `example-template/` for the standalone
-package layout. The following examples have been extracted into their
-own repos — install with `pip install -e ~/fw_handlers/<repo>` and they
+package layout. To clone + install one (or all) of the standalone
+examples, use the registry-driven helper:
+
+```bash
+scripts/install-example --list              # see what's registered
+scripts/install-example anthropic --check   # clone, pip install -e, verify
+scripts/install-example --all               # install every registered example
+scripts/install-anthropic --all --check     # convenience wrapper for the
+                                            # anthropic package — picks pip
+                                            # extras (agent_sdk, mcp) and
+                                            # reports env readiness
+```
+
+It clones into `~/fw_handlers/` (override via `--dir` or
+`FWH_HANDLERS_ROOT`), `pip install -e`s each repo against the current
+venv (auto-detected as `.venv/` if present), and the `--check` flag
+confirms the example surfaces in `facetwork.examples`'s entry-point
+discovery.
+
+The following examples have been extracted into their own repos and
 surface as `--example <name>` exactly like in-repo examples:
 
 - [osm-geocoder](https://github.com/rlemke/fwh_osm) — production-scale OSM ingestion
