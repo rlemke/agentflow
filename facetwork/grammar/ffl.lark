@@ -43,9 +43,17 @@ array_type: "[" type "]"
 mixin_sig: "with" QNAME "(" [named_args] ")"
 
 // andThen blocks, prompt blocks, and script blocks
+//
+// The introducer for prompt blocks is matched as a plain IDENT
+// (semantic check enforces it must be `prompt`) rather than as a
+// hard keyword, so `prompt` remains usable as an ordinary identifier
+// elsewhere in the language — param names, schema field names, etc.
+// Same trick for the three directive keywords (system / template /
+// model) inside the prompt block, and for the `python` script-block
+// dialect tag.
 facet_def_tail: _NL* "script" script_block _NL* andthen_clause*
               | andthen_clause+
-              | _NL* "prompt" prompt_block
+              | _NL* IDENT prompt_block         -> facet_def_tail_prompt
 
 andthen_clause: "andThen" foreach_clause? block
               | "andThen" _NL* "script" script_block _NL*  -> andthen_script
@@ -53,16 +61,20 @@ andthen_clause: "andThen" foreach_clause? block
 
 foreach_clause: "foreach" IDENT "in" reference
 
-// Prompt blocks for LLM-based event facets
+// Prompt blocks for LLM-based event facets.
+// `prompt_directive` accepts `IDENT STRING` and the transformer
+// validates IDENT ∈ {system, template, model}. Keeps these words
+// available as ordinary identifiers (param names, field names,
+// named-arg keys) outside prompt-block scope.
 prompt_block: "{" _NL* prompt_body "}"
 prompt_body: (prompt_directive _NL*)*
-prompt_directive: "system" STRING -> prompt_system
-                | "template" STRING -> prompt_template
-                | "model" STRING -> prompt_model
+prompt_directive: IDENT STRING
 
-// Script blocks for inline code execution
+// Script blocks for inline code execution. `IDENT STRING` accepts
+// the dialect tag (only `python` is recognised today, validated in
+// the transformer) without burning `python` as a hard keyword.
 script_block: STRING
-            | _NL* "python" STRING -> script_python
+            | _NL* IDENT STRING                 -> script_dialect
 
 block: "{" _NL* block_body "}" _NL*
 block_body: (step_stmt _NL*)* (yield_stmt _NL*)*

@@ -562,6 +562,31 @@ class FFLTransformer(Transformer):
             return (pre_script, body)  # tuple signals both fields
         return body  # None, single AndThenBlock, or list
 
+    @v_args(meta=True)
+    def facet_def_tail_prompt(self, meta, items: list):
+        """Soft keyword: the introducer IDENT must equal `prompt`.
+
+        Using IDENT here (rather than a hard `"prompt"` keyword) keeps
+        `prompt` usable as a parameter name / schema field elsewhere
+        in the language.
+        """
+        introducer: str | None = None
+        for it in items:
+            if isinstance(it, Token) and it.type == "IDENT":
+                introducer = str(it)
+                break
+            if isinstance(it, str) and not isinstance(it, PromptBlock):
+                introducer = it
+                break
+        if introducer is not None and introducer != "prompt":
+            from .parser import ParseError
+            raise ParseError(
+                f"Expected `prompt` to introduce a prompt block, got `{introducer}`",
+                line=meta.line,
+                column=meta.column,
+            )
+        return self._find_one(items, PromptBlock)
+
     # Prompt block handling
     @v_args(meta=True)
     def prompt_block(self, meta, items: list) -> PromptBlock:
@@ -580,19 +605,24 @@ class FFLTransformer(Transformer):
         return list(items)
 
     @v_args(meta=True, inline=True)
-    def prompt_system(self, meta, value: str) -> tuple[str, str]:
-        """Handle system directive."""
-        return ("system", value)
+    def prompt_directive(self, meta, key: object, value: str) -> tuple[str, str]:
+        """Soft keyword: directive name must be system / template / model.
 
-    @v_args(meta=True, inline=True)
-    def prompt_template(self, meta, value: str) -> tuple[str, str]:
-        """Handle template directive."""
-        return ("template", value)
-
-    @v_args(meta=True, inline=True)
-    def prompt_model(self, meta, value: str) -> tuple[str, str]:
-        """Handle model directive."""
-        return ("model", value)
+        Using IDENT here (rather than three named keyword terminals)
+        keeps `system`, `template`, `model` usable as ordinary
+        identifiers outside prompt-block scope. The semantic check
+        lives here instead.
+        """
+        name = str(key)
+        if name not in ("system", "template", "model"):
+            from .parser import ParseError
+            raise ParseError(
+                f"Unknown prompt directive `{name}` "
+                "(expected one of: system, template, model)",
+                line=meta.line,
+                column=meta.column,
+            )
+        return (name, value)
 
     # Script block handling
     @v_args(meta=True, inline=True)
@@ -601,8 +631,20 @@ class FFLTransformer(Transformer):
         return ScriptBlock(language="python", code=code, location=self._loc(meta))
 
     @v_args(meta=True, inline=True)
-    def script_python(self, meta, code: str) -> ScriptBlock:
-        """Handle explicit 'python' script directive."""
+    def script_dialect(self, meta, dialect: object, code: str) -> ScriptBlock:
+        """Soft keyword: dialect IDENT must be `python` (currently).
+
+        Modeled as IDENT instead of a hard `"python"` keyword so the
+        word remains usable as a parameter name elsewhere.
+        """
+        name = str(dialect)
+        if name != "python":
+            from .parser import ParseError
+            raise ParseError(
+                f"Unknown script dialect `{name}` (expected `python`)",
+                line=meta.line,
+                column=meta.column,
+            )
         return ScriptBlock(language="python", code=code, location=self._loc(meta))
 
     # Return clause
