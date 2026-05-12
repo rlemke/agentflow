@@ -24,9 +24,10 @@ from ..entities import (
     PublishedSource,
     WorkflowDefinition,
 )
+from ._internals import _MixinBase
 
 
-class WorkflowMixin:
+class WorkflowMixin(_MixinBase):
     """Workflow, flow, handler registration, and published source CRUD."""
 
     # =========================================================================

@@ -285,7 +285,7 @@ def site_selection_download(state_fips: str, format: str = "geojson", store=Depe
             all_keys: set[str] = set()
             for f in features:
                 all_keys.update(f.get("properties", {}).keys())
-            ordered = []
+            ordered: list[str] = []
             for k in ("GEOID", "NAME"):
                 if k in all_keys:
                     ordered.append(k)

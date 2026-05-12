@@ -20,10 +20,11 @@ from dataclasses import asdict
 from typing import Any
 
 from ..entities import HandledCount, ServerDefinition
+from ._internals import _MixinBase
 from .base import _current_time_ms
 
 
-class ServerMixin:
+class ServerMixin(_MixinBase):
     """Server CRUD and heartbeat operations."""
 
     def get_server(self, server_id: str) -> ServerDefinition | None:

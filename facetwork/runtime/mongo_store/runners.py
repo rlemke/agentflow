@@ -18,9 +18,10 @@ from collections.abc import Sequence
 from dataclasses import asdict
 
 from ..entities import Parameter, RunnerDefinition
+from ._internals import _MixinBase
 
 
-class RunnerMixin:
+class RunnerMixin(_MixinBase):
     """Runner CRUD operations."""
 
     def get_runner(self, runner_id: str) -> RunnerDefinition | None:

@@ -23,7 +23,7 @@ try:
     from pymongo import ReturnDocument
 except ImportError:
     try:
-        from mongomock.collection import ReturnDocument  # type: ignore[no-redef]
+        from mongomock.collection import ReturnDocument
     except ImportError:
 
         class ReturnDocument:  # type: ignore[no-redef]
@@ -32,12 +32,13 @@ except ImportError:
 
 
 from ..entities import TaskDefinition
+from ._internals import _MixinBase
 from .base import _current_time_ms
 
 logger = logging.getLogger(__name__)
 
 
-class TaskMixin:
+class TaskMixin(_MixinBase):
     """Task CRUD and reaping operations."""
 
     def get_task(self, task_id: str) -> TaskDefinition | None:

@@ -1940,7 +1940,7 @@ class Evaluator:
                     return not s.is_terminal and s.transition.push_me
 
                 for dirty_id in list(context._dirty_blocks):
-                    for sibling in self.persistence.get_steps_by_block(dirty_id):
+                    for sibling in self.persistence.get_steps_by_block(BlockId(dirty_id)):
                         if sibling.id not in seen and stuck_predicate(sibling):
                             next_queue.append(sibling.id)
                             seen.add(sibling.id)

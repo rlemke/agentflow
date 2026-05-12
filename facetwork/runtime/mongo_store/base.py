@@ -16,7 +16,7 @@
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 try:
     from pymongo import ASCENDING, MongoClient
@@ -94,7 +94,7 @@ class BaseMixin:
         cls,
         config: "MongoDBConfig",
         create_indexes: bool = True,
-    ) -> "BaseMixin":
+    ) -> Self:
         """Create a MongoStore from a MongoDBConfig instance.
 
         Args:

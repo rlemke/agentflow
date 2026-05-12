@@ -14,6 +14,7 @@
 
 """Workflow repair mixin for MongoStore."""
 
+from ._internals import _MixinBase
 from .base import _current_time_ms
 
 
@@ -23,7 +24,7 @@ def _generate_id() -> str:
     return str(_uuid.uuid4())
 
 
-class RepairMixin:
+class RepairMixin(_MixinBase):
     """Workflow repair operations."""
 
     def _repair_log(
@@ -68,6 +69,7 @@ class RepairMixin:
         """
         from ..entities import RunnerState, TaskState
         from ..states import StepState
+        from ..step import StepDefinition
 
         now = _current_time_ms()
         runner = self.get_runner(runner_id)
@@ -88,7 +90,7 @@ class RepairMixin:
         # Gather all tasks and steps
         tasks = list(self.get_tasks_by_workflow(workflow_id))
         steps = list(self.get_steps_by_workflow(workflow_id))
-        step_by_id = {s.id: s for s in steps}
+        step_by_id: dict[str, StepDefinition] = {s.id: s for s in steps}
 
         # -- 1. Check runner state consistency --
         terminal_task_states = {
@@ -302,19 +304,19 @@ class RepairMixin:
                     facet_name=t.name,
                 )
                 # Reset the associated errored step
-                step = step_by_id.get(t.step_id) or self.get_step(t.step_id)
-                if step and step.state == StepState.STATEMENT_ERROR:
-                    step.state = StepState.EVENT_TRANSMIT
-                    if hasattr(step, "transition") and step.transition:
-                        step.transition.current_state = StepState.EVENT_TRANSMIT
-                        step.transition.clear_error()
-                        step.transition.request_transition = False
-                        step.transition.changed = True
-                    self.save_step(step)
+                dl_step = step_by_id.get(t.step_id) or self.get_step(t.step_id)
+                if dl_step and dl_step.state == StepState.STATEMENT_ERROR:
+                    dl_step.state = StepState.EVENT_TRANSMIT
+                    if hasattr(dl_step, "transition") and dl_step.transition:
+                        dl_step.transition.current_state = StepState.EVENT_TRANSMIT
+                        dl_step.transition.clear_error()
+                        dl_step.transition.request_transition = False
+                        dl_step.transition.changed = True
+                    self.save_step(dl_step)
 
                     # Reset errored ancestors
                     seen_dl: set[str] = set()
-                    current_id = step.block_id
+                    current_id = dl_step.block_id
                     while current_id and current_id not in seen_dl:
                         seen_dl.add(current_id)
                         ancestor = step_by_id.get(current_id) or self.get_step(current_id)

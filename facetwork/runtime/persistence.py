@@ -378,6 +378,17 @@ class PersistenceAPI(Protocol):
         """
         ...
 
+    def get_runners_by_workflow(self, workflow_id: str) -> Sequence["RunnerDefinition"]:
+        """Get all runners for a workflow.
+
+        Args:
+            workflow_id: The workflow's unique identifier
+
+        Returns:
+            All runners associated with the workflow
+        """
+        return []
+
     # Task operations
 
     @abstractmethod
@@ -400,6 +411,10 @@ class PersistenceAPI(Protocol):
         self, server_id: str, limit: int = 200
     ) -> "Sequence[TaskDefinition]":
         """Get tasks claimed by a specific server, most recent first."""
+        return []
+
+    def get_tasks_by_workflow(self, workflow_id: str) -> "Sequence[TaskDefinition]":
+        """Get all tasks for a workflow."""
         return []
 
     @abstractmethod
@@ -492,6 +507,19 @@ class PersistenceAPI(Protocol):
 
         Optionally records ``progress_pct`` (0-100) and ``progress_message``
         for the stuck-task watchdog.
+        """
+        return None
+
+    def update_task_stage_budget(
+        self,
+        task_id: str,
+        budget_expires: int,
+        stage_name: str = "",
+    ) -> None:
+        """Set a deadline (``budget_expires``, ms epoch) for the task's current stage.
+
+        Used by handlers that declare per-stage timeouts. Stores cease to be
+        relevant for in-memory implementations, which may treat this as a no-op.
         """
         return None
 

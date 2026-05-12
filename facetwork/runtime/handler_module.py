@@ -60,7 +60,8 @@ def handler(facet_short_name: str) -> Callable:
     """
 
     def decorator(fn: Callable) -> Callable:
-        fn._handler_facet = facet_short_name
+        # Tag the function so HandlerModule discovery can find it by attribute.
+        fn._handler_facet = facet_short_name  # type: ignore[attr-defined]
         return fn
 
     return decorator

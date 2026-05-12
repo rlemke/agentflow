@@ -437,7 +437,7 @@ class RunnerService:
         except Exception:
             logger.exception("Failed to read server state for quarantine check")
             return False
-        return bool(server) and server.state == ServerState.QUARANTINE
+        return server is not None and server.state == ServerState.QUARANTINE
 
     def _poll_cycle(self) -> int:
         """Single poll cycle: find and dispatch work.
@@ -582,12 +582,13 @@ class RunnerService:
             task.updated = _current_time_ms()
             if task.max_retries > 0 and task.retry_count >= task.max_retries:
                 task.state = TaskState.DEAD_LETTER
-                task.error = (
+                dead_letter_msg = (
                     f"Timed out {task.retry_count} times (limit {task.max_retries}), dead-lettered"
                 )
+                task.error = {"message": dead_letter_msg}
                 label = self._task_label(task_id)
                 try:
-                    self._evaluator.fail_step(task.step_id, task.error)
+                    self._evaluator.fail_step(task.step_id, dead_letter_msg)
                 except Exception:
                     logger.debug("Could not fail step %s", task.step_id, exc_info=True)
                 logger.warning(
@@ -1398,9 +1399,14 @@ class RunnerService:
         """
         from .states import StepState
 
+        # Raw-Mongo sweep — only supported on the MongoStore persistence backend.
+        db = getattr(self._persistence, "_db", None)
+        if db is None:
+            return
+
         # Get all non-terminal steps for this workflow
         stuck_steps = list(
-            self._persistence._db.steps.find(
+            db.steps.find(
                 {
                     "workflow_id": workflow_id,
                     "state": {
@@ -1443,7 +1449,7 @@ class RunnerService:
             facet_name = step_doc.get("facet_name")
             if not facet_name:
                 continue  # block-level step, not an event facet
-            existing_task = self._persistence._db.tasks.find_one(
+            existing_task = db.tasks.find_one(
                 {"step_id": step_id, "state": {"$in": ["pending", "running"]}}
             )
             if not existing_task:

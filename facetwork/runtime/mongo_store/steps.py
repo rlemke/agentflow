@@ -24,7 +24,7 @@ try:
 except ImportError:
     ASCENDING = 1
     try:
-        from mongomock.collection import DuplicateKeyError  # type: ignore[no-redef]
+        from mongomock.collection import DuplicateKeyError
     except ImportError:
 
         class DuplicateKeyError(Exception):  # type: ignore[no-redef]
@@ -36,12 +36,13 @@ from ..persistence import IterationChanges
 from ..states import StepState
 from ..step import StepDefinition
 from ..types import BlockId, StepId, VersionInfo, WorkflowId
+from ._internals import _MixinBase
 from .base import _current_time_ms
 
 logger = logging.getLogger(__name__)
 
 
-class StepMixin:
+class StepMixin(_MixinBase):
     """Step, step log, and log CRUD operations."""
 
     # =========================================================================

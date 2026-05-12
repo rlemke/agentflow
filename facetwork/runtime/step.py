@@ -129,6 +129,9 @@ class StepDefinition:
     # State machine
     state: str = field(default=StepState.CREATED)
     transition: StepTransition = field(default_factory=StepTransition.initial)
+    # Last failure recorded for this step (mirrors ``transition.error`` on
+    # persistence; cleared on recovery). ``None`` when the step is healthy.
+    error: str | None = None
 
     # Data
     facet_name: str = ""  # Name of the facet being invoked
