@@ -20,4 +20,4 @@ repos:
           - types-Markdown
         args: [--config-file=pyproject.toml]
         pass_filenames: false
-        entry: mypy afl/
+        entry: mypy facetwork/
