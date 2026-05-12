@@ -60,8 +60,6 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
-from .runner_config import BaseRunnerConfig
-
 from .entities import (
     RunnerState,
     ServerDefinition,
@@ -73,6 +71,7 @@ from .entities import (
 )
 from .evaluator import Evaluator, ExecutionResult, ExecutionStatus
 from .persistence import PersistenceAPI
+from .runner_config import BaseRunnerConfig
 from .types import AttributeValue, generate_id
 
 logger = logging.getLogger(__name__)

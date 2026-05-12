@@ -30,7 +30,7 @@ import socket
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -611,7 +611,7 @@ class RunnerService:
                 elapsed_s = (task.updated - (task.task_heartbeat or task.updated)) / 1000
                 log_msg = (
                     f"Task timed out: {task.name} — execution timeout "
-                    f"({self._execution_timeout_ms / 1000:.0f}s) exceeded, "
+                    f"({self._execution_timeout_ms / 1000:.0f}s) exceeded after {elapsed_s:.0f}s, "
                     f"resetting to pending (retry {task.retry_count}/{task.max_retries}), "
                     f"server={self._config.server_name} (id={self._server_id[:8]})"
                 )
@@ -1442,8 +1442,8 @@ class RunnerService:
                     if runners:
                         runner_id = runners[0].uuid
 
-                from .entities import TaskDefinition, TaskState
                 from ..utils import generate_id
+                from .entities import TaskDefinition, TaskState
 
                 task = TaskDefinition(
                     uuid=generate_id(),

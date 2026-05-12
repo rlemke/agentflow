@@ -16,7 +16,6 @@
 
 from collections.abc import Sequence
 from dataclasses import asdict
-from typing import Any
 
 from ..entities import (
     FlowDefinition,

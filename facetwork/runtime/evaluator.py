@@ -1935,9 +1935,10 @@ class Evaluator:
                 # workflow bodies attach their AndThen blocks to the
                 # root via container_id, not block_id.
                 seen = set(next_queue)
-                stuck_predicate = (
-                    lambda s: not s.is_terminal and s.transition.push_me
-                )
+
+                def stuck_predicate(s):
+                    return not s.is_terminal and s.transition.push_me
+
                 for dirty_id in list(context._dirty_blocks):
                     for sibling in self.persistence.get_steps_by_block(dirty_id):
                         if sibling.id not in seen and stuck_predicate(sibling):

@@ -25,7 +25,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Mock factory — Anthropic-shaped client returning canned text
 # ---------------------------------------------------------------------------

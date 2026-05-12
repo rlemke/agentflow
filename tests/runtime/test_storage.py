@@ -377,9 +377,8 @@ class TestHDFSRetry:
     @patch("facetwork.runtime.storage._requests")
     def test_write_stream_retries(self, mock_req):
         """_WebHDFSWriteStream.close() retries on transient datanode 404."""
-        import requests
-
         import afl.runtime.storage as mod
+        import requests
 
         orig = mod.HAS_REQUESTS
         mod.HAS_REQUESTS = True

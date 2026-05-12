@@ -20,7 +20,6 @@ from dataclasses import asdict
 from typing import Any
 
 from ..entities import HandledCount, ServerDefinition
-
 from .base import _current_time_ms
 
 

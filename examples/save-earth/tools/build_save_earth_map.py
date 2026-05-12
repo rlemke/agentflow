@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _lib import epa_cleanups, map_render, openlittermap, sidecar, tri  # noqa: E402
 from _lib.storage import LocalStorage  # noqa: E402
 
-
 # EPA layers have fixed filenames. OpenLitterMap layers are auto-
 # discovered at render time (see _openlittermap_layers) because the
 # filename depends on mode / zoom / bbox and we want every cached
@@ -158,7 +157,7 @@ def _parse_center(s: str) -> tuple[float, float]:
     try:
         parts = [float(p) for p in s.split(",")]
     except ValueError as exc:
-        raise SystemExit(f"error: --center needs 2 comma-separated numbers: {exc}")
+        raise SystemExit(f"error: --center needs 2 comma-separated numbers: {exc}") from exc
     if len(parts) != 2:
         raise SystemExit("error: --center needs exactly 2 values (lat,lon)")
     return tuple(parts)  # type: ignore[return-value]

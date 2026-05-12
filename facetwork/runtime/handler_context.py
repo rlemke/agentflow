@@ -26,9 +26,10 @@ Example usage::
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterator
+from typing import Any
 
 
 @dataclass
@@ -39,7 +40,7 @@ class StageHandle:
     larger than initially estimated, or emit heartbeats with progress.
     """
 
-    ctx: "HandlerContext"
+    ctx: HandlerContext
     name: str
     timeout_ms: int
     started_ms: float = field(default_factory=lambda: time.monotonic() * 1000.0)

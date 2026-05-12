@@ -42,7 +42,7 @@ def _parse_bbox(s: str) -> tuple[float, float, float, float]:
     try:
         parts = [float(p) for p in s.split(",")]
     except ValueError as exc:
-        raise SystemExit(f"error: --bbox needs 4 comma-separated numbers: {exc}")
+        raise SystemExit(f"error: --bbox needs 4 comma-separated numbers: {exc}") from exc
     if len(parts) != 4:
         raise SystemExit(
             "error: --bbox needs 4 values: min_lon,min_lat,max_lon,max_lat"

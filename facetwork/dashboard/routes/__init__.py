@@ -27,6 +27,9 @@ def register_routes(app: FastAPI) -> None:
     from .core.api import router as api_router
     from .core.health import router as health_router
     from .core.home import router as home_router
+    from .domain.census_maps import router as census_maps_router
+    from .domain.climate_trends import router as climate_trends_router
+    from .domain.site_selection import router as site_selection_router
     from .execution.events import router as events_router
     from .execution.flows import router as flows_router
     from .execution.runners import router as runners_router
@@ -39,9 +42,6 @@ def register_routes(app: FastAPI) -> None:
     from .monitoring.output import router as output_router
     from .monitoring.servers import router as servers_router
     from .monitoring.sources import router as sources_router
-    from .domain.census_maps import router as census_maps_router
-    from .domain.climate_trends import router as climate_trends_router
-    from .domain.site_selection import router as site_selection_router
     from .v2.dashboard_v2 import router as dashboard_v2_router
 
     app.include_router(health_router)

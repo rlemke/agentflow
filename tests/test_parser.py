@@ -17,9 +17,9 @@
 import pytest
 
 from facetwork import (
-    FFLParser,
     ArrayType,
     BinaryExpr,
+    FFLParser,
     Literal,
     ParseError,
     Program,

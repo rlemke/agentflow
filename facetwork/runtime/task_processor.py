@@ -20,8 +20,7 @@ Usage::
 from __future__ import annotations
 
 import logging
-import os
-from typing import Any, Callable
+from typing import Any
 
 from .entities import StepLogEntry, StepLogLevel, StepLogSource, TaskState
 from .persistence import PersistenceAPI

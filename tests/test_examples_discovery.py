@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from facetwork import examples as examples_mod
 from facetwork.examples import (
     ExamplePackage,

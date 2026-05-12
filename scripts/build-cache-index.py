@@ -32,7 +32,7 @@ import os
 import sys
 import textwrap
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -230,7 +230,7 @@ def _count_artifacts(root: Path) -> int:
     if not root.is_dir():
         return 0
     total = 0
-    for dirpath, _dirs, files in os.walk(root):
+    for _dirpath, _dirs, files in os.walk(root):
         for fn in files:
             if fn.endswith(".meta.json"):
                 continue
@@ -295,7 +295,7 @@ def _render_html(cards: list[PipelineCard]) -> str:
         """
     ).strip()
 
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     parts: list[str] = []
     parts.append("<!doctype html><html lang='en'><head>")
     parts.append("<meta charset='utf-8'>")
@@ -364,7 +364,7 @@ def _render_html(cards: list[PipelineCard]) -> str:
 def _write_sidecar_minimal(
     path: Path, *, size_bytes: int, sha256_hex: str, extra: dict[str, Any]
 ) -> None:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     data = {
         "version": 1,
         "namespace": "",

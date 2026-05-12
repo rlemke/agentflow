@@ -50,11 +50,10 @@ import socket
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .dispatcher import RegistryDispatcher
-from .runner_config import BaseRunnerConfig
 from .entities import (
     HandlerRegistration,
     RunnerState,
@@ -67,6 +66,7 @@ from .entities import (
 )
 from .evaluator import Evaluator, ExecutionResult, ExecutionStatus
 from .persistence import PersistenceAPI
+from .runner_config import BaseRunnerConfig
 from .states import StepState
 from .types import AttributeValue, generate_id
 

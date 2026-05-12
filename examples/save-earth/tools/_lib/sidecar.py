@@ -29,9 +29,10 @@ from __future__ import annotations
 
 import json
 import secrets
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Any, Iterator
+from datetime import UTC, datetime
+from typing import Any
 
 from _lib.storage import (
     LocalStorage,
@@ -51,7 +52,7 @@ def _storage(storage: Storage | None) -> Storage:
 
 def utcnow_iso() -> str:
     """Current UTC time as an ISO-8601 ``Z`` string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # ---------------------------------------------------------------------------

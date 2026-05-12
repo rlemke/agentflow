@@ -51,8 +51,9 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import IO, Iterator
+from typing import IO
 
 LOCAL_DEFAULT_ROOT = "/Volumes/afl_data"
 HDFS_DEFAULT_ROOT = "/user/afl"
@@ -170,7 +171,7 @@ class LocalStorage(Storage):
         os.replace(src, dst)
 
     def read_text(self, path: str) -> str:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def write_text_atomic(self, path: str, text: str) -> None:

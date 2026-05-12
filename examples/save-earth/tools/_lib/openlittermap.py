@@ -41,6 +41,8 @@ _TOOLS_ROOT = Path(__file__).resolve().parent.parent
 if str(_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(_TOOLS_ROOT))
 
+from datetime import UTC
+
 from _lib import sidecar  # noqa: E402
 from _lib.storage import LocalStorage, Storage, local_staging_subdir  # noqa: E402
 
@@ -338,15 +340,15 @@ def _normalize(data: Any) -> dict[str, Any]:
 def _age_hours(generated_at: str | None) -> float | None:
     if not generated_at:
         return None
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
     except ValueError:
         return None
-    return (datetime.now(timezone.utc) - ts).total_seconds() / 3600.0
+    return (datetime.now(UTC) - ts).total_seconds() / 3600.0
 
 
 def _mock_geojson(mode: Mode) -> dict[str, Any]:

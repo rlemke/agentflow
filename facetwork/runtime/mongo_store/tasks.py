@@ -30,7 +30,6 @@ except ImportError:
             BEFORE = False
 
 from ..entities import TaskDefinition
-
 from .base import _current_time_ms
 
 logger = logging.getLogger(__name__)

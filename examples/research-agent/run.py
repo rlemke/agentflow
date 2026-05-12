@@ -187,7 +187,7 @@ def main() -> int:
     print("research-agent end-to-end smoke run (mocked Anthropic client)")
     print("=" * 70)
 
-    from facetwork.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
+    from facetwork.runtime import Evaluator, MemoryStore, Telemetry
     from facetwork.runtime.agent_poller import AgentPoller, AgentPollerConfig
 
     try:
@@ -282,7 +282,7 @@ def main() -> int:
                 print(f"  step={getattr(step, 'name', '?')} facet={getattr(step, 'facet_name', '?')} state={state}")
             return 1
         outputs = {name: attr.value for name, attr in root.attributes.returns.items()}
-        print(f"\nFinal status: COMPLETED")
+        print("\nFinal status: COMPLETED")
         report = outputs.get("report") or {}
         review = outputs.get("review") or {}
         print("\n" + "=" * 70)

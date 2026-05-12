@@ -28,10 +28,6 @@ from .agent import (
 from .agent_poller import AgentPoller, AgentPollerConfig
 from .agent_runner import AgentConfig, make_store, run_agent
 from .block import BlockAnalysis, StatementDefinition, StepAnalysis
-from .handler_context import HandlerContext
-from .handler_module import HandlerModule, handler
-from .runner_config import BaseRunnerConfig
-from .task_processor import TaskProcessor
 
 # DAO protocols
 from .dao import (
@@ -113,10 +109,13 @@ from .errors import (
 )
 from .evaluator import Evaluator, ExecutionContext, ExecutionResult, ExecutionStatus
 from .expression import EvaluationContext, ExpressionEvaluator, evaluate_args, evaluate_default
+from .handler_context import HandlerContext
+from .handler_module import HandlerModule, handler
 from .memory_store import MemoryStore
 from .persistence import IterationChanges, PersistenceAPI
 from .registry_runner import RegistryRunner, RegistryRunnerConfig, create_registry_runner
 from .runner import RunnerConfig, RunnerService
+from .runner_config import BaseRunnerConfig
 from .states import (
     BLOCK_TRANSITIONS,
     SCHEMA_TRANSITIONS,
@@ -127,6 +126,7 @@ from .states import (
     select_transitions,
 )
 from .step import StepDefinition, StepTransition
+from .task_processor import TaskProcessor
 from .telemetry import Telemetry, TelemetryEvent
 from .types import (
     AttributeValue,
@@ -199,9 +199,15 @@ __all__ = [
     "TokenUsage",
     "LLMHandler",
     "LLMHandlerConfig",
+    # Handler modules
+    "HandlerContext",
+    "HandlerModule",
+    "handler",
     # Runner
     "RunnerService",
     "RunnerConfig",
+    "BaseRunnerConfig",
+    "TaskProcessor",
     # Agent Poller
     "AgentPoller",
     "AgentPollerConfig",

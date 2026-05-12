@@ -34,7 +34,6 @@ from ..persistence import IterationChanges
 from ..states import StepState
 from ..step import StepDefinition
 from ..types import BlockId, StepId, VersionInfo, WorkflowId
-
 from .base import _current_time_ms
 
 logger = logging.getLogger(__name__)

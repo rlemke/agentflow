@@ -113,7 +113,7 @@ def render_map(
                 f"layer {layer.name!r} expects cached GeoJSON at {geojson_path} — "
                 f"run the matching download-* tool first"
             )
-        with open(geojson_path, "r", encoding="utf-8") as f:
+        with open(geojson_path, encoding="utf-8") as f:
             data = json.load(f)
         if data.get("type") != "FeatureCollection":
             raise ValueError(
