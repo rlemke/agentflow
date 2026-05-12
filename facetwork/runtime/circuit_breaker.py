@@ -56,15 +56,9 @@ class CircuitBreakerConfig:
     def from_env(cls) -> CircuitBreakerConfig:
         """Load configuration from environment variables."""
         return cls(
-            failure_threshold=int(
-                os.environ.get("AFL_CIRCUIT_BREAKER_THRESHOLD", "5")
-            ),
-            cooldown_ms=int(
-                os.environ.get("AFL_CIRCUIT_BREAKER_COOLDOWN_MS", "60000")
-            ),
-            success_threshold=int(
-                os.environ.get("AFL_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", "2")
-            ),
+            failure_threshold=int(os.environ.get("AFL_CIRCUIT_BREAKER_THRESHOLD", "5")),
+            cooldown_ms=int(os.environ.get("AFL_CIRCUIT_BREAKER_COOLDOWN_MS", "60000")),
+            success_threshold=int(os.environ.get("AFL_CIRCUIT_BREAKER_SUCCESS_THRESHOLD", "2")),
         )
 
 
@@ -153,8 +147,7 @@ class CircuitBreakerRegistry:
             circuit.state = CircuitState.OPEN
             circuit.opened_at = int(time.time() * 1000)
             logger.warning(
-                "Circuit breaker OPEN for '%s' — probe failed, "
-                "cooldown %ds",
+                "Circuit breaker OPEN for '%s' — probe failed, cooldown %ds",
                 handler_name,
                 self._config.cooldown_ms // 1000,
             )
@@ -164,8 +157,7 @@ class CircuitBreakerRegistry:
                 circuit.state = CircuitState.OPEN
                 circuit.opened_at = int(time.time() * 1000)
                 logger.warning(
-                    "Circuit breaker OPEN for '%s' — %d consecutive failures, "
-                    "cooldown %ds",
+                    "Circuit breaker OPEN for '%s' — %d consecutive failures, cooldown %ds",
                     handler_name,
                     circuit.consecutive_failures,
                     self._config.cooldown_ms // 1000,

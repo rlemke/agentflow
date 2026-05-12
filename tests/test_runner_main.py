@@ -127,7 +127,10 @@ class TestRunnerMain:
         mock_config.return_value = _make_mock_config()
         mock_mongo.from_config.return_value = MagicMock()
 
-        with patch("sys.argv", ["afl-runner"]), patch("facetwork.runtime.runner.__main__.RunnerService"):
+        with (
+            patch("sys.argv", ["afl-runner"]),
+            patch("facetwork.runtime.runner.__main__.RunnerService"),
+        ):
             main()
 
         signal_calls = [c[0][0] for c in mock_signal.call_args_list]

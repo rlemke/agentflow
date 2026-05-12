@@ -864,8 +864,7 @@ class TestAgentPollerMultiStep:
         root = store.get_workflow_root(result.workflow_id)
         assert root is not None, "workflow root not found"
         assert root.is_complete, (
-            f"workflow did not complete: is_error={root.is_error}, "
-            f"transition={root.transition}"
+            f"workflow did not complete: is_error={root.is_error}, transition={root.transition}"
         )
         return {name: attr.value for name, attr in root.attributes.returns.items()}
 

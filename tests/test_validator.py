@@ -61,10 +61,12 @@ class TestNameUniqueness:
 
     def test_duplicate_workflow_names(self, validator):
         """Duplicate workflow names should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         workflow Process(input: String)
         workflow Process(data: String)
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Duplicate workflow name 'Process'" in str(e) for e in result.errors)
@@ -81,21 +83,25 @@ class TestNameUniqueness:
 
     def test_facet_workflow_same_name(self, validator):
         """Facet and workflow with same name should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Process(input: String)
         workflow Process(input: String)
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Duplicate" in str(e) and "Process" in str(e) for e in result.errors)
 
     def test_unique_names_valid(self, validator):
         """Unique names should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet User(name: String)
         facet Account(id: String)
         workflow Process(input: String)
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
@@ -126,28 +132,32 @@ class TestNameUniqueness:
 
     def test_duplicate_step_names(self, validator):
         """Duplicate step names within a block should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             step1 = Data(value = $.input)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Duplicate step name 'step1'" in str(e) for e in result.errors)
 
     def test_unique_step_names_valid(self, validator):
         """Unique step names should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             step2 = Data(value = $.input)
             yield Test(output = step2.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
@@ -157,52 +167,60 @@ class TestStepReferences:
 
     def test_valid_input_reference(self, validator):
         """Valid $.param reference should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
     def test_invalid_input_reference(self, validator):
         """Invalid $.param reference should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.nonexistent)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
 
     def test_valid_step_reference(self, validator):
         """Valid step.attr reference should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             step2 = Data(value = step1.result)
             yield Test(output = step2.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
     def test_invalid_step_attribute(self, validator):
         """Invalid step attribute should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             step2 = Data(value = step1.nonexistent)
             yield Test(output = step2.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any(
@@ -211,27 +229,31 @@ class TestStepReferences:
 
     def test_reference_undefined_step(self, validator):
         """Reference to undefined step should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = undefined.result)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Reference to undefined step 'undefined'" in str(e) for e in result.errors)
 
     def test_reference_step_defined_after(self, validator):
         """Reference to step defined after should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = step2.result)
             step2 = Data(value = $.input)
             yield Test(output = step2.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         # Step2 is not defined when step1 tries to reference it
@@ -239,13 +261,15 @@ class TestStepReferences:
 
     def test_foreach_variable_valid(self, validator):
         """Foreach variable reference should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Process(item: String) => (result: String)
         workflow Test(items: Json) => (results: Json) andThen foreach item in $.items {
             step1 = Process(item = item.value)
             yield Test(results = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
@@ -255,32 +279,37 @@ class TestYieldValidation:
 
     def test_valid_yield_containing_facet(self, validator):
         """Yield to containing facet should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
     def test_invalid_yield_target(self, validator):
         """Yield to wrong facet should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             yield WrongFacet(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid yield target 'WrongFacet'" in str(e) for e in result.errors)
 
     def test_yield_to_mixin_valid(self, validator):
         """Yield to mixin should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         facet Extra(data: String) => (extra: String)
         workflow Test(input: String) => (output: String) with Extra(data = "x") andThen {
@@ -288,34 +317,39 @@ class TestYieldValidation:
             yield Test(output = step1.result)
             yield Extra(extra = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         # This should pass - yields to both containing facet and mixin
         assert result.is_valid
 
     def test_yield_references_validated(self, validator):
         """References in yield should be validated."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             yield Test(output = undefined.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Reference to undefined step 'undefined'" in str(e) for e in result.errors)
 
     def test_duplicate_yield_targets(self, validator):
         """Duplicate yield targets should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
             yield Test(output = step1.result)
             yield Test(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Duplicate yield target 'Test'" in str(e) for e in result.errors)
@@ -374,7 +408,8 @@ class TestComplexScenarios:
 
     def test_nested_block_references(self, validator):
         """References in nested contexts should work."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Transform(input: String) => (output: String)
         facet Process(data: String) => (result: String)
 
@@ -383,13 +418,15 @@ class TestComplexScenarios:
             p1 = Process(data = t1.output)
             yield Pipeline(final = p1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid
 
     def test_multiple_errors_reported(self, validator):
         """Multiple errors should all be reported."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         facet Data(other: String)
         workflow Test(input: String) => (output: String) andThen {
@@ -397,7 +434,8 @@ class TestComplexScenarios:
             step1 = Data(value = $.input)
             yield WrongTarget(output = step1.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         # Should have multiple errors: duplicate name, invalid input ref, duplicate step, invalid yield
@@ -805,7 +843,8 @@ class TestForwardStepReferences:
 
     def test_step2_references_step3_forward(self, validator):
         """A step cannot reference a step defined after it."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Data(value: String) => (result: String)
         workflow Test(input: String) => (output: String) andThen {
             step1 = Data(value = $.input)
@@ -813,7 +852,8 @@ class TestForwardStepReferences:
             step3 = Data(value = $.input)
             yield Test(output = step3.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("undefined step 'step3'" in str(e) for e in result.errors)
@@ -1038,14 +1078,16 @@ class TestMixinCallValidation:
 
     def test_mixin_args_reference_validated(self, validator):
         """References in mixin call arguments should be validated."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Config(setting: String)
         facet Process(input: String) => (result: String)
         workflow Test(x: String) => (output: String) andThen {
             p = Process(input = $.x) with Config(setting = $.nonexistent)
             yield Test(output = p.result)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
@@ -1056,7 +1098,8 @@ class TestSchemaInstantiation:
 
     def test_valid_schema_instantiation(self, validator):
         """Valid schema instantiation should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Config {
                 timeout: Long,
@@ -1069,13 +1112,15 @@ class TestSchemaInstantiation:
                 yield Example(output = result.result)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_schema_field_reference(self, validator):
         """Step referencing schema fields should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Data {
                 value: String,
@@ -1088,13 +1133,15 @@ class TestSchemaInstantiation:
                 yield Test(result = p.output)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_invalid_schema_field_reference(self, validator):
         """Reference to nonexistent schema field should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Data {
                 value: String
@@ -1106,14 +1153,16 @@ class TestSchemaInstantiation:
                 yield Test(result = p.output)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid attribute 'nonexistent' for step 'd'" in str(e) for e in result.errors)
 
     def test_unknown_schema_field(self, validator):
         """Unknown field in schema instantiation should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Config {
                 timeout: Long
@@ -1122,14 +1171,16 @@ class TestSchemaInstantiation:
                 cfg = Config(timeout = 30, unknown = "bad")
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Unknown field 'unknown' for schema 'Config'" in str(e) for e in result.errors)
 
     def test_schema_with_mixins_error(self, validator):
         """Schema instantiation with mixins should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Config {
                 timeout: Long
@@ -1139,14 +1190,16 @@ class TestSchemaInstantiation:
                 cfg = Config(timeout = 30) with SomeMixin()
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("cannot have mixins" in str(e) for e in result.errors)
 
     def test_namespaced_schema_instantiation(self, validator):
         """Namespaced schema instantiation should work."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Settings {
                 name: String,
@@ -1159,7 +1212,8 @@ class TestSchemaInstantiation:
                 yield Test(output = r.result)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1184,7 +1238,8 @@ class TestSchemaInstantiation:
 
     def test_schema_with_concat_expression(self, validator):
         """Schema instantiation with concatenation expression should validate."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Data {
                 combined: String
@@ -1194,13 +1249,15 @@ class TestSchemaInstantiation:
                 yield Test(result = d.combined)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_schema_fields_accessible_after_step(self, validator):
         """Schema fields should be accessible in subsequent steps."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace app {
             schema Request {
                 url: String,
@@ -1213,7 +1270,8 @@ class TestSchemaInstantiation:
                 yield Test(result = resp.data)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1223,64 +1281,74 @@ class TestBinaryExprValidation:
 
     def test_valid_refs_in_binary(self, validator):
         """Valid references in binary expressions pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Value(input: Long) => (output: Long)
         workflow Test(a: Long) => (output: Long) andThen {
             s = Value(input = $.a + 1)
             yield Test(output = s.output)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_invalid_input_ref_in_binary(self, validator):
         """Invalid input reference in binary expr should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Value(input: Long) => (output: Long)
         workflow Test(a: Long) => (output: Long) andThen {
             s = Value(input = $.nonexistent + 1)
             yield Test(output = s.output)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("nonexistent" in str(e) for e in result.errors)
 
     def test_invalid_step_ref_in_binary(self, validator):
         """Invalid step reference in binary expr should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Value(input: Long) => (output: Long)
         workflow Test(a: Long) => (output: Long) andThen {
             s = Value(input = unknown.output + 1)
             yield Test(output = s.output)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("unknown" in str(e) for e in result.errors)
 
     def test_nested_binary_in_concat(self, validator):
         """References in binary inside concat should be validated."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Value(input: Long) => (output: Long)
         workflow Test(a: Long, b: Long) => (output: String) andThen {
             s = Value(input = $.a + $.b)
             yield Test(output = s.output ++ s.output)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_ref_binary_chain(self, validator):
         """Chain of arithmetic with step refs should validate."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Value(input: Long) => (output: Long)
         workflow Test(input: Long) => (output: Long) andThen {
             s1 = Value(input = $.input + 1)
             s2 = Value(input = s1.output + 1)
             yield Test(output = s2.output + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1290,7 +1358,8 @@ class TestMultipleBlockValidation:
 
     def test_valid_multi_block(self, validator):
         """Multiple andThen blocks with valid refs should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s1 = V(input = $.input)
@@ -1299,13 +1368,15 @@ class TestMultipleBlockValidation:
                 s2 = V(input = $.input)
                 yield Test(b = s2.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_same_step_names_across_blocks(self, validator):
         """Same step names in different blocks should pass (independent scopes)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s = V(input = $.input)
@@ -1314,13 +1385,15 @@ class TestMultipleBlockValidation:
                 s = V(input = $.input)
                 yield Test(b = s.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_invalid_ref_in_second_block(self, validator):
         """Invalid reference in second block should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s1 = V(input = $.input)
@@ -1329,14 +1402,16 @@ class TestMultipleBlockValidation:
                 s2 = V(input = $.nonexistent)
                 yield Test(b = s2.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("nonexistent" in str(e) for e in result.errors)
 
     def test_cross_block_step_reference_error(self, validator):
         """Reference to step from a sibling andThen block should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s1 = V(input = $.input)
@@ -1345,7 +1420,8 @@ class TestMultipleBlockValidation:
                 s2 = V(input = s1.output)
                 yield Test(b = s2.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Cross-block step reference" in str(e) for e in result.errors)
@@ -1353,7 +1429,8 @@ class TestMultipleBlockValidation:
 
     def test_cross_block_yield_reference_error(self, validator):
         """Yield referencing step from a sibling block should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s1 = V(input = $.input)
@@ -1362,14 +1439,16 @@ class TestMultipleBlockValidation:
                 s2 = V(input = $.input)
                 yield Test(b = s1.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Cross-block step reference" in str(e) for e in result.errors)
 
     def test_step_body_within_block_ok(self, validator):
         """Step body (step = Call() andThen { ... }) is NOT cross-block."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (result: Long) andThen {
             s1 = V(input = $.input) andThen {
@@ -1377,13 +1456,15 @@ class TestMultipleBlockValidation:
                 yield Test(result = s2.output)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_same_step_name_different_blocks_ok(self, validator):
         """Same step name in different blocks is allowed (no cross-ref)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(input: Long) => (output: Long)
         workflow Test(input: Long) => (a: Long, b: Long) andThen {
                 s = V(input = $.input)
@@ -1392,7 +1473,8 @@ class TestMultipleBlockValidation:
                 s = V(input = $.input)
                 yield Test(b = s.output)
             }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1402,85 +1484,99 @@ class TestCollectionLiteralValidation:
 
     def test_valid_refs_in_array(self, validator):
         """Valid references inside array should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(items: String) => (output: Long)
         workflow Test(x: Long) andThen {
             s = V(items = "test")
             s2 = V(items = [$.x, s.output])
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_invalid_input_ref_in_array(self, validator):
         """Invalid input reference inside array should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(items: String)
         workflow Test(x: Long) andThen {
             s = V(items = [$.nonexistent])
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("nonexistent" in str(e) for e in result.errors)
 
     def test_invalid_step_ref_in_array(self, validator):
         """Invalid step reference inside array should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(items: String)
         workflow Test(x: Long) andThen {
             s = V(items = [missing.output])
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("missing" in str(e) for e in result.errors)
 
     def test_valid_refs_in_map(self, validator):
         """Valid references inside map should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(config: String) => (output: Long)
         workflow Test(x: Long) andThen {
             s = V(config = "test")
             s2 = V(config = #{"a": $.x, "b": s.output})
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_invalid_ref_in_map_value(self, validator):
         """Invalid reference in map value should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(config: String)
         workflow Test(x: Long) andThen {
             s = V(config = #{"a": $.missing})
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("missing" in str(e) for e in result.errors)
 
     def test_valid_refs_in_index_expr(self, validator):
         """Valid references in index expression should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(items: String) => (output: String)
         workflow Test(idx: Long) andThen {
             s = V(items = "test")
             s2 = V(items = s.output[$.idx])
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_nested_collections_validation(self, validator):
         """Nested collections with valid references should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(items: String) => (output: Long)
         workflow Test(x: Long) andThen {
             s = V(items = "test")
             s2 = V(items = [[$.x], [s.output]])
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1490,116 +1586,136 @@ class TestExpressionTypeChecking:
 
     def test_string_plus_int_error(self, validator):
         """String + Int should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = "hello" + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_int_plus_string_error(self, validator):
         """Int + String should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = 1 + "hello")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_int_plus_int_valid(self, validator):
         """Int + Int should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = 1 + 2)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_int_multiply_int_valid(self, validator):
         """Int * Int should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = 3 * 4)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_boolean_arithmetic_error(self, validator):
         """Boolean in arithmetic should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = true - 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_ref_plus_int_passes(self, validator):
         """Reference + Int should pass (Unknown type, no error)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long) => (output: Long)
         workflow Test(a: Long) andThen {
             s = V(x = $.a + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_ref_plus_int_passes(self, validator):
         """Step reference + Int should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long) => (output: Long)
         workflow Test(a: Long) andThen {
             s1 = V(x = $.a)
             s2 = V(x = s1.output + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_string_concat_valid(self, validator):
         """String ++ String is always valid (concat, not arithmetic)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: String)
         workflow Test() andThen {
             s = V(x = "hello" ++ " " ++ "world")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_nested_binary_type_error(self, validator):
         """Nested binary with type error should be caught."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = 1 + 2 * "bad")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) for e in result.errors)
 
     def test_string_multiply_error(self, validator):
         """String * Int should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = "abc" * 3)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) for e in result.errors)
@@ -1610,80 +1726,94 @@ class TestUnaryExprValidation:
 
     def test_negate_int_valid(self, validator):
         """Negating Int should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = -5)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_negate_float_valid(self, validator):
         """Negating Double should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Double)
         workflow Test() andThen {
             s = V(x = -3.14)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_negate_ref_valid(self, validator):
         """Negating a reference should be valid (Unknown type passes)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long) => (output: Long)
         workflow Test(a: Long) andThen {
             s = V(x = -$.a)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_negate_string_error(self, validator):
         """Negating a String should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = -"hello")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("negate" in str(e) and "String" in str(e) for e in result.errors)
 
     def test_negate_boolean_error(self, validator):
         """Negating a Boolean should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = -true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("negate" in str(e) and "Boolean" in str(e) for e in result.errors)
 
     def test_double_negation_valid(self, validator):
         """Double negation of Int should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = --5)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_negate_in_binary_valid(self, validator):
         """Negation inside binary expression should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test() andThen {
             s = V(x = 10 + -5)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1736,7 +1866,8 @@ class TestWorkflowAsStep:
 
     def test_workflow_calls_workflow(self, validator):
         """A workflow referencing another workflow as a step should validate."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         namespace test {
             event facet DoWork(input: String) => (output: String)
 
@@ -1750,7 +1881,8 @@ class TestWorkflowAsStep:
                 yield Outer(result = inner.y)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1822,93 +1954,109 @@ class TestComparisonBooleanValidation:
 
     def test_boolean_and_with_non_boolean_error(self, validator):
         """&& with non-Boolean operand should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = 1 && true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("'&&' requires Boolean" in str(e) for e in result.errors)
 
     def test_boolean_or_with_non_boolean_error(self, validator):
         """|| with non-Boolean operand should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = true || "yes")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("'||' requires Boolean" in str(e) for e in result.errors)
 
     def test_ordered_comparison_with_boolean_error(self, validator):
         """Ordered comparison (> < >= <=) with Boolean should produce error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = true > false)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("ordered comparison" in str(e) and "Boolean" in str(e) for e in result.errors)
 
     def test_not_with_non_boolean_error(self, validator):
         """! with non-Boolean operand should produce type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = !5)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("'!' requires Boolean" in str(e) for e in result.errors)
 
     def test_equality_with_any_types_valid(self, validator):
         """== can compare any types (Int == Int)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = 1 == 2)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_comparison_with_refs_valid(self, validator):
         """Comparison with references should pass (Unknown type)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean) => (output: Int)
         workflow Test(a: Int) andThen {
             s1 = V(x = $.a > 0)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_not_with_ref_valid(self, validator):
         """! with reference should pass (Unknown type)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean) => (output: Boolean)
         workflow Test(a: Boolean) andThen {
             s = V(x = !$.a)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_boolean_ops_valid(self, validator):
         """&& and || with Boolean operands should be valid."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test() andThen {
             s = V(x = true && false || true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -1918,7 +2066,8 @@ class TestWhenBlockValidation:
 
     def test_valid_when_block(self, validator):
         """Valid when block with boolean conditions should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA(x: Int) => (value: String)
         facet DoFallback() => (value: String)
         workflow Test(count: Int) => (output: String) andThen when {
@@ -1931,13 +2080,15 @@ class TestWhenBlockValidation:
                 yield Test(output = f.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_multiple_defaults_error(self, validator):
         """When block with multiple default cases should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA() => (value: String)
         facet DoB() => (value: String)
         workflow Test() => (output: String) andThen when {
@@ -1950,14 +2101,16 @@ class TestWhenBlockValidation:
                 yield Test(output = b.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("at most one default" in str(e) for e in result.errors)
 
     def test_default_not_last_error(self, validator):
         """Default case not last should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA() => (value: String)
         facet DoB(x: Int) => (value: String)
         workflow Test(count: Int) => (output: String) andThen when {
@@ -1970,14 +2123,16 @@ class TestWhenBlockValidation:
                 yield Test(output = b.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("last case" in str(e) for e in result.errors)
 
     def test_non_boolean_condition_error(self, validator):
         """Non-boolean condition should produce error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA() => (value: String)
         workflow Test() => (output: String) andThen when {
             case 42 => {
@@ -1985,14 +2140,16 @@ class TestWhenBlockValidation:
                 yield Test(output = a.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) for e in result.errors)
 
     def test_missing_default_error(self, validator):
         """When block without a default case should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA(x: Int) => (value: String)
         workflow Test(count: Int) => (output: String) andThen when {
             case $.count > 10 => {
@@ -2000,14 +2157,16 @@ class TestWhenBlockValidation:
                 yield Test(output = a.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("must have a default case" in str(e) for e in result.errors)
 
     def test_valid_references_in_condition(self, validator):
         """Valid input references in when conditions should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA(x: Int) => (value: String)
         facet DoFallback() => (value: String)
         workflow Test(count: Int, active: Boolean) => (output: String) andThen when {
@@ -2020,7 +2179,8 @@ class TestWhenBlockValidation:
                 yield Test(output = f.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -2030,19 +2190,22 @@ class TestCatchBlockValidation:
 
     def test_valid_catch_block(self, validator):
         """Valid catch block should pass validation."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Transform(data: String) => (output: String)
         facet SafeDefault(reason: String) => (output: String)
         workflow Test(input: String) => (output: String) andThen {
             s = Transform(data = $.input) catch { fallback = SafeDefault(reason = $.input) }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_catch_when_missing_default(self, validator):
         """Catch when without default case should fail."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet F(x: String) => (out: String)
         facet G(x: String) => (out: String)
         workflow Test(input: String) => (output: String) andThen {
@@ -2050,14 +2213,16 @@ class TestCatchBlockValidation:
                 case $.input == "a" => { r = G(x = $.input) }
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("default" in str(e).lower() for e in result.errors)
 
     def test_catch_when_multiple_defaults(self, validator):
         """Catch when with multiple defaults should fail."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet F(x: String) => (out: String)
         facet G(x: String) => (out: String)
         workflow Test(input: String) => (output: String) andThen {
@@ -2066,14 +2231,16 @@ class TestCatchBlockValidation:
                 case _ => { r = G(x = $.input) }
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("at most one" in str(e).lower() for e in result.errors)
 
     def test_catch_when_non_boolean_condition(self, validator):
         """Catch when with non-boolean condition should fail."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet F(x: String) => (out: String)
         facet G(x: String) => (out: String)
         workflow Test(input: Int) => (output: String) andThen {
@@ -2082,20 +2249,23 @@ class TestCatchBlockValidation:
                 case _ => { r = G(x = $.input) }
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("boolean" in str(e).lower() for e in result.errors)
 
     def test_valid_workflow_catch(self, validator):
         """Workflow-level catch should pass validation."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Build(service: String) => (image: String)
         facet Notify(service: String) => (status: String)
         workflow Deploy(service: String) => (status: String) andThen {
             build = Build(service = $.service)
         } catch { fallback = Notify(service = $.service) }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -2105,117 +2275,137 @@ class TestParameterTypeInference:
 
     def test_string_param_arithmetic_error(self, validator):
         """$.string_param + 1 should error (String in arithmetic)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(text: String) andThen {
             s = V(x = $.text + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_bool_param_arithmetic_error(self, validator):
         """$.bool_param + 1 should error (Boolean in arithmetic)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(flag: Boolean) andThen {
             s = V(x = $.flag + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_int_param_arithmetic_valid(self, validator):
         """$.int_param + 1 should pass (Int + Int)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(count: Int) andThen {
             s = V(x = $.count + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_int_param_boolean_op_error(self, validator):
         """$.int_param && true should error (Int in boolean op)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test(count: Int) andThen {
             s = V(x = $.count && true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean operands" in str(e) and "Int" in str(e) for e in result.errors)
 
     def test_json_param_passes(self, validator):
         """$.json_param + 1 should pass (Json -> Unknown, no error)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(data: Json) andThen {
             s = V(x = $.data + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_ref_type_resolved(self, validator):
         """step.field type is resolved from facet returns (Long + Int = valid)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long) => (output: Long)
         workflow Test(a: Long) andThen {
             s1 = V(x = $.a)
             s2 = V(x = s1.output + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_negate_string_param_error(self, validator):
         """-$.string_param should error (negate String)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(name: String) andThen {
             s = V(x = -$.name)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) for e in result.errors)
 
     def test_bool_param_ordered_comparison_error(self, validator):
         """$.bool_param > 0 should error (ordered comparison with Boolean)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Boolean)
         workflow Test(flag: Boolean) andThen {
             s = V(x = $.flag > 0)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("ordered comparison" in str(e) and "Boolean" in str(e) for e in result.errors)
 
     def test_double_param_arithmetic_valid(self, validator):
         """$.double_param * 100 should pass (Double * Int = Double)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(rate: Double) andThen {
             s = V(x = $.rate * 100)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_string_param_concat_valid(self, validator):
         """$.string_param ++ "suffix" should pass (concat always valid)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: String)
         workflow Test(name: String) andThen {
             s = V(x = $.name ++ "_suffix")
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -2235,18 +2425,21 @@ class TestParameterTypeInference:
 
     def test_array_typed_param(self, validator):
         """Array-typed param should be Array (passes arithmetic)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet V(x: Long)
         workflow Test(items: [Int]) andThen {
             s = V(x = $.items + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_when_string_condition_error(self, validator):
         """when { case $.string_param => ... } should error (non-Boolean condition)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA() => (value: String)
         facet DoFallback() => (value: String)
         workflow Test(name: String) => (output: String) andThen when {
@@ -2259,14 +2452,16 @@ class TestParameterTypeInference:
                 yield Test(output = f.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) for e in result.errors)
 
     def test_when_bool_condition_valid(self, validator):
         """when { case $.bool_param => ... } should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet DoA() => (value: String)
         facet DoFallback() => (value: String)
         workflow Test(active: Boolean) => (output: String) andThen when {
@@ -2279,7 +2474,8 @@ class TestParameterTypeInference:
                 yield Test(output = f.value)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -2289,90 +2485,103 @@ class TestStepReturnTypeInference:
 
     def test_step_string_plus_int_error(self, validator):
         """s1.name + 1 where name: String should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetName(id: Int) => (name: String)
         facet Process(x: Long)
         workflow Test(id: Int) andThen {
             s1 = GetName(id = $.id)
             s2 = Process(x = s1.name + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_step_long_and_true_error(self, validator):
         """s1.count && true where count: Long should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Count() => (count: Long)
         facet Check(x: Boolean)
         workflow Test() andThen {
             s1 = Count()
             s2 = Check(x = s1.count && true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean operands" in str(e) and "Long" in str(e) for e in result.errors)
 
     def test_step_not_long_error(self, validator):
         """!s1.count where count: Long should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Count() => (count: Long)
         facet Check(x: Boolean)
         workflow Test() andThen {
             s1 = Count()
             s2 = Check(x = !s1.count)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("'!'" in str(e) and "Long" in str(e) for e in result.errors)
 
     def test_step_bool_ordered_comparison_error(self, validator):
         """s1.flag > 0 where flag: Boolean should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetFlag() => (flag: Boolean)
         facet Process(x: Boolean)
         workflow Test() andThen {
             s1 = GetFlag()
             s2 = Process(x = s1.flag > 0)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("ordered comparison" in str(e) and "Boolean" in str(e) for e in result.errors)
 
     def test_step_negate_string_error(self, validator):
         """-s1.name where name: String should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetName() => (name: String)
         facet Process(x: Long)
         workflow Test() andThen {
             s1 = GetName()
             s2 = Process(x = -s1.name)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) for e in result.errors)
 
     def test_step_long_plus_int_valid(self, validator):
         """s1.count + 1 where count: Long should pass (Long + Int = Long)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Count() => (count: Long)
         facet Process(x: Long)
         workflow Test() andThen {
             s1 = Count()
             s2 = Process(x = s1.count + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_double_plus_long_valid(self, validator):
         """s1.rate + s2.count where rate: Double, count: Long should pass (promotion)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetRate() => (rate: Double)
         facet GetCount() => (count: Long)
         facet Process(x: Double)
@@ -2381,26 +2590,30 @@ class TestStepReturnTypeInference:
             s2 = GetCount()
             s3 = Process(x = s1.rate + s2.count)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_not_boolean_valid(self, validator):
         """!s1.enabled where enabled: Boolean should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetEnabled() => (enabled: Boolean)
         facet Check(x: Boolean)
         workflow Test() andThen {
             s1 = GetEnabled()
             s2 = Check(x = !s1.enabled)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_string_equality_valid(self, validator):
         """s1.x == s2.y where both String should pass (comparison always valid)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetA() => (x: String)
         facet GetB() => (y: String)
         facet Check(result: Boolean)
@@ -2409,13 +2622,15 @@ class TestStepReturnTypeInference:
             s2 = GetB()
             s3 = Check(result = s1.x == s2.y)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_int_arithmetic_chain_valid(self, validator):
         """Chained step ref arithmetic should pass: s1.x + s2.y * 2."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetX() => (x: Int)
         facet GetY() => (y: Int)
         facet Process(result: Int)
@@ -2424,34 +2639,39 @@ class TestStepReturnTypeInference:
             s2 = GetY()
             s3 = Process(result = s1.x + s2.y * 2)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_string_bool_op_error(self, validator):
         """s1.name || true where name: String should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetName() => (name: String)
         facet Check(x: Boolean)
         workflow Test() andThen {
             s1 = GetName()
             s2 = Check(x = s1.name || true)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean operands" in str(e) and "String" in str(e) for e in result.errors)
 
     def test_step_negate_boolean_error(self, validator):
         """-s1.flag where flag: Boolean should error (arithmetic negation)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetFlag() => (flag: Boolean)
         facet Process(x: Long)
         workflow Test() andThen {
             s1 = GetFlag()
             s2 = Process(x = -s1.flag)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) for e in result.errors)
@@ -2489,33 +2709,38 @@ class TestStepReturnTypeInference:
 
     def test_unknown_facet_step_ref_passes(self, validator):
         """Step ref to unknown facet returns Unknown — no type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Process(x: Long)
         workflow Test() andThen {
             s1 = ExternalFacet(id = 1)
             s2 = Process(x = s1.output + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         # Should have no arithmetic type errors (Unknown + Int = Unknown, which passes)
         assert not any("arithmetic" in str(e) for e in result.errors)
 
     def test_yield_step_ref_type_checked(self, validator):
         """Step ref type checking also works in yield arguments."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetName() => (name: String)
         workflow Test() => (output: Long) andThen {
             s1 = GetName()
             yield Test(output = s1.name + 1)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_step_ref_concat_valid(self, validator):
         """s1.name ++ s2.name where both String should pass (concat always valid)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetFirst() => (name: String)
         facet GetLast() => (name: String)
         facet Display(label: String)
@@ -2524,20 +2749,23 @@ class TestStepReturnTypeInference:
             s2 = GetLast()
             s3 = Display(label = s1.name ++ " " ++ s2.name)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_step_double_multiply_valid(self, validator):
         """s1.rate * 100 where rate: Double should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet GetRate() => (rate: Double)
         facet Process(x: Double)
         workflow Test() andThen {
             s1 = GetRate()
             s2 = Process(x = s1.rate * 100)
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
@@ -2547,7 +2775,8 @@ class TestWhenBlockStepReturnTypes:
 
     def test_when_condition_step_string_plus_int_error(self, validator):
         """Gap 1: case s1.name + 1 where name: String should catch type error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet HandleHigh(x: Int)
         workflow Test(id: Int) andThen {
@@ -2558,14 +2787,16 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_when_condition_step_int_equals_valid(self, validator):
         """Gap 1: case s1.score == 10 where score: Int should pass (Boolean)."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet HandleHigh(x: Int)
         workflow Test(id: Int) andThen {
@@ -2576,13 +2807,15 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_when_condition_step_string_eq_valid(self, validator):
         """Gap 1: case s1.risk_level == "critical" should pass."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet HandleCritical(x: Int)
         workflow Test(id: Int) andThen {
@@ -2593,13 +2826,15 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_when_condition_step_bool_arithmetic_error(self, validator):
         """Gap 1: case s1.flag + 1 where flag: Boolean should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetFlag() => (flag: Boolean)
         facet Handle(x: Int)
         workflow Test() andThen {
@@ -2610,14 +2845,16 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Boolean" in str(e) for e in result.errors)
 
     def test_cross_block_step_visible_in_when(self, validator):
         """Gap 2: when block can see steps from prior regular andThen blocks."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet HandleCritical(level: String)
         facet HandleNormal(level: String)
@@ -2631,13 +2868,15 @@ class TestWhenBlockStepReturnTypes:
                 n = HandleNormal(level = s1.risk_level)
             }
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_cross_block_step_type_checked_in_when_body(self, validator):
         """Gap 2: step type info flows into when body for type checking."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet Process(x: Int)
         workflow Test(id: Int) andThen {
@@ -2648,14 +2887,16 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("String" in str(e) and "arithmetic" in str(e) for e in result.errors)
 
     def test_when_condition_undefined_step_error(self, validator):
         """Gap 3: referencing undefined step in when condition should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Handle(x: Int)
         workflow Test(id: Int) andThen when {
             case s1.score == 10 => {
@@ -2663,14 +2904,16 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("undefined step" in str(e) and "s1" in str(e) for e in result.errors)
 
     def test_when_condition_invalid_step_attr_error(self, validator):
         """Gap 3: referencing invalid attribute on step in when condition should error."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (risk_level: String, score: Int)
         facet Handle(x: Int)
         workflow Test(id: Int) andThen {
@@ -2681,14 +2924,16 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert not result.is_valid
         assert any("Invalid attribute 'nonexistent'" in str(e) for e in result.errors)
 
     def test_when_condition_step_and_input_mixed(self, validator):
         """Conditions can mix step refs and input refs."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         event facet GetRisk(id: Int) => (score: Int)
         facet Handle(x: Int)
         workflow Test(id: Int, threshold: Int) andThen {
@@ -2699,13 +2944,15 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
     def test_when_no_prior_blocks_step_ref_still_unknown(self, validator):
         """Without prior blocks, step refs in when conditions reference undefined steps."""
-        ast = parse(_ns("""
+        ast = parse(
+            _ns("""
         facet Handle(x: Int)
         workflow Test(id: Int) andThen when {
             case $.id == 1 => {
@@ -2713,7 +2960,8 @@ class TestWhenBlockStepReturnTypes:
             }
             case _ => {}
         }
-        """))
+        """)
+        )
         result = validator.validate(ast)
         # Input ref $.id is valid, no step refs — should pass
         assert result.is_valid, [str(e) for e in result.errors]

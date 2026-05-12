@@ -519,10 +519,7 @@ class BlockExecutionContinueHandler(StateHandler):
             # Stop the block as soon as any step errors — do not let
             # downstream steps (e.g. yield) run against errored deps.
             # Wait for any still-running siblings to finish first.
-            running = [
-                s for s in analysis.steps
-                if not s.is_terminal
-            ]
+            running = [s for s in analysis.steps if not s.is_terminal]
             if not running:
                 errors = [s.transition.error for s in analysis.errored if s.transition.error]
                 msg = f"Block has {len(analysis.errored)} errored step(s)"

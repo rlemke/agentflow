@@ -203,9 +203,9 @@ def synthetic_analysis(topic_name: str, finding_count: int = 0) -> dict[str, Any
     }
 
 
-def synthetic_gaps_and_recs(topic_name: str, gap_count: int = 1) -> tuple[
-    list[dict[str, Any]], list[dict[str, Any]]
-]:
+def synthetic_gaps_and_recs(
+    topic_name: str, gap_count: int = 1
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     gaps = []
     recs = []
     for i in range(max(gap_count, 1)):
@@ -348,9 +348,9 @@ def coerce_analysis(parsed: Any, topic_name: str) -> dict[str, Any]:
     }
 
 
-def coerce_gaps_and_recs(parsed: Any, topic_name: str) -> tuple[
-    list[dict[str, Any]], list[dict[str, Any]]
-]:
+def coerce_gaps_and_recs(
+    parsed: Any, topic_name: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if not isinstance(parsed, dict):
         return synthetic_gaps_and_recs(topic_name)
     gaps_raw = parsed.get("gaps")
@@ -368,9 +368,10 @@ def coerce_draft(parsed: Any, topic_name: str) -> dict[str, Any]:
     sections = parsed.get("sections")
     if not isinstance(sections, list):
         sections = []
-    word_count = int(parsed.get("word_count") or sum(
-        len(str(s.get("content", "")).split()) for s in sections if isinstance(s, dict)
-    ))
+    word_count = int(
+        parsed.get("word_count")
+        or sum(len(str(s.get("content", "")).split()) for s in sections if isinstance(s, dict))
+    )
     return {
         "title": str(parsed.get("title", f"Research Report: {topic_name}")),
         "sections": sections,

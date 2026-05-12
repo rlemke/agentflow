@@ -255,8 +255,11 @@ class RegistryDispatcher:
                 mod_file = os.path.abspath(getattr(mod, "__file__", "") or "")
                 if mod_file and not mod_file.startswith(expected_root):
                     # Found a module from a different example — evict all
-                    stale = [k for k in list(sys.modules)
-                             if k == top_package or k.startswith(top_package + ".")]
+                    stale = [
+                        k
+                        for k in list(sys.modules)
+                        if k == top_package or k.startswith(top_package + ".")
+                    ]
                     for k in stale:
                         del sys.modules[k]
                     importlib.invalidate_caches()

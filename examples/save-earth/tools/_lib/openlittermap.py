@@ -127,9 +127,7 @@ def download(
     with _lock:
         if not force:
             side = sidecar.read_sidecar(NAMESPACE, CACHE_TYPE, relative_path, s)
-            if side and sidecar.exists_and_valid(
-                NAMESPACE, CACHE_TYPE, relative_path, s
-            ):
+            if side and sidecar.exists_and_valid(NAMESPACE, CACHE_TYPE, relative_path, s):
                 age = _age_hours(side.get("generated_at"))
                 if age is None or age < max_age_hours:
                     logger.info(
@@ -190,8 +188,7 @@ def download(
             parsed = resp.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"OpenLitterMap returned non-JSON ({resp.status_code}): "
-                f"{resp.text[:200]!r}"
+                f"OpenLitterMap returned non-JSON ({resp.status_code}): {resp.text[:200]!r}"
             ) from exc
         data = _normalize(parsed)
         body_bytes = json.dumps(data).encode("utf-8")
@@ -210,6 +207,7 @@ def download(
 # ---------------------------------------------------------------------------
 # URL + path helpers.
 # ---------------------------------------------------------------------------
+
 
 def _build_url(
     base: str,
@@ -243,10 +241,7 @@ def _relative_path(
     if bbox is None:
         return f"{mode}-zoom{zoom}.geojson"
     # Stable bbox suffix — floats with 4 decimal places, separators safe for FS.
-    return (
-        f"{mode}-zoom{zoom}"
-        f"_{bbox[0]:.4f},{bbox[1]:.4f},{bbox[2]:.4f},{bbox[3]:.4f}.geojson"
-    )
+    return f"{mode}-zoom{zoom}_{bbox[0]:.4f},{bbox[1]:.4f},{bbox[2]:.4f},{bbox[3]:.4f}.geojson"
 
 
 def _persist(
@@ -262,9 +257,7 @@ def _persist(
 ) -> FetchResult:
     staging_dir = local_staging_subdir(f"{NAMESPACE}/{CACHE_TYPE}")
     os.makedirs(staging_dir, exist_ok=True)
-    stage_path = os.path.join(
-        staging_dir, f"{relative_path.replace('/', '_')}.stage-{os.getpid()}"
-    )
+    stage_path = os.path.join(staging_dir, f"{relative_path.replace('/', '_')}.stage-{os.getpid()}")
     with open(stage_path, "wb") as f:
         f.write(body)
     digest = hashlib.sha256(body).hexdigest()
@@ -276,9 +269,7 @@ def _persist(
         feature_count = 0
 
     final_path = sidecar.cache_path(NAMESPACE, CACHE_TYPE, relative_path, storage)
-    with sidecar.entry_lock(
-        NAMESPACE, CACHE_TYPE, relative_path, storage=storage
-    ):
+    with sidecar.entry_lock(NAMESPACE, CACHE_TYPE, relative_path, storage=storage):
         storage.finalize_from_local(stage_path, final_path)
         side = sidecar.write_sidecar(
             NAMESPACE,
@@ -332,9 +323,7 @@ def _normalize(data: Any) -> dict[str, Any]:
         }
     if isinstance(data, dict) and isinstance(data.get("features"), list):
         return {"type": "FeatureCollection", "features": data["features"]}
-    raise ValueError(
-        "OpenLitterMap response is not a recognizable GeoJSON shape"
-    )
+    raise ValueError("OpenLitterMap response is not a recognizable GeoJSON shape")
 
 
 def _age_hours(generated_at: str | None) -> float | None:
@@ -343,9 +332,7 @@ def _age_hours(generated_at: str | None) -> float | None:
     from datetime import datetime
 
     try:
-        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=UTC
-        )
+        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         return None
     return (datetime.now(UTC) - ts).total_seconds() / 3600.0

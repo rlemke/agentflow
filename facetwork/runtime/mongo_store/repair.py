@@ -92,15 +92,13 @@ class RepairMixin:
 
         # -- 1. Check runner state consistency --
         terminal_task_states = {
-            TaskState.COMPLETED, TaskState.FAILED,
-            TaskState.IGNORED, TaskState.CANCELED,
+            TaskState.COMPLETED,
+            TaskState.FAILED,
+            TaskState.IGNORED,
+            TaskState.CANCELED,
         }
-        has_nonterminal_tasks = any(
-            t.state not in terminal_task_states for t in tasks
-        )
-        has_nonterminal_steps = any(
-            not StepState.is_terminal(s.state) for s in steps
-        )
+        has_nonterminal_tasks = any(t.state not in terminal_task_states for t in tasks)
+        has_nonterminal_steps = any(not StepState.is_terminal(s.state) for s in steps)
         if runner.state in (RunnerState.COMPLETED, RunnerState.FAILED):
             if has_nonterminal_tasks or has_nonterminal_steps:
                 result["runner_reset"] = True
@@ -124,27 +122,34 @@ class RepairMixin:
 
         for t in running_tasks:
             is_orphaned = (
-                t.server_id in dead_server_ids
-                or not t.server_id  # no server claimed it
+                t.server_id in dead_server_ids or not t.server_id  # no server claimed it
             )
             if is_orphaned:
-                result["orphaned_tasks_reset"].append({
-                    "task_id": t.uuid,
-                    "name": t.name,
-                    "step_id": t.step_id,
-                    "server_id": t.server_id,
-                })
+                result["orphaned_tasks_reset"].append(
+                    {
+                        "task_id": t.uuid,
+                        "name": t.name,
+                        "step_id": t.step_id,
+                        "server_id": t.server_id,
+                    }
+                )
                 if not dry_run:
                     self._db.tasks.update_one(
                         {"uuid": t.uuid},
-                        {"$set": {
-                            "state": "pending",
-                            "server_id": "",
-                            "task_heartbeat": 0,
-                            "updated": now,
-                        }},
+                        {
+                            "$set": {
+                                "state": "pending",
+                                "server_id": "",
+                                "task_heartbeat": 0,
+                                "updated": now,
+                            }
+                        },
                     )
-                    reason = "no server claimed it" if not t.server_id else f"server {t.server_id[:8]} is dead/shutdown"
+                    reason = (
+                        "no server claimed it"
+                        if not t.server_id
+                        else f"server {t.server_id[:8]} is dead/shutdown"
+                    )
                     self._repair_log(
                         step_id=t.step_id,
                         workflow_id=workflow_id,
@@ -154,24 +159,34 @@ class RepairMixin:
 
         # -- 3. Retry transient step errors --
         transient_patterns = [
-            "connection refused", "timed out", "timeout",
-            "connectionerror", "serverselectiontimeouterror",
-            "networktimeout", "autoreconnect", "errno 61",
-            "no such file or directory", "input/output error",
+            "connection refused",
+            "timed out",
+            "timeout",
+            "connectionerror",
+            "serverselectiontimeouterror",
+            "networktimeout",
+            "autoreconnect",
+            "errno 61",
+            "no such file or directory",
+            "input/output error",
         ]
         errored_steps = [s for s in steps if s.state == StepState.STATEMENT_ERROR]
         for step in errored_steps:
-            raw_error = getattr(step.transition, "error", None) if hasattr(step, "transition") else None
+            raw_error = (
+                getattr(step.transition, "error", None) if hasattr(step, "transition") else None
+            )
             error_text = (str(raw_error) if raw_error else "").lower()
             if not any(pat in error_text for pat in transient_patterns):
                 continue
 
             error_str = str(raw_error) if raw_error else ""
-            result["transient_steps_retried"].append({
-                "step_id": step.id,
-                "facet_name": step.facet_name or "",
-                "error_snippet": error_str[:120],
-            })
+            result["transient_steps_retried"].append(
+                {
+                    "step_id": step.id,
+                    "facet_name": step.facet_name or "",
+                    "error_snippet": error_str[:120],
+                }
+            )
             if not dry_run:
                 step.state = StepState.EVENT_TRANSMIT
                 if hasattr(step, "transition") and step.transition:
@@ -198,13 +213,15 @@ class RepairMixin:
                 if task_doc:
                     self._db.tasks.update_one(
                         {"uuid": task_doc["uuid"]},
-                        {"$set": {
-                            "state": "pending",
-                            "server_id": "",
-                            "error": None,
-                            "task_heartbeat": 0,
-                            "updated": now,
-                        }},
+                        {
+                            "$set": {
+                                "state": "pending",
+                                "server_id": "",
+                                "error": None,
+                                "task_heartbeat": 0,
+                                "updated": now,
+                            }
+                        },
                     )
 
                 # -- 4. Reset errored ancestors --
@@ -248,24 +265,32 @@ class RepairMixin:
         result["dead_letter_tasks_reset"] = []
         dead_letter_tasks = [t for t in tasks if t.state == TaskState.DEAD_LETTER]
         for t in dead_letter_tasks:
-            result["dead_letter_tasks_reset"].append({
-                "task_id": t.uuid,
-                "name": t.name,
-                "step_id": t.step_id,
-                "error": (t.error or "")[:120] if isinstance(t.error, str) else str(t.error)[:120],
-            })
+            result["dead_letter_tasks_reset"].append(
+                {
+                    "task_id": t.uuid,
+                    "name": t.name,
+                    "step_id": t.step_id,
+                    "error": (t.error or "")[:120]
+                    if isinstance(t.error, str)
+                    else str(t.error)[:120],
+                }
+            )
             if not dry_run:
-                error_snippet = (t.error or "")[:100] if isinstance(t.error, str) else str(t.error)[:100]
+                error_snippet = (
+                    (t.error or "")[:100] if isinstance(t.error, str) else str(t.error)[:100]
+                )
                 self._db.tasks.update_one(
                     {"uuid": t.uuid},
-                    {"$set": {
-                        "state": "pending",
-                        "server_id": "",
-                        "error": None,
-                        "retry_count": 0,
-                        "task_heartbeat": 0,
-                        "updated": now,
-                    }},
+                    {
+                        "$set": {
+                            "state": "pending",
+                            "server_id": "",
+                            "error": None,
+                            "retry_count": 0,
+                            "task_heartbeat": 0,
+                            "updated": now,
+                        }
+                    },
                 )
                 self._repair_log(
                     step_id=t.step_id,
@@ -298,7 +323,9 @@ class RepairMixin:
                         if ancestor.state == StepState.STATEMENT_ERROR:
                             ancestor.state = StepState.BLOCK_EXECUTION_CONTINUE
                             if hasattr(ancestor, "transition") and ancestor.transition:
-                                ancestor.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
+                                ancestor.transition.current_state = (
+                                    StepState.BLOCK_EXECUTION_CONTINUE
+                                )
                                 ancestor.transition.clear_error()
                                 ancestor.transition.request_transition = False
                                 ancestor.transition.changed = True
@@ -321,11 +348,13 @@ class RepairMixin:
             has_failed = any(t.state == TaskState.FAILED for t in step_tasks)
             has_completed = any(t.state == TaskState.COMPLETED for t in step_tasks)
             if has_failed and not has_completed:
-                result["inconsistent_steps_reset"].append({
-                    "step_id": step.id,
-                    "facet_name": step.facet_name or "",
-                    "task_state": "failed",
-                })
+                result["inconsistent_steps_reset"].append(
+                    {
+                        "step_id": step.id,
+                        "facet_name": step.facet_name or "",
+                        "task_state": "failed",
+                    }
+                )
                 if not dry_run:
                     step.state = StepState.EVENT_TRANSMIT
                     step.error = None
@@ -349,13 +378,15 @@ class RepairMixin:
                         if t.state == TaskState.FAILED:
                             self._db.tasks.update_one(
                                 {"uuid": t.uuid},
-                                {"$set": {
-                                    "state": "pending",
-                                    "server_id": "",
-                                    "error": None,
-                                    "task_heartbeat": 0,
-                                    "updated": now,
-                                }},
+                                {
+                                    "$set": {
+                                        "state": "pending",
+                                        "server_id": "",
+                                        "error": None,
+                                        "task_heartbeat": 0,
+                                        "updated": now,
+                                    }
+                                },
                             )
 
         return result

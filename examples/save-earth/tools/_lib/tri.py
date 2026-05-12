@@ -68,8 +68,8 @@ USER_AGENT = "facetwork-save-earth/1.0 (+https://github.com/rlemke/facetwork)"
 CONNECT_TIMEOUT = 30
 READ_TIMEOUT = 300
 DEFAULT_MAX_AGE_HOURS = 24.0 * 7  # TRI data refreshes annually-ish
-PAGE_SIZE = 10_000               # Envirofacts max per request
-MAX_PAGES = 20                   # safety ceiling — full TRI is ~7 pages
+PAGE_SIZE = 10_000  # Envirofacts max per request
+MAX_PAGES = 20  # safety ceiling — full TRI is ~7 pages
 
 # US/territory state codes whose facilities are physically east of
 # Greenwich, so their stored longitude is already a valid positive
@@ -124,6 +124,7 @@ class DownloadResult:
 # Public API.
 # ---------------------------------------------------------------------------
 
+
 def download(
     *,
     active_only: bool = True,
@@ -144,12 +145,8 @@ def download(
     with _lock:
         if not force:
             side = sidecar.read_sidecar(NAMESPACE, CACHE_TYPE, RELATIVE_PATH, s)
-            if side and sidecar.exists_and_valid(
-                NAMESPACE, CACHE_TYPE, RELATIVE_PATH, s
-            ):
-                cached_active = bool(
-                    (side.get("extra") or {}).get("active_only", False)
-                )
+            if side and sidecar.exists_and_valid(NAMESPACE, CACHE_TYPE, RELATIVE_PATH, s):
+                cached_active = bool((side.get("extra") or {}).get("active_only", False))
                 if cached_active == active_only:
                     age = _age_hours(side.get("generated_at"))
                     if age is None or age < max_age_hours:
@@ -163,9 +160,7 @@ def download(
                             relative_path=RELATIVE_PATH,
                             size_bytes=side.get("size_bytes", 0),
                             sha256=side.get("sha256", ""),
-                            feature_count=int(
-                                (side.get("extra") or {}).get("feature_count", 0)
-                            ),
+                            feature_count=int((side.get("extra") or {}).get("feature_count", 0)),
                             active_only=active_only,
                             was_cached=True,
                             source_url=BASE_URL,
@@ -195,6 +190,7 @@ def download(
 # Pagination + normalisation.
 # ---------------------------------------------------------------------------
 
+
 def _fetch_all_pages(*, active_only: bool) -> list[dict[str, Any]]:
     features: list[dict[str, Any]] = []
     for page in range(MAX_PAGES):
@@ -217,13 +213,9 @@ def _fetch_all_pages(*, active_only: bool) -> list[dict[str, Any]]:
         try:
             rows = resp.json()
         except ValueError as exc:
-            raise RuntimeError(
-                f"TRI endpoint returned non-JSON at offset {start}: {exc}"
-            ) from exc
+            raise RuntimeError(f"TRI endpoint returned non-JSON at offset {start}: {exc}") from exc
         if not isinstance(rows, list):
-            raise RuntimeError(
-                f"TRI endpoint returned an unexpected shape at offset {start}"
-            )
+            raise RuntimeError(f"TRI endpoint returned an unexpected shape at offset {start}")
         if not rows:
             break
 
@@ -258,10 +250,8 @@ def _to_feature(row: dict[str, Any], *, active_only: bool) -> dict[str, Any] | N
     state = (row.get("state_abbr") or "").upper()
     lon_signed = lon_f if state in _EASTERN_HEMISPHERE_US else -lon_f
 
-    props: dict[str, Any] = {
-        k: row.get(k) for k in _KEPT_FIELDS if row.get(k) is not None
-    }
-    props["closed"] = (str(row.get("fac_closed_ind") or "").strip() == "1")
+    props: dict[str, Any] = {k: row.get(k) for k in _KEPT_FIELDS if row.get(k) is not None}
+    props["closed"] = str(row.get("fac_closed_ind") or "").strip() == "1"
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [lon_signed, lat_f]},
@@ -272,6 +262,7 @@ def _to_feature(row: dict[str, Any], *, active_only: bool) -> dict[str, Any] | N
 # ---------------------------------------------------------------------------
 # Cache write.
 # ---------------------------------------------------------------------------
+
 
 def _persist(
     body: bytes,
@@ -331,15 +322,14 @@ def _persist(
 # Helpers.
 # ---------------------------------------------------------------------------
 
+
 def _age_hours(generated_at: str | None) -> float | None:
     if not generated_at:
         return None
     from datetime import datetime
 
     try:
-        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=UTC
-        )
+        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         return None
     return (datetime.now(UTC) - ts).total_seconds() / 3600.0
@@ -351,28 +341,64 @@ def _mock_features(*, active_only: bool) -> list[dict[str, Any]]:
     base = [
         # tri_id, name, city, state, parent, lat, lon_unsigned, closed
         (
-            "NYCHEM001", "HUDSON CHEMICAL CORP", "TROY", "NY",
-            "HUDSON INDUSTRIES INC", 42.7284, 73.6918, False,
+            "NYCHEM001",
+            "HUDSON CHEMICAL CORP",
+            "TROY",
+            "NY",
+            "HUDSON INDUSTRIES INC",
+            42.7284,
+            73.6918,
+            False,
         ),
         (
-            "CAREFIN42", "PACIFIC REFINING COMPANY", "MARTINEZ", "CA",
-            "PACIFIC ENERGY CORP", 38.0194, 122.1341, False,
+            "CAREFIN42",
+            "PACIFIC REFINING COMPANY",
+            "MARTINEZ",
+            "CA",
+            "PACIFIC ENERGY CORP",
+            38.0194,
+            122.1341,
+            False,
         ),
         (
-            "TXSTEEL07", "LONE STAR STEEL", "HOUSTON", "TX",
-            "LONE STAR HOLDINGS", 29.7604, 95.3698, False,
+            "TXSTEEL07",
+            "LONE STAR STEEL",
+            "HOUSTON",
+            "TX",
+            "LONE STAR HOLDINGS",
+            29.7604,
+            95.3698,
+            False,
         ),
         (
-            "GUPACKGING", "PACIFIC PACKAGING HAGATNA", "HAGATNA", "GU",
-            "PACIFIC PKG INC", 13.4443, 144.7937, False,  # real east-hemisphere
+            "GUPACKGING",
+            "PACIFIC PACKAGING HAGATNA",
+            "HAGATNA",
+            "GU",
+            "PACIFIC PKG INC",
+            13.4443,
+            144.7937,
+            False,  # real east-hemisphere
         ),
         (
-            "ILTEXTIL9X", "MIDWEST TEXTILES INC", "CHICAGO", "IL",
-            "MIDWEST HOLDINGS LLC", 41.8781, 87.6298, False,
+            "ILTEXTIL9X",
+            "MIDWEST TEXTILES INC",
+            "CHICAGO",
+            "IL",
+            "MIDWEST HOLDINGS LLC",
+            41.8781,
+            87.6298,
+            False,
         ),
         (
-            "PAABANDON1", "DEFUNCT WIDGETS CO", "PHILADELPHIA", "PA",
-            "DEFUNCT HOLDINGS", 39.9526, 75.1652, True,  # closed
+            "PAABANDON1",
+            "DEFUNCT WIDGETS CO",
+            "PHILADELPHIA",
+            "PA",
+            "DEFUNCT HOLDINGS",
+            39.9526,
+            75.1652,
+            True,  # closed
         ),
     ]
     features: list[dict[str, Any]] = []

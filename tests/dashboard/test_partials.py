@@ -27,7 +27,9 @@ except ImportError:
 
 pytestmark = pytest.mark.skipif(not JINJA2_AVAILABLE, reason="jinja2 not installed")
 
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "facetwork" / "dashboard" / "templates"
+_TEMPLATES_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "facetwork" / "dashboard" / "templates"
+)
 
 
 @pytest.fixture

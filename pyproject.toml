@@ -33,7 +33,7 @@ Changelog = "https://github.com/rlemke/facetwork/blob/main/spec/99_changelog.md"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "ruff>=0.8.0",
+    "ruff>=0.15.0",
     "mypy>=1.14.0",
     "pre-commit>=4.0.0",
     "types-requests>=2.31.0",
@@ -125,7 +125,6 @@ ignore = [
     "E402",   # module level import not at top of file (logger setup pattern)
     "B008",   # do not perform function calls in argument defaults
     "B905",   # zip without strict= (python 3.10+)
-    "UP038",  # isinstance with tuple is valid and readable (removed in ruff 0.12+)
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -47,6 +47,7 @@ def _mock_client(reply_text: str):
 def _patch_anthropic_client(client):
     """Patch fwh_anthropic's get_client to return *client*."""
     from anthropic_handlers.tools._lib import messages as msg_lib
+
     return patch.object(msg_lib, "get_client", return_value=client)
 
 
@@ -87,7 +88,7 @@ class TestExtractJsonPayload:
     def test_finds_first_balanced_array(self):
         from handlers.shared.research_utils import extract_json_payload
 
-        msg = "Here you go: [\"a\", \"b\"] and that's all."
+        msg = 'Here you go: ["a", "b"] and that\'s all.'
         assert extract_json_payload(msg) == ["a", "b"]
 
     def test_empty_text_raises(self):
@@ -195,7 +196,9 @@ class TestPlanningHandlers:
     def test_decompose_with_fenced_response(self):
         from handlers.planning.planning_handlers import handle_decompose_into_subtopics
 
-        body = '```json\n[{"name": "a", "parent_topic": "P", "description": "d", "priority": 1}]\n```'
+        body = (
+            '```json\n[{"name": "a", "parent_topic": "P", "description": "d", "priority": 1}]\n```'
+        )
         with _patch_anthropic_client(_mock_client(body)):
             out = handle_decompose_into_subtopics(
                 {"topic": {"name": "P", "keywords": []}, "max_subtopics": 5}
@@ -206,9 +209,7 @@ class TestPlanningHandlers:
     def test_decompose_accepts_json_string_topic(self):
         from handlers.planning.planning_handlers import handle_decompose_into_subtopics
 
-        body = json.dumps(
-            [{"name": "x", "parent_topic": "P", "description": "d", "priority": 1}]
-        )
+        body = json.dumps([{"name": "x", "parent_topic": "P", "description": "d", "priority": 1}])
         with _patch_anthropic_client(_mock_client(body)):
             out = handle_decompose_into_subtopics(
                 {"topic": json.dumps({"name": "P", "keywords": []}), "max_subtopics": 5}
@@ -250,9 +251,7 @@ class TestGatheringHandlers:
         from handlers.gathering.gathering_handlers import handle_extract_findings
 
         with _patch_anthropic_client(_mock_client("no JSON")):
-            out = handle_extract_findings(
-                {"subtopic": {"name": "x"}, "sources": []}
-            )
+            out = handle_extract_findings({"subtopic": {"name": "x"}, "sources": []})
         assert isinstance(out["findings"], list)
         assert all("claim" in f for f in out["findings"])
 
@@ -322,8 +321,11 @@ class TestWritingHandlers:
         )
         with _patch_anthropic_client(_mock_client(body)):
             out = handle_review_draft(
-                {"draft": {"title": "R", "word_count": 100}, "topic": {"name": "X"},
-                 "analysis": {"confidence_score": 0.8}}
+                {
+                    "draft": {"title": "R", "word_count": 100},
+                    "topic": {"name": "X"},
+                    "analysis": {"confidence_score": 0.8},
+                }
             )
         assert out["review"]["score"] == 78
         assert out["review"]["approved"] is True
@@ -386,9 +388,7 @@ class TestCompilation:
     def parsed_ast(self):
         from facetwork.parser import FFLParser
 
-        afl_path = os.path.join(
-            os.path.dirname(__file__), "..", "ffl", "research.ffl"
-        )
+        afl_path = os.path.join(os.path.dirname(__file__), "..", "ffl", "research.ffl")
         with open(afl_path) as f:
             source = f.read()
         return FFLParser().parse(source)

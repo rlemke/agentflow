@@ -33,9 +33,7 @@ def handle_synthesize_findings(params: dict[str, Any]) -> dict[str, Any]:
     topic = _ensure(params.get("topic", {}), dict)
     name = str(topic.get("name", "unknown"))
     all_findings = _ensure(params.get("all_findings", []), list)
-    finding_count = sum(
-        len(g) if isinstance(g, list) else 1 for g in all_findings
-    )
+    finding_count = sum(len(g) if isinstance(g, list) else 1 for g in all_findings)
 
     analysis = run_step_or_fallback(
         system=(

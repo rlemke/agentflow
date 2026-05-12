@@ -64,6 +64,7 @@ class PipelineCard:
 # Per-pipeline discovery.
 # ---------------------------------------------------------------------------
 
+
 def _discover_noaa_weather(cache_root: Path) -> PipelineCard | None:
     ns = cache_root / "noaa-weather"
     if not ns.is_dir():
@@ -104,9 +105,7 @@ def _discover_noaa_weather(cache_root: Path) -> PipelineCard | None:
         meta = _read_sidecar(cache_root / catalog_meta_rel)
         size = meta.get("size_bytes") if meta else None
         if size:
-            card.stats.append(
-                ("GHCN catalog", f"stations.txt {size / 1024:.0f} KB")
-            )
+            card.stats.append(("GHCN catalog", f"stations.txt {size / 1024:.0f} KB"))
     ndbc_json_meta = cache_root / "noaa-weather/ndbc-catalog/stations.json.meta.json"
     if ndbc_json_meta.is_file():
         meta = _read_sidecar(ndbc_json_meta)
@@ -118,9 +117,7 @@ def _discover_noaa_weather(cache_root: Path) -> PipelineCard | None:
     if stdmet_root.is_dir():
         stdmet_years = _count_artifacts(stdmet_root)
         if stdmet_years:
-            card.stats.append(
-                ("NDBC stdmet", f"{stdmet_years:,} cached station-year(s)")
-            )
+            card.stats.append(("NDBC stdmet", f"{stdmet_years:,} cached station-year(s)"))
     if not card.primary_links:
         return None
     return card
@@ -163,9 +160,7 @@ def _discover_save_earth(cache_root: Path) -> PipelineCard | None:
                         if meta:
                             n = (meta.get("extra") or {}).get("feature_count")
                             if n:
-                                card.stats.append(
-                                    ("TRI", f"{n:,} facilities")
-                                )
+                                card.stats.append(("TRI", f"{n:,} facilities"))
                                 continue
                 card.stats.append((label, f"{len(files)} cached file(s)"))
     if not card.primary_links:
@@ -217,6 +212,7 @@ DISCOVERERS = [_discover_noaa_weather, _discover_save_earth, _discover_osm]
 # Sidecar + stats helpers.
 # ---------------------------------------------------------------------------
 
+
 def _read_sidecar(path: Path) -> dict[str, Any] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -260,6 +256,7 @@ def _summarise_report_index(
 # ---------------------------------------------------------------------------
 # HTML rendering.
 # ---------------------------------------------------------------------------
+
 
 def _render_html(cards: list[PipelineCard]) -> str:
     title = "AFL Data Cache"
@@ -330,17 +327,11 @@ def _render_html(cards: list[PipelineCard]) -> str:
                     f"{html_mod.escape(label)}</a>"
                 )
             for label, href in card.secondary_links:
-                parts.append(
-                    f"<a href='{html_mod.escape(href)}'>"
-                    f"{html_mod.escape(label)}</a> "
-                )
+                parts.append(f"<a href='{html_mod.escape(href)}'>{html_mod.escape(label)}</a> ")
             if card.stats:
                 parts.append("<div class='stats'><dl>")
                 for k, v in card.stats:
-                    parts.append(
-                        f"<dt>{html_mod.escape(k)}</dt>"
-                        f"<dd>{html_mod.escape(v)}</dd>"
-                    )
+                    parts.append(f"<dt>{html_mod.escape(k)}</dt><dd>{html_mod.escape(v)}</dd>")
                 parts.append("</dl></div>")
             parts.append("</div>")
         parts.append("</div>")
@@ -360,6 +351,7 @@ def _render_html(cards: list[PipelineCard]) -> str:
 # Sidecar write (minimal, no dependency on the example _lib modules so
 # this runs standalone).
 # ---------------------------------------------------------------------------
+
 
 def _write_sidecar_minimal(
     path: Path, *, size_bytes: int, sha256_hex: str, extra: dict[str, Any]
@@ -441,12 +433,12 @@ def main() -> int:
 
     if args.open:
         import subprocess
+
         opener = "open" if sys.platform == "darwin" else "xdg-open"
         try:
             subprocess.run([opener, str(out_path)], check=False)
         except FileNotFoundError:
-            print(f"warning: '{opener}' not found; open {out_path} manually",
-                  file=sys.stderr)
+            print(f"warning: '{opener}' not found; open {out_path} manually", file=sys.stderr)
 
     return 0
 

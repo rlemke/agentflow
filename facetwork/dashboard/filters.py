@@ -37,7 +37,7 @@ def timestamp_split_fmt(value: int | float | None) -> str:
     return Markup(
         f'<span class="ts-split" data-ts="{ts}">'
         f'{time_str}<br><small class="secondary">{date_str}</small>'
-        f'</span>'
+        f"</span>"
     )
 
 

@@ -212,9 +212,7 @@ def _count_declarations(declarations: list, counts: dict[str, int]) -> None:
             counts["schemas"] += 1
 
 
-def _collect_declarations(
-    declarations: list, namespace: str, groups: dict[str, list]
-) -> None:
+def _collect_declarations(declarations: list, namespace: str, groups: dict[str, list]) -> None:
     """Recursively collect declarations from JSON AST into typed groups."""
     for decl in declarations:
         dtype = decl.get("type", "")
@@ -271,9 +269,7 @@ def _collect_declarations(
                     inner = ftype
                     if inner.get("type") == "ArrayType":
                         elem = inner.get("elementType", {})
-                        elem_name = (
-                            elem.get("name", "?") if isinstance(elem, dict) else str(elem)
-                        )
+                        elem_name = elem.get("name", "?") if isinstance(elem, dict) else str(elem)
                         ftype = f"[{elem_name}]"
                     else:
                         ftype = inner.get("name", inner.get("type", "?"))
@@ -295,11 +291,13 @@ def _collect_steps(decl: dict, entry: dict, namespace: str) -> None:
             target = call.get("target", "")
             args = [a.get("name", "") for a in call.get("args", [])]
             # Also recurse into statement-level andThen body
-            entry["steps"].append({
-                "name": step.get("name", ""),
-                "target": target,
-                "args": args,
-            })
+            entry["steps"].append(
+                {
+                    "name": step.get("name", ""),
+                    "target": target,
+                    "args": args,
+                }
+            )
             # Recurse into nested body (statement-level andThen)
             if step.get("body"):
                 nested = step["body"] if isinstance(step["body"], list) else [step["body"]]
@@ -308,11 +306,13 @@ def _collect_steps(decl: dict, entry: dict, namespace: str) -> None:
                         if ns_step.get("type") != "StepStmt":
                             continue
                         nc = ns_step.get("call", {})
-                        entry["steps"].append({
-                            "name": ns_step.get("name", ""),
-                            "target": nc.get("target", ""),
-                            "args": [a.get("name", "") for a in nc.get("args", [])],
-                        })
+                        entry["steps"].append(
+                            {
+                                "name": ns_step.get("name", ""),
+                                "target": nc.get("target", ""),
+                                "args": [a.get("name", "") for a in nc.get("args", [])],
+                            }
+                        )
 
 
 @router.get("/{flow_id}/ns/{namespace_name:path}")

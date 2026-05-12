@@ -81,14 +81,13 @@ _OLM_COLORS = ["#d9534f", "#e57373", "#f06292", "#ba68c8", "#7986cb"]
 
 
 def _openlittermap_layers(storage: LocalStorage) -> list[map_render.LayerSpec]:
-    olm_dir = sidecar_lib.cache_path(
-        map_render.NAMESPACE, openlittermap.CACHE_TYPE, "", storage
-    )
+    olm_dir = sidecar_lib.cache_path(map_render.NAMESPACE, openlittermap.CACHE_TYPE, "", storage)
     if not os.path.isdir(olm_dir):
         return []
     layers: list[map_render.LayerSpec] = []
     names = sorted(
-        fn for fn in os.listdir(olm_dir)
+        fn
+        for fn in os.listdir(olm_dir)
         if fn.endswith(".geojson") and not fn.endswith(".meta.json")
     )
     for i, fn in enumerate(names):
@@ -117,10 +116,7 @@ def handle_build_map(params: dict[str, Any]) -> dict[str, Any]:
     # Voyager + OSM/CARTO attribution) so FFL callers can leave them
     # unset without breaking rendering.
     basemap_url = params.get("basemap_url", "") or map_render.DEFAULT_BASEMAP_URL
-    basemap_attr = (
-        params.get("basemap_attribution", "")
-        or map_render.DEFAULT_BASEMAP_ATTRIBUTION
-    )
+    basemap_attr = params.get("basemap_attribution", "") or map_render.DEFAULT_BASEMAP_ATTRIBUTION
     step_log = params.get("_step_log")
 
     storage = LocalStorage()

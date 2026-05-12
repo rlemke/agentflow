@@ -834,9 +834,7 @@ def _tool_describe_handler(
         return [
             TextContent(
                 type="text",
-                text=json.dumps(
-                    {"success": False, "error": "facet_name is required"}
-                ),
+                text=json.dumps({"success": False, "error": "facet_name is required"}),
             )
         ]
     try:
@@ -1329,7 +1327,9 @@ def _tool_postgis_query(arguments: dict[str, Any]) -> list[TextContent]:
     )
 
     try:
-        conn = psycopg2.connect(postgis_url, options="-c default_transaction_read_only=on", gssencmode="disable")
+        conn = psycopg2.connect(
+            postgis_url, options="-c default_transaction_read_only=on", gssencmode="disable"
+        )
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(sql)

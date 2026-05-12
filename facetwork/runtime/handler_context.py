@@ -53,7 +53,7 @@ class StageHandle:
         self.timeout_ms += int(extra_ms)
         self.ctx._set_stage_budget(remaining + int(extra_ms), self.name)
         self.ctx.step_log(
-            f"↻ stage {self.name}: +{extra_ms/1000:.0f}s extension",
+            f"↻ stage {self.name}: +{extra_ms / 1000:.0f}s extension",
         )
 
     def heartbeat(
@@ -99,9 +99,7 @@ class HandlerContext:
     is_retry: bool = False
     step_log: Callable[..., None] = field(default=lambda *a, **kw: None, repr=False)
     heartbeat: Callable[..., None] = field(default=lambda *a, **kw: None, repr=False)
-    _set_stage_budget: Callable[[int, str], None] = field(
-        default=_noop_stage_budget, repr=False
-    )
+    _set_stage_budget: Callable[[int, str], None] = field(default=_noop_stage_budget, repr=False)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @contextmanager
@@ -127,7 +125,7 @@ class HandlerContext:
         self._set_stage_budget(int(timeout_ms), name)
         msg = f"{name}: starting" if progress is None else f"{name}: {progress}"
         self.heartbeat(progress_message=msg)
-        self.step_log(f"→ stage {name} (budget {timeout_ms/1000:.0f}s)")
+        self.step_log(f"→ stage {name} (budget {timeout_ms / 1000:.0f}s)")
         handle = StageHandle(ctx=self, name=name, timeout_ms=int(timeout_ms))
         t0 = time.monotonic()
         try:

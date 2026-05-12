@@ -69,8 +69,7 @@ def handle_review_draft(params: dict[str, Any]) -> dict[str, Any]:
             '"suggested_edits": [{"section": string, "suggestion": string}]}.'
         ),
         prompt=(
-            f"Review '{title}' ({word_count} words) on '{name}'. "
-            "Score 0-100. Return JSON only."
+            f"Review '{title}' ({word_count} words) on '{name}'. Score 0-100. Return JSON only."
         ),
         coerce=lambda parsed: coerce_review(parsed, name),
         fallback=lambda: synthetic_review(name, draft_title=title),

@@ -46,7 +46,7 @@ def _compute_next_retry_after(retry_count: int, now_ms: int) -> int:
 
     Backoff: 5s, 10s, 20s, 40s, 80s, 160s, 300s (capped at 5 minutes).
     """
-    delay = min(5000 * (2 ** retry_count), 300_000)
+    delay = min(5000 * (2**retry_count), 300_000)
     return now_ms + delay
 
 

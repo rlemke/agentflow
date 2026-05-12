@@ -65,12 +65,8 @@ DEFAULT_MAX_AGE_HOURS = 24.0 * 7  # cleanup status moves slowly — a week is fi
 _EMEF_BASE = "https://geopub.epa.gov/arcgis/rest/services/EMEF/efpoints/MapServer"
 
 DEFAULT_URLS: dict[str, str] = {
-    "superfund": (
-        f"{_EMEF_BASE}/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson"
-    ),
-    "brownfields": (
-        f"{_EMEF_BASE}/5/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson"
-    ),
+    "superfund": (f"{_EMEF_BASE}/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson"),
+    "brownfields": (f"{_EMEF_BASE}/5/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson"),
 }
 
 DATASET_CHOICES = tuple(DEFAULT_URLS)
@@ -108,9 +104,7 @@ def download(
 ) -> FetchResult:
     """Fetch one EPA dataset and cache it."""
     if dataset not in DEFAULT_URLS:
-        raise ValueError(
-            f"dataset must be one of {list(DEFAULT_URLS)}, got {dataset!r}"
-        )
+        raise ValueError(f"dataset must be one of {list(DEFAULT_URLS)}, got {dataset!r}")
     effective_url = url or DEFAULT_URLS[dataset]
     relative_path = f"{dataset}.geojson"
     s = storage or LocalStorage()
@@ -119,9 +113,7 @@ def download(
     with _lock:
         if not force:
             side = sidecar.read_sidecar(NAMESPACE, CACHE_TYPE, relative_path, s)
-            if side and sidecar.exists_and_valid(
-                NAMESPACE, CACHE_TYPE, relative_path, s
-            ):
+            if side and sidecar.exists_and_valid(NAMESPACE, CACHE_TYPE, relative_path, s):
                 age = _age_hours(side.get("generated_at"))
                 if age is None or age < max_age_hours:
                     logger.info("epa-cleanups/%s cache hit (%.1fh old)", dataset, age or -1.0)
@@ -150,9 +142,7 @@ def download(
         logger.info("downloading epa-cleanups/%s from %s", dataset, effective_url)
         data = _fetch_all_pages(effective_url, dataset=dataset)
         body_bytes = json.dumps(data).encode("utf-8")
-        return _persist(
-            dataset, body_bytes, url=effective_url, storage=s, used_mock=False
-        )
+        return _persist(dataset, body_bytes, url=effective_url, storage=s, used_mock=False)
 
 
 def _persist(
@@ -238,8 +228,7 @@ def _fetch_all_pages(base_url: str, *, dataset: str) -> dict[str, Any]:
             # ArcGIS MapServer error envelope — surface the message.
             err = parsed["error"]
             raise RuntimeError(
-                f"EPA server error for {dataset} at offset {offset}: "
-                f"{err.get('message', err)}"
+                f"EPA server error for {dataset} at offset {offset}: {err.get('message', err)}"
             )
 
         if not (isinstance(parsed, dict) and isinstance(parsed.get("features"), list)):
@@ -280,9 +269,7 @@ def _age_hours(generated_at: str | None) -> float | None:
     from datetime import datetime
 
     try:
-        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=UTC
-        )
+        ts = datetime.strptime(generated_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         return None
     return (datetime.now(UTC) - ts).total_seconds() / 3600.0

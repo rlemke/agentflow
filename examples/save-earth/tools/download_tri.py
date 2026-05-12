@@ -48,8 +48,7 @@ def main() -> int:
     parser.add_argument(
         "--include-closed",
         action="store_true",
-        help="Include closed facilities (fac_closed_ind='1'). Default: "
-        "active-only.",
+        help="Include closed facilities (fac_closed_ind='1'). Default: active-only.",
     )
     parser.add_argument("--force", action="store_true", help="Re-download even if cached.")
     parser.add_argument(

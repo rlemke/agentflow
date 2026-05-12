@@ -131,8 +131,7 @@ class HandlerModule:
         fn = self._dispatch.get(facet_name)
         if fn is None:
             raise ValueError(
-                f"Unknown facet: {facet_name} "
-                f"(registered: {', '.join(sorted(self._dispatch))})"
+                f"Unknown facet: {facet_name} (registered: {', '.join(sorted(self._dispatch))})"
             )
         return fn(payload)
 

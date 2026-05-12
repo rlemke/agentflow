@@ -200,7 +200,9 @@ class TaskProcessor:
             task.state = TaskState.PENDING
             task.server_id = ""
             task.error = None
-            delay_ms = min(10000 * (2 ** (task.retry_count - 1)), 300000)  # 10s, 20s, 40s... max 5min
+            delay_ms = min(
+                10000 * (2 ** (task.retry_count - 1)), 300000
+            )  # 10s, 20s, 40s... max 5min
             task.next_retry_after = now + delay_ms
             logger.warning(
                 "Task %s failed (retry %d/%d, next in %.0fs) — %s: %s",
@@ -224,8 +226,7 @@ class TaskProcessor:
         if task.max_retries > 0 and task.retry_count >= task.max_retries:
             task.state = TaskState.DEAD_LETTER
             task.error = (
-                f"Timed out {task.retry_count} times "
-                f"(limit {task.max_retries}), dead-lettered"
+                f"Timed out {task.retry_count} times (limit {task.max_retries}), dead-lettered"
             )
             try:
                 self._evaluator.fail_step(task.step_id, task.error)
@@ -279,4 +280,6 @@ class TaskProcessor:
                         retries,
                     )
                 else:
-                    logger.exception("save_task failed for %s after %d attempts", task.uuid, retries)
+                    logger.exception(
+                        "save_task failed for %s after %d attempts", task.uuid, retries
+                    )

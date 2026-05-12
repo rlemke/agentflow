@@ -787,9 +787,7 @@ def handler_list(
     active_handlers, busy_handlers, handler_stats = _build_handler_stats(store)
 
     tab_counts = _count_handlers_by_prefix(all_handlers)
-    tab_counts["working"] = len(
-        [h for h in all_handlers if h.facet_name in busy_handlers]
-    )
+    tab_counts["working"] = len([h for h in all_handlers if h.facet_name in busy_handlers])
     # Build sorted list of unique prefixes (excluding 'all' and 'working')
     prefixes = sorted({extract_handler_prefix(h.facet_name) for h in all_handlers})
     filtered = _filter_handlers_by_prefix(all_handlers, tab, busy_handlers)

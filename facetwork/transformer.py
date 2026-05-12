@@ -580,6 +580,7 @@ class FFLTransformer(Transformer):
                 break
         if introducer is not None and introducer != "prompt":
             from .parser import ParseError
+
             raise ParseError(
                 f"Expected `prompt` to introduce a prompt block, got `{introducer}`",
                 line=meta.line,
@@ -616,9 +617,9 @@ class FFLTransformer(Transformer):
         name = str(key)
         if name not in ("system", "template", "model"):
             from .parser import ParseError
+
             raise ParseError(
-                f"Unknown prompt directive `{name}` "
-                "(expected one of: system, template, model)",
+                f"Unknown prompt directive `{name}` (expected one of: system, template, model)",
                 line=meta.line,
                 column=meta.column,
             )
@@ -640,6 +641,7 @@ class FFLTransformer(Transformer):
         name = str(dialect)
         if name != "python":
             from .parser import ParseError
+
             raise ParseError(
                 f"Unknown script dialect `{name}` (expected `python`)",
                 line=meta.line,

@@ -51,13 +51,12 @@ CACHE_TYPE = "maps"
 # does not require a Referer header, so the generated HTML opens
 # correctly from file:// without tripping the OSM tile usage policy.
 DEFAULT_BASEMAP_URL = (
-    "https://cartodb-basemaps-{s}.global.ssl.fastly.net/rastertiles/voyager/"
-    "{z}/{x}/{y}.png"
+    "https://cartodb-basemaps-{s}.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png"
 )
 DEFAULT_BASEMAP_SUBDOMAINS = ["a", "b", "c", "d"]
 DEFAULT_BASEMAP_ATTRIBUTION = (
-    "© <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> "
-    "contributors © <a href=\"https://carto.com/attributions\">CARTO</a>"
+    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+    'contributors © <a href="https://carto.com/attributions">CARTO</a>'
 )
 
 
@@ -65,12 +64,12 @@ DEFAULT_BASEMAP_ATTRIBUTION = (
 class LayerSpec:
     """One point/polygon source to render on the map."""
 
-    name: str                         # short id — lowercase slug ("openlittermap")
-    title: str                        # human-readable title ("Litter observations")
-    source_cache_type: str            # cache_type inside NAMESPACE
-    source_relative_path: str         # relative path of the cached GeoJSON
-    color: str                        # CSS colour for the circles
-    radius: int = 5                   # circle radius in px
+    name: str  # short id — lowercase slug ("openlittermap")
+    title: str  # human-readable title ("Litter observations")
+    source_cache_type: str  # cache_type inside NAMESPACE
+    source_relative_path: str  # relative path of the cached GeoJSON
+    color: str  # CSS colour for the circles
+    radius: int = 5  # circle radius in px
     description_fields: list[str] | None = None  # property names to show in popups
 
 
@@ -78,7 +77,7 @@ class LayerSpec:
 class MapBundle:
     output_dir: Path
     html_path: Path
-    layer_counts: dict[str, int]       # layer name → feature count included
+    layer_counts: dict[str, int]  # layer name → feature count included
     region_key: str
 
 
@@ -116,9 +115,7 @@ def render_map(
         with open(geojson_path, encoding="utf-8") as f:
             data = json.load(f)
         if data.get("type") != "FeatureCollection":
-            raise ValueError(
-                f"{geojson_path} is not a FeatureCollection — aborting"
-            )
+            raise ValueError(f"{geojson_path} is not a FeatureCollection — aborting")
         loaded_layers.append((layer, data))
         counts[layer.name] = len(data.get("features") or [])
 
@@ -189,6 +186,7 @@ def _layer_meta(layer: LayerSpec) -> dict[str, Any]:
 # HTML rendering.
 # ---------------------------------------------------------------------------
 
+
 def _render_html(
     region_key: str,
     loaded_layers: list[tuple[LayerSpec, dict[str, Any]]],
@@ -220,11 +218,7 @@ def _render_html(
             "type": "FeatureCollection",
             "features": features,
         }
-    inline_data = (
-        "const LAYER_DATA = "
-        + json.dumps(layer_data_map, separators=(",", ":"))
-        + ";"
-    )
+    inline_data = "const LAYER_DATA = " + json.dumps(layer_data_map, separators=(",", ":")) + ";"
 
     layer_specs_js = json.dumps(
         [

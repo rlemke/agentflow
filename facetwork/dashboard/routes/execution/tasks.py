@@ -36,9 +36,11 @@ def _count_tasks_by_state(store) -> dict[str, int]:
         "canceled": 0,
         "dead_letter": 0,
     }
-    for doc in store._db.tasks.aggregate([
-        {"$group": {"_id": "$state", "count": {"$sum": 1}}},
-    ]):
+    for doc in store._db.tasks.aggregate(
+        [
+            {"$group": {"_id": "$state", "count": {"$sum": 1}}},
+        ]
+    ):
         state = doc["_id"]
         n = doc["count"]
         counts["all"] += n
@@ -138,7 +140,12 @@ def task_list_partial(request: Request, state: str | None = None, store=Depends(
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/_table_content.html",
-        {"tasks": tasks, "filter_state": state, "step_names": step_names, "server_info": server_info},
+        {
+            "tasks": tasks,
+            "filter_state": state,
+            "step_names": step_names,
+            "server_info": server_info,
+        },
     )
 
 
@@ -187,10 +194,17 @@ def task_reenqueue_all(store=Depends(get_store)):
     db = store._db
     result = db.tasks.update_many(
         {"state": "dead_letter"},
-        {"$set": {
-            "state": "pending", "server_id": "", "task_heartbeat": 0,
-            "retry_count": 0, "next_retry_after": 0, "error": None, "updated": now,
-        }},
+        {
+            "$set": {
+                "state": "pending",
+                "server_id": "",
+                "task_heartbeat": 0,
+                "retry_count": 0,
+                "next_retry_after": 0,
+                "error": None,
+                "updated": now,
+            }
+        },
     )
     return JSONResponse({"success": True, "count": result.modified_count})
 
@@ -206,10 +220,17 @@ def task_retry_all_failed(store=Depends(get_store)):
     db = store._db
     result = db.tasks.update_many(
         {"state": "failed"},
-        {"$set": {
-            "state": "pending", "server_id": "", "task_heartbeat": 0,
-            "retry_count": 0, "next_retry_after": 0, "error": None, "updated": now,
-        }},
+        {
+            "$set": {
+                "state": "pending",
+                "server_id": "",
+                "task_heartbeat": 0,
+                "retry_count": 0,
+                "next_retry_after": 0,
+                "error": None,
+                "updated": now,
+            }
+        },
     )
     return JSONResponse({"success": True, "count": result.modified_count})
 

@@ -45,9 +45,7 @@ def parse_bbox(s: str) -> tuple[float, float, float, float] | None:
         return None
     parts = [p.strip() for p in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(
-            f"bbox must have 4 comma-separated numbers (got {len(parts)}): {s!r}"
-        )
+        raise ValueError(f"bbox must have 4 comma-separated numbers (got {len(parts)}): {s!r}")
     try:
         return (float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
     except ValueError as exc:

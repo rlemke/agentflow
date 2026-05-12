@@ -25,9 +25,11 @@ except ImportError:
     try:
         from mongomock.collection import ReturnDocument  # type: ignore[no-redef]
     except ImportError:
+
         class ReturnDocument:  # type: ignore[no-redef]
             AFTER = True
             BEFORE = False
+
 
 from ..entities import TaskDefinition
 from .base import _current_time_ms
@@ -95,11 +97,13 @@ class TaskMixin:
         name_filter = {"$or": name_conditions} if len(name_conditions) > 1 else name_conditions[0]
 
         # Backoff filter: skip tasks still in their retry cooldown window
-        retry_eligible = {"$or": [
-            {"next_retry_after": {"$exists": False}},
-            {"next_retry_after": 0},
-            {"next_retry_after": {"$lte": now}},
-        ]}
+        retry_eligible = {
+            "$or": [
+                {"next_retry_after": {"$exists": False}},
+                {"next_retry_after": 0},
+                {"next_retry_after": {"$lte": now}},
+            ]
+        }
 
         # First try to claim a pending task
         doc = self._db.tasks.find_one_and_update(

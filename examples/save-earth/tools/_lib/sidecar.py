@@ -59,6 +59,7 @@ def utcnow_iso() -> str:
 # Path derivation.
 # ---------------------------------------------------------------------------
 
+
 def cache_dir(namespace: str, cache_type: str, storage: Storage | None = None) -> str:
     """Return ``<cache_root>/<namespace>/<cache_type>``."""
     s = _storage(storage)
@@ -136,6 +137,7 @@ def lock_path(
 # Sidecar read / write.
 # ---------------------------------------------------------------------------
 
+
 def read_sidecar(
     namespace: str,
     cache_type: str,
@@ -206,6 +208,7 @@ def write_sidecar(
 # Presence and validity.
 # ---------------------------------------------------------------------------
 
+
 def exists_and_valid(
     namespace: str,
     cache_type: str,
@@ -254,6 +257,7 @@ def _is_dir(storage: Storage, path: str) -> bool:
     """Best-effort is-dir check (backends don't expose isdir uniformly)."""
     if isinstance(storage, LocalStorage):
         import os as _os
+
         return _os.path.isdir(path)
     return False
 
@@ -261,6 +265,7 @@ def _is_dir(storage: Storage, path: str) -> bool:
 def _rmtree(storage: Storage, path: str) -> None:
     if isinstance(storage, LocalStorage):
         import shutil as _shutil
+
         _shutil.rmtree(path, ignore_errors=True)
     else:
         storage.unlink(path)
@@ -269,6 +274,7 @@ def _rmtree(storage: Storage, path: str) -> None:
 # ---------------------------------------------------------------------------
 # Per-entry lock.
 # ---------------------------------------------------------------------------
+
 
 @contextmanager
 def entry_lock(
@@ -296,6 +302,7 @@ def entry_lock(
 # Listing.
 # ---------------------------------------------------------------------------
 
+
 def list_entries(
     namespace: str,
     cache_type: str,
@@ -322,6 +329,7 @@ def _walk_sidecars(storage: Storage, root: str) -> Iterator[str]:
     """Yield absolute paths of every ``*.meta.json`` under ``root``."""
     if isinstance(storage, LocalStorage):
         import os as _os
+
         if not _os.path.isdir(root):
             return
         for dirpath, _dirs, files in _os.walk(root):

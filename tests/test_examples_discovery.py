@@ -20,8 +20,7 @@ def _make_local_example(root: Path, name: str, *, with_handlers: bool, with_ffl:
     if with_handlers:
         (ex / "handlers").mkdir(parents=True)
         (ex / "handlers" / "__init__.py").write_text(
-            "def register_all_registry_handlers(runner):\n"
-            f"    runner.calls.append({name!r})\n"
+            f"def register_all_registry_handlers(runner):\n    runner.calls.append({name!r})\n"
         )
     if with_ffl:
         (ex / "ffl").mkdir(parents=True)

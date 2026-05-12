@@ -41,89 +41,155 @@ sys.path.insert(0, str(Path(__file__).parent))
 def _canned_response_for(system: str) -> str:
     s = system.lower()
     if "research planning assistant" in s:
-        return json.dumps({
-            "name": "quantum sensing",
-            "depth": 3,
-            "keywords": ["nv-center", "atomic clocks", "magnetometry"],
-            "summary": "Three-axis exploration of quantum sensing modalities.",
-            "max_subtopics": 3,
-        })
+        return json.dumps(
+            {
+                "name": "quantum sensing",
+                "depth": 3,
+                "keywords": ["nv-center", "atomic clocks", "magnetometry"],
+                "summary": "Three-axis exploration of quantum sensing modalities.",
+                "max_subtopics": 3,
+            }
+        )
     if "decomposition expert" in s:
-        return json.dumps([
-            {"name": "NV center magnetometry", "parent_topic": "quantum sensing",
-             "description": "Diamond NV-center based magnetic field detection.",
-             "priority": 3},
-            {"name": "Atomic clocks", "parent_topic": "quantum sensing",
-             "description": "Optical lattice and ion-trap clocks.", "priority": 2},
-            {"name": "Quantum gravimetry", "parent_topic": "quantum sensing",
-             "description": "Atom-interferometer gravimeters.", "priority": 1},
-        ])
+        return json.dumps(
+            [
+                {
+                    "name": "NV center magnetometry",
+                    "parent_topic": "quantum sensing",
+                    "description": "Diamond NV-center based magnetic field detection.",
+                    "priority": 3,
+                },
+                {
+                    "name": "Atomic clocks",
+                    "parent_topic": "quantum sensing",
+                    "description": "Optical lattice and ion-trap clocks.",
+                    "priority": 2,
+                },
+                {
+                    "name": "Quantum gravimetry",
+                    "parent_topic": "quantum sensing",
+                    "description": "Atom-interferometer gravimeters.",
+                    "priority": 1,
+                },
+            ]
+        )
     if "research librarian" in s:
-        return json.dumps([
-            {"title": "Nature Phys 2024: NV ensembles", "url": "https://example/1",
-             "relevance_score": 0.92, "source_type": "journal"},
-            {"title": "PRX 2023: lattice clocks at 1e-19", "url": "https://example/2",
-             "relevance_score": 0.88, "source_type": "journal"},
-            {"title": "Science 2024: cold-atom gravimeter", "url": "https://example/3",
-             "relevance_score": 0.85, "source_type": "journal"},
-        ])
+        return json.dumps(
+            [
+                {
+                    "title": "Nature Phys 2024: NV ensembles",
+                    "url": "https://example/1",
+                    "relevance_score": 0.92,
+                    "source_type": "journal",
+                },
+                {
+                    "title": "PRX 2023: lattice clocks at 1e-19",
+                    "url": "https://example/2",
+                    "relevance_score": 0.88,
+                    "source_type": "journal",
+                },
+                {
+                    "title": "Science 2024: cold-atom gravimeter",
+                    "url": "https://example/3",
+                    "relevance_score": 0.85,
+                    "source_type": "journal",
+                },
+            ]
+        )
     if "research analyst" in s:
-        return json.dumps([
-            {"claim": "NV ensembles reach 1 pT sensitivity.",
-             "evidence": "Nature Phys 2024 figure 3.",
-             "confidence": 0.86, "source_title": "Nature Phys 2024: NV ensembles"},
-            {"claim": "Optical clocks now stable to 1e-19.",
-             "evidence": "PRX 2023 systematic table.",
-             "confidence": 0.91, "source_title": "PRX 2023: lattice clocks at 1e-19"},
-        ])
+        return json.dumps(
+            [
+                {
+                    "claim": "NV ensembles reach 1 pT sensitivity.",
+                    "evidence": "Nature Phys 2024 figure 3.",
+                    "confidence": 0.86,
+                    "source_title": "Nature Phys 2024: NV ensembles",
+                },
+                {
+                    "claim": "Optical clocks now stable to 1e-19.",
+                    "evidence": "PRX 2023 systematic table.",
+                    "confidence": 0.91,
+                    "source_title": "PRX 2023: lattice clocks at 1e-19",
+                },
+            ]
+        )
     if "research synthesizer" in s:
-        return json.dumps({
-            "themes": ["Sensitivity gains", "Field deployment readiness",
-                       "Cross-platform interoperability"],
-            "contradictions": ["NV vs. atomic-clock cost/SWaP tradeoff disputed"],
-            "gaps": ["Few longitudinal field studies", "Limited public datasets"],
-            "summary": "Quantum sensing is converging on lab-grade sensitivity outside the lab.",
-            "confidence_score": 0.78,
-        })
+        return json.dumps(
+            {
+                "themes": [
+                    "Sensitivity gains",
+                    "Field deployment readiness",
+                    "Cross-platform interoperability",
+                ],
+                "contradictions": ["NV vs. atomic-clock cost/SWaP tradeoff disputed"],
+                "gaps": ["Few longitudinal field studies", "Limited public datasets"],
+                "summary": "Quantum sensing is converging on lab-grade sensitivity outside the lab.",
+                "confidence_score": 0.78,
+            }
+        )
     if "research quality reviewer" in s:
-        return json.dumps({
-            "gaps": [
-                {"description": "No fielded gravimeter benchmarks",
-                 "severity": "high", "area": "deployment"},
-            ],
-            "recommendations": [
-                {"action": "Commission a field-trial benchmark suite",
-                 "priority": "high", "estimated_effort": "high"},
-            ],
-        })
+        return json.dumps(
+            {
+                "gaps": [
+                    {
+                        "description": "No fielded gravimeter benchmarks",
+                        "severity": "high",
+                        "area": "deployment",
+                    },
+                ],
+                "recommendations": [
+                    {
+                        "action": "Commission a field-trial benchmark suite",
+                        "priority": "high",
+                        "estimated_effort": "high",
+                    },
+                ],
+            }
+        )
     if "technical writer" in s:
-        return json.dumps({
-            "title": "Quantum Sensing: 2025 State of the Art",
-            "sections": [
-                {"title": "Introduction",
-                 "content": "Quantum sensing has matured rapidly over the last decade."},
-                {"title": "Methodology",
-                 "content": "Survey of three primary modalities and their figures of merit."},
-                {"title": "Findings",
-                 "content": "Sensitivity gains are real; field readiness is uneven."},
-                {"title": "Discussion",
-                 "content": "Cross-platform interoperability remains a gap."},
-                {"title": "Conclusion",
-                 "content": "Investment is warranted in field-trial infrastructure."},
-            ],
-            "word_count": 50,
-            "citations": ["[1] Nature Phys 2024", "[2] PRX 2023", "[3] Science 2024"],
-        })
+        return json.dumps(
+            {
+                "title": "Quantum Sensing: 2025 State of the Art",
+                "sections": [
+                    {
+                        "title": "Introduction",
+                        "content": "Quantum sensing has matured rapidly over the last decade.",
+                    },
+                    {
+                        "title": "Methodology",
+                        "content": "Survey of three primary modalities and their figures of merit.",
+                    },
+                    {
+                        "title": "Findings",
+                        "content": "Sensitivity gains are real; field readiness is uneven.",
+                    },
+                    {
+                        "title": "Discussion",
+                        "content": "Cross-platform interoperability remains a gap.",
+                    },
+                    {
+                        "title": "Conclusion",
+                        "content": "Investment is warranted in field-trial infrastructure.",
+                    },
+                ],
+                "word_count": 50,
+                "citations": ["[1] Nature Phys 2024", "[2] PRX 2023", "[3] Science 2024"],
+            }
+        )
     if "peer reviewer" in s:
-        return json.dumps({
-            "score": 82,
-            "approved": True,
-            "feedback": ["Well-structured; cite more recent work in NV section."],
-            "suggested_edits": [
-                {"section": "Methodology",
-                 "suggestion": "Add concrete sensitivity figures of merit."}
-            ],
-        })
+        return json.dumps(
+            {
+                "score": 82,
+                "approved": True,
+                "feedback": ["Well-structured; cite more recent work in NV section."],
+                "suggested_edits": [
+                    {
+                        "section": "Methodology",
+                        "suggestion": "Add concrete sensitivity figures of merit.",
+                    }
+                ],
+            }
+        )
     return json.dumps({"placeholder": True, "system_seen": system[:80]})
 
 
@@ -204,9 +270,7 @@ def main() -> int:
 
     try:
         program, workflow_ast = _compile_workflow()
-        ns_count = sum(
-            1 for d in program.get("declarations", []) if d.get("type") == "Namespace"
-        )
+        ns_count = sum(1 for d in program.get("declarations", []) if d.get("type") == "Namespace")
         print(f"\nCompiled OK — {ns_count} namespaces, workflow=ResearchTopic\n")
 
         store = MemoryStore()
@@ -267,7 +331,7 @@ def main() -> int:
         root = store.get_workflow_root(wf_id)
         if not root or not root.is_complete:
             # Show step states for diagnosis
-            err = (root.transition.error if root and root.transition else "no terminal state")
+            err = root.transition.error if root and root.transition else "no terminal state"
             print(f"\nWorkflow did not reach COMPLETED: {err}")
             print("\nWorkflow root state:")
             if root:
@@ -278,8 +342,12 @@ def main() -> int:
             for step in store.get_steps_by_workflow(wf_id):
                 state = "?"
                 if step.transition:
-                    state = getattr(step.transition, "next_state", None) or getattr(step.transition, "state", "?")
-                print(f"  step={getattr(step, 'name', '?')} facet={getattr(step, 'facet_name', '?')} state={state}")
+                    state = getattr(step.transition, "next_state", None) or getattr(
+                        step.transition, "state", "?"
+                    )
+                print(
+                    f"  step={getattr(step, 'name', '?')} facet={getattr(step, 'facet_name', '?')} state={state}"
+                )
             return 1
         outputs = {name: attr.value for name, attr in root.attributes.returns.items()}
         print("\nFinal status: COMPLETED")

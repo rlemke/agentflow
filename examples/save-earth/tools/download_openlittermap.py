@@ -44,9 +44,7 @@ def _parse_bbox(s: str) -> tuple[float, float, float, float]:
     except ValueError as exc:
         raise SystemExit(f"error: --bbox needs 4 comma-separated numbers: {exc}") from exc
     if len(parts) != 4:
-        raise SystemExit(
-            "error: --bbox needs 4 values: min_lon,min_lat,max_lon,max_lat"
-        )
+        raise SystemExit("error: --bbox needs 4 values: min_lon,min_lat,max_lon,max_lat")
     return tuple(parts)  # type: ignore[return-value]
 
 
@@ -81,9 +79,7 @@ def main() -> int:
         default=openlittermap.DEFAULT_BASE_URL,
         help=f"Upstream API base (default: {openlittermap.DEFAULT_BASE_URL}).",
     )
-    parser.add_argument(
-        "--force", action="store_true", help="Re-download even if cached."
-    )
+    parser.add_argument("--force", action="store_true", help="Re-download even if cached.")
     parser.add_argument(
         "--max-age-hours",
         type=float,

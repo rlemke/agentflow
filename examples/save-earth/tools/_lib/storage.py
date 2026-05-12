@@ -238,8 +238,7 @@ class LocalStorage(Storage):
                 self.unlink(tmp_dst)
                 stderr = (proc.stderr or "").strip() or "(no stderr)"
                 raise OSError(
-                    f"cp -X {local_path} {tmp_dst} failed "
-                    f"(exit {proc.returncode}): {stderr}"
+                    f"cp -X {local_path} {tmp_dst} failed (exit {proc.returncode}): {stderr}"
                 )
             os.rename(tmp_dst, dst_path)
         except BaseException:
@@ -270,8 +269,7 @@ class LocalStorage(Storage):
             if proc.returncode != 0:
                 stderr = (proc.stderr or "").strip() or "(no stderr)"
                 raise OSError(
-                    f"cp -R -X {local_dir} {tmp_dst} failed "
-                    f"(exit {proc.returncode}): {stderr}"
+                    f"cp -R -X {local_dir} {tmp_dst} failed (exit {proc.returncode}): {stderr}"
                 )
             os.rename(tmp_dst, dst_dir)
         except BaseException:
@@ -326,12 +324,8 @@ class HdfsStorage(Storage):
         if self._backend.exists(dst):
             self._backend.remove(dst)
         url = self._backend._url(self._backend._strip_uri(src))
-        params = self._backend._params(
-            op="RENAME", destination=self._backend._strip_uri(dst)
-        )
-        response = _requests.put(
-            url, params=params, allow_redirects=True, timeout=30
-        )
+        params = self._backend._params(op="RENAME", destination=self._backend._strip_uri(dst))
+        response = _requests.put(url, params=params, allow_redirects=True, timeout=30)
         response.raise_for_status()
         result = response.json()
         if not result.get("boolean"):
@@ -385,6 +379,7 @@ class HdfsStorage(Storage):
 # Backend selection.
 # ---------------------------------------------------------------------------
 
+
 def default_backend() -> str:
     return (os.environ.get("AFL_STORAGE") or "local").lower()
 
@@ -395,14 +390,13 @@ def get_storage(backend: str | None = None) -> Storage:
         return LocalStorage()
     if name == "hdfs":
         return HdfsStorage()
-    raise ValueError(
-        f"Unknown storage backend: {name!r} (expected 'local' or 'hdfs')"
-    )
+    raise ValueError(f"Unknown storage backend: {name!r} (expected 'local' or 'hdfs')")
 
 
 # ---------------------------------------------------------------------------
 # Roots — one data root, five derived subtrees.
 # ---------------------------------------------------------------------------
+
 
 def data_root(backend: str | None = None) -> str:
     """Return the top-level data root.
@@ -454,6 +448,7 @@ def locks_root(backend: str | None = None) -> str:
 # Local staging helper — used by download libs that must stage on local disk
 # before finalizing into (possibly remote) cache backends.
 # ---------------------------------------------------------------------------
+
 
 def local_staging_subdir(subdir: str) -> str:
     """Return a local-disk staging directory named ``subdir``.

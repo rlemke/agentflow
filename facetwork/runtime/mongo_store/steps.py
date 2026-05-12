@@ -26,8 +26,10 @@ except ImportError:
     try:
         from mongomock.collection import DuplicateKeyError  # type: ignore[no-redef]
     except ImportError:
+
         class DuplicateKeyError(Exception):  # type: ignore[no-redef]
             pass
+
 
 from ..entities import LogDefinition, StepLogEntry
 from ..persistence import IterationChanges

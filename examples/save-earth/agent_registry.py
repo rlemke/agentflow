@@ -21,10 +21,7 @@ def main() -> None:
     """Start the RegistryRunner with all save-earth handlers."""
     runner = create_registry_runner("save-earth", topics=["save_earth.*"])
     register_all_registry_handlers(runner)
-    print(
-        f"save-earth RegistryRunner started with "
-        f"{len(runner.registered_names())} handlers"
-    )
+    print(f"save-earth RegistryRunner started with {len(runner.registered_names())} handlers")
     runner.start()
 
 

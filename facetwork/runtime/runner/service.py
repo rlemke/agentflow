@@ -260,7 +260,9 @@ class RunnerService:
                     segments.append(str(fv))
                 elif sn:
                     segments.append(str(sn))
-                current_id = getattr(ancestor, "container_id", None) or getattr(ancestor, "block_id", None)
+                current_id = getattr(ancestor, "container_id", None) or getattr(
+                    ancestor, "block_id", None
+                )
             segments.reverse()
             if step.statement_name:
                 segments.append(step.statement_name)
@@ -454,10 +456,7 @@ class RunnerService:
             return 0
 
         # Claim event tasks from the task queue (filtered by circuit breaker)
-        event_names = [
-            n for n in self._get_event_names()
-            if self._circuit_breakers.is_allowed(n)
-        ]
+        event_names = [n for n in self._get_event_names() if self._circuit_breakers.is_allowed(n)]
         if event_names:
             while capacity > 0:
                 task = self._persistence.claim_task(
@@ -584,8 +583,7 @@ class RunnerService:
             if task.max_retries > 0 and task.retry_count >= task.max_retries:
                 task.state = TaskState.DEAD_LETTER
                 task.error = (
-                    f"Timed out {task.retry_count} times "
-                    f"(limit {task.max_retries}), dead-lettered"
+                    f"Timed out {task.retry_count} times (limit {task.max_retries}), dead-lettered"
                 )
                 label = self._task_label(task_id)
                 try:
@@ -631,7 +629,9 @@ class RunnerService:
                 )
                 self._persistence.save_step_log(entry)
             except Exception:
-                logger.debug("Could not save timeout step log for step %s", task.step_id, exc_info=True)
+                logger.debug(
+                    "Could not save timeout step log for step %s", task.step_id, exc_info=True
+                )
         except Exception:
             logger.debug("Could not release timed-out task %s", task_id, exc_info=True)
 
@@ -896,7 +896,9 @@ class RunnerService:
                 )
                 self._persistence.save_step_log(entry)
             except Exception:
-                logger.debug("Could not save claim step log for step %s", task.step_id, exc_info=True)
+                logger.debug(
+                    "Could not save claim step log for step %s", task.step_id, exc_info=True
+                )
 
             # Inject _step_log callback for handler-level progress logging
             def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
@@ -1041,14 +1043,17 @@ class RunnerService:
             task.retry_count += 1
             if task.max_retries > 0 and task.retry_count >= task.max_retries:
                 task.state = TaskState.DEAD_LETTER
-                task.error = {"message": f"Handler not loadable after {task.retry_count} attempts: {exc}"}
-                log_msg = (
-                    f"Handler not loadable after {task.retry_count} attempts: {exc}"
-                )
+                task.error = {
+                    "message": f"Handler not loadable after {task.retry_count} attempts: {exc}"
+                }
+                log_msg = f"Handler not loadable after {task.retry_count} attempts: {exc}"
                 log_level = StepLogLevel.ERROR
                 logger.warning(
                     "Dead-lettering task %s (%s): handler not loadable after %d attempts — %s",
-                    task.uuid, task.name, task.retry_count, self._task_label(task.uuid),
+                    task.uuid,
+                    task.name,
+                    task.retry_count,
+                    self._task_label(task.uuid),
                 )
             else:
                 task.state = TaskState.PENDING
@@ -1061,8 +1066,12 @@ class RunnerService:
                 logger.warning(
                     "Cannot load handler for '%s', releasing task %s back to pending "
                     "(attempt %d/%d): %s — %s",
-                    task.name, task.uuid, task.retry_count, task.max_retries,
-                    exc, self._task_label(task.uuid),
+                    task.name,
+                    task.uuid,
+                    task.retry_count,
+                    task.max_retries,
+                    exc,
+                    self._task_label(task.uuid),
                 )
             task.updated = _current_time_ms()
             self._safe_save_task(task)
@@ -1366,21 +1375,18 @@ class RunnerService:
                 except Exception:
                     pass
 
-            names = ", ".join(
-                wf_names.get(wid, wid[:12]) for wid in workflow_ids
-            )
+            names = ", ".join(wf_names.get(wid, wid[:12]) for wid in workflow_ids)
             logger.info(
                 "Stuck-step sweep: %d workflow(s) need resume: %s",
-                len(workflow_ids), names,
+                len(workflow_ids),
+                names,
             )
 
             for wf_id in workflow_ids:
                 try:
                     self._sweep_workflow_steps(wf_id)
                 except Exception:
-                    logger.debug(
-                        "Sweep failed for workflow %s", wf_id, exc_info=True
-                    )
+                    logger.debug("Sweep failed for workflow %s", wf_id, exc_info=True)
         except Exception:
             logger.debug("Stuck-step sweep failed", exc_info=True)
 
@@ -1393,18 +1399,22 @@ class RunnerService:
         from .states import StepState
 
         # Get all non-terminal steps for this workflow
-        stuck_steps = list(self._persistence._db.steps.find({
-            "workflow_id": workflow_id,
-            "state": {
-                "$in": [
-                    StepState.EVENT_TRANSMIT,
-                    StepState.STATEMENT_BLOCKS_BEGIN,
-                    StepState.STATEMENT_BLOCKS_CONTINUE,
-                    StepState.BLOCK_EXECUTION_BEGIN,
-                    StepState.BLOCK_EXECUTION_CONTINUE,
-                ]
-            },
-        }))
+        stuck_steps = list(
+            self._persistence._db.steps.find(
+                {
+                    "workflow_id": workflow_id,
+                    "state": {
+                        "$in": [
+                            StepState.EVENT_TRANSMIT,
+                            StepState.STATEMENT_BLOCKS_BEGIN,
+                            StepState.STATEMENT_BLOCKS_CONTINUE,
+                            StepState.BLOCK_EXECUTION_BEGIN,
+                            StepState.BLOCK_EXECUTION_CONTINUE,
+                        ]
+                    },
+                }
+            )
+        )
 
         if not stuck_steps:
             return
@@ -1420,7 +1430,9 @@ class RunnerService:
             step_details.append(f"{name} ({s['state']})")
         logger.info(
             "Sweep workflow %s: %d leaf + %d block steps stuck: %s",
-            workflow_id[:12], len(leaf_steps), len(block_steps),
+            workflow_id[:12],
+            len(leaf_steps),
+            len(block_steps),
             ", ".join(step_details),
         )
 
@@ -1459,7 +1471,8 @@ class RunnerService:
                 self._persistence.save_task(task)
                 logger.info(
                     "Sweep created task for stuck step: %s (%s)",
-                    step_id[:12], facet_name,
+                    step_id[:12],
+                    facet_name,
                 )
 
         # Resume block steps to cascade completion
@@ -1470,7 +1483,9 @@ class RunnerService:
             except Exception:
                 logger.debug(
                     "Sweep resume_step failed: workflow=%s step=%s",
-                    workflow_id[:12], step_id[:12], exc_info=True,
+                    workflow_id[:12],
+                    step_id[:12],
+                    exc_info=True,
                 )
 
     # =========================================================================
@@ -1592,9 +1607,8 @@ class RunnerService:
         # indefinitely. Large workflows (100+ steps) can have long iteration
         # loops that consume the thread, preventing capacity from being freed.
         import concurrent.futures
-        resume_timeout_s = int(
-            os.environ.get("AFL_RESUME_TIMEOUT_S", "600")
-        )
+
+        resume_timeout_s = int(os.environ.get("AFL_RESUME_TIMEOUT_S", "600"))
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         try:
             future = executor.submit(
@@ -1607,8 +1621,7 @@ class RunnerService:
             result = future.result(timeout=resume_timeout_s)
         except concurrent.futures.TimeoutError:
             logger.warning(
-                "Workflow resume timed out after %ds for workflow %s — "
-                "will retry on next sweep",
+                "Workflow resume timed out after %ds for workflow %s — will retry on next sweep",
                 resume_timeout_s,
                 workflow_id,
             )
@@ -1634,9 +1647,7 @@ class RunnerService:
                 self._workflow_locks[workflow_id] = threading.Lock()
             return self._workflow_locks[workflow_id]
 
-    def _resume_workflow_for_step(
-        self, workflow_id: str, step_id: str
-    ) -> None:
+    def _resume_workflow_for_step(self, workflow_id: str, step_id: str) -> None:
         """Resume a workflow scoped to a single completed step.
 
         Uses ``evaluator.resume_step()`` which walks the ancestor chain
@@ -1675,8 +1686,11 @@ class RunnerService:
                     runner_id = runners[0].uuid
 
             result = self._evaluator.resume_step(
-                workflow_id, step_id, workflow_ast,
-                program_ast=program_ast, runner_id=runner_id,
+                workflow_id,
+                step_id,
+                workflow_ast,
+                program_ast=program_ast,
+                runner_id=runner_id,
             )
 
             if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):
@@ -1684,13 +1698,16 @@ class RunnerService:
 
             logger.debug(
                 "resume_step done: workflow=%s step=%s status=%s",
-                workflow_id, step_id, result.status,
+                workflow_id,
+                step_id,
+                result.status,
             )
         except Exception:
             logger.warning(
-                "resume_step failed for workflow %s step %s, "
-                "falling back to full resume",
-                workflow_id, step_id, exc_info=True,
+                "resume_step failed for workflow %s step %s, falling back to full resume",
+                workflow_id,
+                step_id,
+                exc_info=True,
             )
             try:
                 self._resume_workflow(workflow_id)

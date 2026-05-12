@@ -124,14 +124,13 @@ def _openlittermap_layers(storage: LocalStorage) -> list[map_render.LayerSpec]:
     ``points-zoom15_<bbox>`` detail feed. Without auto-discovery they'd
     only see the default clusters-zoom4 layer on the map.
     """
-    olm_dir = sidecar.cache_path(
-        map_render.NAMESPACE, openlittermap.CACHE_TYPE, "", storage
-    )
+    olm_dir = sidecar.cache_path(map_render.NAMESPACE, openlittermap.CACHE_TYPE, "", storage)
     if not os.path.isdir(olm_dir):
         return []
     layers: list[map_render.LayerSpec] = []
     names = sorted(
-        fn for fn in os.listdir(olm_dir)
+        fn
+        for fn in os.listdir(olm_dir)
         if fn.endswith(".geojson") and not fn.endswith(".meta.json")
     )
     for i, fn in enumerate(names):
@@ -238,9 +237,7 @@ def main() -> int:
         if os.path.exists(geojson_path):
             present.append(layer)
         else:
-            logging.info(
-                "skipping layer %s — no cache at %s", layer.name, geojson_path
-            )
+            logging.info("skipping layer %s — no cache at %s", layer.name, geojson_path)
 
     if not present:
         print(
@@ -265,13 +262,8 @@ def main() -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    counts_str = ", ".join(
-        f"{name}={count:,}" for name, count in bundle.layer_counts.items()
-    )
-    print(
-        f"[map] {bundle.html_path}\n"
-        f"      layers: {counts_str}"
-    )
+    counts_str = ", ".join(f"{name}={count:,}" for name, count in bundle.layer_counts.items())
+    print(f"[map] {bundle.html_path}\n      layers: {counts_str}")
     return 0
 
 

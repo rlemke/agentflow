@@ -78,7 +78,6 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
-
 @dataclass
 class RegistryRunnerConfig(BaseRunnerConfig):
     """Configuration for the RegistryRunner.
@@ -664,18 +663,18 @@ class RegistryRunner:
                 except Exception:
                     pass
 
-            names = ", ".join(
-                wf_names.get(wid, wid[:12]) for wid in workflow_ids
-            )
+            names = ", ".join(wf_names.get(wid, wid[:12]) for wid in workflow_ids)
             logger.info(
                 "Stuck-step sweep: %d workflow(s) need resume: %s",
-                len(workflow_ids), names,
+                len(workflow_ids),
+                names,
             )
 
             for wf_id in workflow_ids:
                 steps = self._persistence.get_actionable_steps_by_workflow(wf_id)
                 stuck = [
-                    s for s in steps
+                    s
+                    for s in steps
                     if not StepState.is_terminal(s.state)
                     and not (
                         s.state == StepState.EVENT_TRANSMIT
@@ -689,7 +688,9 @@ class RegistryRunner:
                     )
                     logger.info(
                         "Sweep workflow %s: %d stuck steps: %s",
-                        wf_names.get(wf_id, wf_id[:12]), len(stuck), step_details,
+                        wf_names.get(wf_id, wf_id[:12]),
+                        len(stuck),
+                        step_details,
                     )
 
                 for step in stuck:
@@ -948,12 +949,16 @@ class RegistryRunner:
                 task.retry_count += 1
                 if task.max_retries > 0 and task.retry_count >= task.max_retries:
                     task.state = TaskState.DEAD_LETTER
-                    task.error = {"message": f"Handler not loadable after {task.retry_count} attempts: {exc}"}
+                    task.error = {
+                        "message": f"Handler not loadable after {task.retry_count} attempts: {exc}"
+                    }
                     log_msg = f"Handler not loadable after {task.retry_count} attempts: {exc}"
                     log_level = StepLogLevel.ERROR
                     logger.warning(
                         "Dead-lettering task %s (%s): handler not loadable after %d attempts",
-                        task.uuid, task.name, task.retry_count,
+                        task.uuid,
+                        task.name,
+                        task.retry_count,
                     )
                 else:
                     task.state = TaskState.PENDING
@@ -962,9 +967,12 @@ class RegistryRunner:
                     log_msg = f"Cannot load handler (attempt {task.retry_count}/{task.max_retries}): {exc}"
                     log_level = StepLogLevel.WARNING
                     logger.warning(
-                        "Cannot load handler for '%s', releasing task %s "
-                        "(attempt %d/%d): %s",
-                        task.name, task.uuid, task.retry_count, task.max_retries, exc,
+                        "Cannot load handler for '%s', releasing task %s (attempt %d/%d): %s",
+                        task.name,
+                        task.uuid,
+                        task.retry_count,
+                        task.max_retries,
+                        exc,
                     )
                 task.updated = _current_time_ms()
                 self._persistence.save_task(task)

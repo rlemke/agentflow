@@ -61,8 +61,7 @@ def handle_download_openlittermap(params: dict[str, Any]) -> dict[str, Any]:
     bbox = parse_bbox(bbox_str)
     _step_log(
         step_log,
-        f"DownloadOpenLitterMap mode={mode} zoom={zoom} "
-        f"bbox={bbox_str or '(none)'}",
+        f"DownloadOpenLitterMap mode={mode} zoom={zoom} bbox={bbox_str or '(none)'}",
     )
 
     res = openlittermap.download(
@@ -75,8 +74,7 @@ def handle_download_openlittermap(params: dict[str, Any]) -> dict[str, Any]:
     status = "cache" if res.was_cached else ("mock" if res.used_mock else "download")
     _step_log(
         step_log,
-        f"[{status}] openlittermap/{res.relative_path}  "
-        f"{res.feature_count:,} features",
+        f"[{status}] openlittermap/{res.relative_path}  {res.feature_count:,} features",
         "success",
     )
     return {"cache_type": openlittermap.CACHE_TYPE, **_result_payload(res)}
@@ -94,8 +92,7 @@ def handle_download_tri(params: dict[str, Any]) -> dict[str, Any]:
     status = "cache" if res.was_cached else ("mock" if res.used_mock else "download")
     _step_log(
         step_log,
-        f"[{status}] tri/{res.absolute_path}  "
-        f"{res.feature_count:,} facilities",
+        f"[{status}] tri/{res.absolute_path}  {res.feature_count:,} facilities",
         "success",
     )
     return {"cache_type": tri.CACHE_TYPE, **_result_payload(res)}
@@ -110,8 +107,7 @@ def handle_download_epa_cleanups(params: dict[str, Any]) -> dict[str, Any]:
 
     if dataset not in epa_cleanups.DEFAULT_URLS:
         raise ValueError(
-            f"unknown EPA dataset {dataset!r}; "
-            f"choices: {sorted(epa_cleanups.DEFAULT_URLS)}"
+            f"unknown EPA dataset {dataset!r}; choices: {sorted(epa_cleanups.DEFAULT_URLS)}"
         )
 
     _step_log(step_log, f"DownloadEpaCleanups dataset={dataset}")
@@ -119,8 +115,7 @@ def handle_download_epa_cleanups(params: dict[str, Any]) -> dict[str, Any]:
     status = "cache" if res.was_cached else ("mock" if res.used_mock else "download")
     _step_log(
         step_log,
-        f"[{status}] epa-cleanups/{res.relative_path}  "
-        f"{res.feature_count:,} features",
+        f"[{status}] epa-cleanups/{res.relative_path}  {res.feature_count:,} features",
         "success",
     )
     return {"cache_type": epa_cleanups.CACHE_TYPE, **_result_payload(res)}

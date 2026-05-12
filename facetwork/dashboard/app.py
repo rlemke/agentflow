@@ -69,14 +69,10 @@ def create_app(config_path: str | None = None) -> FastAPI:
                 await asyncio.sleep(interval)
                 reaped = store.reap_orphaned_tasks(down_timeout_ms=reaper_timeout)
                 if reaped:
-                    logger.warning(
-                        "Dashboard reaper: reset %d orphaned task(s)", len(reaped)
-                    )
+                    logger.warning("Dashboard reaper: reset %d orphaned task(s)", len(reaped))
                 stuck = store.reap_stuck_tasks(default_stuck_ms=stuck_timeout)
                 if stuck:
-                    logger.warning(
-                        "Dashboard reaper: reset %d stuck task(s)", len(stuck)
-                    )
+                    logger.warning("Dashboard reaper: reset %d stuck task(s)", len(stuck))
             except asyncio.CancelledError:
                 break
             except Exception:
