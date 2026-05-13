@@ -61,9 +61,13 @@
         all <span class="subnav-count">{{ list_counts.values()|sum }}</span>
     </a>
     {% for name, n in list_counts.items()|sort %}
+    {% set live = runners_per_list.get(name, 0) if runners_per_list else 0 %}
     <a href="/tasks?task_list={{ name }}{{ qs_state }}"
-       class="subnav-pill{% if filter_task_list == name %} active{% endif %}">
+       class="subnav-pill{% if filter_task_list == name %} active{% endif %}"
+       title="{{ live }} live runner(s) polling '{{ name }}'">
         {{ name }} <span class="subnav-count">{{ n }}</span>
+        <span class="subnav-count{% if live == 0 and n > 0 %} badge-failed{% endif %}"
+              style="margin-left:0.15rem;">&middot;{{ live }}r</span>
     </a>
     {% endfor %}
 </div>

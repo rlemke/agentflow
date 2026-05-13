@@ -358,6 +358,7 @@ class RunnerService:
             state=ServerState.RUNNING,
             http_port=self.http_port or 0,
             version=getattr(self, "_version", ""),
+            task_list=self._config.task_list,
         )
         self._persistence.save_server(server)
 

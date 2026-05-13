@@ -35,6 +35,15 @@
 #   JENKINS_UI_PORT            default 9090
 #   ANTHROPIC_API_KEY          pass-through to runner-anthropic
 #   CENSUS_API_KEY             pass-through to runner-census-us
+#   AFL_OSM_REPLICAS           # of osm-geocoder replicas (default 1)
+#   AFL_ANTHROPIC_REPLICAS     # of anthropic replicas (default 1)
+#   AFL_OSM_LZ_REPLICAS        # of osm-lz replicas (default 1)
+#   AFL_WEATHER_REPLICAS       # of noaa-weather replicas (default 1)
+#   AFL_JENKINS_REPLICAS       # of jenkins-example replicas (default 1)
+#   AFL_CENSUS_REPLICAS        # of census-us replicas (default 1)
+#   AFL_GENOMICS_REPLICAS      # of genomics replicas (default 1)
+#   AFL_MONITOR_REPLICAS       # of sensor-monitoring replicas (default 1)
+#   AFL_RUNNER_REPLICAS        # of main 'runner' replicas (default 1)
 #
 # If a `.env.full-stack` file exists in the repo root it is used as the
 # env-file; otherwise `.env.full-stack.example` (the checked-in
@@ -74,6 +83,39 @@ compose() {
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+# Build --scale args from AFL_<EXAMPLE>_REPLICAS env vars sourced from
+# .env.full-stack. Set AFL_OSM_REPLICAS=3 (etc.) to bring up multiple
+# replicas of a per-example runner. Empty / unset / 1 = no flag emitted.
+# Returns nothing when no replica overrides are set, so existing
+# `scripts/full-stack up` invocations keep the same single-replica
+# behaviour.
+build_scale_args() {
+    set +u  # tolerate unset vars during the test below
+    # service-name → env-var-name pairs
+    local mapping=(
+        "runner:AFL_RUNNER_REPLICAS"
+        "runner-anthropic:AFL_ANTHROPIC_REPLICAS"
+        "runner-osm-geocoder:AFL_OSM_REPLICAS"
+        "runner-osm-lz:AFL_OSM_LZ_REPLICAS"
+        "runner-noaa-weather:AFL_WEATHER_REPLICAS"
+        "runner-jenkins-example:AFL_JENKINS_REPLICAS"
+        "runner-census-us:AFL_CENSUS_REPLICAS"
+        "runner-genomics:AFL_GENOMICS_REPLICAS"
+        "runner-sensor-monitoring:AFL_MONITOR_REPLICAS"
+    )
+    local out=""
+    for entry in "${mapping[@]}"; do
+        local svc="${entry%%:*}"
+        local var="${entry##*:}"
+        local val="${!var:-}"
+        if [[ -n "$val" && "$val" != "1" ]]; then
+            out+=" --scale $svc=$val"
+        fi
+    done
+    set -u
+    echo "$out"
+}
+
 usage() {
     # Print the leading comment block (lines after the shebang, up to the
     # first non-comment line), stripped of the "# " prefix.
@@ -90,7 +132,8 @@ case "$CMD" in
 
     up)
         echo "Starting full-stack (env: $ENV_FILE)"
-        compose up -d "$@"
+        # shellcheck disable=SC2046  # word-splitting the scale args is intentional
+        compose up -d $(build_scale_args) "$@"
         echo
         compose ps --format "table {{.Service}}\t{{.Status}}"
         echo
@@ -145,7 +188,8 @@ case "$CMD" in
         compose build $nocache "$@"
         echo
         echo "Recreating containers with the new images"
-        compose up -d "$@"
+        # shellcheck disable=SC2046
+        compose up -d $(build_scale_args) "$@"
         echo
         compose ps --format "table {{.Service}}\t{{.Status}}"
         echo

@@ -449,6 +449,7 @@ class RegistryRunner:
             handlers=list(self._registered_names),
             handled=[],
             state=ServerState.RUNNING,
+            task_list=self._config.task_list,
         )
         self._persistence.save_server(server)
 

@@ -47,6 +47,26 @@ class ServerMixin(_MixinBase):
         doc = self._server_to_doc(server)
         self._db.servers.replace_one({"uuid": server.uuid}, doc, upsert=True)
 
+    def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
+        """Return ``{task_list: live_runner_count}``.
+
+        A server is "live" if its ``ping_time`` is within the last
+        ``fresh_window_ms`` (default 60s). Used by the dashboard to flag
+        empty lists (work piling up with no listeners) and overloaded
+        lists at a glance.
+        """
+        cutoff = _current_time_ms() - fresh_window_ms
+        out: dict[str, int] = {}
+        for doc in self._db.servers.aggregate(
+            [
+                {"$match": {"ping_time": {"$gt": cutoff}}},
+                {"$group": {"_id": "$task_list", "count": {"$sum": 1}}},
+            ]
+        ):
+            name = doc.get("_id") or "default"
+            out[name] = doc["count"]
+        return out
+
     def update_server_ping(self, server_id: str, ping_time: int) -> None:
         """Update server ping time."""
         self._db.servers.update_one({"uuid": server_id}, {"$set": {"ping_time": ping_time}})
@@ -127,6 +147,7 @@ class ServerMixin(_MixinBase):
             "version": server.version,
             "manager": server.manager,
             "error": server.error,
+            "task_list": server.task_list,
         }
 
     def _doc_to_server(self, doc: dict) -> ServerDefinition:
@@ -147,4 +168,5 @@ class ServerMixin(_MixinBase):
             version=doc.get("version", ""),
             manager=doc.get("manager", ""),
             error=doc.get("error"),
+            task_list=doc.get("task_list", "default"),
         )

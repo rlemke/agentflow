@@ -44,6 +44,10 @@ class ServerDefinition:
     version: str = ""
     manager: str = ""
     error: dict | None = None
+    # Task list this runner polls (set from --task-list / RunnerConfig.task_list).
+    # Operators query by this to see how their workload is partitioned, and the
+    # dashboard surfaces it on /tasks to flag under/over-provisioning.
+    task_list: str = "default"
 
 
 @dataclass

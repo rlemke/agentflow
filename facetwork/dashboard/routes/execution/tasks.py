@@ -117,6 +117,7 @@ def task_list(
     server_info = _resolve_server_info(tasks, store)
     tab_counts = _count_tasks_by_state(store)
     list_counts = store.task_list_counts()
+    runners_per_list = store.runners_per_task_list()
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -129,6 +130,7 @@ def task_list(
             "server_info": server_info,
             "tab_counts": tab_counts,
             "list_counts": list_counts,
+            "runners_per_list": runners_per_list,
             "active_tab": "tasks",
         },
     )

@@ -454,6 +454,18 @@ class MemoryStore(PersistenceAPI):
         """Save a server."""
         self._servers[server.uuid] = server
 
+    def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
+        """Return ``{task_list: live_runner_count}``."""
+        import time as _t
+
+        cutoff = int(_t.time() * 1000) - fresh_window_ms
+        out: dict[str, int] = {}
+        for s in self._servers.values():
+            if getattr(s, "ping_time", 0) > cutoff:
+                tl = getattr(s, "task_list", "default") or "default"
+                out[tl] = out.get(tl, 0) + 1
+        return out
+
     def update_server_ping(self, server_id: str, ping_time: int) -> None:
         """Update server ping time."""
         if server_id in self._servers:
