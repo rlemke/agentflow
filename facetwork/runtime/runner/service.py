@@ -975,22 +975,51 @@ class RunnerService:
                 result = self._tool_registry.handle(short_name, payload)
 
             if result is None:
-                error_msg = f"No handler for event task '{task.name}'"
-                try:
-                    self._evaluator.fail_step(task.step_id, error_msg)
-                except Exception:
-                    logger.debug("Could not fail step %s", task.step_id, exc_info=True)
-                task.state = TaskState.FAILED
-                task.error = {"message": error_msg}
+                # This runner has no handler for the task. In a multi-runner
+                # deployment the right runner just may not have claimed it yet,
+                # so release it back to pending (with backoff) for retry; only
+                # fail it for good once retries are exhausted — i.e. no runner
+                # in the fleet can handle it.
+                task.retry_count += 1
+                self._update_handled_stats(task.name, handled=False)
+                if task.max_retries > 0 and task.retry_count >= task.max_retries:
+                    error_msg = (
+                        f"No handler for event task '{task.name}' "
+                        f"(no runner could service it after {task.retry_count} attempts)"
+                    )
+                    try:
+                        self._evaluator.fail_step(task.step_id, error_msg)
+                    except Exception:
+                        logger.debug("Could not fail step %s", task.step_id, exc_info=True)
+                    task.state = TaskState.FAILED
+                    task.error = {"message": error_msg}
+                    logger.warning(
+                        "No handler for event task '%s' anywhere — failing after %d attempts "
+                        "(step=%s) — %s",
+                        task.name,
+                        task.retry_count,
+                        task.step_id,
+                        self._task_label(task.uuid),
+                    )
+                else:
+                    from facetwork.runtime.mongo_store import _compute_next_retry_after
+
+                    task.state = TaskState.PENDING
+                    task.server_id = ""
+                    task.error = None
+                    task.next_retry_after = _compute_next_retry_after(
+                        task.retry_count, _current_time_ms()
+                    )
+                    logger.info(
+                        "No handler for event task '%s' on this runner — releasing back to "
+                        "pending (attempt %d/%d) — %s",
+                        task.name,
+                        task.retry_count,
+                        task.max_retries,
+                        self._task_label(task.uuid),
+                    )
                 task.updated = _current_time_ms()
                 self._safe_save_task(task)
-                self._update_handled_stats(task.name, handled=False)
-                logger.warning(
-                    "No handler for event task '%s' (step=%s) — %s",
-                    task.name,
-                    task.step_id,
-                    self._task_label(task.uuid),
-                )
                 return
 
             # Continue the step and resume the workflow.
@@ -1232,9 +1261,28 @@ class RunnerService:
 
             if result is not None:
                 task.state = TaskState.COMPLETED
-            else:
+            elif task.max_retries > 0 and (task.retry_count + 1) >= task.max_retries:
+                # No handler here and retries exhausted — fail for good.
+                task.retry_count += 1
                 task.state = TaskState.FAILED
-                task.error = {"message": f"No handler for task '{task.name}'"}
+                task.error = {
+                    "message": (
+                        f"No handler for task '{task.name}' "
+                        f"(no runner could service it after {task.retry_count} attempts)"
+                    )
+                }
+            else:
+                # No handler on this runner — release back to pending (with
+                # backoff) so a runner that has the handler can pick it up.
+                from facetwork.runtime.mongo_store import _compute_next_retry_after
+
+                task.retry_count += 1
+                task.state = TaskState.PENDING
+                task.server_id = ""
+                task.error = None
+                task.next_retry_after = _compute_next_retry_after(
+                    task.retry_count, _current_time_ms()
+                )
 
             task.updated = _current_time_ms()
             self._safe_save_task(task)

@@ -535,8 +535,9 @@ class TestRunnerServiceTaskProcessing:
         updated = store._tasks[task.uuid]
         assert updated.state == TaskState.COMPLETED
 
-    def test_process_task_no_handler(self, store, evaluator):
-        """Task with no handler transitions to FAILED."""
+    def test_process_task_no_handler_releases_then_fails(self, store, evaluator):
+        """Task with no handler is released back to pending for retry, then FAILED once
+        retries are exhausted (no runner in the fleet could service it)."""
         registry = ToolRegistry()  # No handlers
         config = RunnerConfig()
         svc = RunnerService(store, evaluator, config, registry)
@@ -552,10 +553,20 @@ class TestRunnerServiceTaskProcessing:
         )
         store.save_task(task)
 
-        # Task claimed via atomic find_one_and_update (no separate lock needed)
+        # First attempt: released back to pending, no error recorded.
         svc._process_task(task)
-
         updated = store._tasks[task.uuid]
+        assert updated.state == TaskState.PENDING
+        assert updated.retry_count == 1
+        assert updated.error is None
+
+        # Keep retrying until exhausted -> FAILED.
+        for _ in range(task.max_retries):
+            updated.state = TaskState.RUNNING
+            svc._process_task(updated)
+            updated = store._tasks[task.uuid]
+            if updated.state == TaskState.FAILED:
+                break
         assert updated.state == TaskState.FAILED
         assert "No handler" in updated.error["message"]
 
@@ -2361,14 +2372,15 @@ class TestProcessEventTask:
         # Stats should be updated
         assert svc._handled_counts["CountDocuments"].handled == 1
 
-    def test_process_event_task_no_handler(self, store, evaluator, workflow_ast, program_ast):
-        """Event task with no handler is marked FAILED."""
+    def test_process_event_task_no_handler_releases_then_fails(
+        self, store, evaluator, workflow_ast, program_ast
+    ):
+        """Event task with no handler is released back to pending (another runner may
+        have it), and only FAILED once no runner in the fleet could service it."""
         registry = ToolRegistry()
-        # Register to get past execution, but don't register for claiming
         config = RunnerConfig()
         svc = RunnerService(store, evaluator, config, registry)
 
-        # Manually create a task
         task = TaskDefinition(
             uuid=generate_id(),
             name="UnknownEvent",
@@ -2383,8 +2395,17 @@ class TestProcessEventTask:
         store.save_task(task)
 
         svc._process_event_task(task)
-
         updated = store._tasks[task.uuid]
+        assert updated.state == TaskState.PENDING
+        assert updated.retry_count == 1
+        assert updated.error is None
+
+        for _ in range(task.max_retries):
+            updated.state = TaskState.RUNNING
+            svc._process_event_task(updated)
+            updated = store._tasks[task.uuid]
+            if updated.state == TaskState.FAILED:
+                break
         assert updated.state == TaskState.FAILED
         assert "No handler" in updated.error["message"]
 
