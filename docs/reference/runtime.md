@@ -560,6 +560,11 @@ event.Error
 - Retry behavior is **event-level**
 - Evaluator MUST treat retries as idempotent
 - No implicit evaluator-level retries are permitted
+- A runner only claims tasks for facets it has a handler for (plus the
+  `fw:execute` / `fw:resume` protocol tasks). A task that does end up on a
+  runner with no handler for it is released back to `pending` (with backoff),
+  not failed — it is failed only once retries are exhausted, i.e. no runner in
+  the fleet can service it. See [runtime-impl.md §17.1.1](runtime-impl.md).
 
 ---
 

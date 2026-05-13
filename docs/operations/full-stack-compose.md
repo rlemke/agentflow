@@ -41,6 +41,14 @@ the entrypoint (`docker/entrypoint-example-runner.sh`) does:
    a runner restart doesn't pile up duplicate flows.
 3. `exec python -m facetwork.runtime.runner --registry`
 
+In `--registry` mode the runner loads handler registrations from the DB but
+only advertises (and therefore claims tasks for) facets whose handler module
+is *importable in this container*. Since each example runner only bind-mounts
+its own `fwh_<repo>`, `runner-anthropic` claims `anthropic.*` tasks,
+`runner-osm-geocoder` claims `osm.*` tasks, etc. — a runner never picks up a
+task it can't run. (Built-in `fw:execute` / `fw:resume` tasks are claimed by
+every runner.) See [runtime-impl.md §17.1.1](../reference/runtime-impl.md).
+
 ## Prerequisites
 
 - **Docker** with `docker compose` (Docker Desktop on macOS works; the

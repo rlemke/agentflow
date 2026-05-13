@@ -211,6 +211,20 @@ Current internal tasks:
 - `fw:execute:<WorkflowName>` — bootstrap task that starts a workflow execution (created by dashboard/CLI)
 - `fw:resume:<FacetName>` — signals the RunnerService to resume a workflow after an external agent has completed a step (created by agent SDKs)
 
+### Task claiming — a runner only takes tasks it can run
+
+A runner **only claims tasks for facets it has a handler for**, plus the
+`fw:execute` / `fw:resume` protocol tasks (every runner can bootstrap a
+workflow and process resume tasks). `claim_task()` is name-filtered server-side
+(exact match or `<name>:` prefix), so a runner never picks up a task outside the
+set of names it polls for. A `--registry` runner advertises a facet only if its
+handler module is *importable in that process* (`preload(verify=True)`), so in a
+one-runner-per-example deployment each runner claims just its own example's
+facets. If a task does land on a runner with no handler for it, the runner
+releases it back to `pending` (with backoff) rather than failing it — it is
+failed only after retries are exhausted, i.e. no runner in the fleet could
+service it. See [docs/reference/runtime-impl.md §17.1.1](docs/reference/runtime-impl.md).
+
 ### Agent execution models
 - **RegistryRunner** (recommended): auto-loads handlers from DB
 - **AgentPoller**: standalone agent services with `register()` callback

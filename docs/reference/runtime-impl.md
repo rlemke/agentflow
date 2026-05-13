@@ -781,6 +781,8 @@ PENDING ──claim_task()──► RUNNING ──handler succeeds──► COMP
    ▲                        │
    │                        ├── handler fails ──► FAILED
    │                        │                       │
+   │                        ├── no handler here ─► PENDING (backoff) ─► … ─► FAILED (no runner can service it)
+   │                        │
    │                        ├── server dies ────┐   │
    │                        │                   │   │
    │                        └── stuck (4h) ─────┤   │
@@ -788,6 +790,32 @@ PENDING ──claim_task()──► RUNNING ──handler succeeds──► COMP
    └────── reaper / watchdog / dashboard ───────┘   │
    └────── manual retry / dashboard retry ──────────┘
 ```
+
+### 17.1.1 Handler-Scoped Task Claiming
+
+A runner only ever claims a task it can actually run. Concretely:
+
+- **`claim_task(task_names, task_list)` is name-filtered server-side.** The
+  query matches a pending task only if its `name` is one of `task_names`
+  *exactly* or starts with `"<name>:"` (so `"fw:execute"` claims
+  `"fw:execute:MyWorkflow"`). A runner passes three name sets per poll cycle —
+  the facet names it has handlers for, `["fw:resume"]`, and `["fw:execute"]` —
+  so it never picks up a task outside that set.
+- **Registry-mode runners advertise only loadable handlers.** A runner started
+  with `--registry` loads handler registrations from the DB, but registers a
+  proxy (and therefore claims tasks) for a facet *only if its handler module is
+  importable in this process* (`RegistryDispatcher.preload(verify=True)`). In a
+  one-runner-per-example deployment this means each runner claims just its own
+  example's facets — `runner-anthropic` will not grab `osm.*` tasks, etc.
+- **Built-in protocol tasks** (`fw:execute[:Workflow]`, `fw:resume[:Facet]`) are
+  claimed by every runner — `fw:execute` is registered on every `RunnerService`,
+  and `fw:resume` needs no facet handler (the external agent already wrote the
+  step's results).
+- **Defence in depth:** if a task does end up on a runner with no handler for it
+  (e.g. a stale registration), the runner *releases it back to `pending`* with
+  exponential backoff (`retry_count++`) rather than failing it, so a runner that
+  *does* have the handler can pick it up. It is failed for good only once
+  `retry_count` is exhausted — i.e. no runner in the fleet could service it.
 
 ### 17.2 Layer 1: Orphan Reaper (v0.39.0)
 
