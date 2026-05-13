@@ -454,6 +454,17 @@ class MemoryStore(PersistenceAPI):
         """Save a server."""
         self._servers[server.uuid] = server
 
+    def prune_stale_servers(self, older_than_ms: int = 600_000) -> int:
+        """Delete ServerDefinition records whose last ping is older than
+        ``older_than_ms`` (default 10 min). Returns the count deleted."""
+        import time as _t
+
+        cutoff = int(_t.time() * 1000) - older_than_ms
+        stale = [uuid for uuid, s in self._servers.items() if getattr(s, "ping_time", 0) < cutoff]
+        for uuid in stale:
+            del self._servers[uuid]
+        return len(stale)
+
     def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
         """Return ``{task_list: live_runner_count}``."""
         import time as _t

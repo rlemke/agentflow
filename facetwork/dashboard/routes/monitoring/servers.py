@@ -28,16 +28,34 @@ router = APIRouter(prefix="/servers")
 
 
 @router.get("")
-def server_list(request: Request, state: str | None = None, store=Depends(get_store)):
-    """List all servers, optionally filtered by state."""
+def server_list(
+    request: Request,
+    state: str | None = None,
+    task_list: str | None = None,
+    store=Depends(get_store),
+):
+    """List all servers, optionally filtered by state and/or task list."""
     if state:
-        servers = store.get_servers_by_state(state)
+        servers = list(store.get_servers_by_state(state))
     else:
-        servers = store.get_all_servers()
+        servers = list(store.get_all_servers())
+    if task_list:
+        servers = [s for s in servers if getattr(s, "task_list", "default") == task_list]
+
+    # Per-task-list counts (live only — 60s window) for the subnav.
+    runners_per_list: dict[str, int] = {}
+    if hasattr(store, "runners_per_task_list"):
+        runners_per_list = store.runners_per_task_list()
+
     return request.app.state.templates.TemplateResponse(
         request,
         "servers/list.html",
-        {"servers": servers, "filter_state": state},
+        {
+            "servers": servers,
+            "filter_state": state,
+            "filter_task_list": task_list,
+            "runners_per_list": runners_per_list,
+        },
     )
 
 

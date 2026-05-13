@@ -47,6 +47,22 @@ class ServerMixin(_MixinBase):
         doc = self._server_to_doc(server)
         self._db.servers.replace_one({"uuid": server.uuid}, doc, upsert=True)
 
+    def prune_stale_servers(self, older_than_ms: int = 600_000) -> int:
+        """Delete ServerDefinition records whose last ping is older than
+        ``older_than_ms`` (default 10 min).
+
+        Long-stopped containers leave heartbeat-stale records in
+        ``db.servers``. Periodic pruning keeps the collection bounded so
+        debug queries (`db.servers.find()`) stay readable and the
+        dashboard's grouped-by-task_list view doesn't accumulate dead
+        servers in the "null task_list" bucket from older agent versions.
+
+        Returns the number of records deleted.
+        """
+        cutoff = _current_time_ms() - older_than_ms
+        result = self._db.servers.delete_many({"ping_time": {"$lt": cutoff}})
+        return result.deleted_count
+
     def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
         """Return ``{task_list: live_runner_count}``.
 

@@ -1617,6 +1617,22 @@ class RunnerService:
         except Exception:
             logger.debug("Orphan reaper failed", exc_info=True)
 
+        # Also prune long-stale ServerDefinition records. Stopped
+        # containers leave heartbeat-stale rows that crowd debug queries
+        # and the dashboard's grouped-by-task_list view. We use a
+        # generous window (10×reaper timeout) so this only removes
+        # truly dead servers, not transiently slow ones.
+        try:
+            if hasattr(self._persistence, "prune_stale_servers"):
+                prune_window_ms = max(timeout_ms * 10, 600_000)
+                pruned = self._persistence.prune_stale_servers(
+                    older_than_ms=prune_window_ms
+                )
+                if pruned:
+                    logger.info("Pruned %d stale server record(s)", pruned)
+        except Exception:
+            logger.debug("Stale-server pruner failed", exc_info=True)
+
         # --- Stuck task watchdog ---
         try:
             stuck_timeout_ms = int(os.environ.get("AFL_STUCK_TIMEOUT_MS", "1800000"))
