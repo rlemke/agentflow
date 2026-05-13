@@ -64,6 +64,32 @@ class TaskMixin(_MixinBase):
         doc = self._task_to_doc(task)
         self._db.tasks.replace_one({"uuid": task.uuid}, doc, upsert=True)
 
+    def save_task_if_owned(self, task: TaskDefinition, expected_server_id: str) -> bool:
+        """Save a task only if its current ``server_id`` still matches.
+
+        Used by handlers writing terminal state (completed/failed) to
+        prevent the documented lease-reclaim race (thesis §5.6): a handler
+        whose lease expired while it was running shouldn't be able to
+        overwrite the task document the reclaimer has since taken ownership
+        of. Returns ``True`` if the write went through, ``False`` if the
+        task was reclaimed (caller should treat as silently dropped).
+
+        For initial-create-and-claim flows (``expected_server_id == ""``)
+        this is equivalent to a plain ``save_task`` upsert.
+        """
+        doc = self._task_to_doc(task)
+        # Strict ownership: write only if the doc still has expected_server_id.
+        # If expected is "", we allow the upsert path so initial creation works.
+        if expected_server_id == "":
+            self._db.tasks.replace_one({"uuid": task.uuid}, doc, upsert=True)
+            return True
+        result = self._db.tasks.replace_one(
+            {"uuid": task.uuid, "server_id": expected_server_id},
+            doc,
+            upsert=False,
+        )
+        return result.matched_count > 0
+
     def claim_task(
         self,
         task_names: list[str],
@@ -164,6 +190,25 @@ class TaskMixin(_MixinBase):
             query["task_list_name"] = task_list
         docs = self._db.tasks.find(query).sort("created", -1)
         return [self._doc_to_task(doc) for doc in docs]
+
+    def duplicate_completion_count(self) -> int:
+        """Count step_ids that have more than one ``completed`` task document.
+
+        This is the exactly-once-completion check: in normal operation
+        the partial unique index on ``(step_id, state="running")`` plus
+        ownership-gated terminal writes (``save_task_if_owned``) keep
+        this at 0. Bootstrap tasks (which have empty ``step_id``) are
+        excluded so they aren't conflated as duplicates.
+        """
+        pipeline = [
+            {"$match": {"state": "completed", "step_id": {"$ne": ""}}},
+            {"$group": {"_id": "$step_id", "n": {"$sum": 1}}},
+            {"$match": {"n": {"$gt": 1}}},
+            {"$count": "dupes"},
+        ]
+        for doc in self._db.tasks.aggregate(pipeline):
+            return int(doc.get("dupes", 0))
+        return 0
 
     def task_list_counts(self) -> dict[str, int]:
         """Return ``{task_list_name: count}`` across all tasks.

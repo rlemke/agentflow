@@ -638,10 +638,39 @@ class RunnerService:
             logger.debug("Could not release timed-out task %s", task_id, exc_info=True)
 
     def _safe_save_task(self, task: Any, retries: int = 3) -> None:
-        """Save task state with retries to survive transient DB failures."""
+        """Save task state with retries to survive transient DB failures.
+
+        Terminal writes (``completed``/``failed``/``canceled``/``dead_letter``)
+        go through the ownership-gated path: only this runner — the one whose
+        server_id is currently on the doc — may write the result. A handler
+        whose lease was reclaimed under it gets silently dropped here rather
+        than overwriting the new claimer's state. Non-terminal writes
+        (heartbeat fields, retry resets that explicitly clear server_id) keep
+        going through the unconditional path because they're orchestration
+        and not the lease-reclaim race.
+        """
+        terminal_states = (
+            TaskState.COMPLETED,
+            TaskState.FAILED,
+            TaskState.CANCELED,
+            TaskState.DEAD_LETTER,
+        )
+        gate = task.state in terminal_states and getattr(task, "server_id", "") == self._server_id
         for attempt in range(retries):
             try:
-                self._persistence.save_task(task)
+                if gate and hasattr(self._persistence, "save_task_if_owned"):
+                    accepted = self._persistence.save_task_if_owned(task, self._server_id)
+                    if not accepted:
+                        logger.warning(
+                            "Dropped terminal write for task %s (name=%s, state=%s): "
+                            "lease was reclaimed by another server — likely a slow "
+                            "handler whose work has already been redone elsewhere",
+                            task.uuid,
+                            task.name,
+                            task.state,
+                        )
+                else:
+                    self._persistence.save_task(task)
                 return
             except Exception:
                 if attempt < retries - 1:

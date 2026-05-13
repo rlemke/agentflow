@@ -118,6 +118,11 @@ def task_list(
     tab_counts = _count_tasks_by_state(store)
     list_counts = store.task_list_counts()
     runners_per_list = store.runners_per_task_list()
+    duplicate_completions = (
+        store.duplicate_completion_count()
+        if hasattr(store, "duplicate_completion_count")
+        else 0
+    )
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -131,6 +136,7 @@ def task_list(
             "tab_counts": tab_counts,
             "list_counts": list_counts,
             "runners_per_list": runners_per_list,
+            "duplicate_completions": duplicate_completions,
             "active_tab": "tasks",
         },
     )

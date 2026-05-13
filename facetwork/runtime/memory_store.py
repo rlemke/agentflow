@@ -319,6 +319,21 @@ class MemoryStore(PersistenceAPI):
         """Save a task."""
         self._tasks[task.uuid] = task
 
+    def save_task_if_owned(self, task: "TaskDefinition", expected_server_id: str) -> bool:
+        """Save a task only if its current server_id still matches.
+
+        Mirrors MongoStore.save_task_if_owned. When ``expected_server_id``
+        is empty, upserts unconditionally.
+        """
+        if expected_server_id == "":
+            self._tasks[task.uuid] = task
+            return True
+        existing = self._tasks.get(task.uuid)
+        if existing is None or getattr(existing, "server_id", "") != expected_server_id:
+            return False
+        self._tasks[task.uuid] = task
+        return True
+
     def get_all_tasks(
         self, limit: int = 100, task_list: str | None = None
     ) -> list["TaskDefinition"]:
@@ -340,6 +355,16 @@ class MemoryStore(PersistenceAPI):
             for t in self._tasks.values()
             if t.state == state and (not task_list or t.task_list_name == task_list)
         ]
+
+    def duplicate_completion_count(self) -> int:
+        """Count step_ids that have more than one ``completed`` task."""
+        from collections import Counter
+
+        counts: Counter[str] = Counter()
+        for t in self._tasks.values():
+            if t.state == "completed" and getattr(t, "step_id", ""):
+                counts[t.step_id] += 1
+        return sum(1 for v in counts.values() if v > 1)
 
     def task_list_counts(self) -> dict[str, int]:
         """Return ``{task_list_name: count}`` across all tasks."""

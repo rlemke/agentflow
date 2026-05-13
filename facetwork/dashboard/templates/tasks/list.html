@@ -49,7 +49,15 @@
 {% endblock %}
 
 {% block content %}
-<h1>Task Queue</h1>
+<h1>
+    Task Queue
+    {% if duplicate_completions is defined %}
+    <span class="subnav-count{% if duplicate_completions > 0 %} badge-failed{% endif %}"
+          title="Number of step_ids with > 1 completed task document. Should be 0 — non-zero indicates a lease-reclaim race in which a slow handler overwrote a reclaimer's state. See save_task_if_owned in mongo_store/tasks.py.">
+        exactly-once: {{ duplicate_completions }} dup{{ '' if duplicate_completions == 1 else 's' }}
+    </span>
+    {% endif %}
+</h1>
 
 {# Union of lists that have either tasks or live runners. A list with
    runners-but-no-tasks is still useful to surface (it means runners are
