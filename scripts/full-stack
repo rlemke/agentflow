@@ -79,6 +79,15 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
+# Also source the env file into this shell so that build_scale_args (and
+# any other host-side logic) can read AFL_*_REPLICAS etc. Without this,
+# docker compose's --env-file only injects vars into the YAML's
+# ${VAR:-} interpolation, leaving the script's own env empty.
+set -a
+# shellcheck disable=SC1090  # dynamic source path
+source "$ENV_FILE"
+set +a
+
 compose() {
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
