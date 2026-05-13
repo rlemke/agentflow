@@ -81,3 +81,20 @@ These are exported into the runner's environment by `scripts/start-runner`.
 7. `pip install -e .` from your new repo, then verify with
    `scripts/seed-examples --include <name>`.
 8. Remove `examples/<name>/` from the Facetwork repo.
+
+## Seed-stability invariant
+
+`scripts/seed-examples` and the per-runner entrypoint both call
+`facetwork.examples.seed_example_flows`, which seeds your FFL under
+`namespace_id = "example:<name>"`. The seeder is **UUID-stable across
+re-runs**: re-seeding the same package reuses its existing
+`FlowDefinition.uuid` and `WorkflowDefinition.uuid` rather than
+regenerating them.
+
+This matters when a runner restarts while a bootstrap task is in
+flight — the task carries `flow_id` + `workflow_id` in its payload and
+will fail with "Flow not found" if the seeder rotates them. If you
+fork `seed_example_flows` for a custom seeding flow, preserve the
+invariant: look up existing rows by `name.path` (for flows) and by
+`name` within the flow (for workflows), and `replace_one(upsert=True)`
+on the existing UUID rather than `generate_id()`.

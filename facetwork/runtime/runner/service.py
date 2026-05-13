@@ -1333,7 +1333,25 @@ class RunnerService:
             if not hasattr(self._persistence, "get_flow"):
                 raise RuntimeError("Persistence store does not support get_flow")
 
-            flow = self._persistence.get_flow(flow_id)
+            # Transient-failure tolerance: a re-seed (or any other administrative
+            # rewrite of the flow row) may briefly leave `get_flow` returning
+            # None on a row that exists logically. Stable-UUID re-seeding (see
+            # facetwork/examples/__init__.py:seed_example_flows) prevents the
+            # systemic version of this race; the short retry here covers any
+            # remaining transient window. Bounded by ~3s total — anything
+            # longer is a real "flow gone" and should fail.
+            flow = None
+            for attempt in range(6):
+                flow = self._persistence.get_flow(flow_id)
+                if flow:
+                    if attempt > 0:
+                        logger.info(
+                            "Flow %s resolved after %d retry/retries", flow_id, attempt
+                        )
+                    break
+                import time as _t
+
+                _t.sleep(0.5)
             if not flow:
                 raise RuntimeError(f"Flow '{flow_id}' not found")
 

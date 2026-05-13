@@ -36,9 +36,15 @@ the entrypoint (`docker/entrypoint-example-runner.sh`) does:
 2. `python -m facetwork.examples --seed <name>` — registers handler
    routing in MongoDB **and** compiles the example's FFL into a
    `FlowDefinition` + `WorkflowDefinition`s so its workflows show up in
-   the dashboard's Flows tab. `--seed` is idempotent (seeded under
-   `example:<name>`; re-running replaces that example's prior seed), so
-   a runner restart doesn't pile up duplicate flows.
+   the dashboard's Flows tab. `--seed` is idempotent: seeded under
+   `example:<name>`, and re-running **reuses the existing flow + workflow
+   UUIDs** rather than regenerating them. This is load-bearing for
+   resilience — any in-flight bootstrap task (`fw:execute:<Workflow>`)
+   carries `flow_id` + `workflow_id` in its payload; if a runner
+   restarts (and re-seeds) while that task is queued, regenerating IDs
+   would orphan it with "Flow not found". The seed code lives in
+   [`facetwork/examples/__init__.py:seed_example_flows`](../../facetwork/examples/__init__.py);
+   the invariant is locked by `test_reseed_preserves_uuids`.
 3. `exec python -m facetwork.runtime.runner --registry`
 
 In `--registry` mode the runner loads handler registrations from the DB but
