@@ -429,11 +429,11 @@ A single `andThen` block, then, is best understood as an **unordered set of assi
 
 #### 4.4.1 Yield semantics: immutable during execution, aggregated on block completion
 
-FFL's block-mediated coordination (§5.7) has a corresponding data-model discipline worth making explicit. **During the execution of a block's steps, the block's input and output attributes are immutable.** Every step in the block sees the same snapshot of container attributes (`$.region`, `$.census_csv`, and so on) and the same bindings to its siblings; nothing a step does while running can change what another step in the same block observes. There is no mid-execution mutation for an author to reason about, and therefore no data race for the implementation to defend against.
+FFL's block-mediated coordination (§5.8) has a corresponding data-model discipline worth making explicit. **During the execution of a block's steps, the block's input and output attributes are immutable.** Every step in the block sees the same snapshot of container attributes (`$.region`, `$.census_csv`, and so on) and the same bindings to its siblings; nothing a step does while running can change what another step in the same block observes. There is no mid-execution mutation for an author to reason about, and therefore no data race for the implementation to defend against.
 
 **Yields do not mutate; they accumulate.** A `yield` statement does not write into the container's output fields the moment it is executed. Instead, yields are **collected** as the block's steps complete, and when the block as a whole is complete, the accumulated yields are **applied to the container's declared return fields as a single atomic assignment**. The model is closer to a transactional commit at the block boundary than to imperative assignment: no partially-yielded state is ever visible to another block, another step, or the workflow evaluator.
 
-This discipline is what makes sibling `andThen` blocks safe to run in parallel without any coordination between them. Two blocks that yield into different return fields of the same workflow cannot race, because neither yield is visible until its own block has finished; and the block evaluator of §5.7 processes the aggregated yields serially as each block completes.
+This discipline is what makes sibling `andThen` blocks safe to run in parallel without any coordination between them. Two blocks that yield into different return fields of the same workflow cannot race, because neither yield is visible until its own block has finished; and the block evaluator of §5.8 processes the aggregated yields serially as each block completes.
 
 **Collection and map return fields aggregate across multiple yields.** If a workflow declares a return field whose type is `[T]` or `Map[K, V]`, and the field receives more than one yield — across sibling blocks, across iterations of `andThen foreach`, or across branches of an `andThen when` that each contribute to it — the yields are merged rather than overwriting each other. For `[T]`, the contributions are appended; for `Map[K, V]`, the contributions are unioned, with later keys taking precedence over earlier ones. This is the semantic that makes `andThen foreach` useful as an aggregate reducer: each iteration's yield adds to the collection, and the final field is the merged result of all iterations.
 
@@ -676,7 +676,33 @@ The update is atomic at the document level. MongoDB's single-document operations
 
 This is the entire claim protocol. There is no broker. There is no coordinator. There is no leader election. There is not even a task distribution algorithm in the usual sense: each runner asks the database for a task and is given one or not.
 
-### 5.4 Lease-based reclamation
+### 5.4 Per-runner fetch and workload partitioning
+
+The claim protocol of §5.3 describes a single atomic transition. The fleet-wide behaviour follows from each runner executing that transition independently. There is no central dispatcher, no work-stealing queue, and no inter-runner channel: each runner's poll loop is a closed feedback circuit between itself and the database.
+
+**Polling is local.** Every runner runs its own poll loop, with its own period (configurable; default one second). RunnerA's poll cadence has no effect on RunnerB's; a runner that is busy executing a long task is the only thread blocked, and other runners continue claiming and dispatching normally. There is no shared in-memory data structure to contend on between processes — even processes on the same physical machine coordinate only through the database.
+
+**Eligibility is a query, not a routing decision.** A runner's claim issues the find_one_and_update with three filter components:
+
+1. `name ∈ <handler-set> ∪ {fw:execute, fw:resume}` — only tasks for facets this runner can dispatch, plus the protocol tasks every runner participates in.
+2. `task_list_name = <runner's configured list>` — a single string identifier; default `"default"`.
+3. `state = "pending" ∧ retry_eligible` — claimable in the lifecycle sense.
+
+The handler-set filter is built once at runner startup. A registry-mode runner enumerates the `handler_registrations` collection (§6.1), verifies that each entry's module is importable in *this* process, and registers a proxy only for those that load. In a per-example deployment — one container per `fwh_*` package — each container's handler set is exactly that package's facets, and the name filter alone produces deterministic routing: no other runner's filter can match the same task.
+
+**Two regimes follow.** When two runners' filters intersect (both can dispatch the same name on the same list), a claim races between them; MongoDB's per-document atomicity ensures exactly one wins and the other returns `None` and polls again. No fairness is guaranteed across the racers; whichever finishes the database round-trip first claims. When two runners' filters are disjoint, their queries return tasks from non-overlapping subsets of the collection and they cannot race at all. The expected throughput of a runner is independent of the load on a runner whose filter does not intersect — a thousand-task backlog on an `osm` runner adds zero latency to claims on an `anthropic` runner, because the latter's query never sees those documents.
+
+**Workload partitioning via `task_list_name`.** The `task_list_name` field is the operator-facing knob for partitioning. Two workflows that share a handler set but are deemed unrelated for scheduling purposes — say, fast LLM calls and slow PBF imports — can be assigned to separate lists. Runners are started with `--task-list <name>`; submission paths read a prefix-match configuration (`AFL_WORKFLOW_TASK_LIST_MAP=osm.=osm,anthropic.=anthropic`) and stamp the bootstrap task with the resolved list. Child event tasks created during execution inherit the orchestrating runner's list, so all tasks belonging to one workflow execution remain on the same partition by construction. Partitioning is therefore declarative at the configuration layer and requires no code change at the workflow or handler level.
+
+The partitioning is preserved end-to-end by three properties: bootstrap tasks are stamped at submission time using the resolver against the qualified workflow name; child event tasks created by completion handlers read the same configuration in the runner's process; and the per-document atomicity of the claim ensures that exactly one runner — necessarily one whose `--task-list` matches the stamped value — ever dispatches a given task.
+
+**Task creation is also lock-free.** The dual of the claim — task creation — has the same lock-free property. Each task carries a unique `uuid` generated by the producer, and is written through `save_task` as a single `replace_one(upsert=True)`. The orchestrating runner is the sole writer for the step tasks it generates from its own workflow execution; bootstrap and resume tasks are written once by their submitters. No two writers compete for the same document, so there is no producer-side contention to coordinate around either.
+
+**Implications for the coordinator-free thesis.** A natural objection to coordinator-free designs is that they trade simplicity for the inability to partition or prioritise. Facetwork's partitioning shows that the trade is not forced: a coordinator was never needed for routing, because routing reduces to a query filter that the database evaluates atomically per claim. The same is true of recovery (§5.5), correctness (§5.6), and block-mediated advancement (§5.8). The pattern generalises: every place where a classical design would reach for a coordinator, Facetwork instead reaches for the database's per-document atomicity primitive, which it pays for once and reuses everywhere.
+
+The cost is paid in two places. First, the database carries every claim request, every continuation, every state transition — its throughput must scale with the fleet, and an under-provisioned cluster bottlenecks the whole system. In practice, MongoDB's compound indices on `(state, name, task_list_name)` make per-list claims cheap enough that the bottleneck shows up only at fleet sizes well beyond the design target. Second, the rules of partitioning are encoded in operator-facing configuration rather than runtime API; misconfiguration (a runner polling a list that no submission writes to, or vice versa) produces silent idleness rather than an error. The dashboard surfaces per-list task counts and per-runner claim statistics so misconfiguration is observable, but it is not enforced at startup. This is a deliberate operational simplification: the same flexibility that allows the operator to partition by namespace also allows ad-hoc partitions (one-off cleanup runners, isolated test queues) without coordinator changes.
+
+### 5.5 Lease-based reclamation
 
 If a runner claims a task and then dies — kernel panic, OOM, power failure, a human kicking the plug — the task is lost. Recovery is the dual of claiming: after a timeout, any runner may reclaim the task by issuing a similar `find_one_and_update` that matches `state = "running"` and `lease_expires < now`:
 
@@ -702,7 +728,7 @@ Notice that this is a state-to-state transition: `running` → `running`. The at
 
 The handler renews its own lease by heartbeating. The heartbeat endpoint on the store writes both `task_heartbeat` and `lease_expires = now + lease_ms`. A handler that keeps heartbeating keeps its lease; a handler that stops — whether because it is stuck or because the process has died — lets its lease expire.
 
-### 5.5 Correctness arguments
+### 5.6 Correctness arguments
 
 **Safety.** At most one handler executes a given task at a given time. The argument is as follows. A task is *executable* when its state is `running` and its lease is unexpired. The partial unique index ensures that at any instant, at most one document exists with state `running` per `(step_id)`. The atomicity of `find_one_and_update` ensures that no two runners can concurrently transition that document from pending to running. The atomicity of lease reclamation similarly ensures that no two runners can concurrently overwrite `server_id` on an expired lease. Therefore, at any instant, at most one runner *believes* it holds the task. In particular, the previous holder's `server_id` has been overwritten; its subsequent writes will either be rejected (if the update filter includes the old `server_id`, which Facetwork's heartbeat update does implicitly via the `state = "running"` match on the *current* document) or be harmless (if they write stale progress fields that will be overwritten).
 
@@ -712,7 +738,7 @@ There is a subtler issue: the previous holder may still be executing when its le
 
 **Fairness.** Facetwork does not guarantee any particular fairness property across tasks. A greedy runner can monopolise a task list. In practice, per-runner concurrency limits (a thread pool of fixed size) prevent one runner from starving others, but I do not claim mathematical fairness.
 
-### 5.6 Why no coordinator?
+### 5.7 Why no coordinator?
 
 Classical distributed-system design instinct reaches for a coordinator: a leader process that maintains authoritative state, hands out work, and adjudicates conflicts. Coordinators simplify the reasoning: there is exactly one actor deciding each thing, and its decisions are canonical.
 
@@ -726,7 +752,7 @@ Facetwork has no coordinator. The operational cost is zero: there is no service 
 
 This decision is not free. The main cost is that Facetwork relies on MongoDB's atomicity guarantees, specifically `find_one_and_update` and partial unique indices. A Facetwork port to a database without these primitives would be an undertaking. PostgreSQL with `SELECT ... FOR UPDATE SKIP LOCKED` would work; so would CockroachDB; so would FoundationDB. Systems without document-atomic compare-and-swap would require a different approach entirely — likely a coordinator after all.
 
-### 5.7 Block-mediated step advancement
+### 5.8 Block-mediated step advancement
 
 The claim protocol in §5.3 governs how individual tasks move from `pending` to `running`. A second coordination question arises above it: when a task completes, what decides which *next* tasks are created? The concurrency-by-default semantics of §4.4 sharpen the question. In a workflow that has just finished two parallel `Download` facets, some component must decide that both prerequisites of `Compare` are now satisfied and that `Compare` should be enqueued. Which component, and how?
 
@@ -752,7 +778,7 @@ The pattern has an additional observability benefit. The continue message is a f
 
 **Safety.** The invariant we maintain is: at any instant, at most one evaluator is actively computing "which tasks should be created next" for a given block. This follows from the claim protocol's per-task exactly-one-claim guarantee applied to the block's `fw:resume:<FacetName>` task. Redundant continue messages are safe because each evaluator's operation is read-modify-enqueue against the canonical block state in the database, and because newly-enqueued tasks are uniquely keyed on `step_id` — an evaluator that attempts to enqueue a step whose task already exists is a no-op at the store level, by construction.
 
-**Liveness.** A continue message that is enqueued is eventually claimed under the liveness guarantees of the claim protocol (§5.5). Each evaluator makes progress: it either enqueues new tasks or terminates as a no-op. Continue messages therefore do not accumulate indefinitely. In the worst case, a block with *k* prerequisite steps completing simultaneously produces *k* continue messages, of which one is productive and *k-1* are no-ops. The cost is linear in the fan-in of the block, which is bounded by the workflow author's design — and amortised over productive work that had to happen anyway.
+**Liveness.** A continue message that is enqueued is eventually claimed under the liveness guarantees of the claim protocol (§5.6). Each evaluator makes progress: it either enqueues new tasks or terminates as a no-op. Continue messages therefore do not accumulate indefinitely. In the worst case, a block with *k* prerequisite steps completing simultaneously produces *k* continue messages, of which one is productive and *k-1* are no-ops. The cost is linear in the fan-in of the block, which is bounded by the workflow author's design — and amortised over productive work that had to happen anyway.
 
 **Bounded staleness.** There is one timing subtlety worth naming. An evaluator reads the block state at the moment it claims its continue task. If a prerequisite step completes *after* the read but before the evaluator finishes enqueueing, that completion will itself have emitted a continue message that is already queued behind the current evaluator. The current evaluator will not see the late completion, but its successor will, and will correctly handle it. The system never misses a completion; it only occasionally splits the handling of a wave of completions across two evaluator passes. This is the actor model's standard staleness property, and it is both sound and operationally benign.
 
@@ -760,7 +786,7 @@ The pattern has an additional observability benefit. The continue message is a f
 
 There are many possible implementations of "serialise work per block." Facetwork's choice — a per-block evaluator task claimed through the same protocol as any other task — has the virtue of reusing machinery that has to exist anyway. No new lock service, no new queue, no new primitive. The workflow graph itself is the coordination structure; the claim protocol is the synchronisation primitive; the database is the arbiter. Adding block-mediated advancement cost zero new infrastructure, and in the author's experience that economy is among the most satisfying design outcomes of the project.
 
-### 5.8 Task resumption and the resume protocol
+### 5.9 Task resumption and the resume protocol
 
 A sub-case of the claim protocol handles external agents that execute a facet *outside* the runner fleet. A Scala agent on a JVM host may be the canonical implementation of `osm.ops.SpatialIndex`. Facetwork's runner claims the task, serialises the parameters, and invokes an external process; when the external process completes, it writes the result back to the store and emits a resume task (`fw:resume:<FacetName>`) that the runner picks up. This elegantly turns the external process into a participant in the same claim protocol without requiring it to embed the Python runtime.
 
@@ -1453,7 +1479,7 @@ workflow RegionalReport(region: String) => (report: Report) andThen {
 }
 ```
 
-The data-dependency semantics of §4.4 extend uniformly: a sub-workflow reached through a parallel branch runs concurrently with its siblings, and downstream facets that reference its result block until it completes. The block-mediated advancement of §5.7 applies at every level of the call tree — each sub-workflow has its own evaluator and its own continue-message discipline — so composed workflows inherit the same lock-free coordination as monolithic ones. This makes workflows first-class reusable units: a team can publish a workflow alongside its event facets, and downstream teams can consume it by name, substituting implementations at the handler level without touching the consumer's FFL.
+The data-dependency semantics of §4.4 extend uniformly: a sub-workflow reached through a parallel branch runs concurrently with its siblings, and downstream facets that reference its result block until it completes. The block-mediated advancement of §5.8 applies at every level of the call tree — each sub-workflow has its own evaluator and its own continue-message discipline — so composed workflows inherit the same lock-free coordination as monolithic ones. This makes workflows first-class reusable units: a team can publish a workflow alongside its event facets, and downstream teams can consume it by name, substituting implementations at the handler level without touching the consumer's FFL.
 
 A concrete demonstration of this came together as the standalone-package pattern of §6.9 matured. The `fwh_anthropic` package declares `anthropic.messages.CreateMessage` and a small companion `anthropic.compose.DocumentQA` workflow (upload a file via the Files API, ask Claude about it via the Messages API — the canonical retrieval-augmented-generation shape). The framework's in-repo `research-agent` example was then ported to consume `anthropic.messages.CreateMessage` from `fwh_anthropic` rather than declaring its own prompt-block facets — the domain workflow plans, decomposes, gathers, analyses, drafts, and reviews entirely by issuing `CreateMessage` calls against system prompts that demand JSON, and parsing the responses through small typed `Parse<Schema>` event facets. From the FFL author's perspective there is no syntactic distinction between `anthropic.messages.CreateMessage` and any local facet; the discovery is operational (which runner has the matching handler) rather than linguistic. This is precisely the cross-package composition that §4.10 argued the language would enable; eight standalone packages and one cross-package consumer later, it is no longer hypothetical.
 
