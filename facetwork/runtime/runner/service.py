@@ -997,20 +997,25 @@ class RunnerService:
             # Uses resume_step (O(depth)) instead of resume (O(all steps)).
             # These can fail but the handler already succeeded — always mark
             # the task completed so the future finishes and capacity is freed.
+            #
+            # Built-in bootstrap tasks (``fw:execute[:Workflow]``) have no
+            # step — the handler itself starts the workflow — so there's
+            # nothing to continue/resume here.
             resume_error = None
-            try:
-                self._evaluator.continue_step(task.step_id, result)
-                self._resume_workflow_for_step(task.workflow_id, task.step_id)
-            except Exception as resume_exc:
-                resume_error = resume_exc
-                logger.warning(
-                    "Post-handler resume failed for %s (step=%s): %s — "
-                    "task will be marked completed (handler succeeded) — %s",
-                    task.uuid,
-                    task.step_id,
-                    resume_exc,
-                    self._task_label(task.uuid),
-                )
+            if task.step_id:
+                try:
+                    self._evaluator.continue_step(task.step_id, result)
+                    self._resume_workflow_for_step(task.workflow_id, task.step_id)
+                except Exception as resume_exc:
+                    resume_error = resume_exc
+                    logger.warning(
+                        "Post-handler resume failed for %s (step=%s): %s — "
+                        "task will be marked completed (handler succeeded) — %s",
+                        task.uuid,
+                        task.step_id,
+                        resume_exc,
+                        self._task_label(task.uuid),
+                    )
 
             # Always mark task completed — the handler produced a result.
             # If resume failed, the workflow will be retried on the next
@@ -1148,6 +1153,19 @@ class RunnerService:
         task. This method picks up that task, calls continue_step to
         validate and transition the step, then resumes the workflow.
         """
+        # Defensive: only genuine resume tasks (``fw:resume[:Facet]``) belong
+        # here. If anything else got routed in (e.g. a misclassified
+        # ``fw:execute:Workflow`` bootstrap task), hand it to the generic
+        # task handler instead of failing with a misleading "missing step_id".
+        if task.name != RESUME_TASK_NAME and not task.name.startswith(f"{RESUME_TASK_NAME}:"):
+            logger.warning(
+                "Non-resume task %s (name=%s) routed to resume handler — dispatching as a regular task",
+                task.uuid,
+                task.name,
+            )
+            self._process_task(task)
+            return
+
         try:
             data = task.data or {}
             step_id = data.get("step_id") or task.step_id
@@ -1204,6 +1222,13 @@ class RunnerService:
             # Dispatch
             payload = task.data or {}
             result = self._tool_registry.handle(task.name, payload)
+            if result is None and task.name.startswith("fw:"):
+                # Built-in protocol tasks carry a human-readable suffix
+                # (e.g. "fw:execute:MyWorkflow"); fall back to the base
+                # name ("fw:execute") so the registered handler is found.
+                base_name = ":".join(task.name.split(":")[:2])
+                if base_name != task.name:
+                    result = self._tool_registry.handle(base_name, payload)
 
             if result is not None:
                 task.state = TaskState.COMPLETED

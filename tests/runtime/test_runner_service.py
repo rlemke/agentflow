@@ -1748,6 +1748,67 @@ workflow TaskWF(x: Long) => (result: Long) andThen {
         # Task should be marked completed
         assert task.state == TaskState.COMPLETED
 
+    def test_execute_workflow_task_with_workflow_suffix(self, evaluator, config):
+        """``fw:execute:<WorkflowName>`` bootstrap tasks (created by the flow-run
+        route) are handled by falling back to the ``fw:execute`` base name."""
+        import json
+
+        from facetwork.emitter import JSONEmitter
+        from facetwork.parser import FFLParser
+        from facetwork.runtime.entities import RunnerState
+
+        afl_source = """
+facet Compute(input: Long)
+
+workflow TaskWF(x: Long) => (result: Long) andThen {
+    s1 = Compute(input = $.x)
+    yield TaskWF(result = s1.input)
+}
+"""
+        program_dict = json.loads(
+            JSONEmitter(include_locations=False).emit(FFLParser().parse(afl_source))
+        )
+
+        mock_store = MagicMock()
+        mock_flow = MagicMock()
+        mock_flow.compiled_ast = program_dict
+        mock_flow.compiled_sources = []
+        mock_store.get_flow.return_value = mock_flow
+        mock_runner = MagicMock()
+        mock_runner.state = RunnerState.CREATED
+        mock_runner.start_time = 0
+        mock_runner.end_time = 0
+        mock_runner.duration = 0
+        mock_store.get_runner.return_value = mock_runner
+
+        task = TaskDefinition(
+            uuid=generate_id(),
+            name="fw:execute:TaskWF",
+            runner_id="r-1",
+            workflow_id="",
+            flow_id="f-1",
+            step_id="",
+            state=TaskState.PENDING,
+            task_list_name="default",
+            data={
+                "flow_id": "f-1",
+                "workflow_name": "TaskWF",
+                "inputs": {"x": 5},
+                "runner_id": "r-1",
+            },
+        )
+        mock_store.get_pending_tasks.return_value = [task]
+        mock_store.get_steps_by_state.return_value = []
+        # claim order: resume (None), builtin (task), builtin (None)
+        mock_store.claim_task.side_effect = [None, task, None]
+
+        real_evaluator = Evaluator(persistence=MemoryStore(), telemetry=Telemetry(enabled=False))
+        svc = RunnerService(mock_store, real_evaluator, config, ToolRegistry())
+
+        assert svc.run_once() == 1
+        assert task.state == TaskState.COMPLETED
+        assert task.error is None
+
 
 # =========================================================================
 # TestRunnerASTSnapshot
