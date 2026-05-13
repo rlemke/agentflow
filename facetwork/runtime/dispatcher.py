@@ -24,6 +24,7 @@ import importlib
 import importlib.util
 import inspect
 import logging
+import os
 import threading
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
@@ -31,6 +32,24 @@ from typing import Any, Protocol, runtime_checkable
 from .persistence import PersistenceAPI
 
 logger = logging.getLogger(__name__)
+
+
+def registration_module_available(module_uri: str) -> bool:
+    """Return True if ``module_uri`` is importable in this process.
+
+    A cheap, side-effect-light check used to decide whether a runner should
+    advertise (and therefore claim) tasks for a given handler registration:
+    a runner must never accept a task whose handler it cannot load. For
+    ``file://`` URIs this is just a path-existence check (the common case —
+    each example runner only bind-mounts its own handler source); for dotted
+    module names it uses :func:`importlib.util.find_spec`.
+    """
+    if module_uri.startswith("file://"):
+        return os.path.exists(module_uri[len("file://") :])
+    try:
+        return importlib.util.find_spec(module_uri) is not None
+    except (ImportError, ValueError, ModuleNotFoundError):
+        return False
 
 
 @runtime_checkable
@@ -92,20 +111,43 @@ class RegistryDispatcher:
         self._reg_cache: dict[str, Any] = {}
         self._reg_cache_loaded = False
 
-    def preload(self) -> int:
+    def preload(self, *, verify: bool = False) -> int:
         """Load all handler registrations from persistence into memory.
 
-        Returns the number of registrations loaded.  Subsequent
-        ``can_dispatch`` / ``dispatch`` calls use the in-memory cache
-        and never hit the database.
+        When ``verify`` is True, registrations whose handler module is not
+        importable in this process are dropped — so ``can_dispatch`` (and a
+        runner built on top of this dispatcher) only advertises and claims
+        tasks it can actually run. Use this in standalone runners that host a
+        subset of the handler universe (e.g. one example's handlers each).
+
+        Returns the number of registrations kept.  Subsequent ``can_dispatch``
+        / ``dispatch`` calls use the in-memory cache and never hit the database.
         """
         registrations = self._persistence.list_handler_registrations()
         self._reg_cache.clear()
+        skipped: list[str] = []
         for reg in registrations:
+            if verify and not registration_module_available(reg.module_uri):
+                skipped.append(reg.facet_name)
+                continue
             self._reg_cache[reg.facet_name] = reg
         self._reg_cache_loaded = True
-        logger.info("RegistryDispatcher: preloaded %d registrations", len(self._reg_cache))
-        return len(self._reg_cache)
+        kept = len(self._reg_cache)
+        if skipped:
+            preview = ", ".join(skipped[:8]) + (", …" if len(skipped) > 8 else "")
+            logger.info(
+                "RegistryDispatcher: preloaded %d handler(s); skipped %d not loadable here (%s)",
+                kept,
+                len(skipped),
+                preview,
+            )
+        else:
+            logger.info("RegistryDispatcher: preloaded %d registrations", kept)
+        return kept
+
+    def dispatchable_facets(self) -> list[str]:
+        """Facet names this dispatcher can serve. Only meaningful after ``preload()``."""
+        return list(self._reg_cache.keys())
 
     def can_dispatch(self, facet_name: str) -> bool:
         """Check if a handler registration exists for the facet."""

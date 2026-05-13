@@ -144,24 +144,26 @@ def main() -> None:
     evaluator = Evaluator(persistence=store, telemetry=telemetry)
     tool_registry = ToolRegistry()
 
-    # Load handler registrations from MongoDB when --registry is set
+    # Load handler registrations from MongoDB when --registry is set.
+    # Only register (and therefore claim tasks for) handlers this process can
+    # actually load — a runner must never accept a task whose handler it can't
+    # run. In a multi-runner deployment each runner hosts a subset of the
+    # handler universe, so verify=True drops the rest.
     if args.registry:
         from facetwork.runtime.dispatcher import RegistryDispatcher
 
+        def _make_proxy(d: RegistryDispatcher, name: str):
+            def _proxy(payload: dict) -> dict | None:
+                return d.dispatch(name, payload)
+
+            return _proxy
+
         dispatcher = RegistryDispatcher(persistence=store)
-        dispatcher.preload()
-        registrations = store.list_handler_registrations()
-        for reg in registrations:
-
-            def _make_proxy(d: RegistryDispatcher, name: str):  # noqa: E301
-                def _proxy(payload: dict) -> dict | None:
-                    return d.dispatch(name, payload)
-
-                return _proxy
-
-            tool_registry.register(reg.facet_name, _make_proxy(dispatcher, reg.facet_name))
-        if registrations:
-            print(f"  Registry handlers: {len(registrations)} loaded (cached)")
+        loadable = dispatcher.preload(verify=True)
+        for facet_name in dispatcher.dispatchable_facets():
+            tool_registry.register(facet_name, _make_proxy(dispatcher, facet_name))
+        if loadable:
+            print(f"  Registry handlers: {loadable} loadable (cached)")
 
     runner_config = RunnerConfig(
         server_group=args.server_group,

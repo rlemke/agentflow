@@ -214,6 +214,41 @@ class TestRegistryDispatcher:
         dispatcher = RegistryDispatcher(persistence=store)
         assert dispatcher.get_timeout_ms("ns.Unknown") == 0
 
+    def test_preload_verify_drops_unloadable_registrations(self, store, handler_file):
+        """preload(verify=True) keeps only registrations whose module is importable here."""
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Here", module_uri=f"file://{handler_file}", entrypoint="handle"
+            )
+        )
+        store.save_handler_registration(
+            HandlerRegistration(
+                facet_name="ns.Gone",
+                module_uri="file:///definitely/not/here/handler.py",
+                entrypoint="handle",
+            )
+        )
+        dispatcher = RegistryDispatcher(persistence=store)
+
+        # Without verify: both are advertised (legacy behaviour).
+        assert dispatcher.preload() == 2
+        assert set(dispatcher.dispatchable_facets()) == {"ns.Here", "ns.Gone"}
+
+        # With verify: the missing-module one is dropped — the runner won't claim it.
+        assert dispatcher.preload(verify=True) == 1
+        assert dispatcher.dispatchable_facets() == ["ns.Here"]
+        assert dispatcher.can_dispatch("ns.Here") is True
+        assert dispatcher.can_dispatch("ns.Gone") is False
+
+    def test_registration_module_available(self, handler_file):
+        """registration_module_available: True for an existing file:// path, False otherwise."""
+        from facetwork.runtime.dispatcher import registration_module_available
+
+        assert registration_module_available(f"file://{handler_file}") is True
+        assert registration_module_available("file:///no/such/file.py") is False
+        assert registration_module_available("os.path") is True  # importable dotted module
+        assert registration_module_available("totally.not.a.module") is False
+
 
 # =========================================================================
 # TestInMemoryDispatcher
