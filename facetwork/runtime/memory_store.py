@@ -319,14 +319,34 @@ class MemoryStore(PersistenceAPI):
         """Save a task."""
         self._tasks[task.uuid] = task
 
-    def get_all_tasks(self, limit: int = 100) -> list["TaskDefinition"]:
-        """Get all tasks, most recently created first."""
+    def get_all_tasks(
+        self, limit: int = 100, task_list: str | None = None
+    ) -> list["TaskDefinition"]:
+        """Get all tasks, most recently created first.
+
+        When *task_list* is given, only tasks on that list are returned.
+        """
         tasks = sorted(self._tasks.values(), key=lambda t: t.created, reverse=True)
+        if task_list:
+            tasks = [t for t in tasks if t.task_list_name == task_list]
         return tasks[:limit]
 
-    def get_tasks_by_state(self, state: str) -> list["TaskDefinition"]:
-        """Get tasks by state."""
-        return [t for t in self._tasks.values() if t.state == state]
+    def get_tasks_by_state(
+        self, state: str, task_list: str | None = None
+    ) -> list["TaskDefinition"]:
+        """Get tasks by state, optionally narrowed to one task list."""
+        return [
+            t
+            for t in self._tasks.values()
+            if t.state == state and (not task_list or t.task_list_name == task_list)
+        ]
+
+    def task_list_counts(self) -> dict[str, int]:
+        """Return ``{task_list_name: count}`` across all tasks."""
+        out: dict[str, int] = {}
+        for t in self._tasks.values():
+            out[t.task_list_name] = out.get(t.task_list_name, 0) + 1
+        return out
 
     def get_tasks_by_server_id(self, server_id: str, limit: int = 200) -> list["TaskDefinition"]:
         """Get tasks claimed by a specific server, most recent first."""

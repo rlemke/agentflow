@@ -101,16 +101,22 @@ def _resolve_server_info(tasks, store) -> dict[str, dict]:
 
 
 @router.get("")
-def task_list(request: Request, state: str | None = None, store=Depends(get_store)):
-    """List all tasks, optionally filtered by state."""
+def task_list(
+    request: Request,
+    state: str | None = None,
+    task_list: str | None = None,
+    store=Depends(get_store),
+):
+    """List all tasks, optionally filtered by state and/or task list."""
     if state:
-        tasks = store.get_tasks_by_state(state)
+        tasks = store.get_tasks_by_state(state, task_list=task_list)
     else:
-        tasks = store.get_all_tasks()
+        tasks = store.get_all_tasks(task_list=task_list)
 
     step_names = _resolve_step_names(tasks, store)
     server_info = _resolve_server_info(tasks, store)
     tab_counts = _count_tasks_by_state(store)
+    list_counts = store.task_list_counts()
 
     return request.app.state.templates.TemplateResponse(
         request,
@@ -118,21 +124,28 @@ def task_list(request: Request, state: str | None = None, store=Depends(get_stor
         {
             "tasks": tasks,
             "filter_state": state,
+            "filter_task_list": task_list,
             "step_names": step_names,
             "server_info": server_info,
             "tab_counts": tab_counts,
+            "list_counts": list_counts,
             "active_tab": "tasks",
         },
     )
 
 
 @router.get("/partial")
-def task_list_partial(request: Request, state: str | None = None, store=Depends(get_store)):
+def task_list_partial(
+    request: Request,
+    state: str | None = None,
+    task_list: str | None = None,
+    store=Depends(get_store),
+):
     """HTMX partial for auto-refresh of task table."""
     if state:
-        tasks = store.get_tasks_by_state(state)
+        tasks = store.get_tasks_by_state(state, task_list=task_list)
     else:
-        tasks = store.get_all_tasks()
+        tasks = store.get_all_tasks(task_list=task_list)
 
     step_names = _resolve_step_names(tasks, store)
     server_info = _resolve_server_info(tasks, store)
@@ -143,6 +156,7 @@ def task_list_partial(request: Request, state: str | None = None, store=Depends(
         {
             "tasks": tasks,
             "filter_state": state,
+            "filter_task_list": task_list,
             "step_names": step_names,
             "server_info": server_info,
         },

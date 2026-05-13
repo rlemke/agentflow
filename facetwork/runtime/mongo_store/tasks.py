@@ -142,15 +142,42 @@ class TaskMixin(_MixinBase):
             {"uuid": task_id}, {"$set": {"state": state, "updated": _current_time_ms()}}
         )
 
-    def get_all_tasks(self, limit: int = 100) -> Sequence[TaskDefinition]:
-        """Get all tasks, most recently created first."""
-        docs = self._db.tasks.find().sort("created", -1).limit(limit)
+    def get_all_tasks(
+        self, limit: int = 100, task_list: str | None = None
+    ) -> Sequence[TaskDefinition]:
+        """Get all tasks, most recently created first.
+
+        When *task_list* is given, only tasks on that list are returned.
+        """
+        query: dict[str, Any] = {}
+        if task_list:
+            query["task_list_name"] = task_list
+        docs = self._db.tasks.find(query).sort("created", -1).limit(limit)
         return [self._doc_to_task(doc) for doc in docs]
 
-    def get_tasks_by_state(self, state: str) -> Sequence[TaskDefinition]:
-        """Get tasks by state."""
-        docs = self._db.tasks.find({"state": state}).sort("created", -1)
+    def get_tasks_by_state(
+        self, state: str, task_list: str | None = None
+    ) -> Sequence[TaskDefinition]:
+        """Get tasks by state, optionally narrowed to a single task list."""
+        query: dict[str, Any] = {"state": state}
+        if task_list:
+            query["task_list_name"] = task_list
+        docs = self._db.tasks.find(query).sort("created", -1)
         return [self._doc_to_task(doc) for doc in docs]
+
+    def task_list_counts(self) -> dict[str, int]:
+        """Return ``{task_list_name: count}`` across all tasks.
+
+        Used by the dashboard to render a per-list filter with sizes so
+        operators can see how routing is distributing work at a glance.
+        """
+        out: dict[str, int] = {}
+        for doc in self._db.tasks.aggregate(
+            [{"$group": {"_id": "$task_list_name", "count": {"$sum": 1}}}]
+        ):
+            name = doc.get("_id") or "default"
+            out[name] = doc["count"]
+        return out
 
     def get_tasks_by_runner(self, runner_id: str) -> Sequence[TaskDefinition]:
         """Get all tasks for a runner."""

@@ -476,6 +476,23 @@ The repair performs five checks:
 
 **Preventative**: Runners now verify all tasks are terminal before marking a workflow as completed.
 
+### Terminating abandoned workflows
+
+For runs that retry/repair can't recover (e.g. a test that failed at the
+handler layer because of a missing API key or removed binary), use
+`scripts/terminate-workflow` to mark the runner, all non-terminal steps,
+and pending/running tasks as terminal so the stuck-step sweep stops
+re-processing them.
+
+```bash
+scripts/terminate-workflow <runner_id> [<runner_id> ...]
+scripts/terminate-workflow --workflow osm.UnitedStates.analysis.AnalyzeRegion  # all stuck runs of this workflow
+scripts/terminate-workflow --workflow Foo --workflow Bar --dry                 # preview
+```
+
+Use this only after deciding the work isn't recoverable — `repair-workflow`
+is the right call for transient failures.
+
 ### Graceful runner shutdown
 Use `scripts/drain-runners` instead of `scripts/stop-runners` when you need running tasks reset to pending. Each drained task gets a step log entry for audit visibility.
 

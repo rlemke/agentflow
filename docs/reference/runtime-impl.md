@@ -832,6 +832,16 @@ Routing is configured via `AFL_WORKFLOW_TASK_LIST_MAP` — comma-separated
 AFL_WORKFLOW_TASK_LIST_MAP=osm.=osm,osm.heavy.=osm-heavy,anthropic.=anthropic
 ```
 
+**Routing requires the fully qualified workflow name.** `ast_utils.find_workflow()`
+returns the inner `WorkflowDecl` dict whose `"name"` field is only the
+unqualified tail (`"AnalyzeRegion"`) — the namespace prefix lives on the
+enclosing `Namespace` decl. So `workflow_ast["name"]` is the *wrong*
+input to the resolver; passing the short name silently falls back to
+`"default"` because no prefix can match. `ExecutionContext.qualified_workflow_name`
+carries the correct value end-to-end and is what `_create_event_task` reads.
+Submission sites pass the workflow name they were given by the caller
+(CLI argument, dashboard form, etc.), which is already qualified.
+
 `facetwork/runtime/task_list_routing.py:resolve_task_list(workflow_name)` is
 called by every site that *originates* a task list:
 

@@ -136,6 +136,7 @@ services:
       AFL_MAX_CONCURRENT: ${AFL_MAX_CONCURRENT:-4}
       AFL_POLL_INTERVAL_MS: ${AFL_POLL_INTERVAL_MS:-1000}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
       PYTHONPATH: /app
     volumes:
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -216,6 +217,8 @@ services:
       AFL_EXAMPLE_REPO: fwh_osm_lz
       AFL_POSTGIS_URL: postgresql://${POSTGRES_USER:-afl}:${POSTGRES_PASSWORD:-afl}@postgis:5432/${POSTGRES_DB:-afl_gis}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list continental"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_osm_lz:/handlers/fwh_osm_lz
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_osm:/handlers/fwh_osm:ro
@@ -236,6 +239,8 @@ services:
       AFL_EXAMPLE_NAME: noaa-weather
       AFL_EXAMPLE_REPO: fwh_noaa_weather
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list weather"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_noaa_weather:/handlers/fwh_noaa_weather
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -256,6 +261,8 @@ services:
       AFL_EXAMPLE_REPO: fwh_jenkins
       JENKINS_URL: http://jenkins:8080
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list jenkins"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_jenkins:/handlers/fwh_jenkins
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -276,6 +283,8 @@ services:
       AFL_EXAMPLE_REPO: fwh_census_us
       CENSUS_API_KEY: ${CENSUS_API_KEY:-}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list census"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_census_us:/handlers/fwh_census_us
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -295,6 +304,8 @@ services:
       AFL_EXAMPLE_NAME: genomics
       AFL_EXAMPLE_REPO: fwh_genomics
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list genomics"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_genomics:/handlers/fwh_genomics
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -314,6 +325,8 @@ services:
       AFL_EXAMPLE_NAME: sensor-monitoring
       AFL_EXAMPLE_REPO: fwh_sensor_monitoring
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list monitor"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_sensor_monitoring:/handlers/fwh_sensor_monitoring
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data

@@ -12,35 +12,35 @@
 {% block subnav %}
 <div class="container">
     <div class="subnav">
-        <a href="/tasks"
+        <a href="/tasks{% if filter_task_list %}?task_list={{ filter_task_list }}{% endif %}"
            class="subnav-pill{% if not filter_state %} active{% endif %}">
             All <span class="subnav-count">{{ tab_counts.all }}</span>
         </a>
-        <a href="/tasks?state=pending"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=pending"
            class="subnav-pill{% if filter_state == 'pending' %} active{% endif %}">
             Pending <span class="subnav-count">{{ tab_counts.pending }}</span>
         </a>
-        <a href="/tasks?state=running"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=running"
            class="subnav-pill{% if filter_state == 'running' %} active{% endif %}">
             Running <span class="subnav-count">{{ tab_counts.running }}</span>
         </a>
-        <a href="/tasks?state=completed"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=completed"
            class="subnav-pill{% if filter_state == 'completed' %} active{% endif %}">
             Completed <span class="subnav-count">{{ tab_counts.completed }}</span>
         </a>
-        <a href="/tasks?state=failed"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=failed"
            class="subnav-pill{% if filter_state == 'failed' %} active{% endif %}">
             Failed <span class="subnav-count">{{ tab_counts.failed }}</span>
         </a>
-        <a href="/tasks?state=ignored"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=ignored"
            class="subnav-pill{% if filter_state == 'ignored' %} active{% endif %}">
             Ignored <span class="subnav-count">{{ tab_counts.ignored }}</span>
         </a>
-        <a href="/tasks?state=canceled"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=canceled"
            class="subnav-pill{% if filter_state == 'canceled' %} active{% endif %}">
             Canceled <span class="subnav-count">{{ tab_counts.canceled }}</span>
         </a>
-        <a href="/tasks?state=dead_letter"
+        <a href="/tasks?{% if filter_task_list %}task_list={{ filter_task_list }}&amp;{% endif %}state=dead_letter"
            class="subnav-pill{% if filter_state == 'dead_letter' %} active{% endif %}{% if tab_counts.dead_letter > 0 %} badge-failed{% endif %}">
             Dead Letter <span class="subnav-count">{{ tab_counts.dead_letter }}</span>
         </a>
@@ -51,9 +51,29 @@
 {% block content %}
 <h1>Task Queue</h1>
 
+{% if list_counts and list_counts|length > 1 %}
+{# Per-task-list filter row. Hidden when only one list exists (default). #}
+{% set qs_state = '&state=' + filter_state if filter_state else '' %}
+<div style="display:flex; gap:0.35rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+    <span class="secondary" style="font-size:0.85em; margin-right:0.25rem;">Task list:</span>
+    <a href="/tasks?{{ ('state=' + filter_state) if filter_state else '' }}"
+       class="subnav-pill{% if not filter_task_list %} active{% endif %}">
+        all <span class="subnav-count">{{ list_counts.values()|sum }}</span>
+    </a>
+    {% for name, n in list_counts.items()|sort %}
+    <a href="/tasks?task_list={{ name }}{{ qs_state }}"
+       class="subnav-pill{% if filter_task_list == name %} active{% endif %}">
+        {{ name }} <span class="subnav-count">{{ n }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% set refresh_qs %}{% if filter_state and filter_task_list %}?state={{ filter_state }}&task_list={{ filter_task_list }}{% elif filter_state %}?state={{ filter_state }}{% elif filter_task_list %}?task_list={{ filter_task_list }}{% endif %}{% endset %}
+
 <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
     <button class="btn-refresh"
-            hx-get="/tasks/partial{% if filter_state %}?state={{ filter_state }}{% endif %}"
+            hx-get="/tasks/partial{{ refresh_qs }}"
             hx-target="#task-table-content"
             hx-swap="innerHTML">
         <span class="refresh-icon">&#x21bb;</span> Refresh
@@ -80,7 +100,7 @@
 </div>
 
 <div id="task-table-content"
-     {% if filter_state == 'pending' or filter_state == 'running' %}hx-get="/tasks/partial{% if filter_state %}?state={{ filter_state }}{% endif %}" hx-trigger="every 300s" hx-swap="innerHTML"{% endif %}>
+     {% if filter_state == 'pending' or filter_state == 'running' %}hx-get="/tasks/partial{{ refresh_qs }}" hx-trigger="every 300s" hx-swap="innerHTML"{% endif %}>
     {% include "tasks/_table_content.html" %}
 </div>
 {% endblock %}

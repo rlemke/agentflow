@@ -23,6 +23,19 @@ workflow's tasks should land on. Configured via the
 
 Longest-prefix match wins; the empty prefix ``=foo`` sets the global
 fallback (otherwise ``"default"``).
+
+.. note::
+   Callers must pass the **fully qualified** workflow name (e.g.
+   ``"osm.UnitedStates.analysis.AnalyzeRegion"``), not the short name.
+   ``ast_utils.find_workflow()`` returns the inner ``WorkflowDecl`` dict
+   whose ``"name"`` field is only the *unqualified* tail (``"AnalyzeRegion"``)
+   — the namespace prefix lives on the enclosing ``Namespace`` decl and is
+   stripped during lookup. Passing the short name here silently falls back
+   to ``"default"`` because no prefix can match it.
+
+   ``ExecutionContext.qualified_workflow_name`` carries the correct value
+   end-to-end; submission sites pass the workflow name they were given
+   (which is already qualified).
 """
 
 from __future__ import annotations
