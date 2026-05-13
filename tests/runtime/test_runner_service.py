@@ -2688,7 +2688,7 @@ class TestReaperInRunnerService:
                 # Should emit a step log for each reaped task
                 assert mock_log.call_count == 3
                 entry = mock_log.call_args_list[0][0][0]
-                assert "restarted" in entry.message.lower()
+                assert "reclaimed" in entry.message.lower()
                 assert "dead-ser" in entry.message  # truncated server_id
 
     def test_reaper_survives_exception(self, store, evaluator, registry):

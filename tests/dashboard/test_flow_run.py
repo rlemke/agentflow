@@ -248,7 +248,9 @@ class TestFlowRunExecute:
         runner = store.get_runner(runner_id)
         assert runner is not None
         assert runner.state == "created"
-        assert runner.workflow_id == wf.uuid
+        # Each run gets a fresh execution workflow_id; the workflow *definition*
+        # is snapshotted onto the runner.
+        assert runner.workflow.uuid == wf.uuid
 
     def test_creates_task(self, client):
         tc, store = client
@@ -260,9 +262,13 @@ class TestFlowRunExecute:
         )
         tasks = store.get_pending_tasks("default")
         assert len(tasks) == 1
-        assert tasks[0].name == "fw:execute"
+        assert tasks[0].name == "fw:execute:SimpleWF"
         assert tasks[0].data["flow_id"] == flow.uuid
-        assert tasks[0].data["workflow_id"] == wf.uuid
+        # The task carries the per-run execution workflow_id (matches the runner's).
+        runner = store.get_runner(tasks[0].runner_id)
+        assert runner is not None
+        assert tasks[0].data["workflow_id"] == runner.workflow_id
+        assert tasks[0].workflow_id == runner.workflow_id
         assert tasks[0].data["workflow_name"] == "SimpleWF"
 
     def test_user_inputs_override_defaults(self, client):

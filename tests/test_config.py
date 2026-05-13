@@ -33,7 +33,7 @@ class TestMongoDBConfig:
 
     def test_defaults(self):
         cfg = MongoDBConfig()
-        assert cfg.url == "mongodb://localhost:27017"
+        assert cfg.url == "mongodb://afl-mongodb:27017"
         assert cfg.username == ""
         assert cfg.password == ""
         assert cfg.auth_source == "admin"
@@ -47,7 +47,7 @@ class TestMongoDBConfig:
         cfg = MongoDBConfig()
         d = cfg.to_dict()
         assert d == {
-            "url": "mongodb://localhost:27017",
+            "url": "mongodb://afl-mongodb:27017",
             "username": "",
             "password": "",
             "auth_source": "admin",

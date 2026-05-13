@@ -143,7 +143,7 @@ class TestHDFSStorageBackend:
 
     def _make_backend(self, **kwargs):
         """Create an HDFSStorageBackend with requests available."""
-        import afl.runtime.storage as mod
+        import facetwork.runtime.storage as mod
 
         orig = mod.HAS_REQUESTS
         mod.HAS_REQUESTS = True
@@ -377,8 +377,9 @@ class TestHDFSRetry:
     @patch("facetwork.runtime.storage._requests")
     def test_write_stream_retries(self, mock_req):
         """_WebHDFSWriteStream.close() retries on transient datanode 404."""
-        import afl.runtime.storage as mod
         import requests
+
+        import facetwork.runtime.storage as mod
 
         orig = mod.HAS_REQUESTS
         mod.HAS_REQUESTS = True
@@ -426,7 +427,7 @@ class TestGetStorageBackend:
 
     def setup_method(self):
         """Reset cached backends between tests."""
-        import afl.runtime.storage as mod
+        import facetwork.runtime.storage as mod
 
         mod._local_backend = None
         mod._hdfs_backends.clear()

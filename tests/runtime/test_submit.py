@@ -236,7 +236,7 @@ class TestMongoSubmit:
         assert runner.state == "created"
 
         task = mock_store.get_tasks_by_runner(ids["runner_id"])[0]
-        assert task.name == "fw:execute"
+        assert task.name == "fw:execute:test.Run"
         assert task.state == "pending"
         assert task.data["workflow_name"] == "test.Run"
 
