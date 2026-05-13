@@ -33,8 +33,12 @@ the entrypoint (`docker/entrypoint-example-runner.sh`) does:
 
 1. `pip install -e /handlers/<repo>[<extras>]` (editable, so handler
    edits on the host land in the container with no rebuild)
-2. `python -m facetwork.examples <name>` — registers handler routing
-   in MongoDB
+2. `python -m facetwork.examples --seed <name>` — registers handler
+   routing in MongoDB **and** compiles the example's FFL into a
+   `FlowDefinition` + `WorkflowDefinition`s so its workflows show up in
+   the dashboard's Flows tab. `--seed` is idempotent (seeded under
+   `example:<name>`; re-running replaces that example's prior seed), so
+   a runner restart doesn't pile up duplicate flows.
 3. `exec python -m facetwork.runtime.runner --registry`
 
 ## Prerequisites
@@ -289,9 +293,10 @@ scripts/install-anthropic --mcp             # core + mcp extras only
 │ │  runner-genomics, runner-sensor-monitoring                     │   │
 │ │     │                                                          │   │
 │ │     │ each one pip-installs its bind-mounted fwh_* repo,       │   │
-│ │     │ registers handlers in MongoDB, then polls for tasks      │   │
+│ │     │ registers handlers + seeds its workflows in MongoDB,     │   │
+│ │     │ then polls for tasks                                     │   │
 │ │     ▼                                                          │   │
-│ │  seed (one-shot) ─── seeds 18 flows + 41 workflows on first   │   │
+│ │  seed (one-shot) ─── seeds the in-repo example flows on first  │   │
 │ │                       boot so the dashboard isn't empty        │   │
 │ └────────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘

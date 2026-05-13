@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from facetwork import examples as examples_mod
 from facetwork.examples import (
     ExamplePackage,
@@ -270,3 +272,100 @@ class TestFilter:
         _make_local_example(tmp_path, "alpha", with_handlers=True, with_ffl=False)
         found = discover_local_examples(tmp_path)
         assert list(filter_examples(found, include=None)) == found
+
+
+# Minimal but parser/validator-clean FFL with a namespace + two workflows.
+_SEED_FFL = """\
+namespace seedy {
+    event facet AddOne(value: Long) => (result: Long)
+
+    workflow AddOneWorkflow(input: Long) => (output: Long) andThen {
+        added = AddOne(value = $.input)
+        yield AddOneWorkflow(output = added.result)
+    }
+
+    workflow DoubleAddOne(input: Long) => (output: Long) andThen {
+        first = AddOne(value = $.input)
+        second = AddOne(value = first.result)
+        yield DoubleAddOne(output = second.result)
+    }
+}
+"""
+
+
+class _RecordingStore:
+    """A store that just records save_flow / save_workflow calls."""
+
+    def __init__(self):
+        self.flows: list = []
+        self.workflows: list = []
+
+    def save_flow(self, flow):
+        self.flows.append(flow)
+
+    def save_workflow(self, wf):
+        self.workflows.append(wf)
+
+
+class TestSeedExampleFlows:
+    def test_compiles_and_saves_flow_plus_workflows(self, tmp_path):
+        from facetwork.examples import seed_example_flows
+
+        ex = _make_local_example(tmp_path, "seedy", with_handlers=False, with_ffl=True)
+        (ex / "ffl" / "seedy.ffl").write_text(_SEED_FFL)
+        [pkg] = discover_local_examples(tmp_path)
+
+        store = _RecordingStore()
+        n_flows, n_workflows, _warnings = seed_example_flows(pkg, store, replace=False)
+
+        assert (n_flows, n_workflows) == (1, 2)
+        assert len(store.flows) == 1
+        assert store.flows[0].name.path == "example:seedy"
+        assert store.flows[0].name.name == "seedy"
+        wf_names = sorted(w.name for w in store.workflows)
+        assert wf_names == ["seedy.AddOneWorkflow", "seedy.DoubleAddOne"]
+        # Every workflow links back to the seeded flow.
+        assert {w.flow_id for w in store.workflows} == {store.flows[0].uuid}
+
+    def test_no_ffl_files_returns_zero(self, tmp_path):
+        from facetwork.examples import seed_example_flows
+
+        _make_local_example(tmp_path, "handlers-only", with_handlers=True, with_ffl=False)
+        [pkg] = discover_local_examples(tmp_path)
+
+        store = _RecordingStore()
+        assert seed_example_flows(pkg, store) == (0, 0, [])
+        assert store.flows == [] and store.workflows == []
+
+    def test_ffl_without_workflows_returns_zero(self, tmp_path):
+        from facetwork.examples import seed_example_flows
+
+        ex = _make_local_example(tmp_path, "facets-only", with_handlers=False, with_ffl=True)
+        (ex / "ffl" / "facets-only.ffl").write_text(
+            "namespace x {\n    event facet F(a: Long) => (b: Long)\n}\n"
+        )
+        [pkg] = discover_local_examples(tmp_path)
+
+        store = _RecordingStore()
+        n_flows, n_workflows, _w = seed_example_flows(pkg, store)
+        assert (n_flows, n_workflows) == (0, 0)
+        assert store.flows == []
+
+    def test_replace_is_idempotent(self, tmp_path):
+        mongomock = pytest.importorskip("mongomock")
+        from facetwork.examples import seed_example_flows
+        from facetwork.runtime.mongo_store import MongoStore
+
+        ex = _make_local_example(tmp_path, "seedy", with_handlers=False, with_ffl=True)
+        (ex / "ffl" / "seedy.ffl").write_text(_SEED_FFL)
+        [pkg] = discover_local_examples(tmp_path)
+
+        store = MongoStore(database_name="t_seed_idem", client=mongomock.MongoClient())
+        try:
+            seed_example_flows(pkg, store)
+            seed_example_flows(pkg, store)  # re-seed should replace, not duplicate
+            assert store._db.flows.count_documents({"name.path": "example:seedy"}) == 1
+            assert store._db.workflows.count_documents({"namespace_id": "example:seedy"}) == 2
+        finally:
+            store.drop_database()
+            store.close()

@@ -2,11 +2,14 @@
 
 Usage::
 
-    python -m facetwork.examples [NAME ...]
+    python -m facetwork.examples [--seed] [NAME ...]
 
-With no names, registers handlers for every discovered example. Used by
-``scripts/start-runner`` and ``scripts/seed-examples``; safe to call
-directly for ad-hoc registration.
+With no names, operates on every discovered example. ``--seed`` also
+compiles each example's FFL and upserts a FlowDefinition + its
+WorkflowDefinitions so the workflows appear in the dashboard's Flows tab
+(idempotent — re-running replaces the example's prior seed). Used by
+``scripts/start-runner``, ``scripts/seed-examples``, and the per-example
+runner container entrypoint; safe to call directly for ad-hoc registration.
 """
 
 from __future__ import annotations
@@ -16,14 +19,19 @@ import sys
 from pathlib import Path
 
 from facetwork.config import MongoDBConfig
-from facetwork.examples import discover_all_examples, filter_examples
+from facetwork.examples import (
+    discover_all_examples,
+    filter_examples,
+    seed_example_flows,
+)
 from facetwork.runtime import Evaluator, RegistryRunner, Telemetry
 from facetwork.runtime.mongo_store import MongoStore
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    selected = argv or None
+    do_seed = "--seed" in argv
+    selected = [a for a in argv if a != "--seed"] or None
 
     repo_root = Path(os.environ.get("REPO_ROOT", os.getcwd()))
     examples = list(filter_examples(discover_all_examples(repo_root), include=selected))
@@ -60,6 +68,32 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print(f"Total: {total} handlers registered")
+
+    if do_seed:
+        print()
+        print("Seeding example workflows (FlowDefinition + WorkflowDefinition)...")
+        print()
+        seeded_flows = 0
+        seeded_workflows = 0
+        for pkg in examples:
+            try:
+                n_flows, n_workflows, warnings = seed_example_flows(pkg, store)
+            except Exception as e:
+                print(f"  {pkg.name}: seed ERROR — {e}")
+                continue
+            if n_workflows == 0:
+                print(f"  {pkg.name}: no workflows to seed")
+                continue
+            seeded_flows += n_flows
+            seeded_workflows += n_workflows
+            line = f"  {pkg.name}: {n_workflows} workflow(s) seeded"
+            if warnings:
+                line += f"  [{', '.join(warnings)}]"
+            print(line)
+        print()
+        print(f"Seeded {seeded_flows} flow(s) with {seeded_workflows} workflow(s)")
+
+    store.close()
     return 0
 
 

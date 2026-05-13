@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import json
 import logging
 import sys
+import time
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +27,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 ENTRY_POINT_GROUP = "facetwork.examples"
+
+# Seed path stamped onto FlowDefinitions created by ``seed_example_flows``.
+# One path per example so re-seeding a single example is cleanly scoped.
+SEED_PATH_PREFIX = "example:"
 
 
 @dataclass
@@ -269,3 +275,127 @@ def collect_ffl_files(pkg: ExamplePackage) -> list[Path]:
         seen.add(real_f)
         unique.append(f)
     return unique
+
+
+# ---------------------------------------------------------------------------
+# Seeding example workflows (FlowDefinition + WorkflowDefinition)
+# ---------------------------------------------------------------------------
+
+
+def _collect_workflow_names(node: dict, prefix: str = "") -> list[str]:
+    """Collect fully-qualified workflow names from a compiled FFL program dict.
+
+    Handles both the nested (``workflows`` / ``namespaces``) and the flat
+    (``declarations`` with ``WorkflowDecl`` / ``Namespace``) emitter shapes.
+    """
+    names: list[str] = []
+    for w in node.get("workflows", []):
+        names.append(f"{prefix}{w['name']}" if prefix else w["name"])
+    for decl in node.get("declarations", []):
+        if decl.get("type") == "WorkflowDecl":
+            names.append(f"{prefix}{decl['name']}" if prefix else decl["name"])
+        elif decl.get("type") == "Namespace":
+            names.extend(_collect_workflow_names(decl, f"{prefix}{decl['name']}."))
+    for ns in node.get("namespaces", []):
+        names.extend(_collect_workflow_names(ns, f"{prefix}{ns['name']}."))
+    return names
+
+
+def _compile_ffl_files(files: list[Path]) -> tuple[dict, str, list[str]]:
+    """Parse + merge + emit a list of ``.ffl`` files.
+
+    Returns ``(program_dict, combined_source, warnings)``. Parse errors raise;
+    validation problems become warnings (an example may legitimately reference
+    facets defined by another example).
+    """
+    from facetwork.ast import Program
+    from facetwork.emitter import JSONEmitter
+    from facetwork.parser import FFLParser
+    from facetwork.validator import validate
+
+    parser = FFLParser()
+    programs = []
+    parts: list[str] = []
+    for path in files:
+        text = Path(path).read_text()
+        parts.append(text)
+        programs.append(parser.parse(text, filename=str(path)))
+    merged = Program.merge(programs)
+
+    warnings: list[str] = []
+    result = validate(merged)
+    if not result.is_valid:
+        warnings.append(f"{len(result.errors)} validation warning(s)")
+
+    program_dict = json.loads(JSONEmitter(include_locations=False).emit(merged))
+    return program_dict, "\n".join(parts), warnings
+
+
+def seed_example_flows(
+    pkg: ExamplePackage, store: Any, *, replace: bool = True
+) -> tuple[int, int, list[str]]:
+    """Compile ``pkg``'s FFL and upsert a FlowDefinition + its WorkflowDefinitions.
+
+    Each example is seeded under its own path (``example:<name>``); when
+    ``replace`` is set (default) any flows/workflows previously seeded under that
+    path are deleted first, so re-running this — e.g. every time a runner
+    container restarts — is idempotent rather than accumulating duplicates.
+
+    Returns ``(flows_seeded, workflows_seeded, warnings)``; ``(0, 0, [...])`` when
+    the example ships no ``.ffl`` files or declares no workflows.
+    """
+    from facetwork.runtime.entities import (
+        FlowDefinition,
+        FlowIdentity,
+        SourceText,
+        WorkflowDefinition,
+    )
+    from facetwork.runtime.types import generate_id
+
+    files = collect_ffl_files(pkg)
+    if not files:
+        return 0, 0, []
+
+    program_dict, combined_source, warnings = _compile_ffl_files(files)
+    workflow_names = _collect_workflow_names(program_dict)
+    if not workflow_names:
+        return 0, 0, warnings
+
+    seed_path = f"{SEED_PATH_PREFIX}{pkg.name}"
+
+    if replace:
+        # FlowDefinition deletion isn't part of PersistenceAPI; fall through to
+        # the Mongo collection like scripts/seed-examples does. No-op on stores
+        # without a ``_db`` (e.g. MemoryStore in tests).
+        db = getattr(store, "_db", None)
+        if db is not None:
+            old_ids = [d["uuid"] for d in db.flows.find({"name.path": seed_path}, {"uuid": 1})]
+            if old_ids:
+                db.workflows.delete_many({"flow_id": {"$in": old_ids}})
+            db.flows.delete_many({"name.path": seed_path})
+
+    now_ms = int(time.time() * 1000)
+    flow_id = generate_id()
+    store.save_flow(
+        FlowDefinition(
+            uuid=flow_id,
+            name=FlowIdentity(name=pkg.name, path=seed_path, uuid=flow_id),
+            compiled_sources=[SourceText(name="source.ffl", content=combined_source)],
+            compiled_ast=program_dict,
+        )
+    )
+    for qname in workflow_names:
+        wf_id = generate_id()
+        store.save_workflow(
+            WorkflowDefinition(
+                uuid=wf_id,
+                name=qname,
+                namespace_id=seed_path,
+                facet_id=wf_id,
+                flow_id=flow_id,
+                starting_step="",
+                version="1.0",
+                date=now_ms,
+            )
+        )
+    return 1, len(workflow_names), warnings

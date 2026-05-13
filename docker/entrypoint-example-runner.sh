@@ -41,10 +41,13 @@ else
     pip install --quiet --no-cache-dir -e "$EXAMPLE_DIR"
 fi
 
-# Register handler routing in MongoDB so the registry runner knows
-# which facets map to this container's module/entrypoint.
-echo "    Registering handlers for $AFL_EXAMPLE_NAME"
-python -m facetwork.examples "$AFL_EXAMPLE_NAME"
+# Register handler routing in MongoDB so the registry runner knows which
+# facets map to this container's module/entrypoint, AND seed the example's
+# FFL workflows so they appear in the dashboard's Flows tab. `--seed` is
+# idempotent: re-running replaces this example's prior seed (no duplicates
+# across container restarts).
+echo "    Registering handlers + seeding workflows for $AFL_EXAMPLE_NAME"
+python -m facetwork.examples --seed "$AFL_EXAMPLE_NAME"
 
 # Hand off to the runner service in registry mode.
 echo "    Starting runner (registry mode)"
