@@ -1369,6 +1369,7 @@ class RunnerService:
                 program_ast=program_dict,
                 runner_id=runner_id,
                 wf_id=submitted_wf_id,
+                qualified_workflow_name=workflow_name,
             )
 
             # Cache AST for resume
@@ -1677,10 +1678,12 @@ class RunnerService:
 
         # Look up the runner_id so resumed tasks inherit the workflow's runner
         runner_id = ""
+        qualified_workflow_name = ""
         if hasattr(self._persistence, "get_runners_by_workflow"):
             runners = self._persistence.get_runners_by_workflow(workflow_id)
             if runners:
                 runner_id = runners[0].uuid
+                qualified_workflow_name = runners[0].workflow.name
 
         # Run resume with a timeout to prevent blocking the handler thread
         # indefinitely. Large workflows (100+ steps) can have long iteration
@@ -1696,6 +1699,7 @@ class RunnerService:
                 workflow_ast,
                 program_ast=program_ast,
                 runner_id=runner_id,
+                qualified_workflow_name=qualified_workflow_name,
             )
             result = future.result(timeout=resume_timeout_s)
         except concurrent.futures.TimeoutError:
@@ -1759,10 +1763,12 @@ class RunnerService:
             program_ast = self._program_ast_cache.get(workflow_id)
 
             runner_id = ""
+            qualified_workflow_name = ""
             if hasattr(self._persistence, "get_runners_by_workflow"):
                 runners = self._persistence.get_runners_by_workflow(workflow_id)
                 if runners:
                     runner_id = runners[0].uuid
+                    qualified_workflow_name = runners[0].workflow.name
 
             result = self._evaluator.resume_step(
                 workflow_id,
@@ -1770,6 +1776,7 @@ class RunnerService:
                 workflow_ast,
                 program_ast=program_ast,
                 runner_id=runner_id,
+                qualified_workflow_name=qualified_workflow_name,
             )
 
             if result.status in (ExecutionStatus.COMPLETED, ExecutionStatus.ERROR):

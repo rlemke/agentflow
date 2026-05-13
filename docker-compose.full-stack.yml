@@ -106,6 +106,7 @@ services:
       AFL_EXAMPLES_DATABASE: ${AFL_EXAMPLES_DATABASE:-afl_examples}
       AFL_POSTGIS_URL: postgresql://${POSTGRES_USER:-afl}:${POSTGRES_PASSWORD:-afl}@postgis:5432/${POSTGRES_DB:-afl_gis}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
     ports:
       - "${DASHBOARD_PORT:-8080}:8080"
     volumes:
@@ -162,6 +163,8 @@ services:
       AFL_EXAMPLE_EXTRAS: ${ANTHROPIC_EXTRAS:-agent_sdk,mcp}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list anthropic"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_anthropic:/handlers/fwh_anthropic
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
@@ -186,6 +189,8 @@ services:
       AFL_GEOFABRIK_MIRROR: /Volumes/afl_data/osm
       AFL_OSM_OUTPUT_BASE: /Volumes/afl_data/osm-output
       AFL_LOCAL_OUTPUT_DIR: ${AFL_DATA_DIR:-/Volumes/afl_data}/output
+      AFL_WORKFLOW_TASK_LIST_MAP: ${AFL_WORKFLOW_TASK_LIST_MAP:-}
+      AFL_REGISTRY_RUNNER_ARGS: "--task-list osm"
     volumes:
       - ${FWH_HANDLERS_ROOT:-$HOME/fw_handlers}/fwh_osm:/handlers/fwh_osm
       - ${AFL_DATA_DIR:-/Volumes/afl_data}:/Volumes/afl_data
