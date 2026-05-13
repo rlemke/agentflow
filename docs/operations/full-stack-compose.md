@@ -143,6 +143,71 @@ automatically.
 | `ANTHROPIC_EXTRAS` | `agent_sdk,mcp` | fwh_anthropic pip extras |
 | `CENSUS_API_KEY` | _(unset)_ | Required for fwh_census_us live calls |
 
+## Using `docker compose` directly
+
+`scripts/full-stack` is a thin wrapper around
+`docker compose --env-file <env-file> -f docker-compose.full-stack.yml …`.
+If you'd rather drive Compose yourself, two flags do the work the wrapper
+does for you:
+
+- **`-f docker-compose.full-stack.yml`** — on *every* command. Without it
+  Compose picks up the default `docker-compose.yml` (the minimal stack:
+  just MongoDB + dashboard + one runner), not the full stack.
+- **`--env-file .env.full-stack`** — Compose only auto-loads `.env`, not
+  `.env.full-stack`. Without it you still get a working stack from the
+  `${VAR:-default}` fallbacks baked into the compose file, but secrets
+  (`ANTHROPIC_API_KEY`, `CENSUS_API_KEY`) and any non-default ports/paths
+  won't be applied. (You can also just `export` those vars in your shell.)
+
+A session alias keeps the examples short:
+
+```bash
+alias fsc='docker compose --env-file .env.full-stack -f docker-compose.full-stack.yml'
+```
+
+```bash
+# --- start ---
+fsc up -d                              # everything, detached (incl. the one-shot seed)
+fsc up -d mongodb postgis dashboard    # just infra + dashboard
+fsc up -d --no-deps runner-anthropic   # one runner, skip its depends_on chain
+fsc up -d --build dashboard runner     # rebuild custom images, then (re)start those
+
+# --- inspect ---
+fsc ps                                 # services / status / ports
+fsc logs -f                            # tail everything
+fsc logs -f runner-anthropic           # one service
+fsc logs --tail 200 runner             # snapshot of recent lines
+fsc config                             # resolved config with all env vars expanded
+
+# --- iterate ---
+fsc build dashboard runner             # rebuild the custom images
+fsc restart runner-anthropic           # pick up edits in ~/fw_handlers/fwh_anthropic
+fsc exec runner-anthropic /bin/bash    # shell into a container
+fsc exec runner-osm-geocoder python -c "import osm_geocoder; print('ok')"
+fsc run --rm seed                      # re-run the dashboard seeding on demand
+
+# --- stop / tear down ---
+fsc stop                               # stop containers, keep them
+fsc stop runner-anthropic              # stop just one
+fsc down                               # remove containers, KEEP named volumes
+fsc down -v                            # also wipe mongo / postgis / jenkins data
+```
+
+Throwaway run with no env file at all (relies on the compose file's
+built-in defaults):
+
+```bash
+docker compose -f docker-compose.full-stack.yml up -d
+docker compose -f docker-compose.full-stack.yml down
+```
+
+Override individual knobs inline instead of editing the env file:
+
+```bash
+DASHBOARD_PORT=9000 ANTHROPIC_API_KEY=sk-ant-... \
+  docker compose -f docker-compose.full-stack.yml up -d dashboard runner-anthropic
+```
+
 ## Installing example packages
 
 The full stack needs the 8 standalone `fwh_*` repos cloned under
