@@ -363,19 +363,47 @@ def seed_example_flows(
 
     seed_path = f"{SEED_PATH_PREFIX}{pkg.name}"
 
-    if replace:
-        # FlowDefinition deletion isn't part of PersistenceAPI; fall through to
-        # the Mongo collection like scripts/seed-examples does. No-op on stores
-        # without a ``_db`` (e.g. MemoryStore in tests).
-        db = getattr(store, "_db", None)
-        if db is not None:
-            old_ids = [d["uuid"] for d in db.flows.find({"name.path": seed_path}, {"uuid": 1})]
-            if old_ids:
-                db.workflows.delete_many({"flow_id": {"$in": old_ids}})
-            db.flows.delete_many({"name.path": seed_path})
+    # Look up the existing seed (if any) BEFORE writing the new one, so we can
+    # reuse its UUIDs. Stable UUIDs across re-seeds matter for liveness: any
+    # in-flight bootstrap task (fw:execute:<Workflow>) references a flow_id +
+    # workflow_id. If a runner container restarts and re-seeds while that task
+    # is queued, regenerating the IDs would orphan it ("Flow not found" /
+    # "Workflow not found"). Stress-test evidence at thesis §5.6 motivated
+    # this fix — 64% bootstrap failure rate at 10 replicas × 100 concurrent
+    # workflows traced back to seed-replace-old-flow races.
+    flow_id: str = ""
+    wf_ids: dict[str, str] = {}
+    db = getattr(store, "_db", None)
+    if db is not None:
+        existing_flow = db.flows.find_one({"name.path": seed_path}, {"uuid": 1})
+        if existing_flow:
+            flow_id = existing_flow["uuid"]
+            for doc in db.workflows.find(
+                {"flow_id": flow_id}, {"uuid": 1, "name": 1, "_id": 0}
+            ):
+                # Schema migration: older docs had a nested name dict; newer
+                # docs store the qualified name as a plain string.
+                n = doc.get("name")
+                if isinstance(n, dict):
+                    n = n.get("name", "")
+                if n:
+                    wf_ids[n] = doc["uuid"]
+            # Drop workflows that no longer exist in the current FFL; keep
+            # those whose names still match so their UUIDs survive the re-seed.
+            stale = [n for n in wf_ids if n not in workflow_names]
+            if stale:
+                db.workflows.delete_many(
+                    {"flow_id": flow_id, "name": {"$in": stale}}
+                )
+                for n in stale:
+                    wf_ids.pop(n, None)
+
+    if not flow_id:
+        flow_id = generate_id()
 
     now_ms = int(time.time() * 1000)
-    flow_id = generate_id()
+    # ``save_flow`` is ``replace_one(upsert=True)`` on ``uuid``, so reusing the
+    # existing UUID is a content update — readers mid-flight keep their handle.
     store.save_flow(
         FlowDefinition(
             uuid=flow_id,
@@ -385,7 +413,9 @@ def seed_example_flows(
         )
     )
     for qname in workflow_names:
-        wf_id = generate_id()
+        # Reuse the existing workflow UUID when re-seeding so submitted bootstrap
+        # tasks (which carry workflow_id in their payload) keep resolving.
+        wf_id = wf_ids.get(qname) or generate_id()
         store.save_workflow(
             WorkflowDefinition(
                 uuid=wf_id,

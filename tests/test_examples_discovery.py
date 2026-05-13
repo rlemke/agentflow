@@ -369,3 +369,41 @@ class TestSeedExampleFlows:
         finally:
             store.drop_database()
             store.close()
+
+    def test_reseed_preserves_uuids(self, tmp_path):
+        """Re-seeding must keep the same flow_id / workflow_ids.
+
+        Regression test for the stress-test failure where a runner restart
+        re-seeded mid-flight, regenerating UUIDs and orphaning in-flight
+        bootstrap tasks (Flow not found / Workflow not found).
+        """
+        mongomock = pytest.importorskip("mongomock")
+        from facetwork.examples import seed_example_flows
+        from facetwork.runtime.mongo_store import MongoStore
+
+        ex = _make_local_example(tmp_path, "seedy", with_handlers=False, with_ffl=True)
+        (ex / "ffl" / "seedy.ffl").write_text(_SEED_FFL)
+        [pkg] = discover_local_examples(tmp_path)
+
+        store = MongoStore(database_name="t_seed_stable", client=mongomock.MongoClient())
+        try:
+            seed_example_flows(pkg, store)
+            flow_id_before = store._db.flows.find_one({"name.path": "example:seedy"})["uuid"]
+            wf_ids_before = {
+                d["name"]: d["uuid"]
+                for d in store._db.workflows.find({"flow_id": flow_id_before})
+            }
+            assert flow_id_before
+            assert wf_ids_before  # at least one workflow
+
+            seed_example_flows(pkg, store)  # re-seed
+            flow_id_after = store._db.flows.find_one({"name.path": "example:seedy"})["uuid"]
+            wf_ids_after = {
+                d["name"]: d["uuid"]
+                for d in store._db.workflows.find({"flow_id": flow_id_after})
+            }
+            assert flow_id_after == flow_id_before
+            assert wf_ids_after == wf_ids_before
+        finally:
+            store.drop_database()
+            store.close()
