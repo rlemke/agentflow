@@ -51,8 +51,13 @@
 {% block content %}
 <h1>Task Queue</h1>
 
-{% if list_counts and list_counts|length > 1 %}
-{# Per-task-list filter row. Hidden when only one list exists (default). #}
+{# Union of lists that have either tasks or live runners. A list with
+   runners-but-no-tasks is still useful to surface (it means runners are
+   listening on a queue nobody submits to — likely a misconfiguration).
+   A list with tasks-but-no-runners gets the runner badge in red as the
+   silent-idleness flag (work piling up with no listener). #}
+{% set all_lists = ((list_counts.keys() | list) + (runners_per_list.keys() | list)) | unique | sort %}
+{% if all_lists|length > 1 %}
 {% set qs_state = '&state=' + filter_state if filter_state else '' %}
 <div style="display:flex; gap:0.35rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
     <span class="secondary" style="font-size:0.85em; margin-right:0.25rem;">Task list:</span>
@@ -60,7 +65,8 @@
        class="subnav-pill{% if not filter_task_list %} active{% endif %}">
         all <span class="subnav-count">{{ list_counts.values()|sum }}</span>
     </a>
-    {% for name, n in list_counts.items()|sort %}
+    {% for name in all_lists %}
+    {% set n = list_counts.get(name, 0) %}
     {% set live = runners_per_list.get(name, 0) if runners_per_list else 0 %}
     <a href="/tasks?task_list={{ name }}{{ qs_state }}"
        class="subnav-pill{% if filter_task_list == name %} active{% endif %}"
