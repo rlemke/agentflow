@@ -1057,6 +1057,42 @@ class TestReapOrphanedTasks:
         doc = mongo_store._db.tasks.find_one({"uuid": "task-claim"})
         assert doc["server_id"] == "server-xyz"
 
+    def test_claim_task_only_matches_requested_names(self, mongo_store):
+        """claim_task must not claim a pending task whose name isn't requested.
+
+        Regression: ``name_filter`` and the backoff filter both used ``$or`` at
+        the top level, so spreading both into one query dict dropped the name
+        filter and claimed *any* pending task — a runner would steal tasks it
+        had no handler for.
+        """
+        for i, name in enumerate(["osm.Combined.CombinedScan", "fw:execute:Wf", "noaa.Fetch"]):
+            mongo_store.save_task(
+                TaskDefinition(
+                    uuid=f"t-{i}",
+                    name=name,
+                    runner_id="r1",
+                    workflow_id="w1",
+                    flow_id="f1",
+                    step_id=f"s{i}",
+                    state=TaskState.PENDING,
+                    task_list_name="default",
+                )
+            )
+
+        # A runner that only handles noaa.* must not get the osm or fw:execute task.
+        claimed = mongo_store.claim_task(["noaa.Fetch"])
+        assert claimed is not None and claimed.name == "noaa.Fetch"
+
+        # ...and once it's taken, there's nothing else for that runner.
+        assert mongo_store.claim_task(["noaa.Fetch"]) is None
+
+        # Prefix matching still works: "fw:execute" claims "fw:execute:Wf".
+        claimed = mongo_store.claim_task(["fw:execute"])
+        assert claimed is not None and claimed.name == "fw:execute:Wf"
+
+        # The osm task is still pending — nobody who didn't ask for it claimed it.
+        assert mongo_store._db.tasks.find_one({"uuid": "t-0"})["state"] == "pending"
+
     def test_mixed_dead_and_healthy_servers(self, mongo_store):
         """Only tasks from dead servers are reaped, not healthy ones."""
         import time

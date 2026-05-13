@@ -91,13 +91,13 @@ class TaskMixin(_MixinBase):
             update["server_id"] = server_id
 
         # Build a query that matches exact names or names that start with
-        # one of the given prefixes (e.g. "fw:execute" matches "fw:execute:MyWorkflow")
+        # one of the given prefixes (e.g. "fw:execute" matches "fw:execute:MyWorkflow").
         name_conditions: list[dict] = [{"name": {"$in": task_names}}]
         for tn in task_names:
             name_conditions.append({"name": {"$regex": f"^{tn}:"}})
         name_filter = {"$or": name_conditions} if len(name_conditions) > 1 else name_conditions[0]
 
-        # Backoff filter: skip tasks still in their retry cooldown window
+        # Backoff filter: skip tasks still in their retry cooldown window.
         retry_eligible = {
             "$or": [
                 {"next_retry_after": {"$exists": False}},
@@ -106,13 +106,16 @@ class TaskMixin(_MixinBase):
             ]
         }
 
-        # First try to claim a pending task
+        # NOTE: ``name_filter`` and ``retry_eligible`` both use ``$or`` at the
+        # top level, so they MUST be combined with ``$and`` — spreading both
+        # into one dict would silently drop the name filter (duplicate key),
+        # making the runner claim *any* pending task regardless of name.
+        # First try to claim a pending task.
         doc = self._db.tasks.find_one_and_update(
             {
                 "state": "pending",
-                **name_filter,
-                **retry_eligible,
                 "task_list_name": task_list,
+                "$and": [name_filter, retry_eligible],
             },
             {"$set": update},
             return_document=ReturnDocument.AFTER,
@@ -120,13 +123,13 @@ class TaskMixin(_MixinBase):
         if doc:
             return self._doc_to_task(doc)
 
-        # Then try to reclaim a running task whose lease has expired
+        # Then try to reclaim a running task whose lease has expired.
         doc = self._db.tasks.find_one_and_update(
             {
                 "state": "running",
-                **name_filter,
                 "task_list_name": task_list,
                 "lease_expires": {"$lt": now, "$gt": 0},
+                "$and": [name_filter],
             },
             {"$set": update},
             return_document=ReturnDocument.AFTER,
