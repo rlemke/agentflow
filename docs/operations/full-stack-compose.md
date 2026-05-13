@@ -117,6 +117,7 @@ scripts/full-stack logs                  tail -f all services
 scripts/full-stack logs SERVICE          tail -f one service
 scripts/full-stack logs --tail 100 SVC   snapshot
 scripts/full-stack build [SERVICE...]    docker compose build
+scripts/full-stack rebuild [--no-cache] [SERVICE...]   build + recreate containers
 scripts/full-stack pull                  pull mongo / postgis / jenkins images
 scripts/full-stack config                resolved compose config (env expanded)
 scripts/full-stack exec SERVICE          /bin/bash shell inside a container
@@ -332,10 +333,22 @@ scripts/full-stack exec runner-osm-geocoder -- python -c \
 
 ### Rebuild an image after editing facetwork itself
 
+The `facetwork/` source and the entrypoints are baked into the images, so
+changes to them need a rebuild + container recreate. `rebuild` does both:
+
 ```bash
-scripts/full-stack build dashboard runner    # rebuild specific
-scripts/full-stack up --no-deps dashboard    # restart with new image
+scripts/full-stack rebuild                    # rebuild every custom image, recreate containers
+scripts/full-stack rebuild dashboard runner   # just those services
+scripts/full-stack rebuild --no-cache runner-anthropic   # from-scratch rebuild of one
+
+# (lower level — the two steps `rebuild` runs for you)
+scripts/full-stack build dashboard runner
+scripts/full-stack up -d dashboard runner
 ```
+
+A plain `scripts/full-stack up` after a `down`/`down --volumes` does **not**
+rebuild — it only builds images that are missing — so use `rebuild` when
+you've changed `facetwork/` or a Dockerfile/entrypoint.
 
 Editing files inside `~/fw_handlers/<repo>` does **not** require a
 rebuild — they're bind-mounted as editable installs. Just restart the

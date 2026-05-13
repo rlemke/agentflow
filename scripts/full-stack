@@ -16,6 +16,7 @@
 #   scripts/full-stack logs [SERVICE...]        # tail -f logs
 #   scripts/full-stack logs --tail 100 SERVICE  # snapshot of recent logs
 #   scripts/full-stack build [SERVICE...]       # docker compose build
+#   scripts/full-stack rebuild [--no-cache] [SERVICE...]  # build + recreate containers
 #   scripts/full-stack pull                     # pull mongo / postgis / jenkins images
 #   scripts/full-stack config                   # show resolved compose config
 #   scripts/full-stack exec SERVICE [-- CMD]    # shell into a service
@@ -70,7 +71,9 @@ compose() {
 }
 
 usage() {
-    sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//'
+    # Print the leading comment block (lines after the shebang, up to the
+    # first non-comment line), stripped of the "# " prefix.
+    sed -n '2,/^[^#]/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'
 }
 
 CMD="${1:-up}"
@@ -124,6 +127,27 @@ case "$CMD" in
 
     build)
         compose build "$@"
+        ;;
+
+    rebuild)
+        # Rebuild images, then recreate any containers whose image changed.
+        # Optional leading --no-cache forces a from-scratch build.
+        nocache=""
+        if [[ "${1:-}" == "--no-cache" ]]; then
+            nocache="--no-cache"
+            shift
+        fi
+        echo "Rebuilding images${1:+ for: $*}${nocache:+ (--no-cache)} (env: $ENV_FILE)"
+        compose build $nocache "$@"
+        echo
+        echo "Recreating containers with the new images"
+        compose up -d "$@"
+        echo
+        compose ps --format "table {{.Service}}\t{{.Status}}"
+        echo
+        echo "Dashboard: http://localhost:${DASHBOARD_PORT:-8080}"
+        echo "Jenkins:   http://localhost:${JENKINS_UI_PORT:-9090}"
+        echo "Tail logs: scripts/full-stack logs"
         ;;
 
     pull)
