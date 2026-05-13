@@ -32,6 +32,7 @@ import sys
 import time
 
 from .expression import evaluate_default
+from .task_list_routing import resolve_task_list
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--task-list",
-        default="default",
+        default=None,
         metavar="NAME",
-        help="Task list name (default: default)",
+        help=(
+            "Task list name. If omitted, resolved from the workflow name via "
+            "AFL_WORKFLOW_TASK_LIST_MAP (falls back to 'default')."
+        ),
     )
 
     # Config and logging
@@ -333,7 +337,11 @@ def main(args: list[str] | None = None) -> int:
         state=TaskState.PENDING,
         created=now_ms,
         updated=now_ms,
-        task_list_name=parsed.task_list,
+        task_list_name=(
+            parsed.task_list
+            if parsed.task_list is not None
+            else resolve_task_list(parsed.workflow)
+        ),
         data={
             "flow_id": flow_id,
             "workflow_id": wf_id,

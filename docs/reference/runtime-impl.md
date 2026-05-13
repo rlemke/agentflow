@@ -817,6 +817,93 @@ A runner only ever claims a task it can actually run. Concretely:
   *does* have the handler can pick it up. It is failed for good only once
   `retry_count` is exhausted — i.e. no runner in the fleet could service it.
 
+#### 17.1.2 Dedicated Task Lists
+
+Beyond name-filtering, tasks also carry `task_list_name` and runners poll a
+single list (`--task-list <name>`, default `"default"`). This is the
+partitioning lever for isolating workloads — a flooded `osm` queue can't starve
+the `anthropic` queue if they're on separate lists, even when both fleets share
+handlers.
+
+Routing is configured via `AFL_WORKFLOW_TASK_LIST_MAP` — comma-separated
+`prefix=list` pairs, longest-prefix wins, empty prefix sets the global fallback:
+
+```
+AFL_WORKFLOW_TASK_LIST_MAP=osm.=osm,osm.heavy.=osm-heavy,anthropic.=anthropic
+```
+
+`facetwork/runtime/task_list_routing.py:resolve_task_list(workflow_name)` is
+called by every site that *originates* a task list:
+
+- CLI `submit.py` — `--task-list` overrides; otherwise the resolver decides.
+- Dashboard "New run" pages (`workflows.py:366`, `flows.py:549`) — always
+  resolver-driven.
+- `handlers/completion.py:_create_event_task` — child event tasks created
+  during workflow execution use the resolver against the current workflow AST.
+
+Child step tasks created by `RunnerService` (`service.py:464/477/492/1547`)
+inherit the orchestrating runner's `self._config.task_list`. Since that runner
+claimed the bootstrap from the resolved list, all of a workflow's tasks land on
+the same list by construction. **Continuation tasks** (`CONTINUATION_TASK_LIST
+= "_fw_continue"`) are exempt — they're step-state-machine machinery, not
+handler work, and every runner polls the shared continuation queue regardless
+of `--task-list`.
+
+A runner whose `--task-list` doesn't match any workflow's mapped list will
+simply never claim work — easy to spot via `scripts/list-runners` and a
+pending-task count in Mongo. The `(state, name, task_list_name)` compound index
+makes per-list claims cheap.
+
+#### 17.1.3 Per-Runner Polling — No In-Process Contention
+
+Each runner is an autonomous process. There is **no shared in-memory dispatcher,
+work queue, leader, or coordinator across runners** — every cross-runner
+interaction goes through MongoDB. The consequences are worth stating explicitly
+because they're load-bearing for the operational model:
+
+**Polling is independent.** Each runner runs its own `_poll_cycle` on its own
+clock (`AFL_POLL_INTERVAL_MS`, default 1s). RunnerA polling once per second has
+no effect on RunnerB's poll timing. A runner that's busy on a long task is the
+only thread blocked — other runners keep polling normally.
+
+**Claiming is atomic, not coordinated.** `claim_task()` is a single Mongo
+`find_one_and_update({state: pending, …}, {$set: {state: running, …}})`
+operation. Mongo's per-document atomicity guarantees that exactly one runner
+wins for any given document — no in-process locks, no leader election, no
+distributed consensus. The "loser" simply gets `None` back and polls again
+next cycle.
+
+**Different filters → fully disjoint pools.** RunnerA polling for `osm.*` and
+RunnerB polling for `anthropic.*` issue Mongo queries with different
+`name_filter` and possibly different `task_list_name` clauses. Their result
+sets don't overlap, so they can't even race — they're querying different rows.
+This is the common case in per-example deployments: routing is deterministic
+because exactly one runner's filter matches a given task.
+
+**Same filters → race, not queue.** When N runners *can* handle the same task,
+they race for it. There's no fairness guarantee, no FIFO across runners, no
+"earliest-queued runner gets first dibs" — whichever poll's `find_one_and_update`
+hits Mongo first wins. From any individual runner's perspective, the pool of
+eligible tasks is just "whatever's pending right now"; the runner's own task
+backlog is irrelevant to other runners' work.
+
+**Enqueueing is lock-free too.** Tasks are created by `save_task()` which is a
+single `replace_one(upsert=True)` per task. The orchestrating runner is the
+sole writer for its own workflow's step tasks (each task has a unique `uuid`),
+so step-task creation never contends with any other runner. Bootstrap tasks
+(`fw:execute:<Workflow>`) are written once by the submitter — also single-writer
+per document.
+
+**Continuations parallelise the same way.** The shared `_fw_continue` list is
+hit by every runner, but each claim is the same atomic op — N runners can
+drain continuations in parallel without coordination. A runner doesn't "own"
+any continuation; whichever runner's poll grabs it processes it.
+
+The practical takeaway: **a 1000-task backlog on RunnerA's pool does not delay
+RunnerB by a single millisecond**, because RunnerB never queries that pool.
+Polls are local, claims are atomic, and there are no cross-runner data
+structures to contend on.
+
 ### 17.2 Layer 1: Orphan Reaper (v0.39.0)
 
 **Problem:** A runner crashes (OOM, SIGKILL, power loss) without graceful shutdown. Its in-flight tasks remain in `running` state forever.

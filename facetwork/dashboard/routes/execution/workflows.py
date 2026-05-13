@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 
 from facetwork.runtime.expression import evaluate_default
+from facetwork.runtime.task_list_routing import resolve_task_list
 
 from ...dependencies import get_store
 
@@ -363,7 +364,7 @@ def workflow_run(
         state=TaskState.PENDING,
         created=now_ms,
         updated=now_ms,
-        task_list_name="default",
+        task_list_name=resolve_task_list(workflow_name),
         data={
             "flow_id": flow_id,
             "workflow_name": workflow_name,

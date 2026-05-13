@@ -205,9 +205,11 @@ class EventTransmitHandler(StateHandler):
     def _create_event_task(self) -> None:
         """Create a TaskDefinition for the event and add to iteration changes."""
         from ..entities import TaskDefinition, TaskState
+        from ..task_list_routing import resolve_task_list
 
         now = _current_time_ms()
         timeout_ms = self._extract_timeout_ms()
+        workflow_name = (self.context.workflow_ast or {}).get("name", "")
         task = TaskDefinition(
             uuid=generate_id(),
             name=self.step.facet_name,
@@ -218,7 +220,7 @@ class EventTransmitHandler(StateHandler):
             state=TaskState.PENDING,
             created=now,
             updated=now,
-            task_list_name="default",
+            task_list_name=resolve_task_list(workflow_name),
             data=self._build_payload(),
             timeout_ms=timeout_ms,
         )

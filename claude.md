@@ -225,6 +225,51 @@ releases it back to `pending` (with backoff) rather than failing it — it is
 failed only after retries are exhausted, i.e. no runner in the fleet could
 service it. See [docs/reference/runtime-impl.md §17.1.1](docs/reference/runtime-impl.md).
 
+### Per-runner polling — runners do not contend
+
+Each runner is an autonomous process; all coordination goes through MongoDB.
+`claim_task()` is a single atomic `find_one_and_update` — there is no shared
+in-process dispatcher, no leader, no queue lock. Two consequences:
+
+- **Different filters → disjoint pools.** RunnerA polling for `osm.*` and
+  RunnerB polling for `anthropic.*` issue different Mongo queries and never
+  see each other's tasks. A 1000-task `osm` backlog adds zero latency to an
+  `anthropic` claim.
+- **Same filters → race, not queue.** When multiple runners can handle a task,
+  they race on the atomic claim; exactly one wins, the rest get `None` and
+  poll again. There is no fairness, no FIFO across runners — just per-poll
+  first-come-first-served on whatever is pending.
+
+Task creation is also lock-free: each task has a unique `uuid` and is written
+once by its creator, so there's no write contention either. See
+[docs/reference/runtime-impl.md §17.1.3](docs/reference/runtime-impl.md).
+
+### Dedicated task lists — per-workflow queue isolation
+
+Tasks also carry a `task_list_name` and runners poll a single list
+(`--task-list <name>`, default `"default"`). By default all workflows
+submit onto `"default"` and routing is purely by handler-set. To isolate
+a flooded queue from starving an unrelated one, configure
+`AFL_WORKFLOW_TASK_LIST_MAP` (comma-separated `prefix=list` pairs;
+longest-prefix wins):
+
+```bash
+# .env or runner.env
+AFL_WORKFLOW_TASK_LIST_MAP=osm.=osm,anthropic.=anthropic
+
+# Start runners on their dedicated lists:
+scripts/start-runner --example osm-geocoder -- --task-list osm
+scripts/start-runner --example anthropic -- --task-list anthropic
+```
+
+Submission paths (CLI, dashboard "New run", `flows.py`) call
+`resolve_task_list(workflow_name)` to pick the list for the bootstrap
+`fw:execute:<Workflow>` task. Child step tasks created by the
+orchestrating runner inherit the runner's `--task-list`. Continuation
+tasks (`_fw_continue`) stay on a shared internal list — every runner
+polls it because continuations are step-state-machine machinery, not
+handler work. See [facetwork/runtime/task_list_routing.py](facetwork/runtime/task_list_routing.py).
+
 ### Agent execution models
 - **RegistryRunner** (recommended): auto-loads handlers from DB
 - **AgentPoller**: standalone agent services with `register()` callback
