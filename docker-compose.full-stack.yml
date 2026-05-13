@@ -25,6 +25,14 @@
 # Tear down INCLUDING data:
 #   docker compose -f docker-compose.full-stack.yml down -v
 #
+# Scale a runner — model multiple replicas of one example:
+#   docker compose -f docker-compose.full-stack.yml \
+#       up -d --scale runner-osm-geocoder=3
+# (Runners coordinate purely through MongoDB; N replicas race for the
+# same task list via atomic find_one_and_update. Infra services keep
+# pinned container_names; runners use Compose's auto-naming so they're
+# scalable — `docker logs <project>-runner-osm-geocoder-1` etc.)
+#
 # External disk: /Volumes/afl_data is mounted into the dashboard and
 # every runner so all examples share the same cache + output paths.
 # Override the host path with AFL_DATA_DIR in .env or your shell.
@@ -126,7 +134,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.runner
-    container_name: facetwork-runner
     depends_on:
       mongodb:
         condition: service_healthy
@@ -152,7 +159,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-anthropic
     depends_on:
       mongodb:
         condition: service_healthy
@@ -175,7 +181,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-osm-geocoder
     depends_on:
       mongodb:
         condition: service_healthy
@@ -201,7 +206,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-osm-lz
     depends_on:
       mongodb:
         condition: service_healthy
@@ -229,7 +233,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-noaa-weather
     depends_on:
       mongodb:
         condition: service_healthy
@@ -250,7 +253,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-jenkins-example
     depends_on:
       mongodb:
         condition: service_healthy
@@ -272,7 +274,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-census-us
     depends_on:
       mongodb:
         condition: service_healthy
@@ -294,7 +295,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-genomics
     depends_on:
       mongodb:
         condition: service_healthy
@@ -315,7 +315,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.example-runner
-    container_name: facetwork-runner-sensor-monitoring
     depends_on:
       mongodb:
         condition: service_healthy

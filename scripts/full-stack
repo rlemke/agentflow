@@ -8,6 +8,10 @@
 #   scripts/full-stack                          # start every service (detached)
 #   scripts/full-stack up                       # same as no args
 #   scripts/full-stack up runner-anthropic      # start specific services only
+#   scripts/full-stack up --scale runner-osm-geocoder=3
+#                                               # run 3 osm-geocoder replicas (any runner-* service
+#                                               # is scalable; they all share the same task list and
+#                                               # race for tasks via MongoDB's atomic claim).
 #   scripts/full-stack down                     # stop + remove containers (keeps named volumes)
 #   scripts/full-stack down --volumes           # also drop mongodb/postgis/jenkins data
 #   scripts/full-stack stop                     # stop without removing
