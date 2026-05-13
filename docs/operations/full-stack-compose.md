@@ -155,6 +155,97 @@ automatically.
 | `ANTHROPIC_API_KEY` | _(unset)_ | Required for live Claude calls |
 | `ANTHROPIC_EXTRAS` | `agent_sdk,mcp` | fwh_anthropic pip extras |
 | `CENSUS_API_KEY` | _(unset)_ | Required for fwh_census_us live calls |
+| `AFL_WORKFLOW_TASK_LIST_MAP` | (set in `.env.full-stack.example`) | `prefix=list,...` workflow→task-list routing |
+| `AFL_OSM_REPLICAS` | `1` | # of `runner-osm-geocoder` replicas |
+| `AFL_OSM_LZ_REPLICAS` | `1` | # of `runner-osm-lz` replicas |
+| `AFL_ANTHROPIC_REPLICAS` | `1` | # of `runner-anthropic` replicas |
+| `AFL_WEATHER_REPLICAS` | `1` | # of `runner-noaa-weather` replicas |
+| `AFL_JENKINS_REPLICAS` | `1` | # of `runner-jenkins-example` replicas |
+| `AFL_CENSUS_REPLICAS` | `1` | # of `runner-census-us` replicas |
+| `AFL_GENOMICS_REPLICAS` | `1` | # of `runner-genomics` replicas |
+| `AFL_MONITOR_REPLICAS` | `1` | # of `runner-sensor-monitoring` replicas |
+| `AFL_RUNNER_REPLICAS` | `1` | # of main `runner` replicas |
+
+### Workload partitioning (task lists)
+
+Every per-example runner is started with a dedicated `--task-list <name>`
+(`osm`, `anthropic`, `continental`, `weather`, etc.) and the dashboard
+routes a workflow's tasks to the matching list via
+`AFL_WORKFLOW_TASK_LIST_MAP`. The default map (in
+`.env.full-stack.example`) covers every shipped example:
+
+```text
+AFL_WORKFLOW_TASK_LIST_MAP=osm.=osm,continental.=continental,anthropic.=anthropic,\
+                           weather.=weather,jenkins.=jenkins,census.=census,\
+                           genomics.=genomics,monitor.=monitor
+```
+
+A workflow whose qualified name starts with `osm.` lands on the `osm`
+task list (where only `runner-osm-geocoder` is listening); a workflow
+starting with `anthropic.` lands on `anthropic`; anything unmapped falls
+back to `default` (which the main `runner` polls).
+
+The consequence is that a flooded queue (say, an hour-long OSM import)
+can never starve unrelated work — the `runner-anthropic` pool's
+`find_one_and_update` query filters on `task_list_name = "anthropic"` and
+literally cannot see the `osm` backlog. See
+[runtime-impl.md §17.1.2](../reference/runtime-impl.md) and
+[thesis §5.4](../thesis/thesis.md).
+
+To repartition: edit `AFL_WORKFLOW_TASK_LIST_MAP` in `.env.full-stack`
+**and** change the `AFL_REGISTRY_RUNNER_ARGS: "--task-list <name>"` of
+the affected runner blocks in `docker-compose.full-stack.yml`. Both
+ends have to agree — the submission side stamps the list, the runner
+side polls it.
+
+### Scaling runners
+
+Every `runner-*` service is scalable: N replicas all bind-mount the same
+`fwh_*` repo, all poll the same task list, all race for tasks via
+MongoDB's atomic claim. There is no leader, no membership protocol —
+adding a replica is one more concurrent caller of `find_one_and_update`.
+Empirically, throughput is near-uniform: three osm-geocoder replicas on
+10 concurrent `AnalyzeRegion` runs distributed 330 step tasks 112 / 109 /
+109 with no fairness mechanism (thesis §5.4.1).
+
+**Persistent scaling — edit the env file.** `AFL_<EXAMPLE>_REPLICAS`
+checkpoints the topology in `.env.full-stack`. `scripts/full-stack up`
+sources the file and emits the matching `--scale runner-<name>=N` flag
+on every invocation. The defaults are all `1`, commented out — uncomment
+and adjust:
+
+```bash
+# .env.full-stack
+AFL_OSM_REPLICAS=3            # 3 osm-geocoder replicas
+AFL_GENOMICS_REPLICAS=2       # 2 genomics replicas
+```
+
+Then any `scripts/full-stack up` or `rebuild` produces the desired fleet
+shape. Replicas auto-name as `facetwork-runner-osm-geocoder-1/-2/-3` —
+use the service name (not container name) with logs/exec:
+
+```bash
+scripts/full-stack logs runner-osm-geocoder    # all 3 replicas multiplexed
+scripts/full-stack exec runner-osm-geocoder /bin/bash   # picks one
+```
+
+**Ad-hoc scaling — `--scale` on the command line.** Anything after `up`
+or `rebuild` passes through to `docker compose`:
+
+```bash
+scripts/full-stack up -d --scale runner-osm-geocoder=5 runner-osm-geocoder
+```
+
+Caveat: this is *not sticky*. A subsequent plain `scripts/full-stack up`
+re-applies the env-file's `AFL_OSM_REPLICAS` (default `1`) and scales
+back down. Use the env-file form unless you want a one-shot experiment.
+
+**Why `container_name:` is unset on the runner services.** Docker
+Compose can't scale a service with a pinned `container_name`. The compose
+file deliberately omits the pin from every `runner*` service so they're
+scalable; the infra services (`mongodb`, `postgis`, `jenkins`,
+`dashboard`, `seed`) keep their pins so `docker logs facetwork-mongodb`
+etc. continue to work.
 
 ## Using `docker compose` directly
 
@@ -322,6 +413,20 @@ scripts/install-anthropic --mcp             # core + mcp extras only
 
 The dashboard dispatches tasks to MongoDB; the matching example runner
 picks them up automatically.
+
+### Inspect task-list health
+
+`/tasks` shows a filter row with one pill per task list, formatted as
+`<name> <task-count> ·<runner-count>r`:
+
+- A red `·0r` badge means tasks exist but no runner is polling — the
+  silent-idleness failure mode (start the matching runner, or fix
+  `AFL_WORKFLOW_TASK_LIST_MAP`).
+- A pill with `0 ·Nr` means runners are listening on a list nobody
+  submits to — likely a stale `--task-list` arg or a missing entry in
+  `AFL_WORKFLOW_TASK_LIST_MAP`.
+- Click any pill to filter the task table to that list; combines with
+  the state subnav (`/tasks?task_list=osm&state=pending`).
 
 ### Tail logs across runners
 

@@ -44,6 +44,12 @@
 #   AFL_GENOMICS_REPLICAS      # of genomics replicas (default 1)
 #   AFL_MONITOR_REPLICAS       # of sensor-monitoring replicas (default 1)
 #   AFL_RUNNER_REPLICAS        # of main 'runner' replicas (default 1)
+#   AFL_WORKFLOW_TASK_LIST_MAP `prefix=list,...` workflow→task-list routing
+#                              (default in .env.full-stack.example)
+#
+# See docs/operations/full-stack-compose.md for the full reference,
+# including workload partitioning by task list and the dashboard's
+# runners-per-list health pill on /tasks.
 #
 # If a `.env.full-stack` file exists in the repo root it is used as the
 # env-file; otherwise `.env.full-stack.example` (the checked-in
