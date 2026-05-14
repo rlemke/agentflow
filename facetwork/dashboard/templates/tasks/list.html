@@ -57,6 +57,12 @@
         exactly-once: {{ duplicate_completions }} dup{{ '' if duplicate_completions == 1 else 's' }}
     </span>
     {% endif %}
+    {% if unmatched_count is defined %}
+    <span class="subnav-count{% if unmatched_count > 0 %} badge-failed{% endif %}"
+          title="Pending/running tasks whose facet name no live runner advertises. Non-zero indicates a misconfiguration: the workflow is queued but no handler can dispatch it. Common causes: a runner started without --registry; a handler module that failed verify-load on every replica; AFL_WORKFLOW_TASK_LIST_MAP routing to a queue with the wrong handler set.">
+        no handler: {{ unmatched_count }}
+    </span>
+    {% endif %}
 </h1>
 
 {# Union of lists that have either tasks or live runners. A list with

@@ -63,6 +63,26 @@ class ServerMixin(_MixinBase):
         result = self._db.servers.delete_many({"ping_time": {"$lt": cutoff}})
         return result.deleted_count
 
+    def dispatchable_facet_names(self, fresh_window_ms: int = 60_000) -> set[str]:
+        """Union of handler facet names across all live runners.
+
+        Used by the dashboard to flag tasks whose ``name`` no live runner
+        can dispatch — the "runners listening but none with the right
+        handler set" failure mode, which is otherwise indistinguishable
+        from a healthy idle queue. Protocol prefixes (``fw:execute``,
+        ``fw:resume``) are always considered dispatchable: every runner
+        claims them, so we can't infer "no handler" from their absence.
+        """
+        cutoff = _current_time_ms() - fresh_window_ms
+        names: set[str] = set()
+        for doc in self._db.servers.find(
+            {"ping_time": {"$gt": cutoff}},
+            {"handlers": 1, "_id": 0},
+        ):
+            for h in doc.get("handlers", []) or []:
+                names.add(h)
+        return names
+
     def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
         """Return ``{task_list: live_runner_count}``.
 

@@ -124,6 +124,27 @@ def task_list(
         else 0
     )
 
+    # "No matching handler" detection: a non-terminal task whose name no
+    # live runner advertises is silently stuck. Protocol-prefix tasks
+    # (fw:execute, fw:resume) are claimed by every runner, so we never
+    # treat them as no-handler.
+    dispatchable = (
+        store.dispatchable_facet_names()
+        if hasattr(store, "dispatchable_facet_names")
+        else set()
+    )
+    unmatched_task_ids: set[str] = set()
+    if dispatchable:
+        for t in tasks:
+            if t.state not in ("pending", "running"):
+                continue
+            name = getattr(t, "name", "") or ""
+            if name.startswith("fw:execute") or name.startswith("fw:resume"):
+                continue
+            if name and name not in dispatchable:
+                unmatched_task_ids.add(t.uuid)
+    unmatched_count = len(unmatched_task_ids)
+
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/list.html",
@@ -137,6 +158,8 @@ def task_list(
             "list_counts": list_counts,
             "runners_per_list": runners_per_list,
             "duplicate_completions": duplicate_completions,
+            "unmatched_task_ids": unmatched_task_ids,
+            "unmatched_count": unmatched_count,
             "active_tab": "tasks",
         },
     )
@@ -158,6 +181,22 @@ def task_list_partial(
     step_names = _resolve_step_names(tasks, store)
     server_info = _resolve_server_info(tasks, store)
 
+    dispatchable = (
+        store.dispatchable_facet_names()
+        if hasattr(store, "dispatchable_facet_names")
+        else set()
+    )
+    unmatched_task_ids: set[str] = set()
+    if dispatchable:
+        for t in tasks:
+            if t.state not in ("pending", "running"):
+                continue
+            name = getattr(t, "name", "") or ""
+            if name.startswith("fw:execute") or name.startswith("fw:resume"):
+                continue
+            if name and name not in dispatchable:
+                unmatched_task_ids.add(t.uuid)
+
     return request.app.state.templates.TemplateResponse(
         request,
         "tasks/_table_content.html",
@@ -167,6 +206,7 @@ def task_list_partial(
             "filter_task_list": task_list,
             "step_names": step_names,
             "server_info": server_info,
+            "unmatched_task_ids": unmatched_task_ids,
         },
     )
 

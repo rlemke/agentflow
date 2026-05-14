@@ -18,6 +18,12 @@
             <td class="mono"><a href="/tasks/{{ task.uuid }}">{{ task.uuid|truncate_uuid }}</a></td>
             <td>
                 {{ task.name }}
+                {% if unmatched_task_ids is defined and task.uuid in unmatched_task_ids %}
+                <span class="subnav-count badge-failed"
+                      title="No live runner advertises a handler for '{{ task.name }}'. Task will not be dispatched until a runner with the matching handler joins the fleet or the handler is registered on an existing runner.">
+                    no handler
+                </span>
+                {% endif %}
                 {% set sn = step_names.get(task.step_id, '') or '—' %}
                 {% set sn_clean = sn.split('{')[0].rstrip('.') if '{' in sn else sn %}
                 <br><small class="secondary">{{ sn_clean[:50] }}{% if sn_clean|length > 50 %}…{% endif %}</small>

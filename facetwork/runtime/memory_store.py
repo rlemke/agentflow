@@ -490,6 +490,18 @@ class MemoryStore(PersistenceAPI):
             del self._servers[uuid]
         return len(stale)
 
+    def dispatchable_facet_names(self, fresh_window_ms: int = 60_000) -> set[str]:
+        """Union of handler facet names across all live runners."""
+        import time as _t
+
+        cutoff = int(_t.time() * 1000) - fresh_window_ms
+        names: set[str] = set()
+        for s in self._servers.values():
+            if getattr(s, "ping_time", 0) > cutoff:
+                for h in getattr(s, "handlers", []) or []:
+                    names.add(h)
+        return names
+
     def runners_per_task_list(self, fresh_window_ms: int = 60_000) -> dict[str, int]:
         """Return ``{task_list: live_runner_count}``."""
         import time as _t
