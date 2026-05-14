@@ -24,5 +24,15 @@ RUN pip install --no-cache-dir requests pyshp folium osm2geojson
 # broke imports like `from facetwork.logging import ...`.
 COPY facetwork/ ./facetwork/
 
+# Two-step entrypoint: seed in-repo example handlers into MongoDB, then
+# start the runner in --registry mode so it actually advertises (and
+# claims tasks for) the facets it can dispatch. See docker/entrypoint-runner.sh
+# for the rationale; without this the main runner registers only fw:execute
+# and child event tasks for in-repo examples pile up on the default queue
+# with no listener.
+COPY docker/entrypoint-runner.sh /entrypoint-runner.sh
+RUN chmod +x /entrypoint-runner.sh
+
 ENV PYTHONUNBUFFERED=1
-CMD ["python", "-m", "facetwork.runtime.runner", "--poll-interval", "1000"]
+ENV AFL_POLL_INTERVAL_MS=1000
+CMD ["/entrypoint-runner.sh"]
