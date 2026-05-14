@@ -5,7 +5,6 @@ Each subdirectory contains a complete working example with FFL source and a Pyth
 | Example | Description |
 |---------|-------------|
 | [hello-agent](hello-agent/) | Minimal end-to-end example demonstrating the Facetwork execution model |
-| [volcano-query](volcano-query/) | Cross-namespace composition using existing OSM event facets |
 | [osm-geocoder](osm-geocoder/) | Geocoding agent that resolves addresses to coordinates using the OpenStreetMap Nominatim API |
 | [genomics](https://github.com/rlemke/fwh_genomics) | Bioinformatics cohort analysis with foreach fan-out and linear fan-in workflows. Standalone repo: install with `pip install -e ~/fw_handlers/fwh_genomics`. |
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | CI/CD pipelines showcasing mixin composition (Retry, Timeout, Credentials, etc.). Standalone repo: install with `pip install -e ~/fw_handlers/fwh_jenkins`. |
@@ -37,7 +36,6 @@ Each example also has a **USER_GUIDE.md** with step-by-step walkthroughs, key co
 | Example | User Guide |
 |---------|-----------|
 | hello-agent | [USER_GUIDE.md](hello-agent/USER_GUIDE.md) |
-| volcano-query | [USER_GUIDE.md](volcano-query/USER_GUIDE.md) |
 | genomics | [USER_GUIDE.md](https://github.com/rlemke/fwh_genomics/blob/main/USER_GUIDE.md) — in standalone repo |
 | jenkins | [USER_GUIDE.md](https://github.com/rlemke/fwh_jenkins/blob/main/USER_GUIDE.md) — in standalone repo |
 | aws-lambda | [USER_GUIDE.md](aws-lambda/USER_GUIDE.md) |

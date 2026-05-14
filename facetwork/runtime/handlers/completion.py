@@ -51,6 +51,44 @@ class EventTransmitHandler(StateHandler):
         """
         facet_def = self.context.get_facet_definition(self.step.facet_name)
 
+        # If a statement step calls a facet name that doesn't resolve in
+        # a program AST that *does* contain declarations, fail loudly.
+        # Silently passing through (the previous behavior) marked the
+        # step Complete with empty `attributes.returns`, which then made
+        # downstream references throw misleading "Attribute X not found"
+        # errors several steps later. The common cause is an unqualified
+        # name brought into scope by `use` that the compiler didn't
+        # rewrite to its qualified form, or a facet that was renamed
+        # or removed from its namespace.
+        #
+        # The guard requires program_ast to actually have declarations —
+        # in many tests the workflow AST is passed without a wrapping
+        # Program, so `program_ast` is None or empty and we can't tell
+        # whether the facet "should" exist. Falling back to silent
+        # passthrough preserves those tests; real runtime always has a
+        # populated program_ast.
+        from ..types import ObjectType
+
+        has_program_decls = bool(
+            self.context.program_ast
+            and (self.context.program_ast.get("declarations") or [])
+        )
+        if (
+            facet_def is None
+            and has_program_decls
+            and ObjectType.is_statement(getattr(self.step, "object_type", ""))
+            and self.step.facet_name
+        ):
+            return self.error(
+                RuntimeError(
+                    f"Cannot resolve facet '{self.step.facet_name}' in program AST. "
+                    f"This usually means the FFL uses an unqualified name that the "
+                    f"compiler did not rewrite (try using the fully qualified form, "
+                    f"e.g. 'osm.ops.CacheRegion' instead of 'CacheRegion'), or that "
+                    f"the facet has been renamed or removed from its namespace."
+                )
+            )
+
         if facet_def and facet_def.get("type") == "EventFacetDecl":
             # Try inline dispatch if a dispatcher is available
             dispatcher = self.context.dispatcher

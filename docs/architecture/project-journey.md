@@ -583,7 +583,6 @@ facetwork/
 │   │   ├── handlers/             # 16 category subdirectories
 │   │   └── tests/real/           # Scaling variants (2–45 states)
 │   ├── aws-lambda/               # Lambda deployment workflows
-│   ├── volcano-query/            # Cross-namespace composition
 │   ├── (osm-lz/  → extracted to github.com/rlemke/fwh_osm_lz)
 │   ├── genomics/                 # Bioinformatics pipelines
 │   └── jenkins/                  # CI/CD workflows

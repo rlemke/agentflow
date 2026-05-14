@@ -709,20 +709,20 @@ Key points:
   workflow.
 - Callers see a simple interface: give me a URL and format, get back a result.
 
-### Real-world example: volcano data loading
+### Real-world example: composed cache loader
 
-The `examples/volcano-query/` example defines a `LoadVolcanoData` facet that
-wraps cache lookup and data download into a single reusable step:
+A composed facet can wrap a cache lookup and data download into a single
+reusable step:
 
 ```afl
 facet LoadVolcanoData(region: String = "US") => (cache: OSMCache) andThen {
-    c = CacheRegion(region = $.region)
+    c = osm.ops.CacheRegion(region = $.region)
     d = osm.ops.DownloadPBF(cache = c.cache)
     yield LoadVolcanoData(cache = d.downloadCache)
 }
 ```
 
-The workflow `FindVolcanoes` calls it as if it were a simple function:
+A workflow calls it as if it were a simple function:
 
 ```afl
 workflow FindVolcanoes(region: String = "US") => (results: Json) andThen {

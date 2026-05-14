@@ -2074,6 +2074,12 @@ class TestSchemaInstantiationRuntime:
                         {"name": "retries", "type": "Long"},
                     ],
                 },
+                {
+                    "type": "FacetDecl",
+                    "name": "Value",
+                    "params": [{"name": "input", "type": "Long"}],
+                    "returns": [{"name": "output", "type": "Long"}],
+                },
             ],
         }
 
@@ -2266,6 +2272,12 @@ class TestSchemaInstantiationRuntime:
                     "type": "SchemaDecl",
                     "name": "StringData",
                     "fields": [{"name": "combined", "type": "String"}],
+                },
+                {
+                    "type": "FacetDecl",
+                    "name": "Echo",
+                    "params": [{"name": "value", "type": "String"}],
+                    "returns": [{"name": "value", "type": "String"}],
                 },
             ],
         }
