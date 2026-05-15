@@ -35,6 +35,41 @@ def _names_match(a: str | None, b: str | None) -> bool:
     return a.endswith("." + b) or b.endswith("." + a)
 
 
+def _merge_yield_value(existing: object, new: object) -> object:
+    """Combine a prior yield value with a fresh one.
+
+    Yield merge semantics are type-driven:
+      - ``list``   → concat (``existing + new``). Order is yield order; for
+        ``andThen foreach`` blocks where sub-blocks complete in parallel,
+        that is dispatch-completion order, not iteration order.
+      - ``set`` / ``frozenset`` → union (``existing | new``).
+      - everything else (scalars, dicts, schema instances) → ``new``
+        overwrites ``existing``. This preserves the historical contract
+        for scalar yields (``yield F(count = $.x)`` reports the last
+        iteration's value, dispatch-order-dependent) and for schema
+        results (a yield of a single ``OSMCache`` replaces the prior one
+        rather than smashing fields together).
+
+    A ``foreach`` body that wants its outputs collected should yield a
+    *list* containing the new element — ``yield F(items = [item])`` —
+    so each iteration contributes one entry to the aggregate.
+
+    Args:
+        existing: The current return value already on the parent step.
+        new: The value carried by the yield being merged.
+
+    Returns:
+        The combined value to store on the parent step.
+    """
+    if isinstance(existing, list) and isinstance(new, list):
+        return existing + new
+    if isinstance(existing, set) and isinstance(new, set):
+        return existing | new
+    if isinstance(existing, frozenset) and isinstance(new, frozenset):
+        return existing | new
+    return new
+
+
 class MixinCaptureBeginHandler(StateHandler):
     """Handler for state.mixin.capture.Begin.
 
@@ -69,10 +104,22 @@ class MixinCaptureBeginHandler(StateHandler):
         return [s for s in steps if s.object_type == ObjectType.YIELD_ASSIGNMENT and s.is_complete]
 
     def _merge_yield(self, yield_step: "StepDefinition") -> None:
-        """Merge a single yield into the step's attributes."""
+        """Merge a single yield into the step's attributes.
+
+        Collection-typed values (``list``, ``set``, ``frozenset``) combine
+        with the prior return value via concat/union so multiple yields
+        aggregate into one collection. Other types (scalars, dicts,
+        schema instances) overwrite — see ``_merge_yield_value``.
+        """
         # Yield step attributes become return values on this step
         for name, attr in yield_step.attributes.params.items():
-            self.step.attributes.set_return(name, attr.value, attr.type_hint)
+            existing = self.step.attributes.returns.get(name)
+            merged_value = (
+                _merge_yield_value(existing.value, attr.value)
+                if existing is not None
+                else attr.value
+            )
+            self.step.attributes.set_return(name, merged_value, attr.type_hint)
 
 
 class MixinCaptureEndHandler(StateHandler):
@@ -110,7 +157,13 @@ class StatementCaptureBeginHandler(StateHandler):
             ):
                 statement_blocks.append(pending_step)
 
-        # Merge yield results from each block
+        # Merge yield results from every block, deduplicating yield steps
+        # across blocks.  Foreach sub-blocks (each iteration) are listed as
+        # direct children of the containing step AND show up again when the
+        # parent foreach block is walked recursively — without the seen-set
+        # below, each yield's contribution would be applied twice (a no-op
+        # for scalar overwrites, but a doubled list for collection merges).
+        self._seen_yield_ids: set[str] = set()
         for block in statement_blocks:
             self._merge_yields_from_block(block)
 
@@ -125,7 +178,9 @@ class StatementCaptureBeginHandler(StateHandler):
         (set by ScriptExecutor in _execute_script_block).
 
         Recursively searches descendant blocks (andWhen cases, nested
-        andThen blocks) to collect yields at any depth.
+        andThen blocks) to collect yields at any depth.  Deduplication
+        across calls to this method uses ``self._seen_yield_ids``, which
+        the caller (``process_state``) seeds.
         """
 
         # Check if block itself has returns (andThen script blocks)
@@ -141,7 +196,12 @@ class StatementCaptureBeginHandler(StateHandler):
         target = self.step.facet_name
         yield_steps = self._collect_yields_recursive(block.id, target)
 
+        seen = getattr(self, "_seen_yield_ids", None)
         for yield_step in yield_steps:
+            if seen is not None:
+                if yield_step.id in seen:
+                    continue
+                seen.add(yield_step.id)
             self._merge_yield(yield_step)
 
     def _collect_yields_recursive(
@@ -199,9 +259,27 @@ class StatementCaptureBeginHandler(StateHandler):
         """Merge a single yield into the step's attributes.
 
         Yield attributes become return values on the containing step.
+        Collection-typed values (``list``, ``set``, ``frozenset``)
+        combine with the prior return via concat/union so multiple
+        yields — typically from ``andThen foreach`` sub-blocks —
+        aggregate into one collection. Other types (scalars, dicts,
+        schema instances) overwrite — see ``_merge_yield_value``.
+
+        This is what lets a foreach body collect its outputs:
+
+            } andThen foreach r in batch.regions {
+                c = Download(region = $.r)
+                yield Workflow(caches = [c.cache])  // 1-element list per iter
+            }                                       // parent caches: [N elements]
         """
         for name, attr in yield_step.attributes.params.items():
-            self.step.attributes.set_return(name, attr.value, attr.type_hint)
+            existing = self.step.attributes.returns.get(name)
+            merged_value = (
+                _merge_yield_value(existing.value, attr.value)
+                if existing is not None
+                else attr.value
+            )
+            self.step.attributes.set_return(name, merged_value, attr.type_hint)
 
 
 class StatementCaptureEndHandler(StateHandler):

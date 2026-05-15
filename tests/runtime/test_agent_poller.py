@@ -943,6 +943,103 @@ class TestAgentPollerMultiStep:
         # depends on dispatch order but must be one of the items.
         assert outputs["last"] in {"a", "b", "c"}
 
+    def test_foreach_list_yields_aggregate(self):
+        """List-typed foreach yields concatenate at the parent.
+
+        Each iteration yields a 1-element list; the parent's returned
+        ``items`` carries every iteration's contribution. This is the
+        pattern that lets aggregator workflows collect per-region outputs
+        without hand-rolled ``++`` chains.
+        """
+        src = """
+        namespace t {
+            event facet Make(n: Long) => (xs: Json)
+            event facet Pick(x: Json) => (out: String)
+
+            workflow Run(n: Long) => (collected: Json) andThen {
+                m = Make(n = $.n)
+            } andThen foreach x in m.xs {
+                p = Pick(x = $.x)
+                yield Run(collected = [p.out])
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Make": lambda p: {"xs": ["a", "b", "c"]},
+                "t.Pick": lambda p: {"out": str(p["x"])},
+            },
+            {"n": 3},
+        )
+        # All three iterations contribute to the aggregated list.
+        # Dispatch order is non-deterministic so we check membership, not order.
+        assert isinstance(outputs["collected"], list)
+        assert len(outputs["collected"]) == 3
+        assert set(outputs["collected"]) == {"a", "b", "c"}
+
+    def test_foreach_scalar_yields_still_overwrite(self):
+        """Regression: scalar foreach yields keep the legacy last-wins
+        contract (see test_andthen_foreach_iterates above). Only
+        collection-typed yields opt into aggregation."""
+        src = """
+        namespace t {
+            event facet Make(n: Long) => (xs: Json)
+            event facet Pick(x: Json) => (out: String)
+
+            workflow Run(n: Long) => (count: Long, last: String) andThen {
+                m = Make(n = $.n)
+            } andThen foreach x in m.xs {
+                p = Pick(x = $.x)
+                yield Run(count = 1, last = p.out)
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Make": lambda p: {"xs": ["a", "b", "c"]},
+                "t.Pick": lambda p: {"out": str(p["x"])},
+            },
+            {"n": 3},
+        )
+        # Scalars overwrite — count stays 1 (not summed), last is one of the items.
+        assert outputs["count"] == 1
+        assert outputs["last"] in {"a", "b", "c"}
+
+    def test_foreach_mixed_collection_and_scalar(self):
+        """A single yield carrying both a list field and a scalar field —
+        the list aggregates, the scalar overwrites."""
+        src = """
+        namespace t {
+            event facet Make(n: Long) => (xs: Json)
+            event facet Pick(x: Json) => (out: String)
+
+            workflow Run(n: Long) => (items: Json, last: String) andThen {
+                m = Make(n = $.n)
+            } andThen foreach x in m.xs {
+                p = Pick(x = $.x)
+                yield Run(items = [p.out], last = p.out)
+            }
+        }
+        """
+        outputs = self._drive(
+            src,
+            "Run",
+            {
+                "t.Make": lambda p: {"xs": ["a", "b", "c"]},
+                "t.Pick": lambda p: {"out": str(p["x"])},
+            },
+            {"n": 3},
+        )
+        assert isinstance(outputs["items"], list)
+        assert len(outputs["items"]) == 3
+        assert set(outputs["items"]) == {"a", "b", "c"}
+        # Last is one of the values; scalar overwrite preserved.
+        assert outputs["last"] in {"a", "b", "c"}
+
     def test_inline_andthen_reads_parent_outputs(self):
         """Inline-andThen body references parent step's outputs.
 
@@ -974,3 +1071,82 @@ class TestAgentPollerMultiStep:
             {"name": "demo"},
         )
         assert outputs == {"count": 3}
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _merge_yield_value — pure function, no runtime needed.
+# ---------------------------------------------------------------------------
+
+
+class TestMergeYieldValue:
+    """Type-driven merge contract for foreach yields.
+
+    Collection types (list, set, frozenset) combine; everything else
+    overwrites. This is what makes ``yield F(caches = [c.cache])`` inside
+    a foreach body aggregate into a full list at the parent.
+    """
+
+    def _fn(self):
+        from facetwork.runtime.handlers.capture import _merge_yield_value
+
+        return _merge_yield_value
+
+    def test_list_concat(self):
+        fn = self._fn()
+        assert fn([1, 2], [3, 4]) == [1, 2, 3, 4]
+        assert fn([], ["x"]) == ["x"]
+        assert fn(["x"], []) == ["x"]
+
+    def test_set_union(self):
+        fn = self._fn()
+        assert fn({1, 2}, {2, 3}) == {1, 2, 3}
+
+    def test_frozenset_union(self):
+        fn = self._fn()
+        assert fn(frozenset({1, 2}), frozenset({2, 3})) == frozenset({1, 2, 3})
+
+    def test_string_overwrite(self):
+        fn = self._fn()
+        assert fn("first", "second") == "second"
+
+    def test_int_overwrite(self):
+        fn = self._fn()
+        assert fn(1, 2) == 2
+
+    def test_float_overwrite(self):
+        fn = self._fn()
+        assert fn(1.5, 2.5) == 2.5
+
+    def test_bool_overwrite(self):
+        fn = self._fn()
+        assert fn(False, True) is True
+
+    def test_dict_overwrites_not_merges(self):
+        """Schema instances (Region, OSMCache, ...) are dicts in Python.
+        They MUST overwrite — merging field-by-field would smash unrelated
+        instances together."""
+        fn = self._fn()
+        a = {"name": "Quebec", "level": "subnational"}
+        b = {"name": "Ontario", "level": "subnational"}
+        assert fn(a, b) == b
+
+    def test_mismatched_types_overwrite(self):
+        """A list landing on top of a scalar (or vice versa) overwrites —
+        we don't try to box/unbox."""
+        fn = self._fn()
+        assert fn("scalar", [1, 2]) == [1, 2]
+        assert fn([1, 2], "scalar") == "scalar"
+
+    def test_list_then_set_overwrite(self):
+        """Different collection kinds also don't auto-coerce."""
+        fn = self._fn()
+        assert fn([1, 2], {3, 4}) == {3, 4}
+
+    def test_none_existing_is_passed_through(self):
+        """Caller responsibility: the helper only handles the case where
+        an existing value is present. None-existing is handled by the
+        merge-yield method directly. But verify None as existing value
+        still overwrites cleanly."""
+        fn = self._fn()
+        assert fn(None, [1, 2]) == [1, 2]
+        assert fn(None, "x") == "x"
