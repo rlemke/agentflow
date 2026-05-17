@@ -617,23 +617,13 @@ class RunnerService:
                 )
                 log_level = StepLogLevel.WARNING
             self._safe_save_task(task)
-            try:
-                entry = StepLogEntry(
-                    uuid=generate_id(),
-                    step_id=task.step_id,
-                    workflow_id=task.workflow_id,
-                    runner_id=self._server_id,
-                    facet_name=task.name,
-                    source=StepLogSource.FRAMEWORK,
-                    level=log_level,
-                    message=log_msg,
-                    time=_current_time_ms(),
-                )
-                self._persistence.save_step_log(entry)
-            except Exception:
-                logger.debug(
-                    "Could not save timeout step log for step %s", task.step_id, exc_info=True
-                )
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                facet_name=task.name,
+                level=log_level,
+                message=log_msg,
+            )
         except Exception:
             logger.debug("Could not release timed-out task %s", task_id, exc_info=True)
 
@@ -690,6 +680,63 @@ class RunnerService:
                         label,
                         exc_info=True,
                     )
+
+    def _emit_step_log(
+        self,
+        step_id: str,
+        workflow_id: str,
+        facet_name: str,
+        level: str,
+        message: str,
+        source: str = StepLogSource.FRAMEWORK,
+        details: dict | None = None,
+    ) -> None:
+        """Persist a ``StepLogEntry`` best-effort.
+
+        Centralizes the entry-construction + ``save_step_log`` + swallow-and-debug
+        pattern that every claim/timeout/reaper site repeats verbatim. Logging
+        failures must not break runner work, so persistence errors are logged
+        at debug and otherwise dropped.
+        """
+        entry = StepLogEntry(
+            uuid=generate_id(),
+            step_id=step_id,
+            workflow_id=workflow_id,
+            runner_id=self._server_id,
+            facet_name=facet_name,
+            source=source,
+            level=level,
+            message=message,
+            time=_current_time_ms(),
+            details=details,
+        )
+        try:
+            self._persistence.save_step_log(entry)
+        except Exception:
+            logger.debug(
+                "Could not save step log for step %s",
+                step_id,
+                exc_info=True,
+            )
+
+    def _lookup_runner_context(self, workflow_id: str) -> tuple[str, str]:
+        """Return ``(runner_id, qualified_workflow_name)`` for a workflow.
+
+        Resumed tasks need both fields so the runner-id is carried forward
+        and logs can show the workflow's qualified name. Empty strings are
+        returned when the persistence backend doesn't expose
+        ``get_runners_by_workflow`` (e.g. some test fakes) or no runner is
+        registered for the workflow yet.
+        """
+        if not hasattr(self._persistence, "get_runners_by_workflow"):
+            return "", ""
+        try:
+            runners = self._persistence.get_runners_by_workflow(workflow_id)
+        except Exception:
+            return "", ""
+        if not runners:
+            return "", ""
+        return runners[0].uuid, runners[0].workflow.name
 
     def _reconcile_with_db(self) -> None:
         """Reconcile in-memory active futures with actual DB state.
@@ -794,49 +841,36 @@ class RunnerService:
     # Work Submission
     # =========================================================================
 
+    def _submit(self, process_fn: Any, item: Any, item_id: str) -> None:
+        """Submit ``process_fn(item)`` to the executor and track its future.
+
+        Runs inline when no executor is configured (test mode). Otherwise
+        registers ``(future, item_id, now)`` so the cleanup/reconcile loops
+        can find it. ``item_id`` is the step id or task uuid — whichever
+        identifies the work for accounting and reconciliation.
+        """
+        if self._executor is None:
+            process_fn(item)
+            return
+        future = self._executor.submit(process_fn, item)
+        with self._active_lock:
+            self._active_futures.append((future, item_id, _current_time_ms()))
+
     def _submit_step(self, step: StepDefinition) -> None:
         """Submit a step for processing in the thread pool."""
-        if self._executor is None:
-            self._process_step(step)
-            return
-
-        future = self._executor.submit(self._process_step, step)
-        now = _current_time_ms()
-        with self._active_lock:
-            self._active_futures.append((future, getattr(step, "id", ""), now))
+        self._submit(self._process_step, step, getattr(step, "id", ""))
 
     def _submit_event_task(self, task: Any) -> None:
         """Submit an event task for processing in the thread pool."""
-        if self._executor is None:
-            self._process_event_task(task)
-            return
-
-        future = self._executor.submit(self._process_event_task, task)
-        now = _current_time_ms()
-        with self._active_lock:
-            self._active_futures.append((future, task.uuid, now))
+        self._submit(self._process_event_task, task, task.uuid)
 
     def _submit_task(self, task: Any) -> None:
         """Submit a task for processing in the thread pool."""
-        if self._executor is None:
-            self._process_task(task)
-            return
-
-        future = self._executor.submit(self._process_task, task)
-        now = _current_time_ms()
-        with self._active_lock:
-            self._active_futures.append((future, task.uuid, now))
+        self._submit(self._process_task, task, task.uuid)
 
     def _submit_resume_task(self, task: Any) -> None:
         """Submit a resume task for processing in the thread pool."""
-        if self._executor is None:
-            self._process_resume_task(task)
-            return
-
-        future = self._executor.submit(self._process_resume_task, task)
-        now = _current_time_ms()
-        with self._active_lock:
-            self._active_futures.append((future, task.uuid, now))
+        self._submit(self._process_resume_task, task, task.uuid)
 
     # =========================================================================
     # Step Processing
@@ -910,45 +944,28 @@ class RunnerService:
             payload = dict(task.data or {})
 
             # Log task claimed with server identity
-            try:
-                entry = StepLogEntry(
-                    uuid=generate_id(),
-                    step_id=task.step_id,
-                    workflow_id=task.workflow_id,
-                    runner_id=self._server_id,
-                    facet_name=task.name,
-                    source=StepLogSource.FRAMEWORK,
-                    level=StepLogLevel.INFO,
-                    message=(
-                        f"Task claimed: {task.name} "
-                        f"(server={self._config.server_name}, id={self._server_id[:8]})"
-                    ),
-                    time=_current_time_ms(),
-                )
-                self._persistence.save_step_log(entry)
-            except Exception:
-                logger.debug(
-                    "Could not save claim step log for step %s", task.step_id, exc_info=True
-                )
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                facet_name=task.name,
+                level=StepLogLevel.INFO,
+                message=(
+                    f"Task claimed: {task.name} "
+                    f"(server={self._config.server_name}, id={self._server_id[:8]})"
+                ),
+            )
 
             # Inject _step_log callback for handler-level progress logging
             def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
-                entry = StepLogEntry(
-                    uuid=generate_id(),
+                self._emit_step_log(
                     step_id=task.step_id,
                     workflow_id=task.workflow_id,
-                    runner_id=self._server_id,
                     facet_name=task.name,
-                    source=StepLogSource.HANDLER,
                     level=level,
                     message=message,
-                    time=_current_time_ms(),
+                    source=StepLogSource.HANDLER,
                     details=details,
                 )
-                try:
-                    self._persistence.save_step_log(entry)
-                except Exception:
-                    logger.debug("Could not save step log for step %s", task.step_id, exc_info=True)
 
             payload["_step_log"] = _step_log_callback
 
@@ -1142,21 +1159,13 @@ class RunnerService:
             self._safe_save_task(task)
             # Write step log so the error is visible in the dashboard
             if task.step_id:
-                try:
-                    entry = StepLogEntry(
-                        uuid=generate_id(),
-                        step_id=task.step_id,
-                        workflow_id=task.workflow_id,
-                        runner_id=self._server_id,
-                        facet_name=task.name,
-                        source=StepLogSource.FRAMEWORK,
-                        level=log_level,
-                        message=log_msg,
-                        time=_current_time_ms(),
-                    )
-                    self._persistence.save_step_log(entry)
-                except Exception:
-                    pass
+                self._emit_step_log(
+                    step_id=task.step_id,
+                    workflow_id=task.workflow_id,
+                    facet_name=task.name,
+                    level=log_level,
+                    message=log_msg,
+                )
 
         except Exception as exc:
             now = _current_time_ms()
@@ -1491,12 +1500,9 @@ class RunnerService:
             # Resolve workflow names for readable logging
             wf_names: dict[str, str] = {}
             for wf_id in workflow_ids:
-                try:
-                    runners = self._persistence.get_runners_by_workflow(wf_id)
-                    if runners:
-                        wf_names[wf_id] = runners[0].workflow.name
-                except Exception:
-                    pass
+                _, name = self._lookup_runner_context(wf_id)
+                if name:
+                    wf_names[wf_id] = name
 
             names = ", ".join(wf_names.get(wid, wid[:12]) for wid in workflow_ids)
             logger.info(
@@ -1575,12 +1581,7 @@ class RunnerService:
                 {"step_id": step_id, "state": {"$in": ["pending", "running"]}}
             )
             if not existing_task:
-                # Find runner_id for this workflow
-                runner_id = ""
-                if hasattr(self._persistence, "get_runners_by_workflow"):
-                    runners = self._persistence.get_runners_by_workflow(workflow_id)
-                    if runners:
-                        runner_id = runners[0].uuid
+                runner_id, _ = self._lookup_runner_context(workflow_id)
 
                 from ..utils import generate_id
                 from .entities import TaskDefinition, TaskState
@@ -1642,25 +1643,15 @@ class RunnerService:
                     len(reaped),
                 )
                 for task_info in reaped:
-                    entry = StepLogEntry(
-                        uuid=generate_id(),
+                    self._emit_step_log(
                         step_id=task_info["step_id"],
                         workflow_id=task_info["workflow_id"],
-                        runner_id=self._server_id,
                         facet_name=task_info["name"],
-                        source=StepLogSource.FRAMEWORK,
                         level=StepLogLevel.WARNING,
-                        message=_reaper_message(task_info, reclaimer_name=self._config.server_name),
-                        time=_current_time_ms(),
+                        message=_reaper_message(
+                            task_info, reclaimer_name=self._config.server_name
+                        ),
                     )
-                    try:
-                        self._persistence.save_step_log(entry)
-                    except Exception:
-                        logger.debug(
-                            "Could not save reaper step log for step %s",
-                            task_info["step_id"],
-                            exc_info=True,
-                        )
         except Exception:
             logger.debug("Orphan reaper failed", exc_info=True)
 
@@ -1690,25 +1681,15 @@ class RunnerService:
                     len(stuck),
                 )
                 for task_info in stuck:
-                    entry = StepLogEntry(
-                        uuid=generate_id(),
+                    self._emit_step_log(
                         step_id=task_info["step_id"],
                         workflow_id=task_info["workflow_id"],
-                        runner_id=self._server_id,
                         facet_name=task_info["name"],
-                        source=StepLogSource.FRAMEWORK,
                         level=StepLogLevel.WARNING,
-                        message=_stuck_message(task_info, reclaimer_name=self._config.server_name),
-                        time=_current_time_ms(),
+                        message=_stuck_message(
+                            task_info, reclaimer_name=self._config.server_name
+                        ),
                     )
-                    try:
-                        self._persistence.save_step_log(entry)
-                    except Exception:
-                        logger.debug(
-                            "Could not save stuck-task step log for step %s",
-                            task_info["step_id"],
-                            exc_info=True,
-                        )
         except Exception:
             logger.debug("Stuck task watchdog failed", exc_info=True)
 
@@ -1741,13 +1722,7 @@ class RunnerService:
         program_ast = self._program_ast_cache.get(workflow_id)
 
         # Look up the runner_id so resumed tasks inherit the workflow's runner
-        runner_id = ""
-        qualified_workflow_name = ""
-        if hasattr(self._persistence, "get_runners_by_workflow"):
-            runners = self._persistence.get_runners_by_workflow(workflow_id)
-            if runners:
-                runner_id = runners[0].uuid
-                qualified_workflow_name = runners[0].workflow.name
+        runner_id, qualified_workflow_name = self._lookup_runner_context(workflow_id)
 
         # Run resume with a timeout to prevent blocking the handler thread
         # indefinitely. Large workflows (100+ steps) can have long iteration
@@ -1826,13 +1801,7 @@ class RunnerService:
 
             program_ast = self._program_ast_cache.get(workflow_id)
 
-            runner_id = ""
-            qualified_workflow_name = ""
-            if hasattr(self._persistence, "get_runners_by_workflow"):
-                runners = self._persistence.get_runners_by_workflow(workflow_id)
-                if runners:
-                    runner_id = runners[0].uuid
-                    qualified_workflow_name = runners[0].workflow.name
+            runner_id, qualified_workflow_name = self._lookup_runner_context(workflow_id)
 
             result = self._evaluator.resume_step(
                 workflow_id,
