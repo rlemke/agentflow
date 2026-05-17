@@ -717,6 +717,79 @@ class RunnerService:
             task.next_retry_after = _compute_next_retry_after(task.retry_count, task.updated)
         return False
 
+    def _build_handler_payload(self, task: Any) -> dict:
+        """Construct the per-task payload passed to a handler.
+
+        Starts from ``task.data`` (the params the workflow supplied) and
+        layers on the runtime-injected callbacks and retry context that
+        every handler may use:
+
+        - ``_step_log``: write a user-visible log entry under
+          ``StepLogSource.HANDLER``.
+        - ``_task_heartbeat``: renew the lease and optionally report
+          progress; lets long-running handlers avoid the stuck-task
+          watchdog.
+        - ``_set_stage_budget``: declare a per-stage timeout deadline
+          that extends the watchdog independent of the global
+          execution-timeout safety net.
+        - ``_task_uuid``: lets handlers correlate their own logs to the
+          task without parsing.
+        - ``_retry_count`` / ``_is_retry``: lets handlers detect a
+          reclaim and skip operations they already completed.
+
+        Extracted from ``_process_event_task`` so the dispatch logic
+        isn't drowning in closure definitions.
+        """
+        payload: dict[str, Any] = dict(task.data or {})
+
+        def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
+            self._emit_step_log(
+                step_id=task.step_id,
+                workflow_id=task.workflow_id,
+                facet_name=task.name,
+                level=level,
+                message=message,
+                source=StepLogSource.HANDLER,
+                details=details,
+            )
+
+        def _task_heartbeat_callback(
+            progress_pct: int | None = None,
+            progress_message: str | None = None,
+        ) -> None:
+            self._persistence.update_task_heartbeat(
+                task.uuid,
+                _current_time_ms(),
+                progress_pct=progress_pct,
+                progress_message=progress_message,
+            )
+
+        def _set_stage_budget_callback(
+            timeout_ms: int,
+            stage_name: str = "",
+        ) -> None:
+            if timeout_ms <= 0:
+                return
+            budget_expires = _current_time_ms() + int(timeout_ms)
+            self._persistence.update_task_stage_budget(
+                task.uuid,
+                budget_expires,
+                stage_name=stage_name,
+            )
+
+        retry_count = getattr(task, "retry_count", 0) or 0
+        payload.update(
+            {
+                "_step_log": _step_log_callback,
+                "_task_heartbeat": _task_heartbeat_callback,
+                "_set_stage_budget": _set_stage_budget_callback,
+                "_task_uuid": task.uuid,
+                "_retry_count": retry_count,
+                "_is_retry": retry_count > 0,
+            }
+        )
+        return payload
+
     def _emit_step_log(
         self,
         step_id: str,
@@ -977,8 +1050,6 @@ class RunnerService:
         5. Update handled stats
         """
         try:
-            payload = dict(task.data or {})
-
             # Log task claimed with server identity
             self._emit_step_log(
                 step_id=task.step_id,
@@ -991,60 +1062,7 @@ class RunnerService:
                 ),
             )
 
-            # Inject _step_log callback for handler-level progress logging
-            def _step_log_callback(message, level=StepLogLevel.INFO, details=None):
-                self._emit_step_log(
-                    step_id=task.step_id,
-                    workflow_id=task.workflow_id,
-                    facet_name=task.name,
-                    level=level,
-                    message=message,
-                    source=StepLogSource.HANDLER,
-                    details=details,
-                )
-
-            payload["_step_log"] = _step_log_callback
-
-            # Inject _task_heartbeat callback so long-running handlers can
-            # signal progress, renew the lease, and avoid being reaped.
-            def _task_heartbeat_callback(
-                progress_pct: int | None = None,
-                progress_message: str | None = None,
-            ) -> None:
-                now = _current_time_ms()
-                self._persistence.update_task_heartbeat(
-                    task.uuid,
-                    now,
-                    progress_pct=progress_pct,
-                    progress_message=progress_message,
-                )
-
-            payload["_task_heartbeat"] = _task_heartbeat_callback
-
-            # Inject _set_stage_budget so handlers can declare a per-stage
-            # timeout budget (extends the watchdog deadline + lease without
-            # affecting the global execution timeout safety net).
-            def _set_stage_budget_callback(
-                timeout_ms: int,
-                stage_name: str = "",
-            ) -> None:
-                if timeout_ms <= 0:
-                    return
-                budget_expires = _current_time_ms() + int(timeout_ms)
-                self._persistence.update_task_stage_budget(
-                    task.uuid,
-                    budget_expires,
-                    stage_name=stage_name,
-                )
-
-            payload["_set_stage_budget"] = _set_stage_budget_callback
-            payload["_task_uuid"] = task.uuid
-
-            # Retry context — lets handlers detect reclaims and skip
-            # previously-completed operations.
-            retry_count = getattr(task, "retry_count", 0) or 0
-            payload["_retry_count"] = retry_count
-            payload["_is_retry"] = retry_count > 0
+            payload = self._build_handler_payload(task)
 
             # Dispatch to handler (try exact name, then prefix for builtin
             # tasks like "fw:execute:WorkflowName", then short name)
