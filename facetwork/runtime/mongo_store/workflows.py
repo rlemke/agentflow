@@ -41,13 +41,13 @@ class WorkflowMixin(_MixinBase):
 
     def get_workflow(self, workflow_id: str) -> WorkflowDefinition | None:
         """Get a workflow by ID."""
-        doc = self._db.workflows.find_one({"uuid": workflow_id})
-        return self._doc_to_workflow(doc) if doc else None
+        return self._find_decoded(
+            self._db.workflows, {"uuid": workflow_id}, self._doc_to_workflow
+        )
 
     def get_workflow_by_name(self, name: str) -> WorkflowDefinition | None:
         """Get a workflow by name."""
-        doc = self._db.workflows.find_one({"name": name})
-        return self._doc_to_workflow(doc) if doc else None
+        return self._find_decoded(self._db.workflows, {"name": name}, self._doc_to_workflow)
 
     def get_workflows_by_flow(self, flow_id: str) -> Sequence[WorkflowDefinition]:
         """Get all workflows for a flow."""
@@ -56,8 +56,7 @@ class WorkflowMixin(_MixinBase):
 
     def save_workflow(self, workflow: WorkflowDefinition) -> None:
         """Save a workflow."""
-        doc = self._workflow_to_doc(workflow)
-        self._db.workflows.replace_one({"uuid": workflow.uuid}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.workflows, self._workflow_to_doc(workflow))
 
     # =========================================================================
     # Flow Operations
@@ -65,23 +64,19 @@ class WorkflowMixin(_MixinBase):
 
     def get_flow(self, flow_id: str) -> FlowDefinition | None:
         """Get a flow by ID."""
-        doc = self._db.flows.find_one({"uuid": flow_id})
-        return self._doc_to_flow(doc) if doc else None
+        return self._find_decoded(self._db.flows, {"uuid": flow_id}, self._doc_to_flow)
 
     def get_flow_by_path(self, path: str) -> FlowDefinition | None:
         """Get a flow by path."""
-        doc = self._db.flows.find_one({"name.path": path})
-        return self._doc_to_flow(doc) if doc else None
+        return self._find_decoded(self._db.flows, {"name.path": path}, self._doc_to_flow)
 
     def get_flow_by_name(self, name: str) -> FlowDefinition | None:
         """Get a flow by name."""
-        doc = self._db.flows.find_one({"name.name": name})
-        return self._doc_to_flow(doc) if doc else None
+        return self._find_decoded(self._db.flows, {"name.name": name}, self._doc_to_flow)
 
     def save_flow(self, flow: FlowDefinition) -> None:
         """Save a flow."""
-        doc = self._flow_to_doc(flow)
-        self._db.flows.replace_one({"uuid": flow.uuid}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.flows, self._flow_to_doc(flow))
 
     def delete_flow(self, flow_id: str) -> bool:
         """Delete a flow."""
@@ -106,8 +101,11 @@ class WorkflowMixin(_MixinBase):
 
     def get_handler_registration(self, facet_name: str) -> HandlerRegistration | None:
         """Get a handler registration by facet name."""
-        doc = self._db.handler_registrations.find_one({"facet_name": facet_name})
-        return self._doc_to_handler_reg(doc) if doc else None
+        return self._find_decoded(
+            self._db.handler_registrations,
+            {"facet_name": facet_name},
+            self._doc_to_handler_reg,
+        )
 
     def list_handler_registrations(self) -> list[HandlerRegistration]:
         """List all handler registrations."""
@@ -146,8 +144,11 @@ class WorkflowMixin(_MixinBase):
 
     def get_source_by_namespace(self, name: str, version: str = "latest") -> PublishedSource | None:
         """Get a published source by namespace name and version."""
-        doc = self._db.afl_sources.find_one({"namespace_name": name, "version": version})
-        return self._doc_to_published_source(doc) if doc else None
+        return self._find_decoded(
+            self._db.afl_sources,
+            {"namespace_name": name, "version": version},
+            self._doc_to_published_source,
+        )
 
     def get_sources_by_namespaces(
         self, names: set[str], version: str = "latest"

@@ -51,8 +51,7 @@ class StepMixin(_MixinBase):
 
     def get_step(self, step_id: str) -> StepDefinition | None:
         """Fetch a step by ID."""
-        doc = self._db.steps.find_one({"uuid": step_id})
-        return self._doc_to_step(doc) if doc else None
+        return self._find_decoded(self._db.steps, {"uuid": step_id}, self._doc_to_step)
 
     def get_steps_by_block(self, block_id: StepId | BlockId) -> Sequence[StepDefinition]:
         """Fetch all steps in a block."""
@@ -122,8 +121,7 @@ class StepMixin(_MixinBase):
         if not step.start_time:
             step.start_time = now
         step.last_modified = now
-        doc = self._step_to_doc(step)
-        self._db.steps.replace_one({"uuid": step.id}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.steps, self._step_to_doc(step))
 
     def delete_steps(self, step_ids: Sequence[str]) -> int:
         """Delete steps by their UUIDs."""
@@ -158,10 +156,11 @@ class StepMixin(_MixinBase):
 
     def get_workflow_root(self, workflow_id: str) -> StepDefinition | None:
         """Get the root step of a workflow."""
-        doc = self._db.steps.find_one(
-            {"workflow_id": workflow_id, "root_id": None, "container_id": None}
+        return self._find_decoded(
+            self._db.steps,
+            {"workflow_id": workflow_id, "root_id": None, "container_id": None},
+            self._doc_to_step,
         )
-        return self._doc_to_step(doc) if doc else None
 
     def step_exists(self, statement_id: str, block_id: StepId | BlockId | None) -> bool:
         """Check if a step already exists for a statement in a block."""

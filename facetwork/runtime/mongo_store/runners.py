@@ -26,8 +26,7 @@ class RunnerMixin(_MixinBase):
 
     def get_runner(self, runner_id: str) -> RunnerDefinition | None:
         """Get a runner by ID."""
-        doc = self._db.runners.find_one({"uuid": runner_id})
-        return self._doc_to_runner(doc) if doc else None
+        return self._find_decoded(self._db.runners, {"uuid": runner_id}, self._doc_to_runner)
 
     def get_runners_by_workflow(self, workflow_id: str) -> Sequence[RunnerDefinition]:
         """Get all runners for a workflow."""
@@ -41,8 +40,7 @@ class RunnerMixin(_MixinBase):
 
     def save_runner(self, runner: RunnerDefinition) -> None:
         """Save a runner."""
-        doc = self._runner_to_doc(runner)
-        self._db.runners.replace_one({"uuid": runner.uuid}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.runners, self._runner_to_doc(runner))
 
     def update_runner_state(self, runner_id: str, state: str) -> None:
         """Update runner state."""

@@ -42,11 +42,14 @@ class TaskMixin(_MixinBase):
 
     def get_task(self, task_id: str) -> TaskDefinition | None:
         """Get a task by ID."""
-        doc = self._db.tasks.find_one({"uuid": task_id})
-        return self._doc_to_task(doc) if doc else None
+        return self._find_decoded(self._db.tasks, {"uuid": task_id}, self._doc_to_task)
 
     def get_task_for_step(self, step_id: str) -> TaskDefinition | None:
-        """Get the most recent task associated with a step."""
+        """Get the most recent task associated with a step.
+
+        Uses ``find_one`` with a sort rather than ``_find_decoded`` so the
+        ``sort=`` kwarg is preserved — the helper only takes a query.
+        """
         doc = self._db.tasks.find_one(
             {"step_id": step_id},
             sort=[("created", -1)],
@@ -60,8 +63,7 @@ class TaskMixin(_MixinBase):
 
     def save_task(self, task: TaskDefinition) -> None:
         """Save a task."""
-        doc = self._task_to_doc(task)
-        self._db.tasks.replace_one({"uuid": task.uuid}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.tasks, self._task_to_doc(task))
 
     def save_task_if_owned(self, task: TaskDefinition, expected_server_id: str) -> bool:
         """Save a task only if its current ``server_id`` still matches.
@@ -80,7 +82,7 @@ class TaskMixin(_MixinBase):
         # Strict ownership: write only if the doc still has expected_server_id.
         # If expected is "", we allow the upsert path so initial creation works.
         if expected_server_id == "":
-            self._db.tasks.replace_one({"uuid": task.uuid}, doc, upsert=True)
+            self._upsert_by_uuid(self._db.tasks, doc)
             return True
         result = self._db.tasks.replace_one(
             {"uuid": task.uuid, "server_id": expected_server_id},

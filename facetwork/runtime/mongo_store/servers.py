@@ -28,8 +28,7 @@ class ServerMixin(_MixinBase):
 
     def get_server(self, server_id: str) -> ServerDefinition | None:
         """Get a server by ID."""
-        doc = self._db.servers.find_one({"uuid": server_id})
-        return self._doc_to_server(doc) if doc else None
+        return self._find_decoded(self._db.servers, {"uuid": server_id}, self._doc_to_server)
 
     def get_servers_by_state(self, state: str) -> Sequence[ServerDefinition]:
         """Get servers by state."""
@@ -43,8 +42,7 @@ class ServerMixin(_MixinBase):
 
     def save_server(self, server: ServerDefinition) -> None:
         """Save a server."""
-        doc = self._server_to_doc(server)
-        self._db.servers.replace_one({"uuid": server.uuid}, doc, upsert=True)
+        self._upsert_by_uuid(self._db.servers, self._server_to_doc(server))
 
     def prune_stale_servers(self, older_than_ms: int = 600_000) -> int:
         """Delete ServerDefinition records whose last ping is older than

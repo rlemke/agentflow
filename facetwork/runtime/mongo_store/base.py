@@ -108,6 +108,21 @@ class BaseMixin:
         """Read the active lease duration, honoring ``AFL_LEASE_DURATION_MS``."""
         return int(os.environ.get("AFL_LEASE_DURATION_MS", str(self.DEFAULT_LEASE_MS)))
 
+    @staticmethod
+    def _find_decoded(collection: Any, query: dict, decoder: Any) -> Any:
+        """``find_one(query)`` and decode, or return ``None`` if no match.
+
+        Collapses the ``doc = …find_one(…); return decoder(doc) if doc else None``
+        pattern that the per-entity ``get_*`` methods repeat verbatim.
+        """
+        doc = collection.find_one(query)
+        return decoder(doc) if doc else None
+
+    @staticmethod
+    def _upsert_by_uuid(collection: Any, doc: dict) -> None:
+        """``replace_one({"uuid": doc["uuid"]}, doc, upsert=True)``."""
+        collection.replace_one({"uuid": doc["uuid"]}, doc, upsert=True)
+
     def __init__(
         self,
         connection_string: str = "",
