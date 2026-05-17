@@ -2804,3 +2804,223 @@ class TestReaperInRunnerService:
                 _, kwargs = mock_claim.call_args
                 assert "server_id" in kwargs
                 assert kwargs["server_id"] == svc.server_id
+
+
+class TestSweepStuckSteps:
+    """Regression tests for ``RunnerService._sweep_workflow_steps``.
+
+    Two compounding bugs were resolved together in commits b01a1ce and
+    2721b3e after the sweep had been silently broken for ~7 weeks:
+
+    1. Local imports inside the function pointed at non-existent
+       modules (``.states``, ``.entities``, ``..utils``), so the entire
+       function raised ``ModuleNotFoundError`` on its first line. The
+       outer ``try/except logger.debug(...)`` in
+       ``_maybe_sweep_stuck_steps`` swallowed the error.
+    2. Even if the imports had worked, synthesized tasks were written
+       with the mongo-doc serialization shape
+       (``{"params": {name: {...}}, "returns": {...}}``) instead of
+       the flat ``{name: value}`` payload that handlers consume. So
+       the sweep would have failed at the first handler param access
+       with ``KeyError``.
+
+    These tests pin both contracts so regressions surface immediately.
+    """
+
+    @pytest.fixture
+    def runner_def(self, store):
+        """A registered runner so ``_lookup_runner_context`` finds something.
+
+        ``_sweep_workflow_steps`` calls ``_lookup_runner_context`` to
+        carry ``runner_id`` onto synthesized tasks. The lookup just
+        reads from ``get_runners_by_workflow``, so any saved
+        RunnerDefinition works.
+        """
+        from facetwork.runtime.entities import (
+            RunnerDefinition,
+            RunnerState,
+            WorkflowDefinition,
+        )
+
+        workflow_id = "wf-sweep-test"
+        wf = WorkflowDefinition(
+            uuid=workflow_id,
+            name="SweepTestWorkflow",
+            namespace_id="ns-1",
+            facet_id="facet-1",
+            flow_id="flow-1",
+            starting_step="step-root",
+            version="1.0",
+        )
+        runner = RunnerDefinition(
+            uuid="runner-1",
+            workflow_id=workflow_id,
+            workflow=wf,
+            state=RunnerState.RUNNING,
+        )
+        store.save_runner(runner)
+        return runner, workflow_id
+
+    def _make_event_step(self, workflow_id, facet_name="MyEventFacet", params=None):
+        """Build a StepDefinition parked at EVENT_TRANSMIT with given params.
+
+        Mirrors what the evaluator leaves behind when a workflow pauses
+        on an event facet without a task ever being created (the
+        recovery scenario the sweep exists to handle).
+        """
+        from facetwork.runtime.step import StepDefinition
+        from facetwork.runtime.types import (
+            AttributeValue,
+            FacetAttributes,
+            StepId,
+            WorkflowId,
+        )
+
+        attrs = FacetAttributes()
+        for name, value in (params or {}).items():
+            attrs.params[name] = AttributeValue(name=name, value=value, type_hint="Any")
+
+        return StepDefinition(
+            id=StepId(generate_id()),
+            workflow_id=WorkflowId(workflow_id),
+            object_type="VariableAssignment",
+            state=StepState.EVENT_TRANSMIT,
+            statement_id="stmt-1",
+            statement_name="s1",
+            facet_name=facet_name,
+            attributes=attrs,
+        )
+
+    def test_sweep_runs_without_import_errors(self, service, store, runner_def):
+        """Regression for the broken local imports.
+
+        Pre-fix this would raise ``ModuleNotFoundError`` on the first
+        line of the function body. Calling the sweep on an empty
+        workflow exercises the import-path without needing any
+        particular state.
+        """
+        _, workflow_id = runner_def
+        # No exception — and no NotImplementedError or AttributeError
+        # from the new persistence-API methods.
+        service._sweep_workflow_steps(workflow_id)
+
+    def test_sweep_creates_task_for_stuck_event_transmit_step(
+        self, service, store, runner_def
+    ):
+        """A parked EventTransmit step with no task gets one synthesized."""
+        _, workflow_id = runner_def
+        step = self._make_event_step(workflow_id, facet_name="MyEventFacet")
+        store.save_step(step)
+
+        # Sanity: no task exists yet for this step
+        assert store.get_task_for_step(step.id) is None
+
+        service._sweep_workflow_steps(workflow_id)
+
+        task = store.get_task_for_step(step.id)
+        assert task is not None, "sweep should have created a task"
+        assert task.name == "MyEventFacet"
+        assert task.step_id == step.id
+        assert task.workflow_id == workflow_id
+        assert task.state == TaskState.PENDING
+        assert task.runner_id == "runner-1"
+
+    def test_sweep_task_data_is_flat_payload_shape(self, service, store, runner_def):
+        """Regression for the nested payload bug.
+
+        ``task.data`` must be a flat ``{name: value}`` dict matching the
+        canonical ``StatementBeginHandler._build_payload`` shape, not
+        the nested ``{"params": {name: {name, value, type_hint}}, "returns": {...}}``
+        mongo-doc shape. Handlers read ``payload["x"]`` directly.
+        """
+        _, workflow_id = runner_def
+        step = self._make_event_step(
+            workflow_id,
+            facet_name="Adder",
+            params={"x": 7, "y": "hello", "z": [1, 2, 3]},
+        )
+        store.save_step(step)
+
+        service._sweep_workflow_steps(workflow_id)
+
+        task = store.get_task_for_step(step.id)
+        assert task is not None
+        assert task.data == {"x": 7, "y": "hello", "z": [1, 2, 3]}, (
+            f"task.data must be flat {{name: value}}, got: {task.data!r}"
+        )
+        # Negative assertion: the broken nested shape is NOT present.
+        assert "params" not in task.data, (
+            f"task.data must not be the nested mongo-doc shape; got: {task.data!r}"
+        )
+
+    def test_sweep_does_not_duplicate_existing_active_task(
+        self, service, store, runner_def
+    ):
+        """If a pending or running task already exists, no new one is created."""
+        _, workflow_id = runner_def
+        step = self._make_event_step(workflow_id)
+        store.save_step(step)
+
+        existing = TaskDefinition(
+            uuid=generate_id(),
+            name=step.facet_name,
+            runner_id="runner-1",
+            workflow_id=workflow_id,
+            flow_id="",
+            step_id=step.id,
+            state=TaskState.PENDING,
+            created=_current_time_ms(),
+            updated=_current_time_ms(),
+        )
+        store.save_task(existing)
+
+        service._sweep_workflow_steps(workflow_id)
+
+        # Still exactly one task for this step — no duplicate.
+        all_tasks = store.get_tasks_by_step(step.id)
+        assert len(all_tasks) == 1
+        assert all_tasks[0].uuid == existing.uuid
+
+    def test_sweep_skips_event_transmit_step_without_facet_name(
+        self, service, store, runner_def
+    ):
+        """Block-level steps at EventTransmit (no facet_name) aren't task-able."""
+        _, workflow_id = runner_def
+        step = self._make_event_step(workflow_id, facet_name="")
+        store.save_step(step)
+
+        service._sweep_workflow_steps(workflow_id)
+
+        assert store.get_task_for_step(step.id) is None
+
+    def test_sweep_invokes_resume_for_block_steps(
+        self, service, store, runner_def
+    ):
+        """Non-EventTransmit stuck steps go through ``_resume_workflow_for_step``."""
+        from facetwork.runtime.step import StepDefinition
+        from facetwork.runtime.types import StepId, WorkflowId
+
+        _, workflow_id = runner_def
+        block_step = StepDefinition(
+            id=StepId(generate_id()),
+            workflow_id=WorkflowId(workflow_id),
+            object_type="AndThen",
+            state=StepState.BLOCK_EXECUTION_CONTINUE,
+            statement_id="stmt-block",
+            statement_name="block",
+        )
+        store.save_step(block_step)
+
+        with patch.object(service, "_resume_workflow_for_step") as mock_resume:
+            service._sweep_workflow_steps(workflow_id)
+
+        mock_resume.assert_called_once_with(workflow_id, block_step.id)
+
+    def test_sweep_is_noop_when_no_stuck_steps(self, service, store, runner_def):
+        """Sweep on a workflow with no stuck steps creates nothing."""
+        _, workflow_id = runner_def
+
+        service._sweep_workflow_steps(workflow_id)
+
+        # No tasks were created for this workflow.
+        assert list(store.get_tasks_by_workflow(workflow_id)) == []
