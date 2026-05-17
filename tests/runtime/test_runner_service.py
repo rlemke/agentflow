@@ -3024,3 +3024,317 @@ class TestSweepStuckSteps:
 
         # No tasks were created for this workflow.
         assert list(store.get_tasks_by_workflow(workflow_id)) == []
+
+
+class TestReleaseTimedOutTask:
+    """Regression tests for ``RunnerService._release_timed_out_task``.
+
+    The entire method body is wrapped in
+    ``try/except Exception: logger.debug("Could not release timed-out task ...")``
+    — exactly the silent-swallow shape that hid the sweep bug. The
+    method runs on every poll cycle for every future that has exceeded
+    ``_execution_timeout_ms``, so a regression here would silently
+    leak retry/dead-letter behavior on hot paths. None of the existing
+    tests exercised this method directly.
+    """
+
+    def _make_running_task(
+        self,
+        step_id="step-1",
+        retry_count=0,
+        max_retries=3,
+        server_id="srv-1",
+    ):
+        return TaskDefinition(
+            uuid=generate_id(),
+            name="SomeFacet",
+            runner_id="runner-1",
+            workflow_id="wf-1",
+            flow_id="",
+            step_id=step_id,
+            state=TaskState.RUNNING,
+            created=_current_time_ms() - 60_000,
+            updated=_current_time_ms() - 60_000,
+            server_id=server_id,
+            retry_count=retry_count,
+            max_retries=max_retries,
+        )
+
+    def test_resets_to_pending_when_under_retry_limit(self, service, store):
+        """A running task gets PENDING + server_id="" + incremented retry_count."""
+        task = self._make_running_task(retry_count=0, max_retries=3)
+        store.save_task(task)
+
+        service._release_timed_out_task(task.uuid)
+
+        reloaded = store.get_task(task.uuid)
+        assert reloaded.state == TaskState.PENDING
+        assert reloaded.server_id == ""
+        assert reloaded.retry_count == 1
+
+    def test_dead_letters_when_retry_limit_reached(self, service, store):
+        """At ``retry_count + 1 >= max_retries`` the task is dead-lettered."""
+        task = self._make_running_task(retry_count=2, max_retries=3)
+        store.save_task(task)
+
+        with patch.object(service._evaluator, "fail_step") as mock_fail:
+            service._release_timed_out_task(task.uuid)
+
+        reloaded = store.get_task(task.uuid)
+        assert reloaded.state == TaskState.DEAD_LETTER
+        assert reloaded.retry_count == 3
+        # error payload populated for dead-letter
+        assert reloaded.error and "dead-lettered" in reloaded.error["message"]
+        # fail_step called with the step id and the dead-letter message
+        mock_fail.assert_called_once()
+        called_step_id, called_msg = mock_fail.call_args.args[:2]
+        assert called_step_id == task.step_id
+        assert "dead-lettered" in called_msg
+
+    def test_skips_task_not_in_running_state(self, service, store):
+        """A task already in PENDING/COMPLETED/etc. is left alone."""
+        task = self._make_running_task()
+        task.state = TaskState.COMPLETED
+        store.save_task(task)
+
+        service._release_timed_out_task(task.uuid)
+
+        reloaded = store.get_task(task.uuid)
+        assert reloaded.state == TaskState.COMPLETED  # untouched
+
+    def test_missing_task_is_silent_noop(self, service):
+        """A non-existent task id doesn't raise."""
+        # No save — task doesn't exist. Must not raise.
+        service._release_timed_out_task("does-not-exist")
+
+    def test_persistence_failure_is_swallowed(self, service, store):
+        """The outer try/except must absorb persistence failures.
+
+        This is the explicit pin for the silent-swallow contract — if
+        the method ever starts raising, the runner thread crashes.
+        """
+        with patch.object(
+            store, "get_task", side_effect=RuntimeError("simulated DB outage")
+        ):
+            # Must not raise — the outer try/except has to catch this.
+            service._release_timed_out_task("any-id")
+
+    def test_emits_step_log_for_dead_letter(self, service, store):
+        """Dead-letter path writes a step log so the dashboard surfaces it."""
+        task = self._make_running_task(retry_count=2, max_retries=3)
+        store.save_task(task)
+
+        with patch.object(service, "_emit_step_log") as mock_emit:
+            service._release_timed_out_task(task.uuid)
+
+        mock_emit.assert_called_once()
+        kwargs = mock_emit.call_args.kwargs
+        assert kwargs["step_id"] == task.step_id
+        assert "dead-lettered" in kwargs["message"]
+
+
+class TestReconcileWithDb:
+    """Regression tests for ``RunnerService._reconcile_with_db``.
+
+    Like ``_release_timed_out_task`` and the sweep, this is wrapped in
+    ``try/except Exception: logger.debug("Reconciliation: could not query DB", ...)``
+    that absorbs any failure silently. Runs every 10 poll cycles to
+    detect futures that have lost their backing task in the DB (or
+    vice versa). No prior tests.
+    """
+
+    def test_query_failure_is_swallowed(self, service, store):
+        """A DB error returns early without raising."""
+        with patch.object(
+            store, "get_tasks_by_server_id", side_effect=RuntimeError("boom")
+        ):
+            service._reconcile_with_db()  # must not raise
+
+    def test_releases_orphaned_in_memory_futures(self, service, store):
+        """Futures for tasks the DB no longer shows as running are dropped."""
+        future = Future()
+        future.set_result(None)
+        orphan_task_id = "orphan-task-uuid"
+        # In-memory tracking says we're running this task...
+        service._active_futures.append((future, orphan_task_id, _current_time_ms()))
+        # ...but the DB says no task for this server is running.
+        with patch.object(store, "get_tasks_by_server_id", return_value=[]):
+            service._reconcile_with_db()
+
+        # The in-memory entry should have been dropped.
+        assert all(entry[1] != orphan_task_id for entry in service._active_futures)
+
+    def test_resets_db_tasks_missing_from_memory(self, service, store):
+        """Tasks the DB shows as running for us but we don't track go through reset."""
+        ghost_task = TaskDefinition(
+            uuid="ghost-task-uuid",
+            name="Ghost",
+            runner_id="runner-1",
+            workflow_id="wf-1",
+            flow_id="",
+            step_id="step-1",
+            state=TaskState.RUNNING,
+            server_id=service._server_id,
+        )
+        with (
+            patch.object(store, "get_tasks_by_server_id", return_value=[ghost_task]),
+            patch.object(service, "_release_timed_out_task") as mock_release,
+        ):
+            # No in-memory tracking for this task → reconciler resets it.
+            service._reconcile_with_db()
+
+        mock_release.assert_called_once_with("ghost-task-uuid")
+
+    def test_noop_when_memory_and_db_in_sync(self, service, store):
+        """When everything matches, nothing is released or reset."""
+        future = Future()
+        future.set_result(None)
+        task = TaskDefinition(
+            uuid="task-uuid",
+            name="X",
+            runner_id="r",
+            workflow_id="wf",
+            flow_id="",
+            step_id="s",
+            state=TaskState.RUNNING,
+            server_id=service._server_id,
+        )
+        service._active_futures.append((future, task.uuid, _current_time_ms()))
+        with (
+            patch.object(store, "get_tasks_by_server_id", return_value=[task]),
+            patch.object(service, "_release_timed_out_task") as mock_release,
+        ):
+            service._reconcile_with_db()
+
+        # No release calls; in-memory entry preserved.
+        mock_release.assert_not_called()
+        assert any(entry[1] == task.uuid for entry in service._active_futures)
+
+
+class TestStuckWatchdogStepLogs:
+    """Regression tests for the stuck-task watchdog branch of
+    ``_maybe_reap_orphaned_tasks`` (lines 1701-1716).
+
+    Wrapped in ``try/except Exception: logger.debug("Stuck task watchdog failed", ...)``
+    — same silent-swallow shape. Only fires when ``reap_stuck_tasks``
+    returns non-empty, which no existing test forces.
+    """
+
+    def test_emits_step_log_for_each_stuck_task(self, store, evaluator, registry):
+        """Every reaped task gets a WARNING step log via _emit_step_log."""
+        config = RunnerConfig(poll_interval_ms=100, heartbeat_interval_ms=60_000)
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 0  # force the watchdog to run immediately
+
+        fake_reaped = [
+            {
+                "step_id": "step-a",
+                "workflow_id": "wf-1",
+                "name": "FacetA",
+                "server_id": "srv-1",
+                "task_started_ms": "1",
+                "last_ping_ms": "1",
+                "reason": "timeout",
+                "timeout_ms": "30000",
+            },
+            {
+                "step_id": "step-b",
+                "workflow_id": "wf-1",
+                "name": "FacetB",
+                "server_id": "srv-1",
+                "task_started_ms": "1",
+                "last_ping_ms": "1",
+                "reason": "timeout",
+                "timeout_ms": "30000",
+            },
+        ]
+        with (
+            patch.object(store, "reap_orphaned_tasks", return_value=[]),
+            patch.object(store, "reap_stuck_tasks", return_value=fake_reaped),
+            patch.object(svc, "_emit_step_log") as mock_emit,
+        ):
+            svc._maybe_reap_orphaned_tasks()
+
+        # One step log per reaped stuck task.
+        emitted_step_ids = [c.kwargs["step_id"] for c in mock_emit.call_args_list]
+        assert emitted_step_ids == ["step-a", "step-b"]
+        # All at WARNING level (the stuck-task watchdog severity).
+        for call in mock_emit.call_args_list:
+            assert call.kwargs["level"] == "warning"
+
+    def test_watchdog_failure_is_swallowed(self, store, evaluator, registry):
+        """An exception from reap_stuck_tasks doesn't crash the reaper loop."""
+        config = RunnerConfig(poll_interval_ms=100, heartbeat_interval_ms=60_000)
+        svc = RunnerService(store, evaluator, config, registry)
+        svc._reap_interval_ms = 0
+
+        with (
+            patch.object(store, "reap_orphaned_tasks", return_value=[]),
+            patch.object(
+                store, "reap_stuck_tasks", side_effect=RuntimeError("watchdog boom")
+            ),
+        ):
+            # Must not raise — outer try/except absorbs.
+            svc._maybe_reap_orphaned_tasks()
+
+
+class TestSweepNameResolution:
+    """Regression tests for the workflow-name-resolution branch of
+    ``_maybe_sweep_stuck_steps`` (lines 1553-1572).
+
+    Only executes when ``get_pending_resume_workflow_ids`` returns
+    non-empty. ``TestSweepStuckSteps`` exercises ``_sweep_workflow_steps``
+    directly, bypassing the outer fan-out. This class covers the
+    fan-out wrapper.
+    """
+
+    def test_fan_out_iterates_each_workflow(self, service, store, evaluator, registry):
+        """Each pending workflow id gets a ``_sweep_workflow_steps`` call."""
+        service._sweep_interval_ms = 0  # bypass throttle
+        with (
+            patch.object(
+                store,
+                "get_pending_resume_workflow_ids",
+                return_value=["wf-1", "wf-2"],
+            ),
+            patch.object(service, "_sweep_workflow_steps") as mock_sweep,
+        ):
+            service._maybe_sweep_stuck_steps()
+
+        called_ids = [c.args[0] for c in mock_sweep.call_args_list]
+        assert called_ids == ["wf-1", "wf-2"]
+
+    def test_per_workflow_failure_does_not_stop_iteration(self, service, store):
+        """If sweep raises for one workflow, the others still run."""
+        service._sweep_interval_ms = 0
+
+        def maybe_fail(wf_id):
+            if wf_id == "wf-bad":
+                raise RuntimeError("simulated sweep failure")
+
+        with (
+            patch.object(
+                store,
+                "get_pending_resume_workflow_ids",
+                return_value=["wf-good-1", "wf-bad", "wf-good-2"],
+            ),
+            patch.object(
+                service, "_sweep_workflow_steps", side_effect=maybe_fail
+            ) as mock_sweep,
+        ):
+            service._maybe_sweep_stuck_steps()  # must not raise
+
+        # All three were attempted — the bad one didn't short-circuit.
+        called = [c.args[0] for c in mock_sweep.call_args_list]
+        assert called == ["wf-good-1", "wf-bad", "wf-good-2"]
+
+    def test_outer_failure_is_swallowed(self, service, store):
+        """A failure from get_pending_resume_workflow_ids must not raise."""
+        service._sweep_interval_ms = 0
+        with patch.object(
+            store,
+            "get_pending_resume_workflow_ids",
+            side_effect=RuntimeError("boom"),
+        ):
+            # Must not raise — outer try/except absorbs.
+            service._maybe_sweep_stuck_steps()
