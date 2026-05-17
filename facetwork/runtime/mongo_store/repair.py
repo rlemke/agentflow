@@ -14,8 +14,11 @@
 
 """Workflow repair mixin for MongoStore."""
 
+from collections.abc import Callable
+
+from ..step import StepDefinition
 from ._internals import _MixinBase
-from .base import _current_time_ms
+from .base import _current_time_ms, _reset_task_to_pending
 
 
 def _generate_id() -> str:
@@ -54,6 +57,52 @@ class RepairMixin(_MixinBase):
         except Exception:
             pass  # best-effort — don't let log failures break repair
 
+    def _set_step_state(self, step: StepDefinition, target_state: str) -> None:
+        """Set a step's state, clear any prior transition error, and save.
+
+        Centralizes the "reset an errored step so the runtime will re-execute
+        it" pattern used by every repair branch.
+        """
+        step.state = target_state
+        if hasattr(step, "transition") and step.transition:
+            step.transition.current_state = target_state
+            step.transition.clear_error()
+            step.transition.request_transition = False
+            step.transition.changed = True
+        # ``error`` may live on the step itself for some paths
+        if hasattr(step, "error"):
+            step.error = None
+        self.save_step(step)
+
+    def _walk_errored_ancestors(
+        self,
+        start_id: str | None,
+        advance: Callable[[StepDefinition], str | None],
+        target_state: str,
+        seen: set[str],
+        step_by_id: dict[str, StepDefinition],
+        ancestors_reset: list[str],
+    ) -> None:
+        """Walk an ancestor chain, resetting each errored step to ``target_state``.
+
+        ``advance`` returns the next ID to visit from a given step — callers
+        pass ``lambda a: a.block_id`` for block chains, or a wider fallback
+        for container chains. The ``seen`` set is shared across multiple
+        walks rooted at the same starting step to avoid revisiting nodes.
+        """
+        current_id = start_id
+        while current_id and current_id not in seen:
+            seen.add(current_id)
+            from ..states import StepState
+
+            ancestor = step_by_id.get(current_id) or self.get_step(current_id)
+            if ancestor is None:
+                break
+            if ancestor.state == StepState.STATEMENT_ERROR:
+                self._set_step_state(ancestor, target_state)
+                ancestors_reset.append(ancestor.id)
+            current_id = advance(ancestor)
+
     def repair_workflow(self, runner_id: str, dry_run: bool = False) -> dict:
         """Diagnose and repair a stuck workflow.
 
@@ -69,7 +118,6 @@ class RepairMixin(_MixinBase):
         """
         from ..entities import RunnerState, TaskState
         from ..states import StepState
-        from ..step import StepDefinition
 
         now = _current_time_ms()
         runner = self.get_runner(runner_id)
@@ -138,14 +186,7 @@ class RepairMixin(_MixinBase):
                 if not dry_run:
                     self._db.tasks.update_one(
                         {"uuid": t.uuid},
-                        {
-                            "$set": {
-                                "state": "pending",
-                                "server_id": "",
-                                "task_heartbeat": 0,
-                                "updated": now,
-                            }
-                        },
+                        {"$set": _reset_task_to_pending(now)},
                     )
                     reason = (
                         "no server claimed it"
@@ -190,13 +231,7 @@ class RepairMixin(_MixinBase):
                 }
             )
             if not dry_run:
-                step.state = StepState.EVENT_TRANSMIT
-                if hasattr(step, "transition") and step.transition:
-                    step.transition.current_state = StepState.EVENT_TRANSMIT
-                    step.transition.clear_error()
-                    step.transition.request_transition = False
-                    step.transition.changed = True
-                self.save_step(step)
+                self._set_step_state(step, StepState.EVENT_TRANSMIT)
 
                 self._repair_log(
                     step_id=step.id,
@@ -215,53 +250,27 @@ class RepairMixin(_MixinBase):
                 if task_doc:
                     self._db.tasks.update_one(
                         {"uuid": task_doc["uuid"]},
-                        {
-                            "$set": {
-                                "state": "pending",
-                                "server_id": "",
-                                "error": None,
-                                "task_heartbeat": 0,
-                                "updated": now,
-                            }
-                        },
+                        {"$set": _reset_task_to_pending(now, clear_error=True)},
                     )
 
                 # -- 4. Reset errored ancestors --
                 seen: set[str] = set()
-                current_id = step.block_id
-                while current_id and current_id not in seen:
-                    seen.add(current_id)
-                    ancestor = step_by_id.get(current_id) or self.get_step(current_id)
-                    if ancestor is None:
-                        break
-                    if ancestor.state == StepState.STATEMENT_ERROR:
-                        ancestor.state = StepState.BLOCK_EXECUTION_CONTINUE
-                        if hasattr(ancestor, "transition") and ancestor.transition:
-                            ancestor.transition.current_state = StepState.BLOCK_EXECUTION_CONTINUE
-                            ancestor.transition.clear_error()
-                            ancestor.transition.request_transition = False
-                            ancestor.transition.changed = True
-                        self.save_step(ancestor)
-                        result["ancestors_reset"].append(ancestor.id)
-                    current_id = ancestor.block_id
-
-                current_id = step.container_id
-                while current_id and current_id not in seen:
-                    seen.add(current_id)
-                    ancestor = step_by_id.get(current_id) or self.get_step(current_id)
-                    if ancestor is None:
-                        break
-                    if ancestor.state == StepState.STATEMENT_ERROR:
-                        ancestor.state = StepState.STATEMENT_BLOCKS_CONTINUE
-                        if hasattr(ancestor, "transition") and ancestor.transition:
-                            ancestor.transition.current_state = StepState.STATEMENT_BLOCKS_CONTINUE
-                            ancestor.transition.clear_error()
-                            ancestor.transition.request_transition = False
-                            ancestor.transition.changed = True
-                        self.save_step(ancestor)
-                        result["ancestors_reset"].append(ancestor.id)
-                    next_id = ancestor.block_id or ancestor.container_id
-                    current_id = next_id
+                self._walk_errored_ancestors(
+                    step.block_id,
+                    lambda a: a.block_id,
+                    StepState.BLOCK_EXECUTION_CONTINUE,
+                    seen,
+                    step_by_id,
+                    result["ancestors_reset"],
+                )
+                self._walk_errored_ancestors(
+                    step.container_id,
+                    lambda a: a.block_id or a.container_id,
+                    StepState.STATEMENT_BLOCKS_CONTINUE,
+                    seen,
+                    step_by_id,
+                    result["ancestors_reset"],
+                )
 
         # -- 5. Re-enqueue dead-lettered tasks --
         result["dead_letter_tasks_reset"] = []
@@ -283,16 +292,7 @@ class RepairMixin(_MixinBase):
                 )
                 self._db.tasks.update_one(
                     {"uuid": t.uuid},
-                    {
-                        "$set": {
-                            "state": "pending",
-                            "server_id": "",
-                            "error": None,
-                            "retry_count": 0,
-                            "task_heartbeat": 0,
-                            "updated": now,
-                        }
-                    },
+                    {"$set": _reset_task_to_pending(now, clear_error=True, reset_retries=True)},
                 )
                 self._repair_log(
                     step_id=t.step_id,
@@ -303,37 +303,18 @@ class RepairMixin(_MixinBase):
                     ),
                     facet_name=t.name,
                 )
-                # Reset the associated errored step
+                # Reset the associated errored step + its block ancestors
                 dl_step = step_by_id.get(t.step_id) or self.get_step(t.step_id)
                 if dl_step and dl_step.state == StepState.STATEMENT_ERROR:
-                    dl_step.state = StepState.EVENT_TRANSMIT
-                    if hasattr(dl_step, "transition") and dl_step.transition:
-                        dl_step.transition.current_state = StepState.EVENT_TRANSMIT
-                        dl_step.transition.clear_error()
-                        dl_step.transition.request_transition = False
-                        dl_step.transition.changed = True
-                    self.save_step(dl_step)
-
-                    # Reset errored ancestors
-                    seen_dl: set[str] = set()
-                    current_id = dl_step.block_id
-                    while current_id and current_id not in seen_dl:
-                        seen_dl.add(current_id)
-                        ancestor = step_by_id.get(current_id) or self.get_step(current_id)
-                        if ancestor is None:
-                            break
-                        if ancestor.state == StepState.STATEMENT_ERROR:
-                            ancestor.state = StepState.BLOCK_EXECUTION_CONTINUE
-                            if hasattr(ancestor, "transition") and ancestor.transition:
-                                ancestor.transition.current_state = (
-                                    StepState.BLOCK_EXECUTION_CONTINUE
-                                )
-                                ancestor.transition.clear_error()
-                                ancestor.transition.request_transition = False
-                                ancestor.transition.changed = True
-                            self.save_step(ancestor)
-                            result["ancestors_reset"].append(ancestor.id)
-                        current_id = ancestor.block_id
+                    self._set_step_state(dl_step, StepState.EVENT_TRANSMIT)
+                    self._walk_errored_ancestors(
+                        dl_step.block_id,
+                        lambda a: a.block_id,
+                        StepState.BLOCK_EXECUTION_CONTINUE,
+                        set(),
+                        step_by_id,
+                        result["ancestors_reset"],
+                    )
 
         # -- 6. Detect steps marked Complete but with failed tasks --
         # Build task lookup by step_id
@@ -358,14 +339,7 @@ class RepairMixin(_MixinBase):
                     }
                 )
                 if not dry_run:
-                    step.state = StepState.EVENT_TRANSMIT
-                    step.error = None
-                    if hasattr(step, "transition") and step.transition:
-                        step.transition.current_state = StepState.EVENT_TRANSMIT
-                        step.transition.clear_error()
-                        step.transition.request_transition = False
-                        step.transition.changed = True
-                    self.save_step(step)
+                    self._set_step_state(step, StepState.EVENT_TRANSMIT)
                     self._repair_log(
                         step_id=step.id,
                         workflow_id=workflow_id,
@@ -380,15 +354,7 @@ class RepairMixin(_MixinBase):
                         if t.state == TaskState.FAILED:
                             self._db.tasks.update_one(
                                 {"uuid": t.uuid},
-                                {
-                                    "$set": {
-                                        "state": "pending",
-                                        "server_id": "",
-                                        "error": None,
-                                        "task_heartbeat": 0,
-                                        "updated": now,
-                                    }
-                                },
+                                {"$set": _reset_task_to_pending(now, clear_error=True)},
                             )
 
         return result

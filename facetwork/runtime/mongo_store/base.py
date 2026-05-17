@@ -15,6 +15,7 @@
 """MongoDB store base: connection management and index creation."""
 
 import logging
+import os
 import time
 from typing import TYPE_CHECKING, Any, Self
 
@@ -50,6 +51,49 @@ def _compute_next_retry_after(retry_count: int, now_ms: int) -> int:
     return now_ms + delay
 
 
+def _stale_heartbeat_or(cutoff_ms: int) -> dict:
+    """Mongo filter clause matching tasks with no recent heartbeat.
+
+    A task's heartbeat is considered stale if ``task_heartbeat`` is absent,
+    zero, or older than ``cutoff_ms``. Used by both reapers to avoid
+    resetting tasks that are actively making progress.
+    """
+    return {
+        "$or": [
+            {"task_heartbeat": {"$exists": False}},
+            {"task_heartbeat": 0},
+            {"task_heartbeat": {"$lt": cutoff_ms}},
+        ]
+    }
+
+
+def _reset_task_to_pending(
+    now_ms: int,
+    *,
+    clear_error: bool = False,
+    reset_retries: bool = False,
+) -> dict:
+    """Standard ``$set`` payload for resetting a task to ``pending``.
+
+    Used by the orphan/stuck reapers and by the workflow-repair flow when
+    a task needs to go back into the claim queue. The two flags cover the
+    variations: ``clear_error`` blanks the prior error string, and
+    ``reset_retries`` zeros ``retry_count`` (used only by the dead-letter
+    re-enqueue path, which deliberately gives the task a fresh budget).
+    """
+    payload: dict[str, Any] = {
+        "state": "pending",
+        "server_id": "",
+        "task_heartbeat": 0,
+        "updated": now_ms,
+    }
+    if clear_error:
+        payload["error"] = None
+    if reset_retries:
+        payload["retry_count"] = 0
+    return payload
+
+
 class BaseMixin:
     """Connection management, index creation, and from_config classmethod.
 
@@ -59,6 +103,10 @@ class BaseMixin:
 
     # Default lease duration: 5 minutes. Handlers must renew via heartbeat.
     DEFAULT_LEASE_MS = 300_000
+
+    def _lease_ms(self) -> int:
+        """Read the active lease duration, honoring ``AFL_LEASE_DURATION_MS``."""
+        return int(os.environ.get("AFL_LEASE_DURATION_MS", str(self.DEFAULT_LEASE_MS)))
 
     def __init__(
         self,

@@ -15,7 +15,6 @@
 """Task CRUD operations mixin for MongoStore."""
 
 import logging
-import os
 from collections.abc import Sequence
 from typing import Any
 
@@ -33,7 +32,7 @@ except ImportError:
 
 from ..entities import TaskDefinition
 from ._internals import _MixinBase
-from .base import _current_time_ms
+from .base import _current_time_ms, _reset_task_to_pending, _stale_heartbeat_or
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ class TaskMixin(_MixinBase):
         relying solely on the orphan reaper.
         """
         now = _current_time_ms()
-        lease_ms = int(os.environ.get("AFL_LEASE_DURATION_MS", str(self.DEFAULT_LEASE_MS)))
+        lease_ms = self._lease_ms()
         update: dict[str, Any] = {
             "state": "running",
             "updated": now,
@@ -292,13 +291,7 @@ class TaskMixin(_MixinBase):
         # task_heartbeat are still making progress even if the server
         # heartbeat is stale.
         heartbeat_cutoff = now - down_timeout_ms
-        stale_heartbeat_filter = {
-            "$or": [
-                {"task_heartbeat": {"$exists": False}},
-                {"task_heartbeat": 0},
-                {"task_heartbeat": {"$lt": heartbeat_cutoff}},
-            ],
-        }
+        stale_heartbeat_filter = _stale_heartbeat_or(heartbeat_cutoff)
         orphan_cursor = self._db.tasks.find(
             {
                 "state": "running",
@@ -349,24 +342,11 @@ class TaskMixin(_MixinBase):
         self._db.tasks.update_many(
             orphan_filter,
             {
-                "$set": {
-                    "state": "pending",
-                    "server_id": "",
-                    "task_heartbeat": 0,
-                    "updated": now,
-                },
+                "$set": _reset_task_to_pending(now),
                 "$inc": {"retry_count": 1},
             },
         )
-        # Dead-letter tasks that exceeded max_retries
-        self._db.tasks.update_many(
-            {
-                "state": "pending",
-                "max_retries": {"$gt": 0},
-                "$expr": {"$gte": ["$retry_count", "$max_retries"]},
-            },
-            {"$set": {"state": "dead_letter", "updated": now}},
-        )
+        self._dead_letter_overdue(now)
 
         # Clear server_id on pending tasks pinned to dead servers
         self._db.tasks.update_many(
@@ -453,13 +433,7 @@ class TaskMixin(_MixinBase):
                 "$or": [{"timeout_ms": 0}, {"timeout_ms": {"$exists": False}}],
                 "updated": {"$lt": cutoff},
                 "$and": [
-                    {
-                        "$or": [
-                            {"task_heartbeat": {"$exists": False}},
-                            {"task_heartbeat": 0},
-                            {"task_heartbeat": {"$lt": cutoff}},
-                        ]
-                    },
+                    _stale_heartbeat_or(cutoff),
                     {
                         "$or": [
                             {"stage_budget_expires": {"$exists": False}},
@@ -499,26 +473,30 @@ class TaskMixin(_MixinBase):
         self._db.tasks.update_many(
             {"uuid": {"$in": stuck_uuids}, "state": "running"},
             {
-                "$set": {
-                    "state": "pending",
-                    "server_id": "",
-                    "task_heartbeat": 0,
-                    "updated": now,
-                },
+                "$set": _reset_task_to_pending(now),
                 "$inc": {"retry_count": 1},
             },
         )
-        # Dead-letter tasks that exceeded max_retries
-        self._db.tasks.update_many(
-            {
-                "uuid": {"$in": stuck_uuids},
-                "state": "pending",
-                "max_retries": {"$gt": 0},
-                "$expr": {"$gte": ["$retry_count", "$max_retries"]},
-            },
-            {"$set": {"state": "dead_letter", "updated": now}},
-        )
+        self._dead_letter_overdue(now, uuids=stuck_uuids)
         return reaped
+
+    def _dead_letter_overdue(self, now_ms: int, uuids: list[str] | None = None) -> None:
+        """Move pending tasks whose ``retry_count`` reached ``max_retries`` to
+        ``dead_letter``. Optionally narrowed to a specific set of UUIDs (used
+        by ``reap_stuck_tasks`` so it doesn't sweep tasks reset by other
+        passes in the same tick).
+        """
+        query: dict[str, Any] = {
+            "state": "pending",
+            "max_retries": {"$gt": 0},
+            "$expr": {"$gte": ["$retry_count", "$max_retries"]},
+        }
+        if uuids is not None:
+            query["uuid"] = {"$in": uuids}
+        self._db.tasks.update_many(
+            query,
+            {"$set": {"state": "dead_letter", "updated": now_ms}},
+        )
 
     # =========================================================================
     # Serialization Helpers — Tasks

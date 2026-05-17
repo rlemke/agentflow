@@ -14,7 +14,6 @@
 
 """Server CRUD operations mixin for MongoStore."""
 
-import os
 from collections.abc import Sequence
 from dataclasses import asdict
 from typing import Any
@@ -120,7 +119,7 @@ class ServerMixin(_MixinBase):
         so the stuck-task watchdog can distinguish truly stuck handlers from
         those making slow but real progress.
         """
-        lease_ms = int(os.environ.get("AFL_LEASE_DURATION_MS", str(self.DEFAULT_LEASE_MS)))
+        lease_ms = self._lease_ms()
         update: dict[str, Any] = {
             "task_heartbeat": heartbeat_time,
             "lease_expires": heartbeat_time + lease_ms,
@@ -148,7 +147,7 @@ class ServerMixin(_MixinBase):
         and the stage deadline (``now > stage_budget_expires``) have passed.
         Also renews the lease so the task isn't reclaimed while the stage runs.
         """
-        lease_ms = int(os.environ.get("AFL_LEASE_DURATION_MS", str(self.DEFAULT_LEASE_MS)))
+        lease_ms = self._lease_ms()
         now = _current_time_ms()
         update: dict[str, Any] = {
             "stage_budget_expires": budget_expires,
