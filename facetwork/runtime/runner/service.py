@@ -579,15 +579,11 @@ class RunnerService:
             task = self._persistence.get_task(task_id)
             if not task or task.state != TaskState.RUNNING:
                 return
-            task.retry_count += 1
-            task.updated = _current_time_ms()
-            if task.max_retries > 0 and task.retry_count >= task.max_retries:
-                task.state = TaskState.DEAD_LETTER
+            if self._transition_for_retry(task):
                 dead_letter_msg = (
                     f"Timed out {task.retry_count} times (limit {task.max_retries}), dead-lettered"
                 )
                 task.error = {"message": dead_letter_msg}
-                label = self._task_label(task_id)
                 try:
                     self._evaluator.fail_step(task.step_id, dead_letter_msg)
                 except Exception:
@@ -596,7 +592,7 @@ class RunnerService:
                     "Task %s dead-lettered after %d timeout retries — %s",
                     task_id,
                     task.retry_count,
-                    label,
+                    self._task_label(task_id),
                 )
                 log_msg = (
                     f"Task dead-lettered: {task.name} — timed out {task.retry_count} times "
@@ -605,9 +601,6 @@ class RunnerService:
                 )
                 log_level = StepLogLevel.ERROR
             else:
-                task.state = TaskState.PENDING
-                task.server_id = ""
-                task.error = None
                 elapsed_s = (task.updated - (task.task_heartbeat or task.updated)) / 1000
                 log_msg = (
                     f"Task timed out: {task.name} — execution timeout "
@@ -680,6 +673,49 @@ class RunnerService:
                         label,
                         exc_info=True,
                     )
+
+    def _transition_for_retry(
+        self,
+        task: Any,
+        *,
+        dead_letter_state: str = TaskState.DEAD_LETTER,
+        set_next_retry_after: bool = False,
+        clear_error_on_retry: bool = True,
+    ) -> bool:
+        """Apply the retry-or-dead-letter state transition to ``task``.
+
+        - Increments ``retry_count`` and stamps ``updated``.
+        - If ``max_retries`` has been reached: sets ``state`` to
+          ``dead_letter_state`` (defaults to ``DEAD_LETTER``; the "no
+          handler anywhere" site passes ``FAILED`` for finality).
+        - Otherwise: ``state = PENDING``, clears ``server_id``, optionally
+          clears ``error`` (the generic-exception site keeps the prior
+          error message for the retry attempt), optionally computes
+          ``next_retry_after`` via exponential backoff (the timeout and
+          ImportError sites don't — they're already paced by their outer
+          watchdog cadence).
+
+        Returns ``True`` if the task was dead-lettered. The caller is
+        responsible for ``task.error`` payload, calling ``fail_step``,
+        logging, and ``_safe_save_task`` — those differ enough at every
+        site that lifting them in here would make the code harder to
+        read, not easier.
+        """
+        task.retry_count += 1
+        task.updated = _current_time_ms()
+        is_dead_letter = task.max_retries > 0 and task.retry_count >= task.max_retries
+        if is_dead_letter:
+            task.state = dead_letter_state
+            return True
+        task.state = TaskState.PENDING
+        task.server_id = ""
+        if clear_error_on_retry:
+            task.error = None
+        if set_next_retry_after:
+            from facetwork.runtime.mongo_store import _compute_next_retry_after
+
+            task.next_retry_after = _compute_next_retry_after(task.retry_count, task.updated)
+        return False
 
     def _emit_step_log(
         self,
@@ -1027,19 +1063,22 @@ class RunnerService:
                 # so release it back to pending (with backoff) for retry; only
                 # fail it for good once retries are exhausted — i.e. no runner
                 # in the fleet can handle it.
-                task.retry_count += 1
                 self._update_handled_stats(task.name, handled=False)
-                if task.max_retries > 0 and task.retry_count >= task.max_retries:
+                is_terminal = self._transition_for_retry(
+                    task,
+                    dead_letter_state=TaskState.FAILED,
+                    set_next_retry_after=True,
+                )
+                if is_terminal:
                     error_msg = (
                         f"No handler for event task '{task.name}' "
                         f"(no runner could service it after {task.retry_count} attempts)"
                     )
+                    task.error = {"message": error_msg}
                     try:
                         self._evaluator.fail_step(task.step_id, error_msg)
                     except Exception:
                         logger.debug("Could not fail step %s", task.step_id, exc_info=True)
-                    task.state = TaskState.FAILED
-                    task.error = {"message": error_msg}
                     logger.warning(
                         "No handler for event task '%s' anywhere — failing after %d attempts "
                         "(step=%s) — %s",
@@ -1049,14 +1088,6 @@ class RunnerService:
                         self._task_label(task.uuid),
                     )
                 else:
-                    from facetwork.runtime.mongo_store import _compute_next_retry_after
-
-                    task.state = TaskState.PENDING
-                    task.server_id = ""
-                    task.error = None
-                    task.next_retry_after = _compute_next_retry_after(
-                        task.retry_count, _current_time_ms()
-                    )
                     logger.info(
                         "No handler for event task '%s' on this runner — releasing back to "
                         "pending (attempt %d/%d) — %s",
@@ -1065,7 +1096,6 @@ class RunnerService:
                         task.max_retries,
                         self._task_label(task.uuid),
                     )
-                task.updated = _current_time_ms()
                 self._safe_save_task(task)
                 return
 
@@ -1122,9 +1152,7 @@ class RunnerService:
             # Handler module can't be loaded on this runner.  Increment
             # retry_count so the task eventually dead-letters instead of
             # looping forever when no runner has the right handler.
-            task.retry_count += 1
-            if task.max_retries > 0 and task.retry_count >= task.max_retries:
-                task.state = TaskState.DEAD_LETTER
+            if self._transition_for_retry(task):
                 task.error = {
                     "message": f"Handler not loadable after {task.retry_count} attempts: {exc}"
                 }
@@ -1138,9 +1166,6 @@ class RunnerService:
                     self._task_label(task.uuid),
                 )
             else:
-                task.state = TaskState.PENDING
-                task.error = None
-                task.server_id = ""
                 log_msg = (
                     f"Cannot load handler (attempt {task.retry_count}/{task.max_retries}): {exc}"
                 )
@@ -1155,7 +1180,6 @@ class RunnerService:
                     exc,
                     self._task_label(task.uuid),
                 )
-            task.updated = _current_time_ms()
             self._safe_save_task(task)
             # Write step log so the error is visible in the dashboard
             if task.step_id:
@@ -1168,14 +1192,14 @@ class RunnerService:
                 )
 
         except Exception as exc:
-            now = _current_time_ms()
-            task.retry_count += 1
+            # Preserve the original error message across retry attempts —
+            # the helper is told not to clear it on the retry branch.
             task.error = {"message": str(exc)}
-            task.updated = now
-
-            if task.max_retries > 0 and task.retry_count >= task.max_retries:
-                # Dead-letter: max retries exceeded
-                task.state = TaskState.DEAD_LETTER
+            if self._transition_for_retry(
+                task,
+                set_next_retry_after=True,
+                clear_error_on_retry=False,
+            ):
                 try:
                     self._evaluator.fail_step(task.step_id, str(exc))
                 except Exception:
@@ -1188,13 +1212,7 @@ class RunnerService:
                     exc,
                 )
             else:
-                # Retry with exponential backoff
-                from facetwork.runtime.mongo_store import _compute_next_retry_after
-
-                task.state = TaskState.PENDING
-                task.server_id = ""
-                task.next_retry_after = _compute_next_retry_after(task.retry_count, now)
-                delay_s = (task.next_retry_after - now) / 1000
+                delay_s = (task.next_retry_after - task.updated) / 1000
                 logger.warning(
                     "Task %s failed (retry %d/%d, next in %.0fs) — %s: %s",
                     task.uuid,
