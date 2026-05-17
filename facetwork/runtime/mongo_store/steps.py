@@ -83,6 +83,26 @@ class StepMixin(_MixinBase):
         )
         return [self._doc_to_step(doc) for doc in docs]
 
+    def get_stuck_steps_for_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
+        """Fetch steps needing an external nudge — server-side filtered."""
+        from ..states import StepState
+
+        docs = self._db.steps.find(
+            {
+                "workflow_id": workflow_id,
+                "state": {
+                    "$in": [
+                        StepState.EVENT_TRANSMIT,
+                        StepState.STATEMENT_BLOCKS_BEGIN,
+                        StepState.STATEMENT_BLOCKS_CONTINUE,
+                        StepState.BLOCK_EXECUTION_BEGIN,
+                        StepState.BLOCK_EXECUTION_CONTINUE,
+                    ]
+                },
+            }
+        )
+        return [self._doc_to_step(doc) for doc in docs]
+
     def get_pending_resume_workflow_ids(self) -> list[str]:
         """Get workflow IDs with steps that need resume processing.
 

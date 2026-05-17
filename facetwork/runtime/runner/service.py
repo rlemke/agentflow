@@ -43,6 +43,7 @@ from ..entities import (
     StepLogEntry,
     StepLogLevel,
     StepLogSource,
+    TaskDefinition,
     TaskState,
 )
 from ..evaluator import Evaluator, ExecutionStatus
@@ -59,6 +60,28 @@ RESUME_TASK_NAME = "fw:resume"
 def _current_time_ms() -> int:
     """Get current time in milliseconds."""
     return int(time.time() * 1000)
+
+
+def _step_attributes_as_dict(step: StepDefinition) -> dict:
+    """Serialize ``step.attributes`` to the same dict shape MongoStore stores.
+
+    Used by ``_sweep_workflow_steps`` when constructing a task for an
+    EventTransmit step that never got one. Keeps the payload identical
+    to what the prior raw-Mongo sweep produced, so behavior is
+    unchanged across the layering refactor.
+    """
+    if not step.attributes:
+        return {}
+    return {
+        "params": {
+            k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
+            for k, v in step.attributes.params.items()
+        },
+        "returns": {
+            k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
+            for k, v in step.attributes.returns.items()
+        },
+    }
 
 
 def _reaper_message(task_info: dict[str, str], reclaimer_name: str = "") -> str:
@@ -1559,45 +1582,22 @@ class RunnerService:
         """Resume individual stuck steps in a workflow using resume_step().
 
         Processes leaf steps (EventTransmit) first, then block steps,
-        so parent blocks see completed children.
+        so parent blocks see completed children. Routes through the
+        ``PersistenceAPI`` so any backend that implements
+        ``get_stuck_steps_for_workflow`` is supported, not just MongoStore.
         """
-        from .states import StepState
-
-        # Raw-Mongo sweep — only supported on the MongoStore persistence backend.
-        db = getattr(self._persistence, "_db", None)
-        if db is None:
-            return
-
-        # Get all non-terminal steps for this workflow
-        stuck_steps = list(
-            db.steps.find(
-                {
-                    "workflow_id": workflow_id,
-                    "state": {
-                        "$in": [
-                            StepState.EVENT_TRANSMIT,
-                            StepState.STATEMENT_BLOCKS_BEGIN,
-                            StepState.STATEMENT_BLOCKS_CONTINUE,
-                            StepState.BLOCK_EXECUTION_BEGIN,
-                            StepState.BLOCK_EXECUTION_CONTINUE,
-                        ]
-                    },
-                }
-            )
-        )
-
+        stuck_steps = list(self._persistence.get_stuck_steps_for_workflow(workflow_id))
         if not stuck_steps:
             return
 
         # Process leaf steps (EventTransmit) first, then blocks
-        leaf_steps = [s for s in stuck_steps if s["state"] == StepState.EVENT_TRANSMIT]
-        block_steps = [s for s in stuck_steps if s["state"] != StepState.EVENT_TRANSMIT]
+        leaf_steps = [s for s in stuck_steps if s.state == StepState.EVENT_TRANSMIT]
+        block_steps = [s for s in stuck_steps if s.state != StepState.EVENT_TRANSMIT]
 
-        # Log each stuck step with its name and state
-        step_details = []
-        for s in stuck_steps:
-            name = s.get("statement_name") or s.get("facet_name") or s.get("object_type", "?")
-            step_details.append(f"{name} ({s['state']})")
+        step_details = [
+            f"{(s.statement_name or s.facet_name or s.object_type or '?')} ({s.state})"
+            for s in stuck_steps
+        ]
         logger.info(
             "Sweep workflow %s: %d leaf + %d block steps stuck: %s",
             workflow_id[:12],
@@ -1608,48 +1608,47 @@ class RunnerService:
 
         # For EventTransmit steps without tasks, create tasks so handlers run.
         # resume_step() can't do this — it only walks the ancestor chain.
-        for step_doc in leaf_steps:
-            step_id = step_doc["uuid"]
-            facet_name = step_doc.get("facet_name")
+        for step in leaf_steps:
+            facet_name = step.facet_name
             if not facet_name:
                 continue  # block-level step, not an event facet
-            existing_task = db.tasks.find_one(
-                {"step_id": step_id, "state": {"$in": ["pending", "running"]}}
+            if self._persistence.has_active_task_for_step(step.id):
+                continue
+
+            runner_id, _ = self._lookup_runner_context(workflow_id)
+            task = TaskDefinition(
+                uuid=generate_id(),
+                name=facet_name,
+                runner_id=runner_id,
+                workflow_id=workflow_id,
+                flow_id="",
+                step_id=step.id,
+                state=TaskState.PENDING,
+                task_list_name=self._config.task_list,
+                # Preserve the prior payload shape — mirrors the
+                # ``attributes`` dict that ``_step_to_doc`` writes so
+                # existing handlers see the same input as before this
+                # refactor. (Whether handlers actually consume the
+                # ``{"params": ..., "returns": ...}`` shape is a separate
+                # question — out of scope here.)
+                data=_step_attributes_as_dict(step),
             )
-            if not existing_task:
-                runner_id, _ = self._lookup_runner_context(workflow_id)
-
-                from ..utils import generate_id
-                from .entities import TaskDefinition, TaskState
-
-                task = TaskDefinition(
-                    uuid=generate_id(),
-                    name=facet_name,
-                    runner_id=runner_id,
-                    workflow_id=workflow_id,
-                    flow_id=step_doc.get("flow_id", ""),
-                    step_id=step_id,
-                    state=TaskState.PENDING,
-                    task_list_name=self._config.task_list,
-                    data=step_doc.get("attributes", {}),
-                )
-                self._persistence.save_task(task)
-                logger.info(
-                    "Sweep created task for stuck step: %s (%s)",
-                    step_id[:12],
-                    facet_name,
-                )
+            self._persistence.save_task(task)
+            logger.info(
+                "Sweep created task for stuck step: %s (%s)",
+                step.id[:12],
+                facet_name,
+            )
 
         # Resume block steps to cascade completion
-        for step_doc in block_steps:
-            step_id = step_doc["uuid"]
+        for step in block_steps:
             try:
-                self._resume_workflow_for_step(workflow_id, step_id)
+                self._resume_workflow_for_step(workflow_id, step.id)
             except Exception:
                 logger.debug(
                     "Sweep resume_step failed: workflow=%s step=%s",
                     workflow_id[:12],
-                    step_id[:12],
+                    step.id[:12],
                     exc_info=True,
                 )
 

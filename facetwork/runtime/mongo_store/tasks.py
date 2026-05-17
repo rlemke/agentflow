@@ -56,6 +56,25 @@ class TaskMixin(_MixinBase):
         )
         return self._doc_to_task(doc) if doc else None
 
+    def get_tasks_by_step(self, step_id: str) -> Sequence[TaskDefinition]:
+        """Get all tasks associated with a step."""
+        docs = self._db.tasks.find({"step_id": step_id})
+        return [self._doc_to_task(doc) for doc in docs]
+
+    def has_active_task_for_step(self, step_id: str) -> bool:
+        """Return True if any task for ``step_id`` is pending or running.
+
+        Uses ``count_documents(limit=1)`` so the check is short-circuited
+        on the first match instead of materializing the whole result set.
+        """
+        return (
+            self._db.tasks.count_documents(
+                {"step_id": step_id, "state": {"$in": ["pending", "running"]}},
+                limit=1,
+            )
+            > 0
+        )
+
     def get_pending_tasks(self, task_list: str) -> Sequence[TaskDefinition]:
         """Get pending tasks for a task list."""
         docs = self._db.tasks.find({"task_list_name": task_list, "state": "pending"})

@@ -311,6 +311,10 @@ class MemoryStore(PersistenceAPI):
             return None
         return max(matching, key=lambda t: t.created)
 
+    def get_tasks_by_step(self, step_id: str) -> list["TaskDefinition"]:
+        """Get all tasks associated with a step."""
+        return [t for t in self._tasks.values() if t.step_id == step_id]
+
     def get_task(self, task_id: str) -> Optional["TaskDefinition"]:
         """Get a task by ID."""
         return self._tasks.get(task_id)

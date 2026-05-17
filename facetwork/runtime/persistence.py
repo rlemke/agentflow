@@ -177,6 +177,27 @@ class PersistenceAPI(Protocol):
             )
         ]
 
+    def get_stuck_steps_for_workflow(self, workflow_id: str) -> Sequence[StepDefinition]:
+        """Fetch steps in a workflow that need an external nudge to progress.
+
+        Returns steps at ``EventTransmit`` (waiting for handler dispatch)
+        or at intermediate block-execution states the evaluator left
+        partway. Used by the runner's stuck-step sweep — distinct from
+        ``get_actionable_steps_by_workflow`` (which is the per-iteration
+        view from inside the evaluator). Subclasses with a database
+        backend should override to push filtering server-side.
+        """
+        from .states import StepState
+
+        stuck_states = {
+            StepState.EVENT_TRANSMIT,
+            StepState.STATEMENT_BLOCKS_BEGIN,
+            StepState.STATEMENT_BLOCKS_CONTINUE,
+            StepState.BLOCK_EXECUTION_BEGIN,
+            StepState.BLOCK_EXECUTION_CONTINUE,
+        }
+        return [s for s in self.get_steps_by_workflow(workflow_id) if s.state in stuck_states]
+
     def get_pending_resume_workflow_ids(self) -> list[str]:
         """Get workflow IDs that have steps needing resume processing.
 
@@ -428,6 +449,25 @@ class PersistenceAPI(Protocol):
             The most recent task for the step, or None if not found
         """
         ...
+
+    def has_active_task_for_step(self, step_id: str) -> bool:
+        """Return True if any task for ``step_id`` is pending or running.
+
+        Used by the stuck-step sweep to decide whether to create a fresh
+        task for a parked ``EventTransmit`` step — only if no existing
+        task is still in flight. Default scans tasks for the step;
+        subclasses with a DB backend should push the filter server-side.
+        """
+        from .entities import TaskState
+
+        for task in self.get_tasks_by_step(step_id):
+            if task.state in (TaskState.PENDING, TaskState.RUNNING):
+                return True
+        return False
+
+    def get_tasks_by_step(self, step_id: str) -> "Sequence[TaskDefinition]":
+        """Get all tasks associated with a step. Default returns empty."""
+        return []
 
     @abstractmethod
     def save_task(self, task: "TaskDefinition") -> None:
