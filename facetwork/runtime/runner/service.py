@@ -62,26 +62,19 @@ def _current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _step_attributes_as_dict(step: StepDefinition) -> dict:
-    """Serialize ``step.attributes`` to the same dict shape MongoStore stores.
+def _step_params_as_payload(step: StepDefinition) -> dict:
+    """Build a flat ``{name: value}`` event payload from a step's params.
 
-    Used by ``_sweep_workflow_steps`` when constructing a task for an
-    EventTransmit step that never got one. Keeps the payload identical
-    to what the prior raw-Mongo sweep produced, so behavior is
-    unchanged across the layering refactor.
+    Mirrors ``StatementBeginHandler._build_payload`` (the canonical event-
+    task creator in ``handlers/completion.py``). Used by
+    ``_sweep_workflow_steps`` when synthesizing a task for an
+    EventTransmit step that never got one — handlers consume payload
+    keys directly (``payload["x"]``), so the flat shape is the only one
+    that works.
     """
     if not step.attributes:
         return {}
-    return {
-        "params": {
-            k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
-            for k, v in step.attributes.params.items()
-        },
-        "returns": {
-            k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
-            for k, v in step.attributes.returns.items()
-        },
-    }
+    return {name: attr.value for name, attr in step.attributes.params.items()}
 
 
 def _reaper_message(task_info: dict[str, str], reclaimer_name: str = "") -> str:
@@ -1625,13 +1618,7 @@ class RunnerService:
                 step_id=step.id,
                 state=TaskState.PENDING,
                 task_list_name=self._config.task_list,
-                # Preserve the prior payload shape — mirrors the
-                # ``attributes`` dict that ``_step_to_doc`` writes so
-                # existing handlers see the same input as before this
-                # refactor. (Whether handlers actually consume the
-                # ``{"params": ..., "returns": ...}`` shape is a separate
-                # question — out of scope here.)
-                data=_step_attributes_as_dict(step),
+                data=_step_params_as_payload(step),
             )
             self._persistence.save_task(task)
             logger.info(
