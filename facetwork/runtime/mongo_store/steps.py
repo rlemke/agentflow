@@ -383,13 +383,23 @@ class StepMixin(_MixinBase):
             doc["foreach_value"] = step.foreach_value
 
         if step.attributes:
+            from ..types import serialize_attribute_value
+
             doc["attributes"] = {
                 "params": {
-                    k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
+                    k: {
+                        "name": v.name,
+                        "value": serialize_attribute_value(v.value),
+                        "type_hint": v.type_hint,
+                    }
                     for k, v in step.attributes.params.items()
                 },
                 "returns": {
-                    k: {"name": v.name, "value": v.value, "type_hint": v.type_hint}
+                    k: {
+                        "name": v.name,
+                        "value": serialize_attribute_value(v.value),
+                        "type_hint": v.type_hint,
+                    }
                     for k, v in step.attributes.returns.items()
                 },
             }
@@ -410,7 +420,7 @@ class StepMixin(_MixinBase):
 
     def _doc_to_step(self, doc: dict) -> StepDefinition:
         """Convert MongoDB document to StepDefinition."""
-        from ..types import AttributeValue, FacetAttributes
+        from ..types import AttributeValue, FacetAttributes, deserialize_attribute_value
 
         step = StepDefinition(
             id=StepId(doc["uuid"]),
@@ -453,11 +463,11 @@ class StepMixin(_MixinBase):
             step.attributes = FacetAttributes()
             for k, v in attrs.get("params", {}).items():
                 step.attributes.params[k] = AttributeValue(
-                    v["name"], v["value"], v.get("type_hint", "Any")
+                    v["name"], deserialize_attribute_value(v["value"]), v.get("type_hint", "Any")
                 )
             for k, v in attrs.get("returns", {}).items():
                 step.attributes.returns[k] = AttributeValue(
-                    v["name"], v["value"], v.get("type_hint", "Any")
+                    v["name"], deserialize_attribute_value(v["value"]), v.get("type_hint", "Any")
                 )
 
         step.foreach_var = doc.get("foreach_var")

@@ -1,0 +1,27 @@
+// Passing a whole step as a parameter (StepReference).
+//
+// When a parameter is typed as a facet, you can pass the step itself by
+// its bare name — no `.field` segment.  The consumer can then read any
+// field on the upstream step in two ways:
+//
+//   1. From an `andThen` body: `$.<param>.<field>` is resolved lazily by
+//      the evaluator (no handler round-trip).
+//   2. From a handler: the param arrives as a tagged JSON ref and the
+//      agent SDK provides `ctx.fetch_step(ref)` to fetch the whole
+//      upstream step as a dict snapshot.  Snapshots are read-only.
+
+namespace refs {
+    facet DoSomething(input: String) => (output: String) andThen {
+        yield DoSomething(output = $.input ++ "!")
+    }
+
+    facet AnotherThing(ds: DoSomething) => (output: String) andThen {
+        yield AnotherThing(output = $.ds.output)
+    }
+
+    workflow Demo(input: String) => (output: String) andThen {
+        s1 = DoSomething(input = $.input)
+        s2 = AnotherThing(ds = s1)
+        yield Demo(output = s2.output)
+    }
+}

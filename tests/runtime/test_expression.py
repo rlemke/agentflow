@@ -272,14 +272,24 @@ class TestReferenceEdgeCases:
         with pytest.raises(ReferenceError, match="Empty input reference"):
             evaluator.evaluate(expr, ctx)
 
-    def test_step_ref_too_short(self, evaluator):
-        """_eval_step_ref raises when path < 2 elements (line 152)."""
+    def test_step_ref_bare_name_without_lookup(self, evaluator):
+        """Bare step name (`s1`) needs get_step_by_name on the context."""
         ctx = EvaluationContext(
             inputs={},
             get_step_output=lambda s, a: None,
         )
         expr = {"type": "StepRef", "path": ["s1"]}
-        with pytest.raises(ReferenceError, match="at least step.attribute"):
+        with pytest.raises(ReferenceError, match="get_step_by_name"):
+            evaluator.evaluate(expr, ctx)
+
+    def test_step_ref_empty_path(self, evaluator):
+        """Empty StepRef path is still an error."""
+        ctx = EvaluationContext(
+            inputs={},
+            get_step_output=lambda s, a: None,
+        )
+        expr = {"type": "StepRef", "path": []}
+        with pytest.raises(ReferenceError, match="empty path"):
             evaluator.evaluate(expr, ctx)
 
 

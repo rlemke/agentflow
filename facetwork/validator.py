@@ -420,6 +420,13 @@ class FFLValidator:
         if type_name in self.BUILTIN_TYPES:
             return  # Builtin types are always valid
 
+        # A param/return may also be typed as a facet (step-reference): the
+        # value passed is a whole step, and the consumer reads its fields via
+        # `$.param.field` or `ctx.fetch_step(ref)`. Accept any known facet
+        # short name or qualified name.
+        if type_name in self._facets or type_name in self._facets_by_short_name:
+            return
+
         # Not a builtin - must resolve to a schema
         schema_info = self._resolve_schema_name(type_name, type_node.location or location)
         if schema_info is None:
@@ -1497,17 +1504,21 @@ class FFLValidator:
                         rule_id="REF_INVALID_INPUT",
                     )
         else:
-            # step.attr - must reference a valid step and attribute
-            if not ref.path or len(ref.path) < 2:
+            # step.attr or bare step - must reference a valid step
+            if not ref.path:
                 self._result.add_error(
-                    "Invalid step reference: must be 'step.attribute'",
+                    "Empty step reference",
                     ref.location,
                     rule_id="REF_INVALID_STEP_FORMAT",
                 )
                 return
 
             step_name = ref.path[0]
-            attr = ref.path[1]
+            # Bare step ref (len(path) == 1) — pass-by-reference into a
+            # facet-typed param. Validate step existence only; the runtime
+            # builds a StepReference and the consumer dereferences lazily.
+            bare_ref = len(ref.path) == 1
+            attr = ref.path[1] if not bare_ref else None
 
             # Check if referencing a step that exists
             if step_name not in steps:
@@ -1546,6 +1557,10 @@ class FFLValidator:
                                 rule_id="REF_FORWARD_STEP",
                             )
                             return
+
+            # Bare step refs (`ds = s1`) have no attribute to validate.
+            if bare_ref:
+                return
 
             # Check if attribute is valid for that step's facet
             returns = step_returns.get(step_name, set())

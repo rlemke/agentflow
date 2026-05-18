@@ -77,6 +77,13 @@ def _noop_stage_budget(timeout_ms: int, stage_name: str = "") -> None:
     return None
 
 
+def _noop_fetch_step(ref: object) -> dict:
+    raise RuntimeError(
+        "fetch_step is not wired on this HandlerContext — the runner did not "
+        "inject _fetch_step. Are you running inside a real handler dispatch?"
+    )
+
+
 @dataclass
 class HandlerContext:
     """Typed context injected by the runner into every handler dispatch.
@@ -100,7 +107,28 @@ class HandlerContext:
     step_log: Callable[..., None] = field(default=lambda *a, **kw: None, repr=False)
     heartbeat: Callable[..., None] = field(default=lambda *a, **kw: None, repr=False)
     _set_stage_budget: Callable[[int, str], None] = field(default=_noop_stage_budget, repr=False)
+    _fetch_step: Callable[[object], dict] = field(default=_noop_fetch_step, repr=False)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def fetch_step(self, ref: object) -> dict:
+        """Fetch a referenced step's data by StepReference.
+
+        Returns a read-only snapshot dict::
+
+            {
+                "step_id": "...",
+                "facet_name": "...",
+                "workflow_id": "...",
+                "params": {name: value, ...},
+                "returns": {name: value, ...},
+            }
+
+        Mutating the returned dict has no effect on the referenced step —
+        step references are read-only by convention. Accepts either a
+        ``StepReference`` instance or its tagged JSON form (the shape
+        passed in the handler payload).
+        """
+        return self._fetch_step(ref)
 
     @contextmanager
     def stage(
@@ -155,6 +183,7 @@ class HandlerContext:
             step_log=payload.get("_step_log", lambda *a, **kw: None),
             heartbeat=payload.get("_task_heartbeat", lambda *a, **kw: None),
             _set_stage_budget=payload.get("_set_stage_budget", _noop_stage_budget),
+            _fetch_step=payload.get("_fetch_step", _noop_fetch_step),
             metadata=payload.get("_handler_metadata", {}),
         )
 
@@ -168,6 +197,7 @@ class HandlerContext:
             "_step_log": self.step_log,
             "_task_heartbeat": self.heartbeat,
             "_set_stage_budget": self._set_stage_budget,
+            "_fetch_step": self._fetch_step,
             "_handler_metadata": self.metadata,
             "_ctx": self,
         }

@@ -1,24 +1,20 @@
-# REF_INVALID_STEP_FORMAT — Step reference must include an attribute
+# REF_INVALID_STEP_FORMAT — Step reference must name a step (and optionally an attribute)
 
-A bare step name was used where a `step.attr` reference was expected.
+A step reference must start with a step name. The reference may be **bare**
+(just the step name, when passing a whole step as a parameter) or **dotted**
+(`step.attribute` for field access).
 
 ## Wrong
 
-```ffl
-namespace x {
-    facet A() => (out: String)
-    facet B(in: String) => (r: String)
-    workflow W() => (r: String) andThen {
-        a = A()
-        b = B(in = a)              // ← bare 'a' is not a valid expression
-        yield W(r = b.r)
-    }
-}
+An empty step reference is the only shape rejected by this rule:
+
+```text
+y = B(in = .)                     // ← empty step reference (no step named)
 ```
 
-→ `Invalid step reference: must be 'step.attribute'`
+→ `Empty step reference`
 
-## Correct
+## Correct — field access
 
 ```ffl
 namespace x {
@@ -32,9 +28,35 @@ namespace x {
 }
 ```
 
+## Correct — bare step reference (pass-by-step)
+
+When a parameter is typed as a facet, you can pass the whole step:
+
+```ffl
+namespace x {
+    facet A() => (out: String)
+    facet B(src: A) => (r: String) andThen {
+        yield B(r = $.src.out)
+    }
+    workflow W() => (r: String) andThen {
+        a = A()
+        b = B(src = a)            // ← bare step name; B receives the whole step
+        yield W(r = b.r)
+    }
+}
+```
+
 ## Why
 
-The grammar rule is `step_ref: IDENT ("." IDENT)+` — at least one `.field`
-segment is required. Even when a step's return is a single-field schema,
-you must access it via `step.field`. There is no way to pass a whole step
-result as one opaque value.
+Two reference shapes are accepted:
+
+1. **`step.attribute`** — read a single output value from a completed step.
+2. **`step`** (bare) — pass a `StepReference` into a parameter typed as a
+   facet. The consumer reads multiple fields from the upstream step via
+   `$.param.field` in `andThen` bodies, or via `ctx.fetch_step(ref)` in
+   handler bodies.
+
+The grammar accepts `step_ref: IDENT ("." IDENT)*` — the attribute portion
+is optional. The validator only flags an empty reference. Existence of the
+named step is still checked — see
+[REF_UNDEFINED_STEP](REF_UNDEFINED_STEP.md).

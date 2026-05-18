@@ -793,12 +793,44 @@ class RunnerService:
                 stage_name=stage_name,
             )
 
+        def _fetch_step_callback(ref: object) -> dict:
+            from ..types import StepReference, serialize_attribute_value
+
+            if isinstance(ref, dict):
+                step_ref = StepReference.from_json(ref)
+            elif isinstance(ref, StepReference):
+                step_ref = ref
+            else:
+                raise TypeError(
+                    f"fetch_step expects StepReference or tagged dict, "
+                    f"got {type(ref).__name__}"
+                )
+            step = self._persistence.get_step(step_ref.step_id)
+            if step is None:
+                raise LookupError(
+                    f"Referenced step '{step_ref.step_id}' not found"
+                )
+            return {
+                "step_id": str(step.id),
+                "facet_name": step.facet_name,
+                "workflow_id": str(step.workflow_id),
+                "params": {
+                    k: serialize_attribute_value(v.value)
+                    for k, v in step.attributes.params.items()
+                },
+                "returns": {
+                    k: serialize_attribute_value(v.value)
+                    for k, v in step.attributes.returns.items()
+                },
+            }
+
         retry_count = getattr(task, "retry_count", 0) or 0
         payload.update(
             {
                 "_step_log": _step_log_callback,
                 "_task_heartbeat": _task_heartbeat_callback,
                 "_set_stage_budget": _set_stage_budget_callback,
+                "_fetch_step": _fetch_step_callback,
                 "_task_uuid": task.uuid,
                 "_retry_count": retry_count,
                 "_is_retry": retry_count > 0,

@@ -99,6 +99,88 @@ class VersionInfo:
 
 
 @dataclass
+class StepReference:
+    """Reference to a step passed as a parameter value.
+
+    Created when an FFL argument is a bare step name (`ds = s1`). Carries
+    enough information for both the evaluator (resolving `$.ds.field` lazily)
+    and handlers (calling `fetch_step(ref)` via the agent SDK) to retrieve
+    the referenced step's data.
+
+    Read-only by convention — `fetch_step()` returns a dict snapshot; there
+    is no write API for the referenced step.
+    """
+
+    step_id: str
+    workflow_id: str
+    facet_name: str
+
+    REF_TAG = "_facet_ref"
+
+    def to_json(self) -> dict:
+        """Serialize for handler payloads."""
+        return {
+            self.REF_TAG: True,
+            "step_id": self.step_id,
+            "workflow_id": self.workflow_id,
+            "facet_name": self.facet_name,
+        }
+
+    @classmethod
+    def from_json(cls, data: dict) -> "StepReference":
+        """Deserialize from a tagged JSON dict."""
+        if not isinstance(data, dict) or not data.get(cls.REF_TAG):
+            raise ValueError(f"Not a step reference: {data!r}")
+        return cls(
+            step_id=data["step_id"],
+            workflow_id=data["workflow_id"],
+            facet_name=data["facet_name"],
+        )
+
+    @classmethod
+    def is_ref(cls, value: object) -> bool:
+        """True if the value is a StepReference or its tagged JSON form."""
+        if isinstance(value, cls):
+            return True
+        return isinstance(value, dict) and bool(value.get(cls.REF_TAG))
+
+
+def serialize_attribute_value(value: object) -> object:
+    """Convert StepReference instances to tagged JSON for storage/transport.
+
+    Recurses into lists, tuples, and dicts so a StepReference nested in
+    a collection is also serialized.
+    """
+    if isinstance(value, StepReference):
+        return value.to_json()
+    if isinstance(value, list):
+        return [serialize_attribute_value(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(serialize_attribute_value(v) for v in value)
+    if isinstance(value, dict):
+        # Don't touch dicts that are already tagged refs — they're valid as-is.
+        if value.get(StepReference.REF_TAG):
+            return value
+        return {k: serialize_attribute_value(v) for k, v in value.items()}
+    return value
+
+
+def deserialize_attribute_value(value: object) -> object:
+    """Inverse of serialize_attribute_value — restores StepReference dataclasses.
+
+    Used when loading persisted step attributes so the evaluator's
+    isinstance(value, StepReference) checks fire correctly.
+    """
+    if isinstance(value, dict) and value.get(StepReference.REF_TAG):
+        return StepReference.from_json(value)
+    if isinstance(value, list):
+        return [deserialize_attribute_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: deserialize_attribute_value(v) for k, v in value.items()}
+    return value
+
+
+@dataclass
 class AttributeValue:
     """A computed attribute value.
 

@@ -394,14 +394,22 @@ def reset_block(step_id: str, store=Depends(get_store)):
 
 
 @router.post("/{step_id}/rerun")
-def rerun_step(step_id: str, store=Depends(get_store)):
-    """Re-run a step: reset it to EventTransmit and delete downstream dependents."""
+def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
+    """Re-run a step: reset it to EventTransmit and delete downstream dependents.
+
+    By default refuses to proceed if any dependent step has a running task —
+    deleting it would leave a runner mid-execution with no step to write back
+    to. Pass ``force=true`` to stop and delete those running tasks anyway.
+    """
     import time as _time
+
+    from fastapi.responses import JSONResponse
 
     from facetwork.runtime.entities import (
         StepLogEntry,
         StepLogLevel,
         StepLogSource,
+        TaskState,
     )
     from facetwork.runtime.states import StepState
     from facetwork.runtime.types import generate_id
@@ -462,8 +470,60 @@ def rerun_step(step_id: str, store=Depends(get_store)):
                             downstream_step_ids.append(child_id)
                             stack.append(child_id)
 
+    # Safety: refuse to delete dependents that have a running task unless
+    # the caller explicitly forces.  Re-running a step while a dependent is
+    # mid-handler would orphan that handler (its step row would vanish).
+    if downstream_step_ids and not force:
+        running_blockers: list[dict] = []
+        for ds_id in downstream_step_ids:
+            ds_task = store.get_task_for_step(ds_id)
+            if ds_task is not None and ds_task.state == TaskState.RUNNING:
+                ds_step = store.get_step(ds_id)
+                running_blockers.append(
+                    {
+                        "step_id": ds_id,
+                        "facet_name": (ds_step.facet_name if ds_step else "") or "",
+                        "task_uuid": ds_task.uuid,
+                    }
+                )
+        if running_blockers:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": "running_dependents",
+                    "message": (
+                        f"{len(running_blockers)} dependent step(s) have running tasks. "
+                        "Pass ?force=true to stop and delete them."
+                    ),
+                    "blockers": running_blockers,
+                },
+            )
+
     # Delete downstream steps
     if downstream_step_ids:
+        if force:
+            forced_running = [
+                ds_id
+                for ds_id in downstream_step_ids
+                if (t := store.get_task_for_step(ds_id)) is not None
+                and t.state == TaskState.RUNNING
+            ]
+            for ds_id in forced_running:
+                ds_step = store.get_step(ds_id)
+                forced_entry = StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=ds_id,
+                    workflow_id=(ds_step.workflow_id if ds_step else step.workflow_id),
+                    facet_name=(ds_step.facet_name if ds_step else "") or "",
+                    source=StepLogSource.FRAMEWORK,
+                    level=StepLogLevel.WARNING,
+                    message=(
+                        f"Forcibly removed by re-run of upstream step {step_id} "
+                        f"while task was RUNNING"
+                    ),
+                    time=int(_time.time() * 1000),
+                )
+                store.save_step_log(forced_entry)
         store.delete_step_logs_for_steps(downstream_step_ids)
         store.delete_tasks_for_steps(downstream_step_ids)
         store.delete_steps(downstream_step_ids)

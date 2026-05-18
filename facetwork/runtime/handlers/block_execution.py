@@ -130,9 +130,22 @@ class BlockExecutionBeginHandler(StateHandler):
             _step_not_ready = True
             raise ValueError(f"{step_name}.{attr_name} not ready")
 
+        def get_step_by_name(step_name: str):
+            nonlocal _step_not_ready
+            for s in self.context.persistence.get_steps_by_workflow(self.step.workflow_id):
+                if s.statement_name == step_name and s.is_complete:
+                    return s
+            _step_not_ready = True
+            raise ValueError(f"{step_name} not ready")
+
+        def get_step_by_id(step_id: str):
+            return self.context.persistence.get_step(step_id)
+
         eval_ctx = EvaluationContext(
             inputs=inputs,
             get_step_output=get_step_output,
+            get_step_by_name=get_step_by_name,
+            get_step_by_id=get_step_by_id,
             step_id=self.step.id,
         )
         evaluator = ExpressionEvaluator()
@@ -244,9 +257,22 @@ class BlockExecutionBeginHandler(StateHandler):
             _step_not_ready = True
             raise ValueError(f"{step_name}.{attr_name} not ready")
 
+        def get_step_by_name(step_name: str):
+            nonlocal _step_not_ready
+            for s in self.context.persistence.get_steps_by_workflow(self.step.workflow_id):
+                if s.statement_name == step_name and s.is_complete:
+                    return s
+            _step_not_ready = True
+            raise ValueError(f"{step_name} not ready")
+
+        def get_step_by_id(step_id: str):
+            return self.context.persistence.get_step(step_id)
+
         eval_ctx = EvaluationContext(
             inputs=inputs,
             get_step_output=get_step_output,
+            get_step_by_name=get_step_by_name,
+            get_step_by_id=get_step_by_id,
             step_id=self.step.id,
         )
         evaluator = ExpressionEvaluator()

@@ -23,11 +23,11 @@ Evaluates expressions from compiled AST including:
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .errors import EvaluationError, ReferenceError
-from .types import StepId
+from .types import StepId, StepReference
 
 
 @dataclass
@@ -38,6 +38,7 @@ class EvaluationContext:
     - Workflow input parameters
     - Completed step outputs
     - Foreach iteration variables
+    - Step lookups (for bare step refs and StepReference dereferencing)
     """
 
     # Workflow input values
@@ -45,6 +46,18 @@ class EvaluationContext:
 
     # Step output getter: step_name -> attribute -> value
     get_step_output: Callable[[str, str], Any]
+
+    # Step lookup by statement name — used for bare `ds = s1` step refs.
+    # Returns the step definition (with id, workflow_id, facet_name) or None.
+    get_step_by_name: Callable[[str], Any] | None = None
+
+    # Step lookup by id — used to dereference a StepReference encountered
+    # while walking a path (e.g. `$.ds.field` when `ds` is a step ref).
+    get_step_by_id: Callable[[str], Any] | None = None
+
+    # Per-tick resolved-ref cache keyed by step_id; avoids repeated lookups
+    # when the same StepReference is dereferenced multiple times.
+    _resolved_refs: dict[str, Any] = field(default_factory=dict)
 
     # Foreach variable (if in foreach block)
     foreach_var: str | None = None
@@ -161,27 +174,61 @@ class ExpressionEvaluator:
         return self._resolve_path(value, path[1:], f"$.{field}", ctx)
 
     def _eval_step_ref(self, expr: dict, ctx: EvaluationContext) -> Any:
-        """Evaluate a step reference (step.field).
+        """Evaluate a step reference.
+
+        Two forms:
+        - Bare step name (`s1`, path=[step_name]): returns a StepReference
+          carrying the step's id, workflow id, and facet name. Used when a
+          parameter is typed as a facet so the consumer can read multiple
+          fields from the same upstream step.
+        - Field access (`s1.field` or `s1.field.sub`, path>=2): returns the
+          value of `field`, with any remaining path segments resolved.
 
         Args:
             expr: The StepRef expression
             ctx: Evaluation context
 
         Returns:
-            The step output value
+            A StepReference for bare names, or the resolved value for field
+            access.
 
         Raises:
-            ReferenceError: If step or attribute not found
+            ReferenceError: If step or attribute not found.
         """
         path = expr.get("path", [])
-        if len(path) < 2:
+        if not path:
             raise ReferenceError(
                 str(path),
-                "Step reference requires at least step.attribute",
+                "Step reference has empty path",
                 ctx.step_id,
             )
 
         step_name = path[0]
+
+        if len(path) == 1:
+            # Bare step name — build a StepReference. Requires the caller to
+            # have wired get_step_by_name on the evaluation context.
+            if ctx.get_step_by_name is None:
+                raise ReferenceError(
+                    step_name,
+                    "Bare step reference requires get_step_by_name on context",
+                    ctx.step_id,
+                )
+            step_def = ctx.get_step_by_name(step_name)
+            if step_def is None:
+                raise ReferenceError(
+                    step_name,
+                    f"Step '{step_name}' not found",
+                    ctx.step_id,
+                )
+            ref = StepReference(
+                step_id=str(step_def.id),
+                workflow_id=str(step_def.workflow_id),
+                facet_name=getattr(step_def, "facet_name", "") or "",
+            )
+            ctx._resolved_refs[ref.step_id] = step_def
+            return ref
+
         attr_name = path[1]
 
         try:
@@ -222,7 +269,33 @@ class ExpressionEvaluator:
                     ctx.step_id,
                 )
 
-            if isinstance(value, dict):
+            # StepReference: dereference into the referenced step's returns.
+            if isinstance(value, StepReference):
+                if ctx.get_step_by_id is None:
+                    raise ReferenceError(
+                        f"{base_path}.{segment}",
+                        "Step reference dereference requires get_step_by_id on context",
+                        ctx.step_id,
+                    )
+                step_def = ctx._resolved_refs.get(value.step_id)
+                if step_def is None:
+                    step_def = ctx.get_step_by_id(value.step_id)
+                    if step_def is None:
+                        raise ReferenceError(
+                            f"{base_path}.{segment}",
+                            f"Referenced step '{value.step_id}' not found",
+                            ctx.step_id,
+                        )
+                    ctx._resolved_refs[value.step_id] = step_def
+                returns = getattr(step_def, "attributes", None)
+                if returns is None or segment not in returns.returns:
+                    raise ReferenceError(
+                        f"{base_path}.{segment}",
+                        f"Referenced step has no return '{segment}'",
+                        ctx.step_id,
+                    )
+                value = returns.returns[segment].value
+            elif isinstance(value, dict):
                 if segment not in value:
                     raise ReferenceError(
                         f"{base_path}.{segment}",

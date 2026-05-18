@@ -132,10 +132,18 @@ class EventTransmitHandler(StateHandler):
         return StateChangeResult(step=self.step)
 
     def _build_payload(self) -> dict:
-        """Build event payload from step attributes."""
+        """Build event payload from step attributes.
+
+        StepReference values are converted to their tagged JSON form so
+        handlers receive `{_facet_ref: True, step_id, workflow_id,
+        facet_name}` dicts and can call `fetch_step(ref)` via the agent
+        SDK.
+        """
+        from ..types import serialize_attribute_value
+
         payload = {}
         for name, attr in self.step.attributes.params.items():
-            payload[name] = attr.value
+            payload[name] = serialize_attribute_value(attr.value)
         return payload
 
     def _emit_step_log(self, message: str, level: str = "info") -> None:

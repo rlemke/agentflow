@@ -143,9 +143,20 @@ class CatchBeginHandler(StateHandler):
                     return ret.value
             raise ValueError(f"Not found: {step_name}.{attr_name}")
 
+        def get_step_by_name(step_name: str):
+            # Allow bare-step refs to the errored step itself within a catch.
+            if step_name == str(self.step.statement_name or self.step.statement_id):
+                return self.step
+            raise ValueError(f"Step '{step_name}' not visible in catch scope")
+
+        def get_step_by_id(step_id: str):
+            return self.context.persistence.get_step(step_id)
+
         eval_ctx = EvaluationContext(
             inputs=inputs,
             get_step_output=get_step_output,
+            get_step_by_name=get_step_by_name,
+            get_step_by_id=get_step_by_id,
             step_id=self.step.id,
         )
         evaluator = ExpressionEvaluator()

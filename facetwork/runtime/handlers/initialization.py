@@ -188,9 +188,26 @@ class FacetInitializationBeginHandler(StateHandler):
                 raise ValueError(f"Attribute '{attr_name}' not found on step '{step_name}'")
             return value
 
+        # Bare-step-ref lookups (for `ds = s1` style args). Same scope as
+        # get_step_output — the dep tracker has already gated this step on
+        # s1's completion, so by the time we evaluate args s1 must be done.
+        def get_step_by_name(step_name: str):
+            step = self.context.get_completed_step_by_name(step_name, self.step.block_id)
+            if step is None:
+                raise _StepNotReady(
+                    f"Step '{step_name}' not found or not yet complete "
+                    f"(bare step reference: {step_name})"
+                )
+            return step
+
+        def get_step_by_id(step_id: str):
+            return self.context.persistence.get_step(step_id)
+
         return EvaluationContext(
             inputs=inputs,
             get_step_output=get_step_output,
+            get_step_by_name=get_step_by_name,
+            get_step_by_id=get_step_by_id,
             step_id=self.step.id,
             foreach_var=foreach_var,
             foreach_value=foreach_value,
