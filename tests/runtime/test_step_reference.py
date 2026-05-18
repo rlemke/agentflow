@@ -87,6 +87,116 @@ def test_canonical_example_parses_and_validates():
 
 
 # =========================================================================
+# Validator — STEP_REF_FACET_MISMATCH
+# =========================================================================
+
+
+_MISMATCH_SRC = """
+namespace refs {
+    facet DoSomething(input: String) => (output: String) andThen {
+        yield DoSomething(output = $.input ++ "!")
+    }
+    facet OtherFacet(value: String) => (output: String) andThen {
+        yield OtherFacet(output = $.value)
+    }
+    facet AnotherThing(ds: DoSomething) => (output: String) andThen {
+        yield AnotherThing(output = $.ds.output)
+    }
+    workflow Demo(input: String) => (output: String) andThen {
+        s1  = DoSomething(input = $.input)
+        bad = OtherFacet(value = $.input)
+        s2  = AnotherThing(ds = bad)
+        yield Demo(output = s2.output)
+    }
+}
+"""
+
+
+def test_step_ref_facet_mismatch_emits_rule_id():
+    result = validate_ast(parse(_MISMATCH_SRC))
+    mismatches = [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"]
+    assert len(mismatches) == 1, f"expected one mismatch, got {result.errors}"
+    msg = str(mismatches[0])
+    assert "bad" in msg
+    assert "OtherFacet" in msg
+    assert "DoSomething" in msg
+    assert "ds" in msg
+
+
+def test_step_ref_facet_match_passes():
+    src = """
+namespace refs {
+    facet DoSomething(input: String) => (output: String) andThen {
+        yield DoSomething(output = $.input)
+    }
+    facet AnotherThing(ds: DoSomething) => (output: String) andThen {
+        yield AnotherThing(output = $.ds.output)
+    }
+    workflow Demo(input: String) => (output: String) andThen {
+        s1 = DoSomething(input = $.input)
+        s2 = AnotherThing(ds = s1)
+        yield Demo(output = s2.output)
+    }
+}
+"""
+    result = validate_ast(parse(src))
+    assert not [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"], (
+        f"unexpected mismatch: {result.errors}"
+    )
+
+
+def test_step_ref_field_access_not_flagged_as_mismatch():
+    """`step.field` references are not step-refs; they should never trigger
+    STEP_REF_FACET_MISMATCH even if the field name happens to be a facet
+    name."""
+    src = """
+namespace refs {
+    facet DoSomething(input: String) => (output: String) andThen {
+        yield DoSomething(output = $.input)
+    }
+    facet Sink(value: String) => (out: String) andThen {
+        yield Sink(out = $.value)
+    }
+    workflow Demo(input: String) => (out: String) andThen {
+        s1 = DoSomething(input = $.input)
+        s2 = Sink(value = s1.output)
+        yield Demo(out = s2.out)
+    }
+}
+"""
+    result = validate_ast(parse(src))
+    assert not [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"]
+
+
+def test_step_ref_mismatch_in_mixin_args():
+    """Mixin call args should also be checked."""
+    src = """
+namespace refs {
+    facet DoSomething(input: String) => (output: String) andThen {
+        yield DoSomething(output = $.input)
+    }
+    facet OtherFacet(value: String) => (output: String) andThen {
+        yield OtherFacet(output = $.value)
+    }
+    facet WithRef(ds: DoSomething) => (output: String) andThen {
+        yield WithRef(output = $.ds.output)
+    }
+    facet Composed() => (output: String) andThen {
+        yield Composed(output = "x")
+    }
+    workflow Demo(input: String) => (output: String) andThen {
+        bad = OtherFacet(value = $.input)
+        c   = Composed() with WithRef(ds = bad)
+        yield Demo(output = c.output)
+    }
+}
+"""
+    result = validate_ast(parse(src))
+    mismatches = [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"]
+    assert len(mismatches) == 1, f"expected mismatch in mixin args, got {result.errors}"
+
+
+# =========================================================================
 # Evaluator
 # =========================================================================
 

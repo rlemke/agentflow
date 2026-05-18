@@ -40,6 +40,7 @@ from .ast import (
     IndexExpr,
     Literal,
     MapLiteral,
+    NamedArg,
     Namespace,
     Program,
     PromptBlock,
@@ -155,6 +156,7 @@ class FacetInfo:
     params: set[str]  # Input parameter names
     returns: set[str]  # Return parameter names
     returns_types: dict[str, str] = field(default_factory=dict)  # Return field name → type
+    params_types: dict[str, str] = field(default_factory=dict)  # Param name → type
     location: SourceLocation | None = None
 
 
@@ -277,6 +279,9 @@ class FFLValidator:
         """Register a facet definition."""
         full_name = f"{namespace}.{sig.name}" if namespace else sig.name
         params = {p.name for p in sig.params}
+        params_types: dict[str, str] = {}
+        for p in sig.params:
+            params_types[p.name] = self._type_ref_to_str(p.type)
         returns = {p.name for p in sig.returns.params} if sig.returns else set()
         returns_types: dict[str, str] = {}
         if sig.returns:
@@ -287,6 +292,7 @@ class FFLValidator:
             params=params,
             returns=returns,
             returns_types=returns_types,
+            params_types=params_types,
             location=sig.location,
         )
         # Track by short name for ambiguity detection
@@ -1451,6 +1457,7 @@ class FFLValidator:
         other_block_steps: set[str] | None = None,
     ) -> None:
         """Validate references in a call expression."""
+        target_facet = self._lookup_facet_for_type(call.name)
         for arg in call.args:
             for ref in self._extract_references(arg.value):
                 self._validate_reference(
@@ -1464,9 +1471,11 @@ class FFLValidator:
                 )
             # Type check expressions
             self._infer_type(arg.value, step_returns_types)
+            self._check_step_ref_facet_type(arg, target_facet, steps)
 
         # Also validate mixin call arguments
         for mixin in call.mixins:
+            mixin_facet = self._lookup_facet_for_type(mixin.name)
             for arg in mixin.args:
                 for ref in self._extract_references(arg.value):
                     self._validate_reference(
@@ -1478,6 +1487,60 @@ class FFLValidator:
                         current_step,
                         other_block_steps,
                     )
+                self._check_step_ref_facet_type(arg, mixin_facet, steps)
+
+    def _lookup_facet_for_type(self, type_name: str) -> FacetInfo | None:
+        """Resolve a type name to a FacetInfo without emitting errors.
+
+        Returns the FacetInfo only when the name is an unambiguous reference
+        to a known facet. Used to identify step-reference param types.
+        """
+        if not type_name or type_name in self.BUILTIN_TYPES or type_name == "Unknown":
+            return None
+        if type_name in self._facets:
+            return self._facets[type_name]
+        matches = self._facets_by_short_name.get(type_name, [])
+        if len(matches) == 1:
+            return self._facets[matches[0]]
+        return None
+
+    def _check_step_ref_facet_type(
+        self,
+        arg: NamedArg,
+        target_facet: FacetInfo | None,
+        steps: dict[str, StepInfo],
+    ) -> None:
+        """Flag step-ref args whose source facet differs from the param's
+        declared facet type. Fires STEP_REF_FACET_MISMATCH when:
+
+        - the target param's type is a known facet (step-reference param),
+        - the arg value is a bare step ref (e.g. ``ds = s1``), and
+        - the referenced step's call target is a different facet.
+        """
+        if target_facet is None:
+            return
+        expected_type = target_facet.params_types.get(arg.name, "")
+        expected_facet = self._lookup_facet_for_type(expected_type)
+        if expected_facet is None:
+            return
+        value = arg.value
+        if not isinstance(value, Reference):
+            return
+        if value.is_input or len(value.path) != 1:
+            return
+        source = steps.get(value.path[0])
+        if source is None:
+            return
+        source_facet = self._lookup_facet_for_type(source.facet_name)
+        if source_facet is None or source_facet is expected_facet:
+            return
+        self._result.add_error(
+            f"Step '{source.name}' is a '{source_facet.name}', "
+            f"but parameter '{arg.name}' expects a step of facet "
+            f"'{expected_facet.name}'",
+            value.location,
+            rule_id="STEP_REF_FACET_MISMATCH",
+        )
 
     def _validate_reference(
         self,
