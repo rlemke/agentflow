@@ -287,14 +287,27 @@ class ExpressionEvaluator:
                             ctx.step_id,
                         )
                     ctx._resolved_refs[value.step_id] = step_def
-                returns = getattr(step_def, "attributes", None)
-                if returns is None or segment not in returns.returns:
+                attrs = getattr(step_def, "attributes", None)
+                if attrs is None:
                     raise ReferenceError(
                         f"{base_path}.{segment}",
-                        f"Referenced step has no return '{segment}'",
+                        f"Referenced step has no attribute '{segment}'",
                         ctx.step_id,
                     )
-                value = returns.returns[segment].value
+                # A step-ref exposes both bound inputs and computed outputs:
+                # a fully-evaluated step has both populated on its record.
+                # Returns shadow params on name collision (a yielded value
+                # supersedes the param assignment, mirroring merge order).
+                if segment in attrs.returns:
+                    value = attrs.returns[segment].value
+                elif segment in attrs.params:
+                    value = attrs.params[segment].value
+                else:
+                    raise ReferenceError(
+                        f"{base_path}.{segment}",
+                        f"Referenced step has no param or return '{segment}'",
+                        ctx.step_id,
+                    )
             elif isinstance(value, dict):
                 if segment not in value:
                     raise ReferenceError(

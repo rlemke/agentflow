@@ -204,12 +204,13 @@ namespace refs {
 class _FakeStep:
     """Minimal StepDefinition shape consumed by the evaluator."""
 
-    def __init__(self, step_id, workflow_id, facet_name, returns):
+    def __init__(self, step_id, workflow_id, facet_name, returns, params=None):
         self.id = step_id
         self.workflow_id = workflow_id
         self.facet_name = facet_name
         self.attributes = FacetAttributes(
-            returns={k: AttributeValue(k, v) for k, v in returns.items()}
+            params={k: AttributeValue(k, v) for k, v in (params or {}).items()},
+            returns={k: AttributeValue(k, v) for k, v in returns.items()},
         )
 
 
@@ -256,7 +257,7 @@ def test_resolve_path_missing_callback_errors():
         evaluator.evaluate({"type": "InputRef", "path": ["ds", "output"]}, ctx)
 
 
-def test_resolve_path_unknown_return_field():
+def test_resolve_path_unknown_field_errors_on_param_or_return():
     step = _FakeStep("sid-4", "wf-1", "DoSomething", {"output": "x"})
     ref = StepReference(step_id="sid-4", workflow_id="wf-1", facet_name="DoSomething")
     ctx = EvaluationContext(
@@ -267,8 +268,56 @@ def test_resolve_path_unknown_return_field():
     evaluator = ExpressionEvaluator()
     from facetwork.runtime.errors import ReferenceError
 
-    with pytest.raises(ReferenceError, match="no return 'nope'"):
+    with pytest.raises(ReferenceError, match="no param or return 'nope'"):
         evaluator.evaluate({"type": "InputRef", "path": ["ds", "nope"]}, ctx)
+
+
+def test_resolve_path_reads_bound_input_via_step_ref():
+    """A step-ref consumer reads bound inputs of the upstream step as well
+    as its returns — both are persisted attributes of a fully-evaluated
+    step."""
+    step = _FakeStep(
+        "sid-5",
+        "wf-1",
+        "Value",
+        returns={},
+        params={"input": "hi"},
+    )
+    ref = StepReference(step_id="sid-5", workflow_id="wf-1", facet_name="Value")
+    ctx = EvaluationContext(
+        inputs={"facetRef": ref},
+        get_step_output=lambda *_: None,
+        get_step_by_id=lambda sid: step,
+    )
+    evaluator = ExpressionEvaluator()
+    val = evaluator.evaluate(
+        {"type": "InputRef", "path": ["facetRef", "input"]}, ctx
+    )
+    assert val == "hi"
+
+
+def test_resolve_path_return_shadows_param_on_name_collision():
+    """When a field name appears in both params and returns (e.g. a yielded
+    value overrides the input under the same name), the return wins —
+    matching FacetAttributes.merge() semantics."""
+    step = _FakeStep(
+        "sid-6",
+        "wf-1",
+        "Value",
+        returns={"input": "yielded"},
+        params={"input": "bound"},
+    )
+    ref = StepReference(step_id="sid-6", workflow_id="wf-1", facet_name="Value")
+    ctx = EvaluationContext(
+        inputs={"facetRef": ref},
+        get_step_output=lambda *_: None,
+        get_step_by_id=lambda sid: step,
+    )
+    evaluator = ExpressionEvaluator()
+    val = evaluator.evaluate(
+        {"type": "InputRef", "path": ["facetRef", "input"]}, ctx
+    )
+    assert val == "yielded"
 
 
 # =========================================================================
