@@ -187,65 +187,115 @@ def step_detail_partial(step_id: str, request: Request, store=Depends(get_store)
 
 
 @router.post("/{step_id}/retry")
-def retry_step(step_id: str, store=Depends(get_store)):
-    """Retry a failed step by resetting it to EVENT_TRANSMIT."""
+def retry_step(step_id: str, force: bool = False, store=Depends(get_store)):
+    """Retry a failed step by resetting it to EVENT_TRANSMIT.
+
+    By default refuses to proceed if the step's own task is currently
+    RUNNING — resetting it to pending while a handler is in flight races
+    with the live runner. Pass ``force=true`` to clear the running task
+    anyway.
+    """
     import time as _time
+
+    from fastapi.responses import JSONResponse
 
     from facetwork.runtime.entities import (
         StepLogEntry,
         StepLogLevel,
         StepLogSource,
+        TaskState,
     )
     from facetwork.runtime.states import StepState
+    from facetwork.runtime.types import generate_id
 
     step = store.get_step(step_id)
-    if step:
-        prev_state = step.state
+    if not step:
+        return RedirectResponse(url=f"/steps/{step_id}", status_code=303)
 
-        # Reset step state to EVENT_TRANSMIT (matches evaluator.retry_step logic)
-        step.state = StepState.EVENT_TRANSMIT
-        step.transition.current_state = StepState.EVENT_TRANSMIT
-        step.transition.clear_error()
-        step.transition.request_transition = False
-        step.transition.changed = True
-        store.save_step(step)
+    prev_state = step.state
+    task = store.get_task_for_step(step_id)
 
-        # Reset associated task to pending
-        task = store.get_task_for_step(step_id)
-        if task is not None:
-            task.state = "pending"
-            task.error = None
-            store.save_task(task)
-
-        # Reset errored ancestor blocks/containers so execution resumes
-        _reset_errored_ancestors(step, store)
-
-        # Emit step log entry for the manual retry
-        from facetwork.runtime.types import generate_id
-
-        entry = StepLogEntry(
-            uuid=generate_id(),
-            step_id=step_id,
-            workflow_id=step.workflow_id,
-            facet_name=step.facet_name or "",
-            source=StepLogSource.FRAMEWORK,
-            level=StepLogLevel.WARNING,
-            message=f"Step manually restarted via dashboard (was {prev_state})",
-            time=int(_time.time() * 1000),
+    # Safety: refuse to reset a step whose handler is currently running.
+    if task is not None and task.state == TaskState.RUNNING and not force:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": "step_task_running",
+                "message": (
+                    "This step's task is currently RUNNING. "
+                    "Pass ?force=true to reset it anyway."
+                ),
+                "blockers": [
+                    {
+                        "step_id": step_id,
+                        "facet_name": step.facet_name or "",
+                        "task_uuid": task.uuid,
+                    }
+                ],
+            },
         )
-        store.save_step_log(entry)
+
+    # Reset step state to EVENT_TRANSMIT (matches evaluator.retry_step logic)
+    step.state = StepState.EVENT_TRANSMIT
+    step.transition.current_state = StepState.EVENT_TRANSMIT
+    step.transition.clear_error()
+    step.transition.request_transition = False
+    step.transition.changed = True
+    store.save_step(step)
+
+    # Reset associated task to pending
+    if task is not None:
+        forced_running = force and task.state == TaskState.RUNNING
+        task.state = "pending"
+        task.error = None
+        store.save_task(task)
+        if forced_running:
+            forced_entry = StepLogEntry(
+                uuid=generate_id(),
+                step_id=step_id,
+                workflow_id=step.workflow_id,
+                facet_name=step.facet_name or "",
+                source=StepLogSource.FRAMEWORK,
+                level=StepLogLevel.WARNING,
+                message="Forcibly retried while task was RUNNING",
+                time=int(_time.time() * 1000),
+            )
+            store.save_step_log(forced_entry)
+
+    # Reset errored ancestor blocks/containers so execution resumes
+    _reset_errored_ancestors(step, store)
+
+    # Emit step log entry for the manual retry
+    entry = StepLogEntry(
+        uuid=generate_id(),
+        step_id=step_id,
+        workflow_id=step.workflow_id,
+        facet_name=step.facet_name or "",
+        source=StepLogSource.FRAMEWORK,
+        level=StepLogLevel.WARNING,
+        message=f"Step manually restarted via dashboard (was {prev_state})",
+        time=int(_time.time() * 1000),
+    )
+    store.save_step_log(entry)
     return RedirectResponse(url=f"/steps/{step_id}", status_code=303)
 
 
 @router.post("/{step_id}/retry-block")
-def retry_block(step_id: str, store=Depends(get_store)):
-    """Retry all errored leaf steps under a block recursively."""
+def retry_block(step_id: str, force: bool = False, store=Depends(get_store)):
+    """Retry all errored leaf steps under a block recursively.
+
+    By default refuses if any errored leaf's task is currently RUNNING.
+    Pass ``force=true`` to reset those tasks alongside the rest.
+    """
     import time as _time
+
+    from fastapi.responses import JSONResponse
 
     from facetwork.runtime.entities import (
         StepLogEntry,
         StepLogLevel,
         StepLogSource,
+        TaskState,
     )
     from facetwork.runtime.states import StepState
     from facetwork.runtime.types import generate_id
@@ -287,6 +337,33 @@ def retry_block(step_id: str, store=Depends(get_store)):
                 if child.state == StepState.STATEMENT_ERROR:
                     stack.append(child.id)
 
+    # Safety: refuse if any errored leaf still has a RUNNING task — its
+    # handler is in flight and resetting would race the live runner.
+    if errored_leaves and not force:
+        running_blockers: list[dict] = []
+        for leaf in errored_leaves:
+            t = store.get_task_for_step(leaf.id)
+            if t is not None and t.state == TaskState.RUNNING:
+                running_blockers.append(
+                    {
+                        "step_id": leaf.id,
+                        "facet_name": leaf.facet_name or "",
+                        "task_uuid": t.uuid,
+                    }
+                )
+        if running_blockers:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": "leaf_task_running",
+                    "message": (
+                        f"{len(running_blockers)} errored leaf(s) have running tasks. "
+                        "Pass ?force=true to reset them anyway."
+                    ),
+                    "blockers": running_blockers,
+                },
+            )
+
     # Retry each leaf
     for leaf in errored_leaves:
         leaf.state = StepState.EVENT_TRANSMIT
@@ -298,9 +375,22 @@ def retry_block(step_id: str, store=Depends(get_store)):
 
         task = store.get_task_for_step(leaf.id)
         if task is not None:
+            forced_running = force and task.state == TaskState.RUNNING
             task.state = "pending"
             task.error = None
             store.save_task(task)
+            if forced_running:
+                forced_entry = StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=leaf.id,
+                    workflow_id=leaf.workflow_id,
+                    facet_name=leaf.facet_name or "",
+                    source=StepLogSource.FRAMEWORK,
+                    level=StepLogLevel.WARNING,
+                    message="Forcibly retried during block retry while task was RUNNING",
+                    time=int(_time.time() * 1000),
+                )
+                store.save_step_log(forced_entry)
 
         _reset_errored_ancestors(leaf, store)
 
@@ -321,14 +411,22 @@ def retry_block(step_id: str, store=Depends(get_store)):
 
 
 @router.post("/{step_id}/reset-block")
-def reset_block(step_id: str, store=Depends(get_store)):
-    """Reset a block: delete all descendant steps and restart from scratch."""
+def reset_block(step_id: str, force: bool = False, store=Depends(get_store)):
+    """Reset a block: delete all descendant steps and restart from scratch.
+
+    By default refuses to proceed if any descendant step has a running task —
+    deleting it would leave a runner mid-execution with no step to write back
+    to. Pass ``force=true`` to stop and delete those running tasks anyway.
+    """
     import time as _time
+
+    from fastapi.responses import JSONResponse
 
     from facetwork.runtime.entities import (
         StepLogEntry,
         StepLogLevel,
         StepLogSource,
+        TaskState,
     )
     from facetwork.runtime.states import StepState
     from facetwork.runtime.types import generate_id
@@ -360,8 +458,56 @@ def reset_block(step_id: str, store=Depends(get_store)):
             descendant_ids.append(child_id)
             stack.append(child_id)
 
+    # Safety: refuse to delete descendants that have a running task unless
+    # the caller explicitly forces.  Wiping a step while its handler is in
+    # flight orphans the runner (its step row would vanish).
+    if descendant_ids and not force:
+        running_blockers: list[dict] = []
+        for ds_id in descendant_ids:
+            ds_task = store.get_task_for_step(ds_id)
+            if ds_task is not None and ds_task.state == TaskState.RUNNING:
+                ds_step = store.get_step(ds_id)
+                running_blockers.append(
+                    {
+                        "step_id": ds_id,
+                        "facet_name": (ds_step.facet_name if ds_step else "") or "",
+                        "task_uuid": ds_task.uuid,
+                    }
+                )
+        if running_blockers:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": "running_descendants",
+                    "message": (
+                        f"{len(running_blockers)} descendant step(s) have running tasks. "
+                        "Pass ?force=true to stop and delete them."
+                    ),
+                    "blockers": running_blockers,
+                },
+            )
+
     # Delete descendants
     if descendant_ids:
+        if force:
+            for ds_id in descendant_ids:
+                ds_task = store.get_task_for_step(ds_id)
+                if ds_task is not None and ds_task.state == TaskState.RUNNING:
+                    ds_step = store.get_step(ds_id)
+                    forced_entry = StepLogEntry(
+                        uuid=generate_id(),
+                        step_id=ds_id,
+                        workflow_id=(ds_step.workflow_id if ds_step else block.workflow_id),
+                        facet_name=(ds_step.facet_name if ds_step else "") or "",
+                        source=StepLogSource.FRAMEWORK,
+                        level=StepLogLevel.WARNING,
+                        message=(
+                            f"Forcibly removed by reset of block {step_id} "
+                            f"while task was RUNNING"
+                        ),
+                        time=int(_time.time() * 1000),
+                    )
+                    store.save_step_log(forced_entry)
         store.delete_step_logs_for_steps(descendant_ids)
         store.delete_tasks_for_steps(descendant_ids)
         store.delete_steps(descendant_ids)
