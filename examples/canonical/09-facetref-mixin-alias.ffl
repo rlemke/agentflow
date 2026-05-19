@@ -18,13 +18,13 @@
 // deliberately unreachable from FacetRef consumers — see rule
 // REF_INVALID_FACET_REF_ATTRIBUTE.
 //
-// Caveat: facet-signature mixin execution is not yet fully wired in the
-// runtime (MixinBlocksBeginHandler is stubbed). The validator accepts
-// the syntax and the resolver knows how to follow an alias to a mixin
-// sub-step, but until the mixin sub-step rows are persisted at runtime
-// the `$.f2.m1.output` access will raise a `no param, return, or mixin
-// alias` ReferenceError. The grammar + validator side of this example
-// is fully exercised by the test suite.
+// At runtime, the mixin sub-step is synthesized on demand from the
+// parent's persisted yields — `yield F2(...) with M1(out = ...)`
+// surfaces the M1 contribution as the M1 sub-step's `out` return when
+// a downstream FacetRef consumer reads `$.f2.m1.out`. Multiple yields
+// to the same mixin merge per the standard yield-merge rules
+// (collections aggregate, scalars overwrite). See
+// `facetwork/runtime/mixin_alias.py`.
 
 namespace alias_demo {
     facet M1(input: String) => (output: String) andThen {

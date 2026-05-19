@@ -204,10 +204,14 @@ class FacetInitializationBeginHandler(StateHandler):
             return self.context.persistence.get_step(step_id)
 
         def get_mixin_step_by_alias(parent_step_id: str, alias: str):
-            for child in self.context.persistence.get_steps_by_container(parent_step_id):
-                if child.statement_name == alias:
-                    return child
-            return None
+            from ..mixin_alias import resolve_mixin_step_by_alias
+
+            return resolve_mixin_step_by_alias(
+                parent_step_id,
+                alias,
+                self.context.persistence,
+                self.context.get_facet_definition,
+            )
 
         return EvaluationContext(
             inputs=inputs,
