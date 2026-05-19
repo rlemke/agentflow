@@ -995,10 +995,19 @@ class FFLValidator:
         # Get valid input references (parameters of containing facet)
         input_attrs = {p.name for p in containing_sig.params}
 
-        # Get valid yield targets (containing facet name + mixin names)
+        # Get valid yield targets: the containing facet name, every
+        # mixin's short target name, and every declared alias.  Aliases
+        # are the disambiguated form authors must use when the same
+        # target appears twice (see YIELD_TARGET_AMBIGUOUS below).
         valid_yield_targets = {containing_sig.name}
+        # Count mixin short names so we can flag ambiguous bare-target yields.
+        mixin_target_counts: dict[str, int] = {}
         for mixin in containing_sig.mixins:
-            valid_yield_targets.add(mixin.name.split(".")[-1])  # Use short name
+            short = mixin.name.split(".")[-1]
+            valid_yield_targets.add(short)
+            mixin_target_counts[short] = mixin_target_counts.get(short, 0) + 1
+            if mixin.alias:
+                valid_yield_targets.add(mixin.alias)
         if extra_yield_targets:
             valid_yield_targets |= extra_yield_targets
 
@@ -1135,6 +1144,8 @@ class FFLValidator:
                 foreach_var,
                 step_returns_types,
                 other_block_steps=other_block_steps,
+                containing_sig=containing_sig,
+                mixin_target_counts=mixin_target_counts,
             )
             target = yield_stmt.call.name.split(".")[-1]
             if target in yield_targets_used:
@@ -1937,6 +1948,8 @@ class FFLValidator:
         foreach_var: str | None,
         step_returns_types: dict[str, dict[str, str]] | None = None,
         other_block_steps: set[str] | None = None,
+        containing_sig: FacetSig | None = None,
+        mixin_target_counts: dict[str, int] | None = None,
     ) -> None:
         """Validate a yield statement."""
         target = yield_stmt.call.name.split(".")[-1]  # Use short name
@@ -1947,6 +1960,25 @@ class FFLValidator:
                 f"Valid targets are: {sorted(valid_targets)}",
                 yield_stmt.location,
                 rule_id="YIELD_INVALID_TARGET",
+            )
+        elif (
+            mixin_target_counts is not None
+            and containing_sig is not None
+            and mixin_target_counts.get(target, 0) > 1
+        ):
+            # Multiple sig-level mixins target the same facet — the bare
+            # target name can't pick one.  Author must use an alias.
+            alias_choices = sorted(
+                m.alias
+                for m in containing_sig.mixins
+                if m.alias and m.name.split(".")[-1] == target
+            )
+            self._result.add_error(
+                f"Ambiguous yield target '{target}': the containing facet has "
+                f"{mixin_target_counts[target]} mixins with this target. "
+                f"Use one of the aliases instead: {alias_choices}",
+                yield_stmt.location,
+                rule_id="YIELD_TARGET_AMBIGUOUS",
             )
 
         # Validate references in yield arguments

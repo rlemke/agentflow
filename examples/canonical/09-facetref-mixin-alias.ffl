@@ -18,17 +18,26 @@
 // deliberately unreachable from FacetRef consumers — see rule
 // REF_INVALID_FACET_REF_ATTRIBUTE.
 //
-// At runtime, the parent step gets one placeholder sub-step row per
-// aliased mixin (created by `MixinBlocksBeginHandler`) so each mixin
-// shows up as a child in the dashboard. The actual `attributes.returns`
-// the FacetRef consumer reads are synthesised on demand from the
-// parent's persisted yields — `yield F2(...) with M1(out = ...)`
-// surfaces the M1 contribution as the M1 sub-step's `out` return when
-// a downstream FacetRef consumer reads `$.f2.m1.out`. Multiple yields
-// to the same mixin merge per the standard yield-merge rules
-// (collections aggregate, scalars overwrite). See
-// `facetwork/runtime/mixin_alias.py` and
-// `facetwork/runtime/handlers/blocks.py::MixinBlocksBeginHandler`.
+// At runtime, the parent step gets one sub-step row per aliased mixin
+// (created by `MixinBlocksBeginHandler`) so each mixin shows up as a
+// child in the dashboard tree. Yields targeting the mixin land in the
+// sub-step's `attributes.returns` via `StatementCaptureBeginHandler`'s
+// routing pass — `yield F2(...) with M1(output = ...)` writes to the
+// M1 sub-step's `output`, which a downstream FacetRef consumer then
+// reads as `$.f2.m1.output`.
+//
+// Two ways to address an aliased mixin in a yield:
+//   * by mixin facet name — `yield F2(...) with M1(output = ...)`
+//     (works when only one alias points at that facet)
+//   * by alias name — `yield m1(output = ...)`
+//     (required when the same target appears twice with different
+//     aliases; see rule YIELD_TARGET_AMBIGUOUS)
+//
+// Multiple yields to the same destination merge per the standard
+// yield-merge rules (lists/sets aggregate, scalars overwrite). See
+// `facetwork/runtime/handlers/capture.py::StatementCaptureBeginHandler`
+// and `facetwork/runtime/mixin_alias.py` (the consumer-side resolver,
+// now a thin persistence lookup).
 
 namespace alias_demo {
     facet M1(input: String) => (output: String) andThen {

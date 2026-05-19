@@ -1,11 +1,10 @@
 """Tests for ``facetwork.runtime.mixin_alias.resolve_mixin_step_by_alias``.
 
-These exercise the synthesis path that backs the
-``get_mixin_step_by_alias`` callback wired into every
-``EvaluationContext`` — given a parent step, a mixin alias, and the
-parent's yield steps, the helper returns a synthetic step whose
-``attributes.returns`` carries the yielded values keyed by field
-name.
+The helper is a thin lookup over persistence: given a parent step id
+and an alias name, it returns the persisted mixin sub-step whose
+``statement_name`` matches the alias.  The sub-step is created by
+``MixinBlocksBeginHandler`` and populated with returns by
+``StatementCaptureBeginHandler``'s yield-routing path.
 """
 
 from __future__ import annotations
@@ -49,141 +48,62 @@ def _step(
 
 class _FakePersistence:
     def __init__(self, steps: list[StepDefinition]):
-        self._by_id = {s.id: s for s in steps}
         self._by_container: dict[str, list[StepDefinition]] = {}
-        self._by_block: dict[str, list[StepDefinition]] = {}
         for s in steps:
             if s.container_id:
                 self._by_container.setdefault(s.container_id, []).append(s)
-            if s.block_id:
-                self._by_block.setdefault(s.block_id, []).append(s)
-
-    def get_step(self, step_id):
-        return self._by_id.get(step_id)
 
     def get_steps_by_container(self, container_id):
         return list(self._by_container.get(container_id, []))
 
-    def get_steps_by_block(self, block_id):
-        return list(self._by_block.get(block_id, []))
 
-
-def _facet_def(name: str, mixins: list[dict]) -> dict:
-    return {"name": name, "mixins": mixins}
-
-
-def test_resolves_alias_from_single_yield():
-    """A single yield to an aliased mixin surfaces as the mixin
-    sub-step's only return."""
-    parent = _step(
-        id="f2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
-    )
-    block = _step(
-        id="b1",
-        object_type=ObjectType.AND_THEN,
-        container_id="f2",
-        container_type=parent.object_type,
-    )
-    yld = _step(
-        id="y-m1",
-        object_type=ObjectType.YIELD_ASSIGNMENT,
-        block_id="b1",
+def test_returns_sub_step_when_alias_matches_statement_name():
+    """Happy path: persistence has a child with ``statement_name == alias``."""
+    sub = _step(
+        id="sub-m1",
+        object_type=ObjectType.VARIABLE_ASSIGNMENT,
         facet_name="M1",
-        params={"output": "hello"},
-    )
-    persistence = _FakePersistence([parent, block, yld])
-    facets = {
-        "F2": _facet_def("F2", [{"target": "M1", "alias": "m1"}]),
-    }
-
-    synth = resolve_mixin_step_by_alias(
-        "f2", "m1", persistence, lambda n: facets.get(n)
-    )
-    assert synth is not None
-    assert synth.facet_name == "M1"
-    assert synth.statement_name == "m1"
-    assert synth.attributes.returns["output"].value == "hello"
-
-
-def test_merges_multiple_yields_to_same_alias_list_collection():
-    """Yields contributing to a list-typed field aggregate."""
-    parent = _step(
-        id="f2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
-    )
-    block = _step(
-        id="b1",
-        object_type=ObjectType.AND_THEN,
+        statement_name="m1",
         container_id="f2",
-        container_type=parent.object_type,
+        returns={"output": "from-routing"},
     )
-    y1 = _step(
-        id="y1",
-        object_type=ObjectType.YIELD_ASSIGNMENT,
-        block_id="b1",
-        facet_name="M1",
-        params={"items": ["a"]},
-    )
-    y2 = _step(
-        id="y2",
-        object_type=ObjectType.YIELD_ASSIGNMENT,
-        block_id="b1",
-        facet_name="M1",
-        params={"items": ["b"]},
-    )
-    persistence = _FakePersistence([parent, block, y1, y2])
-    facets = {"F2": _facet_def("F2", [{"target": "M1", "alias": "m1"}])}
-
-    synth = resolve_mixin_step_by_alias(
-        "f2", "m1", persistence, lambda n: facets.get(n)
-    )
-    assert synth is not None
-    assert synth.attributes.returns["items"].value == ["a", "b"]
+    persistence = _FakePersistence([sub])
+    result = resolve_mixin_step_by_alias("f2", "m1", persistence)
+    assert result is sub
+    assert result.attributes.returns["output"].value == "from-routing"
 
 
-def test_returns_none_when_alias_not_declared():
-    parent = _step(
-        id="f2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
-    )
-    persistence = _FakePersistence([parent])
-    facets = {"F2": _facet_def("F2", [{"target": "M1", "alias": "m1"}])}
-
-    synth = resolve_mixin_step_by_alias(
-        "f2", "not_declared", persistence, lambda n: facets.get(n)
-    )
-    assert synth is None
-
-
-def test_returns_none_when_no_yields_target_alias():
-    """The alias is declared, but the parent body never yielded to it."""
-    parent = _step(
-        id="f2", object_type=ObjectType.VARIABLE_ASSIGNMENT, facet_name="F2"
-    )
-    block = _step(
-        id="b1",
-        object_type=ObjectType.AND_THEN,
+def test_returns_none_when_no_child_matches_alias():
+    """The parent has children but none use this alias."""
+    other = _step(
+        id="other",
+        object_type=ObjectType.VARIABLE_ASSIGNMENT,
+        facet_name="M2",
+        statement_name="m2",
         container_id="f2",
-        container_type=parent.object_type,
     )
-    # Yield targets the parent itself, not M1.
-    yld = _step(
-        id="y-f2",
-        object_type=ObjectType.YIELD_ASSIGNMENT,
-        block_id="b1",
-        facet_name="F2",
-        params={"output": "primary"},
-    )
-    persistence = _FakePersistence([parent, block, yld])
-    facets = {"F2": _facet_def("F2", [{"target": "M1", "alias": "m1"}])}
-
-    synth = resolve_mixin_step_by_alias(
-        "f2", "m1", persistence, lambda n: facets.get(n)
-    )
-    assert synth is None
+    persistence = _FakePersistence([other])
+    assert resolve_mixin_step_by_alias("f2", "m1", persistence) is None
 
 
-def test_returns_none_when_parent_missing():
+def test_returns_none_when_parent_has_no_children():
+    """Parent never reached MIXIN_BLOCKS_BEGIN, so no placeholder exists."""
     persistence = _FakePersistence([])
-    synth = resolve_mixin_step_by_alias(
-        "missing", "m1", persistence, lambda n: None
+    assert resolve_mixin_step_by_alias("f2", "m1", persistence) is None
+
+
+def test_legacy_get_facet_definition_positional_arg_is_ignored():
+    """The synthesis-era 4th positional arg is accepted for source-level
+    back-compat with callers that still pass it."""
+    sub = _step(
+        id="sub-m1",
+        object_type=ObjectType.VARIABLE_ASSIGNMENT,
+        facet_name="M1",
+        statement_name="m1",
+        container_id="f2",
     )
-    assert synth is None
+    persistence = _FakePersistence([sub])
+    result = resolve_mixin_step_by_alias(
+        "f2", "m1", persistence, lambda name: {"name": name, "mixins": []}
+    )
+    assert result is sub

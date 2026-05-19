@@ -32,12 +32,12 @@ A naive MCP only covers layer 3. The most leverage comes from layer 4: a tight v
 
 `ValidationError` carries `rule_id`, `severity`, `line`, `column`, `docs_uri`, `suggested_fix`. The `add_error` and `add_warning` methods accept `rule_id` as a keyword-only argument with a default of `"UNKNOWN"` — backward-compatible with any caller that doesn't pass one. The `docs_uri` is auto-populated from the `rule_id` as `afl://docs/rules/{rule_id}` when not explicitly provided.
 
-The validator emits **43 distinct rule_ids** across these categories:
+The validator emits **44 distinct rule_ids** across these categories:
 
 - **Placement** — `WORKFLOW_AT_TOP_LEVEL`, `SCHEMA_AT_TOP_LEVEL`
 - **Reference resolution** — `REF_UNKNOWN_FACET`, `REF_AMBIGUOUS_FACET`, `REF_UNKNOWN_SCHEMA`, `REF_AMBIGUOUS_SCHEMA`, `REF_UNKNOWN_TYPE`, `REF_UNDEFINED_STEP`, `REF_INVALID_STEP_FORMAT`, `REF_INVALID_STEP_ATTRIBUTE`, `REF_INVALID_INPUT`, `REF_CROSS_BLOCK_STEP`, `REF_FORWARD_STEP`, `STEP_REF_FACET_MISMATCH`, `REF_INVALID_FACET_REF_ATTRIBUTE`
 - **Naming/uniqueness** — `DUPLICATE_NAME`, `DUPLICATE_STEP_NAME`, `YIELD_DUPLICATE_TARGET`, `USE_UNKNOWN_NAMESPACE`, `MIXIN_ALIAS_NAME_CONFLICT`
-- **Yield** — `YIELD_INVALID_TARGET`
+- **Yield** — `YIELD_INVALID_TARGET`, `YIELD_TARGET_AMBIGUOUS`
 - **`when` blocks** — `WHEN_NO_CASES`, `WHEN_MULTIPLE_DEFAULTS`, `WHEN_MISSING_DEFAULT`, `WHEN_DEFAULT_NOT_LAST`, `WHEN_CONDITION_NOT_BOOLEAN`
 - **Prompt blocks** — `PROMPT_MISSING_TEMPLATE`, `PROMPT_INVALID_PLACEHOLDER`
 - **Script blocks** — `SCRIPT_EMPTY`, `SCRIPT_UNSUPPORTED_LANGUAGE`
@@ -49,7 +49,7 @@ The validator emits **43 distinct rule_ids** across these categories:
 
 ### Rule documentation (`docs/reference/rules/{rule_id}.md`)
 
-44 files (43 rules + `PARSE_ERROR`), one per emitted rule_id, all following the same template:
+45 files (44 rules + `PARSE_ERROR`), one per emitted rule_id, all following the same template:
 
 ```markdown
 # RULE_ID — One-line summary

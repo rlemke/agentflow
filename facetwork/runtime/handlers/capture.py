@@ -137,8 +137,32 @@ class MixinCaptureEndHandler(StateHandler):
 class StatementCaptureBeginHandler(StateHandler):
     """Handler for state.statement.capture.Begin.
 
-    Merges yield results from statement blocks (andThen).
-    This is where yield TestOne(output = s2.input + 1) is captured.
+    Merges yield results from statement blocks (andThen) into either
+    the parent step's returns (the typical case) or into an aliased
+    mixin sub-step's returns when the yield targets the mixin by
+    alias name (or by the mixin facet's name when that target is
+    used by exactly one alias on the parent facet).
+
+    Routing rules per yield (target = ``yield <target>(...)``):
+
+    1. ``target`` matches the parent's facet name → merge into the
+       parent step's returns (this is the existing primary case).
+    2. ``target`` matches a declared mixin alias on the parent's facet
+       → merge into the matching mixin sub-step's returns.  The
+       sub-step was created in ``STATEMENT_COMPLETE`` by
+       ``MixinBlocksBeginHandler``; we update it in place via
+       ``add_updated_step`` so its returns are visible to FacetRef
+       consumers reading ``$.<fref>.<alias>.<field>``.
+    3. ``target`` is the **facet name** of a mixin used **exactly once**
+       on the parent and that one usage has an alias → route to that
+       sub-step.  Preserves the historical ``yield F(...) with M(out=...)``
+       pattern (which the parser splits into two YieldStmts, one per
+       target) when there is no ambiguity.  When two or more aliases
+       point at the same target, the validator's ``YIELD_TARGET_AMBIGUOUS``
+       rule forces the author to use the alias name explicitly, so this
+       branch never has to disambiguate at runtime.
+    4. Otherwise → ignored at this capture scope (inner-facet-body
+       yields handled by their own capture).
     """
 
     def process_state(self) -> StateChangeResult:
@@ -157,13 +181,34 @@ class StatementCaptureBeginHandler(StateHandler):
             ):
                 statement_blocks.append(pending_step)
 
-        # Merge yield results from every block, deduplicating yield steps
-        # across blocks.  Foreach sub-blocks (each iteration) are listed as
-        # direct children of the containing step AND show up again when the
-        # parent foreach block is walked recursively — without the seen-set
-        # below, each yield's contribution would be applied twice (a no-op
-        # for scalar overwrites, but a doubled list for collection merges).
+        # Per-process routing scratch state.  ``_seen_yield_ids`` dedups
+        # yields seen across foreach/when sub-blocks (a foreach yield's
+        # step is reachable from both its direct foreach sub-block and
+        # the parent's container walk).  ``_mixin_substep_working`` is a
+        # working-copy map alias → mutable StepDefinition so multiple
+        # yields targeting the same alias accumulate before we persist
+        # the sub-step once via ``add_updated_step``.
         self._seen_yield_ids: set[str] = set()
+        self._mixin_substep_working: dict[str, "StepDefinition"] = {}
+
+        # Cache parent's mixin metadata once.  ``mixin_aliases`` maps
+        # alias → target facet name; ``target_to_aliases`` is the inverse
+        # used to resolve the unique-target back-compat case.  Computed
+        # from the same facet def the validator reads, so any disambiguation
+        # rule in the validator also applies at routing time.
+        self._mixin_aliases: dict[str, str] = {}
+        self._target_to_aliases: dict[str, list[str]] = {}
+        if self.step.facet_name:
+            facet_def = self.context.get_facet_definition(self.step.facet_name)
+            if facet_def:
+                for mixin in facet_def.get("mixins", []) or []:
+                    target = mixin.get("target") or ""
+                    alias = mixin.get("alias")
+                    if alias:
+                        self._mixin_aliases[alias] = target
+                    if target:
+                        self._target_to_aliases.setdefault(target, []).append(alias or "")
+
         for block in statement_blocks:
             self._merge_yields_from_block(block)
 
@@ -171,16 +216,18 @@ class StatementCaptureBeginHandler(StateHandler):
         return StateChangeResult(step=self.step)
 
     def _merge_yields_from_block(self, block: "StepDefinition") -> None:
-        """Merge yield results from a block into the step.
+        """Merge yield results from a block into the right destination.
 
-        For regular blocks, merges yield step attributes.
-        For andThen script blocks, merges the block step's own returns
-        (set by ScriptExecutor in _execute_script_block).
+        For andThen script blocks, the block step's own ``attributes.returns``
+        are copied directly onto the parent (these are populated by
+        ``ScriptExecutor`` in ``_execute_script_block`` and never need
+        mixin routing).
 
-        Recursively searches descendant blocks (andWhen cases, nested
-        andThen blocks) to collect yields at any depth.  Deduplication
-        across calls to this method uses ``self._seen_yield_ids``, which
-        the caller (``process_state``) seeds.
+        Recursively walks descendant blocks (andWhen cases, nested andThen
+        blocks) to find every completed yield step.  Yields are then
+        routed per the rules in this handler's class docstring.
+        Deduplication uses ``self._seen_yield_ids``, seeded by
+        ``process_state``.
         """
 
         # Check if block itself has returns (andThen script blocks)
@@ -188,13 +235,12 @@ class StatementCaptureBeginHandler(StateHandler):
             for name, attr in block.attributes.returns.items():
                 self.step.attributes.set_return(name, attr.value, attr.type_hint)
 
-        # Collect yields recursively from this block and all descendant
-        # blocks.  Only capture yields whose target matches the capture
-        # scope (self.step.facet_name) so that inner facet body yields
-        # (e.g. yield IntValueAdd inside Adder body) are not incorrectly
-        # merged into the parent scope.
-        target = self.step.facet_name
-        yield_steps = self._collect_yields_recursive(block.id, target)
+        # Collect every completed yield under this block — filtering now
+        # happens during routing instead of during collection.  Inner-facet-
+        # body yields (whose target is some inner facet on a nested step's
+        # own body) are dropped by the routing step because their target
+        # name matches neither the parent nor any of the parent's mixins.
+        yield_steps = self._collect_yields_recursive(block.id)
 
         seen = getattr(self, "_seen_yield_ids", None)
         for yield_step in yield_steps:
@@ -202,21 +248,49 @@ class StatementCaptureBeginHandler(StateHandler):
                 if yield_step.id in seen:
                     continue
                 seen.add(yield_step.id)
-            self._merge_yield(yield_step)
+            self._route_yield(yield_step)
 
-    def _collect_yields_recursive(
-        self, block_id, target_name: str | None = None
-    ) -> list["StepDefinition"]:
+    def _route_yield(self, yield_step: "StepDefinition") -> None:
+        """Decide where a yield's params go and merge them there."""
+        target = yield_step.facet_name or ""
+        short = target.split(".")[-1]
+        parent_short = (
+            self.step.facet_name.split(".")[-1] if self.step.facet_name else None
+        )
+
+        # Case 1: yield to the parent facet itself.
+        if parent_short is not None and _names_match(target, self.step.facet_name):
+            self._merge_yield_into_parent(yield_step)
+            return
+
+        # Case 2: yield uses an alias name directly.
+        if short in self._mixin_aliases:
+            self._merge_yield_into_mixin_substep(yield_step, alias=short)
+            return
+
+        # Case 3: yield uses a mixin's target facet name and that target
+        # has exactly one alias on the parent.  The validator's
+        # YIELD_TARGET_AMBIGUOUS rule rejects multi-alias cases at compile
+        # time, so we only need the unique-alias branch here.
+        aliases = [a for a in self._target_to_aliases.get(short, []) if a]
+        if len(aliases) == 1:
+            self._merge_yield_into_mixin_substep(yield_step, alias=aliases[0])
+            return
+
+        # Otherwise: not for this capture scope (inner facet body, etc.).
+
+    def _collect_yields_recursive(self, block_id) -> list["StepDefinition"]:
         """Recursively collect yield steps from a block and its descendants.
 
         Follows both block children (andWhen cases, nested andThen) and
         step_body blocks (andThen when/foreach attached to a step).
+        Routing decides which collected yield belongs to which destination;
+        unmatched yields are silently dropped, which is also how inner
+        facet body yields (e.g. ``yield IntValueAdd(...)`` inside Adder's
+        body) avoid leaking into an outer capture scope.
 
         Args:
             block_id: The block to search.
-            target_name: If given, only yield steps whose facet_name
-                matches this target are collected.  This prevents inner
-                facet body yields from leaking into outer capture scopes.
         """
         from ..types import ObjectType
 
@@ -234,15 +308,13 @@ class StatementCaptureBeginHandler(StateHandler):
         yields = [
             s
             for s in steps
-            if s.object_type == ObjectType.YIELD_ASSIGNMENT
-            and s.is_complete
-            and (target_name is None or _names_match(s.facet_name, target_name))
+            if s.object_type == ObjectType.YIELD_ASSIGNMENT and s.is_complete
         ]
 
         # Recurse into sub-blocks (andWhen cases, nested andThen blocks)
         for s in steps:
             if s.is_block and s.is_complete:
-                yields.extend(self._collect_yields_recursive(s.id, target_name))
+                yields.extend(self._collect_yields_recursive(s.id))
 
         # Also follow step_body blocks: for each non-block step, check if
         # it has block children (from andThen when/foreach step_body).
@@ -251,18 +323,18 @@ class StatementCaptureBeginHandler(StateHandler):
                 child_blocks = self.context.persistence.get_blocks_by_step(s.id)
                 for cb in child_blocks:
                     if cb.is_complete:
-                        yields.extend(self._collect_yields_recursive(cb.id, target_name))
+                        yields.extend(self._collect_yields_recursive(cb.id))
 
         return yields
 
-    def _merge_yield(self, yield_step: "StepDefinition") -> None:
-        """Merge a single yield into the step's attributes.
+    def _merge_yield_into_parent(self, yield_step: "StepDefinition") -> None:
+        """Merge a yield into the parent step's returns.
 
         Yield attributes become return values on the containing step.
         Collection-typed values (``list``, ``set``, ``frozenset``)
         combine with the prior return via concat/union so multiple
         yields — typically from ``andThen foreach`` sub-blocks —
-        aggregate into one collection. Other types (scalars, dicts,
+        aggregate into one collection.  Other types (scalars, dicts,
         schema instances) overwrite — see ``_merge_yield_value``.
 
         This is what lets a foreach body collect its outputs:
@@ -280,6 +352,71 @@ class StatementCaptureBeginHandler(StateHandler):
                 else attr.value
             )
             self.step.attributes.set_return(name, merged_value, attr.type_hint)
+
+    def _merge_yield_into_mixin_substep(
+        self, yield_step: "StepDefinition", alias: str
+    ) -> None:
+        """Merge a yield into the aliased mixin sub-step's returns.
+
+        Looks up (or creates a working copy of) the persisted sub-step
+        under the parent, merges the yield's params into its
+        ``attributes.returns`` using the same merge rules as parent-side
+        capture, and registers it via ``add_updated_step`` so the iteration
+        commits the change.  Multiple yields targeting the same alias
+        accumulate in the working copy before a single update is committed.
+        """
+        sub_step = self._get_mixin_substep(alias)
+        if sub_step is None:
+            # Placeholder wasn't created for this alias (e.g. handler skipped
+            # because the facet definition is missing).  Without a sub-step
+            # to write to, the yield has no consumer-visible home — silently
+            # drop, matching the pre-routing behavior for unknown targets.
+            return
+        for name, attr in yield_step.attributes.params.items():
+            existing = sub_step.attributes.returns.get(name)
+            merged_value = (
+                _merge_yield_value(existing.value, attr.value)
+                if existing is not None
+                else attr.value
+            )
+            sub_step.attributes.set_return(name, merged_value, attr.type_hint)
+        self.context.changes.add_updated_step(sub_step)
+
+    def _get_mixin_substep(self, alias: str) -> "StepDefinition | None":
+        """Return a mutable working copy of the aliased mixin sub-step.
+
+        Search order:
+
+        1. The handler's per-process working-copy cache, so multiple yields
+           into the same alias share state.
+        2. ``changes.created_steps`` (the placeholder this iteration's own
+           ``MixinBlocksBeginHandler`` just wrote), since persistence may
+           not yet have committed it.
+        3. ``changes.updated_steps`` (an earlier routing call this iteration).
+        4. Persistence — clone before mutating to avoid leaking into the
+           store's internal cache.
+        """
+        working = self._mixin_substep_working.get(alias)
+        if working is not None:
+            return working
+
+        for pending in self.context.changes.created_steps:
+            if pending.container_id == self.step.id and pending.statement_name == alias:
+                self._mixin_substep_working[alias] = pending
+                return pending
+
+        for pending in self.context.changes.updated_steps:
+            if pending.container_id == self.step.id and pending.statement_name == alias:
+                self._mixin_substep_working[alias] = pending
+                return pending
+
+        for child in self.context.persistence.get_steps_by_container(self.step.id):
+            if child.statement_name == alias:
+                cloned = child.clone()
+                self._mixin_substep_working[alias] = cloned
+                return cloned
+
+        return None
 
 
 class StatementCaptureEndHandler(StateHandler):

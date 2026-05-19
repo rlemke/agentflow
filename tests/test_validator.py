@@ -354,6 +354,79 @@ class TestYieldValidation:
         assert not result.is_valid
         assert any("Duplicate yield target 'Test'" in str(e) for e in result.errors)
 
+    def test_yield_to_alias_valid(self, validator):
+        """A yield using an alias name should resolve to the aliased mixin."""
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String)
+        facet F(input: String) => (output: String)
+            with M() as m1
+            andThen {
+                yield F(output = "ok")
+                yield m1(output = "via-alias")
+            }
+        """)
+        )
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_yield_target_ambiguous(self, validator):
+        """Two aliases to the same target must force the alias form."""
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String)
+        facet F(input: String) => (output: String)
+            with M() as primary
+            with M() as fallback
+            andThen {
+                yield F(output = "ok")
+                yield M(output = "ambiguous")
+            }
+        """)
+        )
+        result = validator.validate(ast)
+        assert not result.is_valid
+        ambiguous = [e for e in result.errors if e.rule_id == "YIELD_TARGET_AMBIGUOUS"]
+        assert len(ambiguous) == 1
+        msg = str(ambiguous[0])
+        assert "Ambiguous yield target 'M'" in msg
+        assert "fallback" in msg and "primary" in msg
+
+    def test_yield_target_ambiguous_resolved_by_alias(self, validator):
+        """Same shape as above but author uses alias form — should pass."""
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String)
+        facet F(input: String) => (output: String)
+            with M() as primary
+            with M() as fallback
+            andThen {
+                yield F(output = "ok")
+                yield primary(output = "p")
+                yield fallback(output = "f")
+            }
+        """)
+        )
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_yield_to_unique_target_facet_still_valid(self, validator):
+        """When only one mixin uses a given target, the bare target form
+        stays valid — no ambiguity to flag."""
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String)
+        facet F(input: String) => (output: String)
+            with M() as only
+            andThen {
+                yield F(output = "ok")
+                yield M(output = "still-fine")
+            }
+        """)
+        )
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
 
 class TestConvenienceFunction:
     """Test module-level validate function."""

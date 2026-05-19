@@ -471,3 +471,128 @@ def test_is_ref_recognizes_both_forms():
     assert StepReference.is_ref(ref.to_json())
     assert not StepReference.is_ref({"foo": "bar"})
     assert not StepReference.is_ref("not-a-ref")
+
+
+# =========================================================================
+# End-to-end: yields land on distinct mixin sub-steps; FacetRef consumer
+# reads each alias's returns independently.
+# =========================================================================
+
+
+_TWO_ALIASES_SRC = """
+namespace two_aliases {
+    facet M(input: String) => (output: String)
+
+    facet F(input: String) => (output: String)
+        with M() as primary
+        with M() as fallback
+        andThen {
+            yield F(output = "main")
+            yield primary(output = $.input ++ "-p")
+            yield fallback(output = $.input ++ "-f")
+        }
+
+    facet Consumer(f: F) => (a: String, b: String, c: String) andThen {
+        yield Consumer(
+            a = $.f.output,
+            b = $.f.primary.output,
+            c = $.f.fallback.output
+        )
+    }
+
+    workflow Demo(input: String) => (a: String, b: String, c: String) andThen {
+        f1   = F(input = $.input)
+        cons = Consumer(f = f1)
+        yield Demo(a = cons.a, b = cons.b, c = cons.c)
+    }
+}
+"""
+
+
+def test_e2e_two_aliases_to_same_target_route_independently():
+    """End-to-end execution of a workflow whose facet F declares two
+    aliases (``primary`` and ``fallback``) on the same target mixin
+    (``M``).  Each alias is populated by a separate ``yield alias(...)``
+    statement; a downstream FacetRef consumer reads both aliases'
+    returns alongside F's primary return.  Exercises:
+
+    - validator: alias names are valid yield targets, and the bare
+      target name ``M`` is *not* used (would be YIELD_TARGET_AMBIGUOUS).
+    - runtime: ``StatementCaptureBeginHandler._route_yield`` resolves
+      ``primary`` → primary sub-step, ``fallback`` → fallback sub-step,
+      and ``F`` → parent.
+    - resolver: ``resolve_mixin_step_by_alias`` returns the persisted
+      sub-step (no synthesis), and the consumer's
+      ``$.f.<alias>.output`` reads the routed return.
+    """
+    from facetwork.ast_utils import find_workflow
+    from facetwork.runtime import Evaluator, ExecutionStatus, MemoryStore, Telemetry
+
+    program = emit_dict(parse(_TWO_ALIASES_SRC))
+
+    # Validator must accept the alias-named yields.
+    val = validate_ast(parse(_TWO_ALIASES_SRC))
+    assert not val.errors, f"unexpected validator errors: {val.errors}"
+
+    workflow_ast = find_workflow(program, "Demo")
+    store = MemoryStore()
+    evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+    result = evaluator.execute(
+        workflow_ast, inputs={"input": "hi"}, program_ast=program
+    )
+
+    assert result.success, f"workflow failed: {result.status}"
+    assert result.status == ExecutionStatus.COMPLETED
+    assert result.outputs == {"a": "main", "b": "hi-p", "c": "hi-f"}
+
+
+def test_e2e_two_aliases_persist_distinct_substeps():
+    """The runtime persists one sub-step per alias under F's step, with
+    each carrying only its own routed return.  Verifies the two
+    sub-steps are addressable separately (not synthesized on read)."""
+    from facetwork.ast_utils import find_workflow
+    from facetwork.runtime import Evaluator, MemoryStore, Telemetry
+
+    program = emit_dict(parse(_TWO_ALIASES_SRC))
+    workflow_ast = find_workflow(program, "Demo")
+    store = MemoryStore()
+    evaluator = Evaluator(persistence=store, telemetry=Telemetry(enabled=False))
+    result = evaluator.execute(
+        workflow_ast, inputs={"input": "x"}, program_ast=program
+    )
+    assert result.success
+
+    # Find the variable-assignment F-step (the call ``f1 = F(...)``).
+    # The same workflow also contains a yield-assignment step whose
+    # facet_name is "F" (the body's ``yield F(output = ...)``); we want
+    # the call site, not the yield row.
+    from facetwork.runtime import ObjectType
+
+    root_steps = list(store.get_steps_by_workflow(result.workflow_id))
+    f_steps = [
+        s
+        for s in root_steps
+        if s.facet_name
+        and s.facet_name.split(".")[-1] == "F"
+        and s.object_type == ObjectType.VARIABLE_ASSIGNMENT
+    ]
+    assert len(f_steps) == 1, (
+        f"expected one F variable-assignment step, "
+        f"got {[(s.facet_name, s.object_type) for s in f_steps]}"
+    )
+    f_step = f_steps[0]
+
+    # The two aliased mixin sub-steps live as children of F with
+    # statement_name set to the alias.
+    children = list(store.get_steps_by_container(f_step.id))
+    by_alias = {c.statement_name: c for c in children if c.statement_name}
+    assert "primary" in by_alias, f"missing primary: {list(by_alias)}"
+    assert "fallback" in by_alias, f"missing fallback: {list(by_alias)}"
+
+    primary = by_alias["primary"]
+    fallback = by_alias["fallback"]
+    assert primary.attributes.returns["output"].value == "x-p"
+    assert fallback.attributes.returns["output"].value == "x-f"
+    # The two sub-steps carry only their own return — routing is per-alias.
+    assert "fallback" not in primary.attributes.returns
+    assert "primary" not in fallback.attributes.returns
