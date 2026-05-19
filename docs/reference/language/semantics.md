@@ -158,6 +158,16 @@ Program
   collision). The reference is read-only. Validator rule
   `STEP_REF_FACET_MISMATCH` enforces exact facet-name match between
   the source step's call target and the declared parameter type.
+- **Mixin aliases on FacetRef access**: a mixin declared on a facet
+  signature with `with M() as <alias>` exposes its sub-step to a
+  FacetRef consumer as `$.fref.<alias>.<field>`. The alias shares the
+  consumer-side namespace with the facet's own params and returns;
+  collisions are rejected by `MIXIN_ALIAS_NAME_CONFLICT`. Mixins
+  without an `as` alias are unreachable from FacetRef consumers.
+  Validator rule `REF_INVALID_FACET_REF_ATTRIBUTE` checks the first
+  one or two segments past the FacetRef param against the union
+  `params ∪ returns ∪ mixin_aliases` of the referenced facet (and the
+  aliased mixin, when applicable).
 
 ### Default Parameter Values
 - Parameters can have optional default values: `name: Type = expr`

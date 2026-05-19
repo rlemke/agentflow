@@ -1346,6 +1346,19 @@ The call is one RPC back to the runner, which serves the row from the
 same Mongo collection. There is no per-handler cache — call `fetch_step`
 once and reuse the dict for multiple reads.
 
+#### Mixin sub-steps via alias
+
+If the referenced facet declares mixins with `as <alias>`, the
+upstream step's mixin sub-steps are addressable from inside an
+`andThen` body as `$.fref.<alias>.<field>` — the resolver follows the
+alias to the mixin's persisted step and reads the named attribute. In
+handler code, the same access path is available indirectly: a handler
+that needs a mixin sub-step's attributes should expose a parameter
+typed as the **mixin facet** and have the producing workflow pass the
+mixin step by reference into it, rather than navigating from the
+parent FacetRef. The JSON ref shape on the wire (the
+`{_facet_ref: true, ...}` envelope) is identical for both.
+
 #### Read-only semantics
 
 The snapshot is a **point-in-time copy**. It is read-only by contract:

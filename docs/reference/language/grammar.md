@@ -577,6 +577,40 @@ Constraints enforced by the validator:
 The grammar rule is `step_ref: IDENT ("." IDENT)*` — the field portion
 is optional. A bare reference round-trips to AST `StepRef(path=["s1"])`.
 
+##### Mixin aliases on facet signatures
+
+A mixin in a facet signature may be given an alias with `as <name>`.
+The grammar rule is `mixin_sig: "with" QNAME "(" [named_args] ")" ["as" IDENT]`.
+The alias becomes the consumer-side name for that mixin's sub-step on a
+FacetRef:
+
+    facet M1(input: String) => (output: String)
+    facet M2(input: String) => (output: String)
+
+    facet F1(input: String) => (output: String) with M1() with M2()
+    facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2
+
+    facet S1(f1: F1) => (output: String) andThen {
+        v1 = Value(input = $.f1.output)
+        // M1 / M2 cannot be referenced from here — F1's mixins have no alias.
+    }
+
+    facet S2(f2: F2) => (output: String) andThen {
+        v1 = Value(input = $.f2.output)
+        v2 = Value(input = $.f2.m1.output)
+        v3 = Value(input = $.f2.m2.output)
+    }
+
+Aliases share the consumer-side namespace with the facet's own params
+and returns; collisions (alias vs. param, alias vs. return, alias vs.
+another alias) are rejected by rule `MIXIN_ALIAS_NAME_CONFLICT`. For
+example, `facet F3(m1: String) with M1() as m1` is illegal because the
+alias `m1` collides with the param `m1`.
+
+Mixins without an `as` alias are unreachable through a FacetRef by
+design — see [REF_INVALID_FACET_REF_ATTRIBUTE](../rules/REF_INVALID_FACET_REF_ATTRIBUTE.md)
+for the consumer-side rule.
+
 ### Yields
 A yield must have the name of a facet in the containing step. For example:
     s1 = SomeFacet(input = "this") andThen {
