@@ -43,11 +43,20 @@ namespace x {
 
 ## Correct
 
+The mixin signatures may be stacked on their own lines:
+
 ```ffl
 namespace x {
     facet M1(input: String) => (output: String)
     facet M2(input: String) => (output: String)
-    facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2
+    facet F2(input: String) => (output: String)
+        with M1() as m1
+        with M2() as m2
+        andThen {
+            yield F2(output = $.input)
+                with M1(output = $.input)
+                with M2(output = $.input)
+        }
 }
 ```
 

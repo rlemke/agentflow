@@ -1,8 +1,10 @@
 // Mixin composition — extra return attributes attached to a facet/workflow.
 //
 // `with FacetA()` on a signature makes the mixin's return attributes
-// part of what callers can yield to. yield statements may target the
-// containing facet OR any of its declared mixins.
+// part of what callers can yield to. A single yield may target the
+// containing facet AND any of its mixins via a `with` chain, or each
+// target may be written as its own `yield` statement — the two forms
+// produce identical AST.
 
 namespace audit {
     facet Timestamp() => (at: String)
@@ -10,7 +12,9 @@ namespace audit {
 
     workflow ChargeWithAudit(account: String, amount: Long, at: String) => (txn_id: String, at: String) with Timestamp() andThen {
         charged = Charge(account = $.account, amount = $.amount)
+        // Chained form — symmetric with how mixins attach to the
+        // workflow signature above:
         yield ChargeWithAudit(txn_id = charged.txn_id)
-        yield Timestamp(at = $.at)
+            with Timestamp(at = $.at)
     }
 }

@@ -481,6 +481,21 @@ This third reference form composes naturally with the data-dependency discipline
 
 A facet signature may declare mixins with the syntax `with M() as <alias>`, and a consumer that holds a FacetRef can then address each aliased mixin's sub-step through `$.fref.<alias>.<field>`. This makes the per-mixin work visible to downstream consumers without forcing the producing facet to re-project mixin outputs into its own returns. The alias shares the consumer-side namespace with the facet's own params and returns; a compile-time rule rejects collisions — for instance, `facet F3(m1: String) with M1() as m1` is illegal because the alias `m1` shadows a primary parameter. Mixins declared without an `as` alias are deliberately unreachable from FacetRef consumers: they remain part of the facet's composition but are private to it, the namespace-discipline analogue of an unexported method. Aliases therefore serve two purposes at once — they give consumers a stable name to address mixin sub-steps, and they form an opt-in surface boundary that determines what a facet exposes through pass-by-step.
 
+The same `with` keyword that attaches mixins to a signature also chains additional targets in a `yield` statement, so the producing facet's body reads symmetrically with its declaration:
+
+```ffl
+facet F2(input: String) => (output: String)
+    with M1() as m1
+    with M2() as m2
+    andThen {
+        yield F2(output = $.input)
+            with M1(output = $.input)
+            with M2(output = $.input)
+    }
+```
+
+A single `yield F2(...) with M1(...) with M2(...)` is parsed as one statement per target — the compiler unpacks the chain into independent yields, each subject to the usual yield-target rules. The chained form removes the visual asymmetry between a signature that lists its mixins on stacked lines and a body that would otherwise need three separate `yield` statements to fan results back across them.
+
 ### 4.5 Mixins, implicits, and inheritance-by-composition
 
 Mixins let one facet be defined as the combination of several others:

@@ -62,9 +62,16 @@ facet F1(input: String) => (output: String) with M1() as m1
 
 ```ffl
 namespace x {
-    facet M1(in: String) => (out: String)
-    facet M2(in: String) => (out: String)
-    facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2
+    facet M1(in: String) => (out: String) andThen { yield M1(out = $.in) }
+    facet M2(in: String) => (out: String) andThen { yield M2(out = $.in) }
+    facet F2(input: String) => (output: String)
+        with M1() as m1
+        with M2() as m2
+        andThen {
+            yield F2(output = $.input)
+                with M1(out = $.input)
+                with M2(out = $.input)
+        }
     facet Consumer(f2: F2) => (out: String) andThen {
         V1 = Value(input = $.f2.output)         // primary return
         V2 = Value(input = $.f2.input)          // primary param
