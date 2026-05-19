@@ -149,10 +149,11 @@ class NamedArg(ASTNode):
 # Mixins
 @dataclass
 class MixinSig(ASTNode):
-    """Mixin signature in facet declaration: with Name(args)"""
+    """Mixin signature in facet declaration: with Name(args) [as alias]"""
 
     name: str
     args: list[NamedArg] = field(default_factory=list)
+    alias: str | None = None
 
 
 @dataclass

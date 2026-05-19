@@ -428,8 +428,12 @@ class FFLTransformer(Transformer):
     @v_args(meta=True)
     def mixin_sig(self, meta, items: list) -> MixinSig:
         name = items[0]
-        args = items[1] if len(items) > 1 else []
-        return MixinSig(name=name, args=args, location=self._loc(meta))
+        # Remaining items may include the named_args list and/or the
+        # optional `as <alias>` IDENT — mirror mixin_call's by-type lookup
+        # so order independence holds even if the grammar grows.
+        args = self._find_one(items[1:], list) or []
+        alias = self._find_one(items[1:], str)
+        return MixinSig(name=name, args=args, alias=alias, location=self._loc(meta))
 
     @v_args(meta=True)
     def mixin_call(self, meta, items: list) -> MixinCall:

@@ -40,7 +40,7 @@ param: IDENT ":" type ("=" expr)?
 type: array_type | TYPE_BUILTIN | QNAME
 array_type: "[" type "]"
 
-mixin_sig: "with" QNAME "(" [named_args] ")"
+mixin_sig: "with" QNAME "(" [named_args] ")" ["as" IDENT]
 
 // andThen blocks, prompt blocks, and script blocks
 //

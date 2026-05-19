@@ -450,6 +450,8 @@ class JSONEmitter:
 
         if node.args:
             data["args"] = self._convert(node.args)
+        if node.alias:
+            data["alias"] = node.alias
 
         return data
 
