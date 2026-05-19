@@ -152,11 +152,18 @@ class CatchBeginHandler(StateHandler):
         def get_step_by_id(step_id: str):
             return self.context.persistence.get_step(step_id)
 
+        def get_mixin_step_by_alias(parent_step_id: str, alias: str):
+            for child in self.context.persistence.get_steps_by_container(parent_step_id):
+                if child.statement_name == alias:
+                    return child
+            return None
+
         eval_ctx = EvaluationContext(
             inputs=inputs,
             get_step_output=get_step_output,
             get_step_by_name=get_step_by_name,
             get_step_by_id=get_step_by_id,
+            get_mixin_step_by_alias=get_mixin_step_by_alias,
             step_id=self.step.id,
         )
         evaluator = ExpressionEvaluator()

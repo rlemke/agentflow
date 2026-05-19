@@ -55,6 +55,13 @@ class EvaluationContext:
     # while walking a path (e.g. `$.ds.field` when `ds` is a step ref).
     get_step_by_id: Callable[[str], Any] | None = None
 
+    # Mixin sub-step lookup by (parent_step_id, alias) — used when the next
+    # segment after a StepReference is a mixin alias on the referenced
+    # facet (e.g. `$.fref.m1.output`). Returns the mixin sub-step
+    # definition or None. Optional; when absent or returning None, the
+    # resolver falls through to the standard "no attribute" error.
+    get_mixin_step_by_alias: Callable[[str, str], Any] | None = None
+
     # Per-tick resolved-ref cache keyed by step_id; avoids repeated lookups
     # when the same StepReference is dereferenced multiple times.
     _resolved_refs: dict[str, Any] = field(default_factory=dict)
@@ -294,20 +301,38 @@ class ExpressionEvaluator:
                         f"Referenced step has no attribute '{segment}'",
                         ctx.step_id,
                     )
-                # A step-ref exposes both bound inputs and computed outputs:
-                # a fully-evaluated step has both populated on its record.
-                # Returns shadow params on name collision (a yielded value
-                # supersedes the param assignment, mirroring merge order).
+                # A step-ref exposes bound inputs, computed outputs, and
+                # aliased mixin sub-steps. Returns shadow params on name
+                # collision (yielded values supersede param assignments,
+                # mirroring FacetAttributes.merge); a mixin alias matches
+                # only after the primary attributes don't.
                 if segment in attrs.returns:
                     value = attrs.returns[segment].value
                 elif segment in attrs.params:
                     value = attrs.params[segment].value
                 else:
-                    raise ReferenceError(
-                        f"{base_path}.{segment}",
-                        f"Referenced step has no param or return '{segment}'",
-                        ctx.step_id,
+                    mixin_step = None
+                    if ctx.get_mixin_step_by_alias is not None:
+                        mixin_step = ctx.get_mixin_step_by_alias(
+                            value.step_id, segment
+                        )
+                    if mixin_step is None:
+                        raise ReferenceError(
+                            f"{base_path}.{segment}",
+                            f"Referenced step has no param, return, or "
+                            f"mixin alias '{segment}'",
+                            ctx.step_id,
+                        )
+                    # Continue resolution into the mixin sub-step. Build a
+                    # synthetic StepReference so the next iteration uses
+                    # the same dereference path (and caches the lookup).
+                    mixin_ref = StepReference(
+                        step_id=str(mixin_step.id),
+                        workflow_id=str(getattr(mixin_step, "workflow_id", "")),
+                        facet_name=getattr(mixin_step, "facet_name", "") or "",
                     )
+                    ctx._resolved_refs[mixin_ref.step_id] = mixin_step
+                    value = mixin_ref
             elif isinstance(value, dict):
                 if segment not in value:
                     raise ReferenceError(

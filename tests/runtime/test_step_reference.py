@@ -268,7 +268,9 @@ def test_resolve_path_unknown_field_errors_on_param_or_return():
     evaluator = ExpressionEvaluator()
     from facetwork.runtime.errors import ReferenceError
 
-    with pytest.raises(ReferenceError, match="no param or return 'nope'"):
+    with pytest.raises(
+        ReferenceError, match="no param, return, or mixin alias 'nope'"
+    ):
         evaluator.evaluate({"type": "InputRef", "path": ["ds", "nope"]}, ctx)
 
 
@@ -294,6 +296,53 @@ def test_resolve_path_reads_bound_input_via_step_ref():
         {"type": "InputRef", "path": ["facetRef", "input"]}, ctx
     )
     assert val == "hi"
+
+
+def test_resolve_path_follows_mixin_alias_via_callback():
+    """`$.fref.alias.field` looks up the mixin sub-step via
+    get_mixin_step_by_alias and continues resolution into its
+    attributes."""
+    parent = _FakeStep(
+        "parent-1", "wf-1", "F2", returns={"output": "parent-out"}
+    )
+    mixin = _FakeStep(
+        "mixin-1", "wf-1", "M1", returns={"output": "mixin-out"}
+    )
+    ref = StepReference(step_id="parent-1", workflow_id="wf-1", facet_name="F2")
+    ctx = EvaluationContext(
+        inputs={"f2": ref},
+        get_step_output=lambda *_: None,
+        get_step_by_id=lambda sid: parent if sid == "parent-1" else None,
+        get_mixin_step_by_alias=lambda pid, alias: (
+            mixin if pid == "parent-1" and alias == "m1" else None
+        ),
+    )
+    evaluator = ExpressionEvaluator()
+    val = evaluator.evaluate(
+        {"type": "InputRef", "path": ["f2", "m1", "output"]}, ctx
+    )
+    assert val == "mixin-out"
+
+
+def test_resolve_path_mixin_alias_unfound_errors():
+    """If the alias callback returns None, the resolver reports a
+    no-param-return-or-alias error rather than silently dereferencing
+    something unrelated."""
+    parent = _FakeStep("parent-2", "wf-1", "F2", returns={"output": "x"})
+    ref = StepReference(step_id="parent-2", workflow_id="wf-1", facet_name="F2")
+    ctx = EvaluationContext(
+        inputs={"f2": ref},
+        get_step_output=lambda *_: None,
+        get_step_by_id=lambda sid: parent,
+        get_mixin_step_by_alias=lambda pid, alias: None,
+    )
+    evaluator = ExpressionEvaluator()
+    from facetwork.runtime.errors import ReferenceError
+
+    with pytest.raises(ReferenceError, match="no param, return, or mixin alias 'bogus'"):
+        evaluator.evaluate(
+            {"type": "InputRef", "path": ["f2", "bogus"]}, ctx
+        )
 
 
 def test_resolve_path_return_shadows_param_on_name_collision():
