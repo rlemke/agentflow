@@ -581,6 +581,21 @@ is optional. A bare reference round-trips to AST `StepRef(path=["s1"])`.
 
 A mixin in a facet signature may be given an alias with `as <name>`.
 The grammar rule is `mixin_sig: "with" QNAME "(" [named_args] ")" ["as" IDENT]`.
+Signature mixins may be placed on the same line as the return clause or
+on their own lines:
+
+    facet F2(input: String) => (output: String)
+        with M1() as m1
+        with M2() as m2
+        andThen {
+            yield F2(output = $.input),
+                  M1(output = $.input),
+                  M2(output = $.input)
+        }
+
+(The trailing comma on a `yield` statement continues the targets onto
+the next line — see "Multi-target yields" below.)
+
 The alias becomes the consumer-side name for that mixin's sub-step on a
 FacetRef:
 
@@ -624,4 +639,20 @@ There can be more than one yield. Each one referencing a different mixin in the 
        yield SomeFacet(input = s2.input)
        yield AnotherFacet(x = s2.input)
         }
+
+#### Multi-target yields
+
+A single `yield` statement may name multiple targets separated by
+commas — sugar for several yield statements at the same source
+location. Each target must still resolve to a distinct facet or mixin
+(rule `YIELD_DUPLICATE_TARGET`):
+
+    yield F(out = v1.output), M1(out = v2.output), M2(out = v3.output)
+
+The grammar accepts an optional newline after each comma, so authors
+may continue onto the next line:
+
+    yield F(out = v1.output),
+          M1(out = v2.output),
+          M2(out = v3.output)
 

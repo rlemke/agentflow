@@ -29,8 +29,9 @@ facet_decl: DOC_COMMENT? "facet" facet_sig facet_def_tail? catch_clause? _stmt_e
 event_facet_decl: DOC_COMMENT? "event" "facet" facet_sig facet_def_tail? catch_clause? _stmt_end
 workflow_decl: DOC_COMMENT? "workflow" facet_sig facet_def_tail? catch_clause? _stmt_end
 
-// Facet signature
-facet_sig: IDENT "(" [params] ")" [return_clause] mixin_sig*
+// Facet signature.  Mixin sigs may appear on the same line as the
+// return clause or on separate lines.
+facet_sig: IDENT "(" [params] ")" [return_clause] _NL* (mixin_sig _NL*)*
 return_clause: "=>" "(" [params] ")"
 
 // Parameters (allow newlines)
@@ -92,7 +93,13 @@ step_body: "andThen" foreach_clause? block
 catch_clause: CATCH_KW block                    -> catch_simple
             | CATCH_KW _NL* "when" when_block   -> catch_when
 
-yield_stmt: "yield" call_expr
+// A single yield may target multiple facets/mixins separated by
+// commas — sugar for several `yield` statements at the same source
+// location.  Each call must still target a distinct facet/mixin
+// (YIELD_DUPLICATE_TARGET).  An optional newline after the comma
+// lets authors continue onto a new line; multiple newlines are not
+// supported (this avoids LALR conflicts with the block-body's `_NL*`).
+yield_stmt: "yield" call_expr ("," _NL? call_expr)*
 
 // Call expressions
 call_expr: QNAME "(" [named_args] ")" mixin_call*

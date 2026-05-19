@@ -463,14 +463,27 @@ class FFLTransformer(Transformer):
     def step_body(self, meta, items: list) -> AndThenBlock:
         return self._andthen_from_items(meta, items)
 
-    @v_args(meta=True, inline=True)
-    def yield_stmt(self, meta, call: CallExpr) -> YieldStmt:
-        return YieldStmt(call=call, location=self._loc(meta))
+    @v_args(meta=True)
+    def yield_stmt(self, meta, items: list) -> list[YieldStmt]:
+        """A yield statement may target one or more facets/mixins, e.g.
+        ``yield F(a = 1), M(b = 2)``.  We return a list of YieldStmt
+        nodes — one per target call — at the same source location;
+        ``block_body`` flattens them into the block's yield list.
+        """
+        loc = self._loc(meta)
+        return [YieldStmt(call=call, location=loc) for call in items if isinstance(call, CallExpr)]
 
     # Blocks
     @v_args(meta=True)
     def block_body(self, meta, items: list) -> tuple[list[StepStmt], list[YieldStmt]]:
-        return (self._find_all(items, StepStmt), self._find_all(items, YieldStmt))
+        steps = self._find_all(items, StepStmt)
+        yields: list[YieldStmt] = []
+        for item in items:
+            if isinstance(item, YieldStmt):
+                yields.append(item)
+            elif isinstance(item, list):
+                yields.extend(y for y in item if isinstance(y, YieldStmt))
+        return (steps, yields)
 
     @v_args(meta=True)
     def block(self, meta, items: list) -> Block:

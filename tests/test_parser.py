@@ -406,6 +406,78 @@ class TestMixins:
         assert len(step.call.mixins) == 1
         assert step.call.mixins[0].alias == "user"
 
+    def test_mixin_sig_with_alias(self, parser):
+        """Parse facet signature mixin with `as <alias>`."""
+        source = "facet F(input: String) => (output: String) with M1() as m1 with M2() as m2"
+        ast = parser.parse(source)
+        facet = ast.facets[0]
+        assert len(facet.sig.mixins) == 2
+        assert facet.sig.mixins[0].name == "M1"
+        assert facet.sig.mixins[0].alias == "m1"
+        assert facet.sig.mixins[1].name == "M2"
+        assert facet.sig.mixins[1].alias == "m2"
+
+    def test_mixin_sigs_on_separate_lines(self, parser):
+        """Mixin sigs may be placed on their own lines."""
+        source = """
+        facet F(input: String) => (output: String)
+            with M1() as m1
+            with M2() as m2
+            andThen {
+                yield F(output = $.input)
+            }
+        """
+        ast = parser.parse(source)
+        facet = ast.facets[0]
+        assert [(m.name, m.alias) for m in facet.sig.mixins] == [
+            ("M1", "m1"),
+            ("M2", "m2"),
+        ]
+
+
+class TestMultiTargetYield:
+    """Test comma-separated yield targets."""
+
+    def test_inline_comma_yield(self, parser):
+        """yield F(...), M1(...), M2(...) on a single line."""
+        source = """
+        facet M1(x: String) => (y: String)
+        facet M2(x: String) => (y: String)
+        facet F(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
+            yield F(output = $.input), M1(y = $.input), M2(y = $.input)
+        }
+        """
+        ast = parser.parse(source)
+        F = next(f for f in ast.facets if f.sig.name == "F")
+        assert [y.call.name for y in F.body.block.yield_stmts] == ["F", "M1", "M2"]
+
+    def test_multi_line_yield_via_trailing_comma(self, parser):
+        """A comma at end-of-line allows continuing onto the next line."""
+        source = """
+        facet M1(x: String) => (y: String)
+        facet M2(x: String) => (y: String)
+        facet F(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
+            yield F(output = $.input),
+                  M1(y = $.input),
+                  M2(y = $.input)
+        }
+        """
+        ast = parser.parse(source)
+        F = next(f for f in ast.facets if f.sig.name == "F")
+        assert [y.call.name for y in F.body.block.yield_stmts] == ["F", "M1", "M2"]
+
+    def test_single_target_yield_still_works(self, parser):
+        """Backward compatibility: single-target yield is unchanged."""
+        source = """
+        facet F(input: String) => (output: String) andThen {
+            yield F(output = $.input)
+        }
+        """
+        ast = parser.parse(source)
+        F = ast.facets[0]
+        assert len(F.body.block.yield_stmts) == 1
+        assert F.body.block.yield_stmts[0].call.name == "F"
+
 
 class TestImplicits:
     """Test implicit declaration parsing."""

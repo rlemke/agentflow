@@ -35,9 +35,14 @@ namespace alias_demo {
         yield M2(output = $.input ++ "-m2")
     }
 
-    facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
-        yield F2(output = $.input ++ "-primary")
-    }
+    facet F2(input: String) => (output: String)
+        with M1() as m1
+        with M2() as m2
+        andThen {
+            yield F2(output = $.input ++ "-primary"),
+                  M1(output = $.input ++ "-m1"),
+                  M2(output = $.input ++ "-m2")
+        }
 
     facet Sink(input: String) => (output: String) andThen {
         yield Sink(output = $.input)
