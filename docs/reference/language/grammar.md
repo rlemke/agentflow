@@ -548,6 +548,35 @@ the following is not valid
     s1 = SomeFacet(input = "this")
     s2 = AnotherFacet(input = s1.otherAttribute)
 
+#### Pass-by-step (FacetRef)
+
+A parameter typed as a **facet name** receives an entire step by
+reference, not a single field. The grammar accepts a bare step name
+(no `.field`) wherever a value is expected:
+
+    facet Value(input: String) => (output: String)
+    facet Consumer(ds: Value) => (output: String) andThen {
+        yield Consumer(output = $.ds.output)
+    }
+
+    workflow Demo(input: String) => (output: String) andThen {
+        s1 = Value(input = $.input)
+        s2 = Consumer(ds = s1)        // s1 itself, not s1.field
+        yield Demo(output = s2.output)
+    }
+
+Constraints enforced by the validator:
+
+- The source step's facet must equal the parameter's declared facet
+  exactly (rule `STEP_REF_FACET_MISMATCH`). Mixin compatibility is not
+  considered.
+- Inside the consuming `andThen` body, `$.ds.<field>` reads attributes
+  of the referenced step's persisted record — both bound inputs and
+  computed outputs are accessible; on name collision the return wins.
+
+The grammar rule is `step_ref: IDENT ("." IDENT)*` — the field portion
+is optional. A bare reference round-trips to AST `StepRef(path=["s1"])`.
+
 ### Yields
 A yield must have the name of a facet in the containing step. For example:
     s1 = SomeFacet(input = "this") andThen {

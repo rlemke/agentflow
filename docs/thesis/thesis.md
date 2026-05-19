@@ -453,6 +453,32 @@ Each iteration yields a single-element list into `stats`. The workflow's final `
 
 The practical effect of these rules is that `yield`, viewed from inside the language, behaves like the commit phase of a transaction scoped to a block, and viewed from outside the language, behaves like a reducer that absorbs contributions from every path that reaches it. Both views are correct; neither requires the author to reason about interleaved concurrent writes.
 
+#### 4.4.2 Pass-by-step: parameters typed as facets
+
+The reference forms presented so far carry a single value — `s1.field` selects one attribute, `$.field` reads one of the enclosing facet's bound inputs. FFL admits a third form: when a parameter's declared type is itself a facet name, the argument bound to that parameter is **a reference to a whole step** rather than a copy of one of its fields.
+
+```ffl
+facet Value(input: String) => (output: String)
+
+facet Consumer(facetRef: Value) => (output: String) andThen {
+    yield Consumer(output = $.facetRef.output)
+}
+
+workflow Demo(input: String) => (output: String) andThen {
+    s1 = Value(input = $.input)
+    s2 = Consumer(facetRef = s1)
+    yield Demo(output = s2.output)
+}
+```
+
+`facetRef: Value` declares that `Consumer`'s `facetRef` parameter expects a step whose call target is the facet `Value`. The argument is the bare step name `s1`, not `s1.output`. Inside the consumer body — and inside its handler, if it is an event facet — `facetRef` is a **FacetRef**: a small immutable record carrying the upstream step's identity (`step_id`, `workflow_id`, `facet_name`). The reference's contents are resolved lazily: `$.facetRef.output` causes the evaluator to load the upstream step's record on first use and read the named attribute from it; subsequent reads in the same evaluation context are served from a per-tick cache. Both bound input attributes and computed output attributes are accessible through this path, because the dependency tracker blocks the consumer's task from being claimed until the upstream step is in a terminal completed state with both kinds of attribute persisted.
+
+The motivation is the same as the motivation for any reference type: avoiding the need for the producer to project every potentially-interesting field into the signature in advance. A pipeline that hands a whole `OSMCache` step downstream can let each consumer read just the fields it needs, without the producer enumerating them. The cost is paid in the consumer's own evaluation, not at the call site, and the reference is **read-only by construction** — there is no write API on the FacetRef and no way for a consumer to mutate the upstream step. A handler that wishes to derive a new value from a referenced step does so by returning its own outputs, which become the handler's own step record, distinct from the upstream's.
+
+The validator enforces exact facet-name match (rule `STEP_REF_FACET_MISMATCH`): passing a step of a different facet to a FacetRef parameter is a compile-time error. Mixin compatibility — accepting a step whose facet *includes* the declared type via composition — is intentionally not considered in the first cut and is left as an extension point.
+
+This third reference form composes naturally with the data-dependency discipline introduced above. A FacetRef is, for the purposes of dependency analysis, a reference to its target step exactly as `s1.field` would be; the dependency tracker reads `path[0]` regardless of whether the path is bare or dotted. Concurrency-by-default and block-scoped immutability of inputs (§4.4) hold without modification. The new form simply extends the kinds of value an `andThen` block can pass around, without altering the rules by which the runtime decides what runs when.
+
 ### 4.5 Mixins, implicits, and inheritance-by-composition
 
 Mixins let one facet be defined as the combination of several others:

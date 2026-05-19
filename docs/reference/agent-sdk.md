@@ -1103,6 +1103,7 @@ metadata — never return them in results.
 | `_retry_count` | `int` | Number of prior attempts (0 on first execution) |
 | `_is_retry` | `bool` | `True` if this is a reclaimed/retried task |
 | `_handler_metadata` | `dict` | From `HandlerRegistration.metadata` (if present) |
+| `_fetch_step` | `callable(ref)` | Materialise a FacetRef parameter to a whole-step snapshot dict (see [9.15a FacetRef Parameters](#915a-facetref-parameters)) |
 
 #### Error Handling
 
@@ -1295,6 +1296,78 @@ this for:
 5. **Do not assume ordering** — a different runner (on a different
    server) may reclaim the task. Local temp files from the prior
    attempt may not exist.
+
+### 9.15a FacetRef Parameters
+
+A handler whose facet declares a parameter of type *facet name* receives a
+**FacetRef** (also called `StepReference`) rather than a scalar. This lets
+the consumer read the entire upstream step record — both bound inputs and
+computed outputs — without the producer pre-projecting every needed field.
+
+#### Payload shape
+
+A FacetRef parameter arrives in the handler payload as a tagged JSON
+object:
+
+```json
+{
+  "_facet_ref": true,
+  "step_id":     "<uuid of the upstream step>",
+  "workflow_id": "<uuid of the workflow run>",
+  "facet_name":  "<facet the upstream step was a call to>"
+}
+```
+
+A handler can detect it with the `_facet_ref` key. The other fields are
+metadata; treat them as opaque routing data passed to `_fetch_step`.
+
+#### Materialising the snapshot
+
+The runner injects `_fetch_step` into the payload alongside the other
+runtime callables. Calling it returns a whole-step snapshot dict:
+
+```python
+def handle(payload: dict) -> dict:
+    ref = payload["facetRef"]              # tagged JSON ref
+    fetch = payload["_fetch_step"]
+    upstream = fetch(ref)
+    # upstream is:
+    # {
+    #   "step_id":     ...,
+    #   "workflow_id": ...,
+    #   "facet_name":  "Value",
+    #   "params":      {"input": "hi"},
+    #   "returns":     {"output": "hi!"}
+    # }
+    return {"output": upstream["returns"]["output"].upper()}
+```
+
+The call is one RPC back to the runner, which serves the row from the
+same Mongo collection. There is no per-handler cache — call `fetch_step`
+once and reuse the dict for multiple reads.
+
+#### Read-only semantics
+
+The snapshot is a **point-in-time copy**. It is read-only by contract:
+
+- No write API is exposed on the dict.
+- Mutating values in-memory does not propagate anywhere.
+- To "update" what a downstream step sees, the handler returns its own
+  outputs — they become the handler's own step record, not the
+  upstream's.
+
+The upstream step is guaranteed to be fully evaluated (both `params` and
+`returns` populated) before the consumer's task is even claimable —
+dependency resolution blocks claim until the referenced step reaches a
+terminal completed state.
+
+#### Cross-language SDKs
+
+Only the Python SDK ports `fetch_step` today. Non-Python SDKs that need
+to consume FacetRef parameters must implement the same RPC contract: a
+client-side helper that accepts the tagged JSON ref and returns the
+five-key snapshot dict (`step_id`, `workflow_id`, `facet_name`,
+`params`, `returns`).
 
 ### 9.16 Streaming/Partial Updates (All SDKs)
 

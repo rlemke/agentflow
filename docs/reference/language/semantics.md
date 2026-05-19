@@ -148,6 +148,16 @@ Program
 - Input references (`$.field`) refer to workflow/facet parameters
 - Step references (`step.field`) refer to outputs of previous steps
 - Nested paths (`$.data.nested.field`) supported
+- **Pass-by-step (FacetRef)**: when a parameter type is itself a facet
+  name (e.g. `ds: Value`), the argument is a bare step reference
+  (`ds = s1`). The runtime binds `ds` to a `StepReference` carrying the
+  referenced step's id, workflow id, and facet name. Inside the
+  consuming `andThen` body, `$.ds.<field>` dereferences the
+  `StepReference` against the upstream step's persisted attributes,
+  consulting `returns` then `params` (returns shadow params on name
+  collision). The reference is read-only. Validator rule
+  `STEP_REF_FACET_MISMATCH` enforces exact facet-name match between
+  the source step's call target and the declared parameter type.
 
 ### Default Parameter Values
 - Parameters can have optional default values: `name: Type = expr`
