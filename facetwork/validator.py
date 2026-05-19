@@ -40,6 +40,7 @@ from .ast import (
     IndexExpr,
     Literal,
     MapLiteral,
+    MixinSig,
     NamedArg,
     Namespace,
     Program,
@@ -157,6 +158,7 @@ class FacetInfo:
     returns: set[str]  # Return parameter names
     returns_types: dict[str, str] = field(default_factory=dict)  # Return field name → type
     params_types: dict[str, str] = field(default_factory=dict)  # Param name → type
+    mixin_aliases: dict[str, str] = field(default_factory=dict)  # Alias → mixin facet target
     location: SourceLocation | None = None
 
 
@@ -193,6 +195,7 @@ class FFLValidator:
         self._current_namespace: str = ""
         self._current_imports: set[str] = set()  # Namespaces imported via 'use'
         self._param_scope: dict[str, str] = {}  # Parameter name -> inferred type
+        self._facet_param_types: dict[str, str] = {}  # Param name -> facet type name (step-ref params only)
 
     def validate(self, program: Program) -> ValidationResult:
         """Validate a program AST.
@@ -213,6 +216,7 @@ class FFLValidator:
         self._current_namespace = ""
         self._current_imports = set()
         self._param_scope = {}
+        self._facet_param_types = {}
 
         # First pass: collect all namespace names and facet definitions
         self._collect_namespaces(program)
@@ -287,12 +291,17 @@ class FFLValidator:
         if sig.returns:
             for p in sig.returns.params:
                 returns_types[p.name] = self._type_ref_to_str(p.type)
+        mixin_aliases: dict[str, str] = {}
+        for m in sig.mixins:
+            if m.alias:
+                mixin_aliases[m.alias] = m.name
         self._facets[full_name] = FacetInfo(
             name=sig.name,
             params=params,
             returns=returns,
             returns_types=returns_types,
             params_types=params_types,
+            mixin_aliases=mixin_aliases,
             location=sig.location,
         )
         # Track by short name for ambiguity detection
@@ -466,6 +475,50 @@ class FFLValidator:
         if sig.returns:
             for ret_param in sig.returns.params:
                 self._validate_type_ref(ret_param.type, ret_param.location)
+
+        # Validate mixin aliases: must not collide with the primary facet's
+        # own params, returns, or another mixin's alias.  The alias becomes
+        # an accessible name on a FacetRef consumer (e.g. `$.fref.alias.field`)
+        # so it shares the consumer-side namespace with primary attributes.
+        self._validate_mixin_aliases(sig)
+
+    def _validate_mixin_aliases(self, sig: FacetSig) -> None:
+        """Reject mixin alias collisions on a facet signature."""
+        param_names = {p.name for p in sig.params}
+        return_names = (
+            {p.name for p in sig.returns.params} if sig.returns else set()
+        )
+        seen_aliases: dict[str, "MixinSig"] = {}
+        for mixin in sig.mixins:
+            alias = mixin.alias
+            if not alias:
+                continue
+            if alias in param_names:
+                self._result.add_error(
+                    f"Mixin alias '{alias}' on facet '{sig.name}' conflicts "
+                    f"with a parameter of the same name. Aliases share the "
+                    f"consumer-side namespace with primary attributes.",
+                    mixin.location or sig.location,
+                    rule_id="MIXIN_ALIAS_NAME_CONFLICT",
+                )
+                continue
+            if alias in return_names:
+                self._result.add_error(
+                    f"Mixin alias '{alias}' on facet '{sig.name}' conflicts "
+                    f"with a return field of the same name.",
+                    mixin.location or sig.location,
+                    rule_id="MIXIN_ALIAS_NAME_CONFLICT",
+                )
+                continue
+            if alias in seen_aliases:
+                self._result.add_error(
+                    f"Duplicate mixin alias '{alias}' on facet '{sig.name}' "
+                    f"(also used by 'with {seen_aliases[alias].name}').",
+                    mixin.location or sig.location,
+                    rule_id="MIXIN_ALIAS_NAME_CONFLICT",
+                )
+                continue
+            seen_aliases[alias] = mixin
 
     def _resolve_facet_name(
         self, name: str, location: SourceLocation | None = None
@@ -690,6 +743,26 @@ class FFLValidator:
                     scope[param.name] = "Unknown"
         return scope
 
+    def _build_facet_param_scope(self, sig: FacetSig) -> dict[str, str]:
+        """Build a param name -> facet type name map for step-ref params.
+
+        Only retains parameters whose declared type resolves to a known
+        facet (`ds: SomeFacet`).  Consumers can dereference them via
+        `$.ds.attr` or `$.ds.alias.attr` — Phase C validates those paths
+        against this map.
+        """
+        scope: dict[str, str] = {}
+        for param in sig.params:
+            if not isinstance(param.type, TypeRef):
+                continue
+            name = param.type.name
+            if not name or name in self.BUILTIN_TYPES:
+                continue
+            # Only step-ref params — type is a known facet (not a schema).
+            if self._lookup_facet_for_type(name) is not None:
+                scope[param.name] = name
+        return scope
+
     def _validate_body(self, body, sig: FacetSig) -> None:
         """Validate a body, handling single or list of AndThenBlocks."""
         if isinstance(body, list):
@@ -775,6 +848,7 @@ class FFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         self._param_scope = self._build_param_scope(decl.sig)
+        self._facet_param_types = self._build_facet_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
@@ -782,6 +856,7 @@ class FFLValidator:
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
         self._param_scope = {}
+        self._facet_param_types = {}
 
     def _validate_event_facet_decl(self, decl: EventFacetDecl) -> None:
         """Validate an event facet declaration."""
@@ -791,6 +866,7 @@ class FFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         self._param_scope = self._build_param_scope(decl.sig)
+        self._facet_param_types = self._build_facet_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
@@ -801,6 +877,7 @@ class FFLValidator:
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
         self._param_scope = {}
+        self._facet_param_types = {}
 
     def _validate_prompt_block(self, block: PromptBlock, sig: FacetSig) -> None:
         """Validate a prompt block.
@@ -869,6 +946,7 @@ class FFLValidator:
         for mixin in decl.sig.mixins:
             self._resolve_facet_name(mixin.name, mixin.location)
         self._param_scope = self._build_param_scope(decl.sig)
+        self._facet_param_types = self._build_facet_param_scope(decl.sig)
         if decl.pre_script:
             self._validate_script_block(decl.pre_script, decl.sig)
         if decl.body:
@@ -876,6 +954,7 @@ class FFLValidator:
         if decl.catch:
             self._validate_catch_clause(decl.catch, decl.sig)
         self._param_scope = {}
+        self._facet_param_types = {}
 
     def _validate_and_then_block(
         self,
@@ -1489,6 +1568,65 @@ class FFLValidator:
                     )
                 self._check_step_ref_facet_type(arg, mixin_facet, steps)
 
+    def _validate_facet_ref_attr_path(self, ref: Reference, param_name: str) -> None:
+        """Validate `$.<facetRef>.<attr>[.<sub>]*` against the param's facet.
+
+        For a step-ref param `param_name: <FacetType>`:
+          - The next path segment must be one of <FacetType>'s
+            params, returns, or mixin aliases.
+          - If it matches a mixin alias, one further segment may be
+            validated against that mixin facet's params/returns/aliases.
+
+        Mixins on the param's facet that have *no* alias are
+        unaddressable through a FacetRef — by design, so the
+        consumer-side namespace is unambiguous.
+        """
+        facet_type = self._facet_param_types.get(param_name)
+        if not facet_type:
+            return
+        facet = self._lookup_facet_for_type(facet_type)
+        if facet is None:
+            return  # facet type unresolvable; other rules report this
+        segment = ref.path[1]
+        if (
+            segment in facet.params
+            or segment in facet.returns
+            or segment in facet.mixin_aliases
+        ):
+            # Recurse one level into a mixin alias to validate `<alias>.<field>`.
+            if (
+                segment in facet.mixin_aliases
+                and len(ref.path) >= 3
+            ):
+                mixin_type = facet.mixin_aliases[segment]
+                mixin = self._lookup_facet_for_type(mixin_type)
+                if mixin is not None:
+                    sub = ref.path[2]
+                    if (
+                        sub not in mixin.params
+                        and sub not in mixin.returns
+                        and sub not in mixin.mixin_aliases
+                    ):
+                        valid = sorted(
+                            mixin.params | mixin.returns | set(mixin.mixin_aliases)
+                        )
+                        self._result.add_error(
+                            f"Invalid mixin attribute '$.{param_name}.{segment}.{sub}': "
+                            f"mixin facet '{mixin.name}' has no param, return, or "
+                            f"mixin alias named '{sub}'. Valid names: {valid}",
+                            ref.location,
+                            rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
+                        )
+            return
+        valid = sorted(facet.params | facet.returns | set(facet.mixin_aliases))
+        self._result.add_error(
+            f"Invalid FacetRef attribute '$.{param_name}.{segment}': "
+            f"facet '{facet.name}' has no param, return, or mixin alias "
+            f"named '{segment}'. Valid names: {valid}",
+            ref.location,
+            rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
+        )
+
     def _lookup_facet_for_type(self, type_name: str) -> FacetInfo | None:
         """Resolve a type name to a FacetInfo without emitting errors.
 
@@ -1566,6 +1704,11 @@ class FFLValidator:
                         ref.location,
                         rule_id="REF_INVALID_INPUT",
                     )
+                    return
+                # Step-ref param: validate the next path segment against
+                # the referenced facet's params ∪ returns ∪ mixin aliases.
+                if len(ref.path) >= 2:
+                    self._validate_facet_ref_attr_path(ref, attr)
         else:
             # step.attr or bare step - must reference a valid step
             if not ref.path:

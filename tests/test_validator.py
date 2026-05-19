@@ -1093,6 +1093,166 @@ class TestMixinCallValidation:
         assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
 
 
+class TestMixinAliasNameConflict:
+    """MIXIN_ALIAS_NAME_CONFLICT — mixin sig aliases share namespace with
+    primary attributes on a FacetRef consumer, so they must not collide."""
+
+    def _validate(self, validator, body: str):
+        return validator.validate(parse(_ns(body)))
+
+    def test_alias_conflicts_with_param(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet M1(x: String) => (y: String) andThen { yield M1(y = $.x) }
+        facet F3(m1: String) => (out: String) with M1() as m1
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "MIXIN_ALIAS_NAME_CONFLICT"]
+        assert len(errs) == 1
+        assert "parameter" in str(errs[0])
+        assert "'m1'" in str(errs[0])
+
+    def test_alias_conflicts_with_return(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet M1(x: String) => (y: String) andThen { yield M1(y = $.x) }
+        facet F4(input: String) => (m1: String) with M1() as m1
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "MIXIN_ALIAS_NAME_CONFLICT"]
+        assert len(errs) == 1
+        assert "return field" in str(errs[0])
+
+    def test_duplicate_alias(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet M1(x: String) => (y: String) andThen { yield M1(y = $.x) }
+        facet M2(x: String) => (y: String) andThen { yield M2(y = $.x) }
+        facet F5(input: String) => (out: String) with M1() as m with M2() as m
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "MIXIN_ALIAS_NAME_CONFLICT"]
+        assert len(errs) == 1
+        assert "Duplicate mixin alias" in str(errs[0])
+
+    def test_distinct_aliases_pass(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet M1(x: String) => (y: String) andThen { yield M1(y = $.x) }
+        facet M2(x: String) => (y: String) andThen { yield M2(y = $.x) }
+        facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2
+        """,
+        )
+        assert not [e for e in result.errors if e.rule_id == "MIXIN_ALIAS_NAME_CONFLICT"]
+
+    def test_no_alias_does_not_collide(self, validator):
+        """A mixin without an alias has no consumer-side name, so it
+        cannot collide with primary attributes."""
+        result = self._validate(
+            validator,
+            """
+        facet M1(x: String) => (y: String) andThen { yield M1(y = $.x) }
+        facet F1(input: String) => (output: String) with M1()
+        """,
+        )
+        assert not [e for e in result.errors if e.rule_id == "MIXIN_ALIAS_NAME_CONFLICT"]
+
+
+class TestFacetRefAttributePath:
+    """REF_INVALID_FACET_REF_ATTRIBUTE — `$.fref.<name>[.<sub>]` validated
+    against the referenced facet's params ∪ returns ∪ mixin aliases."""
+
+    _SETUP = """
+        facet M1(input: String) => (output: String) andThen { yield M1(output = $.input) }
+        facet M2(input: String) => (output: String) andThen { yield M2(output = $.input) }
+        facet F1(input: String) => (output: String) with M1() with M2() andThen { yield F1(output = $.input) }
+        facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen { yield F2(output = $.input) }
+    """
+
+    def _validate(self, validator, consumer_body: str):
+        return validator.validate(parse(_ns(self._SETUP + consumer_body)))
+
+    def test_primary_return_accessible(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet S(f2: F2) => (out: String) andThen {
+            yield S(out = $.f2.output)
+        }
+        """,
+        )
+        assert not [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+
+    def test_primary_param_accessible(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet S(f2: F2) => (out: String) andThen {
+            yield S(out = $.f2.input)
+        }
+        """,
+        )
+        assert not [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+
+    def test_mixin_alias_accessible(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet S(f2: F2) => (out: String) andThen {
+            yield S(out = $.f2.m1.output)
+        }
+        """,
+        )
+        assert not [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+
+    def test_unknown_attr_on_facet_errors(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet S(f2: F2) => (out: String) andThen {
+            yield S(out = $.f2.bogus)
+        }
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+        assert len(errs) == 1
+        assert "'F2'" in str(errs[0])
+        assert "'bogus'" in str(errs[0])
+
+    def test_unknown_attr_on_mixin_errors(self, validator):
+        result = self._validate(
+            validator,
+            """
+        facet S(f2: F2) => (out: String) andThen {
+            yield S(out = $.f2.m1.bogus)
+        }
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+        assert len(errs) == 1
+        assert "mixin facet 'M1'" in str(errs[0])
+        assert "'bogus'" in str(errs[0])
+
+    def test_unaliased_mixin_unaddressable(self, validator):
+        """F1 has mixins M1, M2 with no `as`, so $.f1.M1 is rejected."""
+        result = self._validate(
+            validator,
+            """
+        facet S(f1: F1) => (out: String) andThen {
+            yield S(out = $.f1.M1)
+        }
+        """,
+        )
+        errs = [e for e in result.errors if e.rule_id == "REF_INVALID_FACET_REF_ATTRIBUTE"]
+        assert len(errs) == 1
+        assert "'F1'" in str(errs[0])
+        assert "'M1'" in str(errs[0])
+
+
 class TestSchemaInstantiation:
     """Test schema instantiation validation in step statements."""
 
