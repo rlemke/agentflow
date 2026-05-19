@@ -302,30 +302,26 @@ class ExpressionEvaluator:
                         ctx.step_id,
                     )
                 # A step-ref exposes bound inputs, computed outputs, and
-                # aliased mixin sub-steps. Returns shadow params on name
-                # collision (yielded values supersede param assignments,
-                # mirroring FacetAttributes.merge); a mixin alias matches
-                # only after the primary attributes don't.
-                if segment in attrs.returns:
-                    value = attrs.returns[segment].value
-                elif segment in attrs.params:
-                    value = attrs.params[segment].value
-                else:
-                    mixin_step = None
-                    if ctx.get_mixin_step_by_alias is not None:
-                        mixin_step = ctx.get_mixin_step_by_alias(
-                            value.step_id, segment
-                        )
-                    if mixin_step is None:
-                        raise ReferenceError(
-                            f"{base_path}.{segment}",
-                            f"Referenced step has no param, return, or "
-                            f"mixin alias '{segment}'",
-                            ctx.step_id,
-                        )
-                    # Continue resolution into the mixin sub-step. Build a
-                    # synthetic StepReference so the next iteration uses
-                    # the same dereference path (and caches the lookup).
+                # aliased mixin sub-steps.  Resolution order:
+                #   1. Mixin sub-step under this alias — always the live
+                #      persisted state, so consumers see Scope-A yield
+                #      overrides applied to the sub-step at the parent's
+                #      STATEMENT_CAPTURE_BEGIN.  Beats the snapshot dict
+                #      ``MixinCaptureBeginHandler`` left on
+                #      ``attrs.params[alias]`` (the snapshot freezes at
+                #      mixin-execution time and goes stale once routing
+                #      writes to the persisted sub-step).
+                #   2. ``returns`` — shadows params on name collision.
+                #   3. ``params`` — bound inputs.
+                # ``MIXIN_ALIAS_NAME_CONFLICT`` already forbids an alias
+                # colliding with a primary param or return, so this
+                # precedence change doesn't reintroduce ambiguity.
+                mixin_step = None
+                if ctx.get_mixin_step_by_alias is not None:
+                    mixin_step = ctx.get_mixin_step_by_alias(
+                        value.step_id, segment
+                    )
+                if mixin_step is not None:
                     mixin_ref = StepReference(
                         step_id=str(mixin_step.id),
                         workflow_id=str(getattr(mixin_step, "workflow_id", "")),
@@ -333,6 +329,17 @@ class ExpressionEvaluator:
                     )
                     ctx._resolved_refs[mixin_ref.step_id] = mixin_step
                     value = mixin_ref
+                elif segment in attrs.returns:
+                    value = attrs.returns[segment].value
+                elif segment in attrs.params:
+                    value = attrs.params[segment].value
+                else:
+                    raise ReferenceError(
+                        f"{base_path}.{segment}",
+                        f"Referenced step has no param, return, or "
+                        f"mixin alias '{segment}'",
+                        ctx.step_id,
+                    )
             elif isinstance(value, dict):
                 if segment not in value:
                     raise ReferenceError(

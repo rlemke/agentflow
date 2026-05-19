@@ -1,43 +1,59 @@
-// Mixin aliases on a FacetRef consumer.
+// Mixin aliases on a FacetRef consumer — Scope B (executing mixins).
 //
-// When a facet's signature declares mixins with `as <alias>`, a downstream
-// step that receives the facet by reference can address each mixin's
-// sub-step through `$.<fref>.<alias>.<field>`, alongside the facet's own
-// `$.<fref>.<field>` for primary attributes.
+// When a facet's signature declares mixins with `as <alias>`, the
+// runtime treats each aliased mixin as a sub-step that fully executes
+// its facet body BEFORE the parent body runs. The parent body can read
+// each mixin's returns as `$.<alias>.<field>`, and a downstream step
+// that receives the parent by reference can address each mixin via
+// `$.<fref>.<alias>.<field>` alongside the parent's own attributes.
 //
 // In this example:
 //
-//   F2 has primary return `output` and two aliased mixins, `m1` and `m2`.
-//   Consumer takes an `f2: F2` parameter and reads all three:
+//   F2 has primary return `output` and two aliased mixins, m1 and m2.
+//   Each mixin's `input` is bound at the signature with `$.input`,
+//   which evaluates in F2's scope (the parent inputs are initialized
+//   before mixin inputs). Each mixin's andThen body runs with `$.`
+//   isolated to its OWN attributes — no workflow-root or parent
+//   inheritance. Consumer takes an `f2: F2` parameter and reads:
 //     - `$.f2.output`       — F2's own return
-//     - `$.f2.m1.output`    — M1 mixin sub-step's return, via alias `m1`
-//     - `$.f2.m2.output`    — M2 mixin sub-step's return, via alias `m2`
+//     - `$.f2.m1.output`    — M1 mixin sub-step's executed return
+//     - `$.f2.m2.output`    — M2 mixin sub-step's executed return
 //
 // An alias may not collide with the facet's own param or return names
-// (MIXIN_ALIAS_NAME_CONFLICT). Mixins declared without an `as` alias are
-// deliberately unreachable from FacetRef consumers — see rule
-// REF_INVALID_FACET_REF_ATTRIBUTE.
+// (MIXIN_ALIAS_NAME_CONFLICT). Mixins declared without an `as` alias
+// remain pure config (sig-args flat-merge into parent.params per the
+// v0.21.0 contract; no sub-step executes) and are unreachable from
+// FacetRef consumers — see rule REF_INVALID_FACET_REF_ATTRIBUTE.
 //
-// At runtime, the parent step gets one sub-step row per aliased mixin
-// (created by `MixinBlocksBeginHandler`) so each mixin shows up as a
-// child in the dashboard tree. Yields targeting the mixin land in the
-// sub-step's `attributes.returns` via `StatementCaptureBeginHandler`'s
-// routing pass — `yield F2(...) with M1(output = ...)` writes to the
-// M1 sub-step's `output`, which a downstream FacetRef consumer then
-// reads as `$.f2.m1.output`.
+// Lifecycle (Scope B):
+//   parent FACET_INIT      — evaluate parent.params, then mixin
+//                             sig-args in parent scope into
+//                             parent.params[alias]
+//   parent MIXIN_BLOCKS    — create one CREATED sub-step per aliased
+//                             mixin with its seeded params
+//   [mixin sub-steps run in parallel through full STEP_TRANSITIONS]
+//     - mixin FACET_INIT   — skip arg-eval (already bound); apply
+//                             facet defaults for unbound attributes
+//     - mixin body runs    — `$.` is the mixin's own attributes only
+//     - mixin captures yields onto its returns
+//   parent MIXIN_CAPTURE   — snapshot each sub-step's {params+returns}
+//                             into parent.params[alias]; refreshes the
+//                             pre-execution sig-arg dict
+//   parent body runs       — `$.alias.field` reads the snapshot
 //
-// Two ways to address an aliased mixin in a yield:
-//   * by mixin facet name — `yield F2(...) with M1(output = ...)`
+// Parent yields can still write to a mixin sub-step (`yield aliasName(...)`
+// or `yield F(...) with M(...)`), which overrides at parent
+// STATEMENT_CAPTURE_BEGIN; FacetRef consumers see the override via the
+// live persisted sub-step. Two ways to address an aliased mixin in a
+// yield:
+//   * by mixin facet name — `yield F2(...) with M1(out = ...)`
 //     (works when only one alias points at that facet)
-//   * by alias name — `yield m1(output = ...)`
+//   * by alias name — `yield m1(out = ...)`
 //     (required when the same target appears twice with different
 //     aliases; see rule YIELD_TARGET_AMBIGUOUS)
 //
 // Multiple yields to the same destination merge per the standard
-// yield-merge rules (lists/sets aggregate, scalars overwrite). See
-// `facetwork/runtime/handlers/capture.py::StatementCaptureBeginHandler`
-// and `facetwork/runtime/mixin_alias.py` (the consumer-side resolver,
-// now a thin persistence lookup).
+// yield-merge rules (lists/sets aggregate, scalars overwrite).
 
 namespace alias_demo {
     facet M1(input: String) => (output: String) andThen {
@@ -49,12 +65,10 @@ namespace alias_demo {
     }
 
     facet F2(input: String) => (output: String)
-        with M1() as m1
-        with M2() as m2
+        with M1(input = $.input) as m1
+        with M2(input = $.input) as m2
         andThen {
             yield F2(output = $.input ++ "-primary")
-                with M1(output = $.input ++ "-m1")
-                with M2(output = $.input ++ "-m2")
         }
 
     facet Sink(input: String) => (output: String) andThen {

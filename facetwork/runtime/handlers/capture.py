@@ -73,53 +73,74 @@ def _merge_yield_value(existing: object, new: object) -> object:
 class MixinCaptureBeginHandler(StateHandler):
     """Handler for state.mixin.capture.Begin.
 
-    Merges yield results from mixin blocks.
+    Snapshots each aliased mixin sub-step's full attributes
+    (params + returns, with returns shadowing params on collision)
+    into ``parent.attributes.params[alias]`` as a single dict.  This
+    replaces the v0.21.0 sig-args nested dict that
+    ``FacetInitializationBeginHandler`` wrote there at parent init —
+    after Scope B the mixin sub-step has actually executed, so the
+    parent's "view" of the alias gets refreshed with the sub-step's
+    computed returns.
+
+    The parent's andThen body then reads ``$.<alias>.<field>`` against
+    this merged dict.  Mixin sub-steps are the live source of truth
+    for FacetRef consumers (``$.<fref>.<alias>.<field>`` still goes
+    through the persistence resolver); this snapshot exists purely as
+    a parent-internal convenience for in-handler / in-andThen reads.
     """
 
     def process_state(self) -> StateChangeResult:
-        """Begin mixin capture."""
-        # Get completed mixin blocks
-        blocks = self.context.persistence.get_blocks_by_step(self.step.id)
-        mixin_blocks = [b for b in blocks if b.container_type == "Facet" and b.is_complete]
+        """Snapshot each mixin sub-step's attributes onto the parent."""
+        aliases = self._declared_aliases()
+        if not aliases:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
 
-        # Merge yield results from each mixin block
-        for block in mixin_blocks:
-            self._merge_yields_from_block(block)
+        sub_step_by_alias = self._sub_steps_by_alias(aliases)
+        for alias, sub_step in sub_step_by_alias.items():
+            snapshot: dict = {}
+            for name, attr in sub_step.attributes.params.items():
+                snapshot[name] = attr.value
+            for name, attr in sub_step.attributes.returns.items():
+                snapshot[name] = attr.value
+            self.step.attributes.set_param(alias, snapshot)
 
         self.step.request_state_change(True)
         return StateChangeResult(step=self.step)
 
-    def _merge_yields_from_block(self, block: "StepDefinition") -> None:
-        """Merge yield results from a block into the step."""
-        # Get yield steps from the block
-        yields = self._get_yield_steps(block)
-        for yield_step in yields:
-            self._merge_yield(yield_step)
+    def _declared_aliases(self) -> set[str]:
+        if not self.step.facet_name:
+            return set()
+        facet_def = self.context.get_facet_definition(self.step.facet_name)
+        if not facet_def:
+            return set()
+        return {
+            m.get("alias")
+            for m in (facet_def.get("mixins", []) or [])
+            if m.get("alias")
+        }
 
-    def _get_yield_steps(self, block: "StepDefinition") -> list["StepDefinition"]:
-        """Get all yield steps from a block."""
-        from ..types import ObjectType
-
-        steps = self.context.persistence.get_steps_by_block(block.id)
-        return [s for s in steps if s.object_type == ObjectType.YIELD_ASSIGNMENT and s.is_complete]
-
-    def _merge_yield(self, yield_step: "StepDefinition") -> None:
-        """Merge a single yield into the step's attributes.
-
-        Collection-typed values (``list``, ``set``, ``frozenset``) combine
-        with the prior return value via concat/union so multiple yields
-        aggregate into one collection. Other types (scalars, dicts,
-        schema instances) overwrite — see ``_merge_yield_value``.
-        """
-        # Yield step attributes become return values on this step
-        for name, attr in yield_step.attributes.params.items():
-            existing = self.step.attributes.returns.get(name)
-            merged_value = (
-                _merge_yield_value(existing.value, attr.value)
-                if existing is not None
-                else attr.value
-            )
-            self.step.attributes.set_return(name, merged_value, attr.type_hint)
+    def _sub_steps_by_alias(self, aliases: set[str]) -> dict:
+        """Return ``{alias: sub_step}`` for the parent's mixin sub-steps,
+        accounting for pending creates/updates so we see the freshest
+        copy this iteration."""
+        result: dict = {}
+        for child in self.context.persistence.get_steps_by_container(self.step.id):
+            if child.statement_name in aliases:
+                result[child.statement_name] = child
+        for pending in self.context.changes.created_steps:
+            if (
+                pending.container_id == self.step.id
+                and pending.statement_name in aliases
+            ):
+                result[pending.statement_name] = pending
+        for pending in self.context.changes.updated_steps:
+            if (
+                pending.container_id == self.step.id
+                and pending.statement_name in aliases
+            ):
+                result[pending.statement_name] = pending
+        return result
 
 
 class MixinCaptureEndHandler(StateHandler):

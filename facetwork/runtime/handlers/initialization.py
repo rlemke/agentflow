@@ -66,7 +66,16 @@ class FacetInitializationBeginHandler(StateHandler):
         # Get the statement definition for this step
         stmt_def = self.context.get_statement_definition(self.step)
         if stmt_def is None:
-            # Workflow root step - use workflow inputs directly
+            # Two cases land here:
+            # 1. Mixin sub-step — written by MixinBlocksBeginHandler with
+            #    its params pre-bound from the parent's already-evaluated
+            #    sig-args.  We skip call-arg evaluation and only fill
+            #    facet defaults for params the parent didn't bind.
+            # 2. Workflow root step — use the workflow's declared params
+            #    and any default values.
+            if self.step.container_id is not None and self.step.statement_name:
+                return self._init_mixin_sub_step()
+
             workflow_ast = self.context.get_workflow_ast()
             if workflow_ast:
                 params = workflow_ast.get("params", [])
@@ -89,13 +98,48 @@ class FacetInitializationBeginHandler(StateHandler):
             args = stmt_def.args
             evaluated = evaluate_args(args, ctx)
 
+            # Evaluate sig-level mixin args first.  The facet sig may
+            # declare aliased mixins with bound args, e.g.
+            #     facet Parent(input: String) with M(x = $.input) as m
+            # Those args are evaluated in the parent's scope (so $.input
+            # here resolves to the parent's bound ``input`` param) and
+            # placed under ``params[alias]`` as a nested dict.  This is
+            # the seed ``MixinBlocksBeginHandler`` reads when binding
+            # the mixin sub-step's own params.  Call-site mixin args
+            # (handled below) override sig-level args on the same alias.
+            facet_def_for_sig = None
+            if self.step.facet_name:
+                facet_def_for_sig = self.context.get_facet_definition(self.step.facet_name)
+            if facet_def_for_sig:
+                for sig_mixin in facet_def_for_sig.get("mixins", []) or []:
+                    sig_alias = sig_mixin.get("alias")
+                    sig_args = sig_mixin.get("args", [])
+                    if not sig_alias or not sig_args:
+                        continue
+                    sig_evaluated = evaluate_args(sig_args, ctx)
+                    # Initialise the alias bag if call-site didn't already.
+                    existing = evaluated.get(sig_alias)
+                    if isinstance(existing, dict):
+                        # Fill in keys the call-site override didn't specify.
+                        for k, v in sig_evaluated.items():
+                            if k not in existing:
+                                existing[k] = v
+                    else:
+                        evaluated[sig_alias] = sig_evaluated
+
             # Evaluate call-site mixin args
             for mixin in stmt_def.mixins or []:
                 mixin_args = mixin.get("args", [])
                 mixin_alias = mixin.get("alias")
                 mixin_evaluated = evaluate_args(mixin_args, ctx)
                 if mixin_alias:
-                    evaluated[mixin_alias] = mixin_evaluated
+                    existing = evaluated.get(mixin_alias)
+                    if isinstance(existing, dict):
+                        # Call-site args override sig-level args under the
+                        # same alias.
+                        existing.update(mixin_evaluated)
+                    else:
+                        evaluated[mixin_alias] = mixin_evaluated
                 else:
                     for k, v in mixin_evaluated.items():
                         if k not in evaluated:
@@ -228,28 +272,26 @@ class FacetInitializationBeginHandler(StateHandler):
         """Resolve the InputRef ($.) scope for this step.
 
         For steps in the workflow root block, inputs come from the
-        workflow root step's params. For steps in nested blocks
+        workflow root step's params.  For steps in nested blocks
         (e.g. inside a called sub-workflow), inputs come from the
-        container step that owns the block.
+        container step that owns the block, overlaid on workflow
+        root params.
 
-        For steps deeply nested via step_body (andThen when/foreach on
-        a step), we walk up the container chain to find the nearest
-        workflow or sub-workflow scope, always starting with the
-        workflow root params as a base.
+        For steps inside a **mixin sub-step's body** (Scope B), the
+        scope is *isolated*: only the mixin sub-step's own attributes
+        (params + returns) are in $.   The workflow root is not seeded
+        and the walk stops at the mixin sub-step.  This enforces the
+        rule that a mixin body cannot reference anything outside its
+        own scope.
 
         Returns:
             Dict of input name -> value
         """
-        # Always start with workflow root params as the base
-        workflow_root = self.context.get_workflow_root()
-        inputs = {}
-        if workflow_root:
-            for name, attr in workflow_root.attributes.params.items():
-                inputs[name] = attr.value
-
-        # Walk up from this step's block to find a nested facet/workflow
-        # call that defines a new $. scope.  FacetDecl and WorkflowDecl
-        # calls define scopes; EventFacetDecl calls do NOT.
+        # Walk up from this step's block looking for the nearest
+        # VARIABLE_ASSIGNMENT facet ancestor.  If that ancestor turns
+        # out to be a mixin sub-step, the body's scope is isolated to
+        # that sub-step's attributes alone.  Otherwise we fall back to
+        # the standard workflow-root + nearest-facet-ancestor overlay.
         if self.step.block_id:
             block_step = self.context._find_step(self.step.block_id)
             if block_step and block_step.container_id:
@@ -270,10 +312,20 @@ class FacetInitializationBeginHandler(StateHandler):
                                 if fdef and fdef.get("type") == "EventFacetDecl":
                                     is_event = True
                             if not is_event:
-                                # FacetDecl or WorkflowDecl — overlay params
+                                if self._is_mixin_sub_step(cursor):
+                                    # Mixin body scope isolation: $. is
+                                    # the mixin's own attributes only.
+                                    return self._mixin_step_scope(cursor)
+                                # FacetDecl or WorkflowDecl — overlay
+                                # params on workflow root.
+                                inputs: dict = {}
+                                workflow_root = self.context.get_workflow_root()
+                                if workflow_root:
+                                    for name, attr in workflow_root.attributes.params.items():
+                                        inputs[name] = attr.value
                                 for name, attr in cursor.attributes.params.items():
                                     inputs[name] = attr.value
-                                break
+                                return inputs
                         if cursor.container_id is None:
                             break
                         next_step = self.context._find_step(cursor.container_id)
@@ -281,13 +333,109 @@ class FacetInitializationBeginHandler(StateHandler):
                             break
                         cursor = next_step
 
+        # Top-level step (no facet ancestor) — workflow root params only.
+        inputs = {}
+        workflow_root = self.context.get_workflow_root()
+        if workflow_root:
+            for name, attr in workflow_root.attributes.params.items():
+                inputs[name] = attr.value
         return inputs
+
+    def _is_mixin_sub_step(self, step) -> bool:
+        """A step is a mixin sub-step when its ``statement_name`` is
+        declared as an alias on its container facet's signature."""
+        if not step.statement_name or not step.container_id:
+            return False
+        parent = self.context._find_step(step.container_id)
+        if not parent or not parent.facet_name:
+            return False
+        parent_def = self.context.get_facet_definition(parent.facet_name)
+        if not parent_def:
+            return False
+        for mixin in parent_def.get("mixins", []) or []:
+            if mixin.get("alias") == step.statement_name:
+                return True
+        return False
+
+    def _mixin_step_scope(self, mixin_step) -> dict:
+        """Build a scope dict from a mixin sub-step's attributes
+        (params + returns, with returns shadowing params on collision —
+        matching ``FacetAttributes.merge``)."""
+        scope: dict = {}
+        for name, attr in mixin_step.attributes.params.items():
+            scope[name] = attr.value
+        for name, attr in mixin_step.attributes.returns.items():
+            scope[name] = attr.value
+        return scope
 
     def _get_default_value(self, param_name: str, workflow_ast: dict) -> object:
         """Get default value for a workflow parameter."""
         # Look in the workflow's default values
         defaults = self.context.workflow_defaults
         return defaults.get(param_name)
+
+    def _init_mixin_sub_step(self) -> StateChangeResult:
+        """Initialize a mixin sub-step whose params were pre-bound by
+        ``MixinBlocksBeginHandler``.
+
+        Skips call-arg evaluation (no stmt_def to pull args from).
+        Applies facet defaults only for params the parent didn't bind
+        — so ``with M(x = 1)`` keeps the explicit binding while ``y``,
+        if it has a default in M's signature, gets that default.
+        Returns with defaults are also seeded so the mixin body's
+        first statement can reference ``$.return_name`` before any
+        yield (per FFL attribute semantics — params and returns are
+        both addressable from the body, with defaults populated at
+        init time).
+        """
+        if not self.step.facet_name:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        facet_def = self.context.get_facet_definition(self.step.facet_name)
+        if not facet_def:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        # The mixin sub-step's own scope is its already-bound params —
+        # default expressions are evaluated against that, NOT against
+        # workflow root (per the mixin-scope-isolation rule).
+        try:
+            scope_inputs = {
+                name: attr.value
+                for name, attr in self.step.attributes.params.items()
+            }
+            mixin_ctx = EvaluationContext(
+                inputs=scope_inputs,
+                get_step_output=lambda *_: None,
+                step_id=self.step.id,
+            )
+            expr_eval = ExpressionEvaluator()
+
+            for param in facet_def.get("params", []):
+                name = param.get("name", "")
+                if not name or name in self.step.attributes.params:
+                    continue
+                if "default" in param:
+                    self.step.set_attribute(
+                        name, expr_eval.evaluate(param["default"], mixin_ctx)
+                    )
+
+            for ret in facet_def.get("returns", []):
+                name = ret.get("name", "")
+                if not name:
+                    continue
+                if "default" in ret:
+                    self.step.set_attribute(
+                        name,
+                        expr_eval.evaluate(ret["default"], mixin_ctx),
+                        is_return=True,
+                    )
+        except Exception as e:
+            return self.error(e)
+
+        self.step.request_state_change(True)
+        return StateChangeResult(step=self.step)
 
 
 class FacetInitializationEndHandler(StateHandler):

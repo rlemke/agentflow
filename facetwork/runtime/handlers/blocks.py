@@ -31,22 +31,32 @@ if TYPE_CHECKING:
 class MixinBlocksBeginHandler(StateHandler):
     """Handler for state.mixin.blocks.Begin.
 
-    Creates **placeholder** sub-step rows for each aliased mixin
-    declared on this step's facet signature.  The rows are written in
-    ``STATEMENT_COMPLETE`` state with empty attributes — they make
-    the mixin visible as a child of the parent step in the dashboard
-    and give the FacetRef alias resolver a stable identity to point
-    at.  Actual mixin execution (running the mixin facet's body,
-    populating its own returns) is still a separate, future-work
-    initiative; for now the FacetRef alias view is synthesised from
-    the parent's yields by ``mixin_alias.resolve_mixin_step_by_alias``.
+    Creates one sub-step per aliased mixin declared on this step's
+    facet signature.  The sub-step is born in ``CREATED`` state and
+    walks the full ``STEP_TRANSITIONS`` lifecycle: facet init (with
+    pre-bound params), mixin blocks (typically a no-op since mixin
+    facets rarely nest mixins), the mixin facet's own body, capture,
+    and finally ``STATEMENT_COMPLETE``.  Parent waits on these at
+    ``MixinBlocksContinueHandler``.
+
+    Sub-step params are seeded from the parent's already-evaluated
+    ``attributes.params[alias]`` (a nested dict produced by
+    ``FacetInitializationBeginHandler`` when it evaluated the mixin's
+    sig-args in the parent's scope).  ``FacetInitializationBeginHandler``
+    on the sub-step then detects the pre-populated params and skips
+    its own arg-evaluation pass.
+
+    Un-aliased mixins are intentionally skipped here — they remain
+    purely config (their sig-args flat-merge into parent.params via
+    the v0.21.0 contract) and never execute their bodies.  An
+    un-aliased mixin has no consumer-visible identity, so spinning up
+    a sub-step whose results nobody can read would be wasteful.
     """
 
     def process_state(self) -> StateChangeResult:
         """Begin mixin blocks execution."""
         from ..step import StepDefinition
-        from ..states import StepState
-        from ..types import ObjectType
+        from ..types import AttributeValue, FacetAttributes, ObjectType
 
         facet_def = (
             self.context.get_facet_definition(self.step.facet_name)
@@ -71,6 +81,18 @@ class MixinBlocksBeginHandler(StateHandler):
                     continue
                 if alias in existing_aliases:
                     continue
+
+                # Pull the mixin's already-evaluated sig-args off the
+                # parent.  FACET_INIT_BEGIN put them under params[alias]
+                # as a nested dict (v0.21.0 contract) — those values
+                # become the sub-step's bound params, one entry per
+                # sig-arg.  Empty dict if the parent didn't bind any.
+                parent_bag = self.step.attributes.params.get(alias)
+                seed_params: dict[str, AttributeValue] = {}
+                if parent_bag is not None and isinstance(parent_bag.value, dict):
+                    for k, v in parent_bag.value.items():
+                        seed_params[k] = AttributeValue(k, v)
+
                 sub_step = StepDefinition.create(
                     workflow_id=self.step.workflow_id,
                     object_type=ObjectType.VARIABLE_ASSIGNMENT,
@@ -80,9 +102,11 @@ class MixinBlocksBeginHandler(StateHandler):
                     container_type=self.step.object_type,
                     root_id=self.step.root_id or self.step.id,
                 )
-                sub_step.state = StepState.STATEMENT_COMPLETE
-                sub_step.transition.current_state = StepState.STATEMENT_COMPLETE
-                sub_step.transition.changed = True
+                if seed_params:
+                    sub_step.attributes = FacetAttributes(params=seed_params)
+                # State stays at the StepDefinition.create default
+                # (``CREATED``) so the sub-step picks up at the next
+                # iteration and walks its full lifecycle.
                 self.context.changes.add_created_step(sub_step)
                 existing_aliases.add(alias)
 
@@ -93,35 +117,89 @@ class MixinBlocksBeginHandler(StateHandler):
 class MixinBlocksContinueHandler(StateHandler):
     """Handler for state.mixin.blocks.Continue.
 
-    Polls until all mixin blocks are complete.
+    Waits for every aliased mixin sub-step under this parent to reach
+    a terminal state.  Sub-steps are children of the parent whose
+    ``statement_name`` is one of the aliases declared on the parent's
+    facet signature.  Un-aliased mixins are pure config (no sub-step
+    created by ``MixinBlocksBeginHandler``) and are not waited on.
+
+    Error coupling is strict: if any mixin sub-step errored, the
+    parent step also errors with the first sub-step's error message.
     """
 
     def process_state(self) -> StateChangeResult:
         """Continue mixin blocks execution."""
-        # Load block analysis for mixin blocks
-        blocks = self.context.persistence.get_blocks_by_step(self.step.id)
-        mixin_blocks = [b for b in blocks if b.container_type == "Facet"]
-
-        if not mixin_blocks:
-            # No mixin blocks to wait for
+        aliases = self._declared_aliases()
+        if not aliases:
+            # Facet has no aliased mixins — nothing to wait for.
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
 
-        analysis = BlockAnalysis.load(self.step, mixin_blocks, mixins=True)
-
-        if analysis.done:
-            if analysis.has_errors:
-                errors = [b.transition.error for b in analysis.errored if b.transition.error]
-                msg = f"{len(analysis.errored)} mixin block(s) errored"
-                if errors:
-                    msg += f": {errors[0]}"
-                self.step.mark_error(RuntimeError(msg))
-                return StateChangeResult(step=self.step)
-            self.step.request_state_change(True)
-            return StateChangeResult(step=self.step)
-        else:
-            # Still waiting, push for retry
+        sub_steps = self._mixin_sub_steps(aliases)
+        if not sub_steps:
+            # MIXIN_BLOCKS_BEGIN didn't run yet, or sub-step rows are
+            # still pending the next iteration's commit — defer.
             return self.stay(push=True)
+
+        errored = [s for s in sub_steps if s.is_error]
+        if errored:
+            err = errored[0].transition.error
+            msg = (
+                f"{len(errored)} mixin sub-step(s) errored"
+                + (f": {err}" if err else "")
+            )
+            self.step.mark_error(RuntimeError(msg))
+            return StateChangeResult(step=self.step)
+
+        not_done = [s for s in sub_steps if not s.is_terminal]
+        if not_done:
+            return self.stay(push=True)
+
+        # All mixin sub-steps reached STATEMENT_COMPLETE.
+        self.step.request_state_change(True)
+        return StateChangeResult(step=self.step)
+
+    def _declared_aliases(self) -> set[str]:
+        if not self.step.facet_name:
+            return set()
+        facet_def = self.context.get_facet_definition(self.step.facet_name)
+        if not facet_def:
+            return set()
+        return {
+            m.get("alias")
+            for m in (facet_def.get("mixins", []) or [])
+            if m.get("alias")
+        }
+
+    def _mixin_sub_steps(self, aliases: set[str]) -> list:
+        """Return persisted+pending sub-steps under this parent whose
+        ``statement_name`` is one of the declared aliases."""
+        seen_ids: set[str] = set()
+        result = []
+        for child in self.context.persistence.get_steps_by_container(self.step.id):
+            if child.statement_name in aliases and child.id not in seen_ids:
+                seen_ids.add(child.id)
+                result.append(child)
+        # Pending creates from this iteration aren't yet in persistence.
+        for pending in self.context.changes.created_steps:
+            if (
+                pending.container_id == self.step.id
+                and pending.statement_name in aliases
+                and pending.id not in seen_ids
+            ):
+                seen_ids.add(pending.id)
+                result.append(pending)
+        # Pending updates supersede prior persisted copies.
+        for pending in self.context.changes.updated_steps:
+            if (
+                pending.container_id == self.step.id
+                and pending.statement_name in aliases
+            ):
+                for i, s in enumerate(result):
+                    if s.id == pending.id:
+                        result[i] = pending
+                        break
+        return result
 
 
 class MixinBlocksEndHandler(StateHandler):
