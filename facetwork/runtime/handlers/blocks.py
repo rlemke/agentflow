@@ -31,14 +31,60 @@ if TYPE_CHECKING:
 class MixinBlocksBeginHandler(StateHandler):
     """Handler for state.mixin.blocks.Begin.
 
-    Creates block steps for mixin (facet-level) blocks.
+    Creates **placeholder** sub-step rows for each aliased mixin
+    declared on this step's facet signature.  The rows are written in
+    ``STATEMENT_COMPLETE`` state with empty attributes — they make
+    the mixin visible as a child of the parent step in the dashboard
+    and give the FacetRef alias resolver a stable identity to point
+    at.  Actual mixin execution (running the mixin facet's body,
+    populating its own returns) is still a separate, future-work
+    initiative; for now the FacetRef alias view is synthesised from
+    the parent's yields by ``mixin_alias.resolve_mixin_step_by_alias``.
     """
 
     def process_state(self) -> StateChangeResult:
         """Begin mixin blocks execution."""
-        # Get mixin blocks for this step's facet
-        # In the current implementation, we don't have mixin blocks yet
-        # This would create BlockStep instances for each mixin's andThen blocks
+        from ..step import StepDefinition
+        from ..states import StepState
+        from ..types import ObjectType
+
+        facet_def = (
+            self.context.get_facet_definition(self.step.facet_name)
+            if self.step.facet_name
+            else None
+        )
+        if facet_def:
+            existing_aliases = {
+                child.statement_name
+                for child in self.context.persistence.get_steps_by_container(self.step.id)
+                if child.statement_name
+            }
+            existing_aliases |= {
+                p.statement_name
+                for p in self.context.changes.created_steps
+                if p.container_id == self.step.id and p.statement_name
+            }
+            for mixin in facet_def.get("mixins", []) or []:
+                alias = mixin.get("alias")
+                target = mixin.get("target") or ""
+                if not alias or not target:
+                    continue
+                if alias in existing_aliases:
+                    continue
+                sub_step = StepDefinition.create(
+                    workflow_id=self.step.workflow_id,
+                    object_type=ObjectType.VARIABLE_ASSIGNMENT,
+                    facet_name=target,
+                    statement_name=alias,
+                    container_id=self.step.id,
+                    container_type=self.step.object_type,
+                    root_id=self.step.root_id or self.step.id,
+                )
+                sub_step.state = StepState.STATEMENT_COMPLETE
+                sub_step.transition.current_state = StepState.STATEMENT_COMPLETE
+                sub_step.transition.changed = True
+                self.context.changes.add_created_step(sub_step)
+                existing_aliases.add(alias)
 
         self.step.request_state_change(True)
         return StateChangeResult(step=self.step)

@@ -18,13 +18,17 @@
 // deliberately unreachable from FacetRef consumers — see rule
 // REF_INVALID_FACET_REF_ATTRIBUTE.
 //
-// At runtime, the mixin sub-step is synthesized on demand from the
+// At runtime, the parent step gets one placeholder sub-step row per
+// aliased mixin (created by `MixinBlocksBeginHandler`) so each mixin
+// shows up as a child in the dashboard. The actual `attributes.returns`
+// the FacetRef consumer reads are synthesised on demand from the
 // parent's persisted yields — `yield F2(...) with M1(out = ...)`
 // surfaces the M1 contribution as the M1 sub-step's `out` return when
 // a downstream FacetRef consumer reads `$.f2.m1.out`. Multiple yields
 // to the same mixin merge per the standard yield-merge rules
 // (collections aggregate, scalars overwrite). See
-// `facetwork/runtime/mixin_alias.py`.
+// `facetwork/runtime/mixin_alias.py` and
+// `facetwork/runtime/handlers/blocks.py::MixinBlocksBeginHandler`.
 
 namespace alias_demo {
     facet M1(input: String) => (output: String) andThen {
