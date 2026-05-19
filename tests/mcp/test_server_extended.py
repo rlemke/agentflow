@@ -171,6 +171,68 @@ class TestRetryStep:
         assert data["success"] is False
         assert "not found" in data["error"]
 
+    def test_retry_step_refuses_when_task_running(self):
+        """Mirror the dashboard /retry endpoint: refuse if the step's
+        task is RUNNING and force is not set."""
+        from facetwork.runtime.entities import TaskDefinition, TaskState
+
+        mem = MemoryStore()
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Download",
+        )
+        mem.save_step(step)
+        mem.save_task(
+            TaskDefinition(
+                uuid="task-running",
+                name="Download",
+                runner_id="runner-1",
+                workflow_id="wf-1",
+                flow_id="flow-1",
+                step_id=step.id,
+                state=TaskState.RUNNING,
+                created=1000,
+            )
+        )
+
+        result = _tool_retry_step({"step_id": step.id}, lambda: mem)
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert data["error"] == "step_task_running"
+        assert data["blockers"][0]["step_id"] == step.id
+
+    def test_retry_step_force_proceeds(self):
+        from facetwork.runtime.entities import TaskDefinition, TaskState
+
+        mem = MemoryStore()
+        step = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Download",
+        )
+        step.mark_error(RuntimeError("stuck"))
+        mem.save_step(step)
+        mem.save_task(
+            TaskDefinition(
+                uuid="task-running",
+                name="Download",
+                runner_id="runner-1",
+                workflow_id="wf-1",
+                flow_id="flow-1",
+                step_id=step.id,
+                state=TaskState.RUNNING,
+                created=1000,
+            )
+        )
+
+        result = _tool_retry_step({"step_id": step.id, "force": True}, lambda: mem)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data.get("forced") is True
+        reloaded = mem.get_step(step.id)
+        assert reloaded.state == StepState.EVENT_TRANSMIT
+
 
 # ============================================================================
 # Tool: afl_resume_workflow

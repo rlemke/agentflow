@@ -182,7 +182,9 @@ def create_server(
                     "(connection blip, timeout). For workflows stuck due to "
                     "ancestor-block errors, dead-server tasks, or premature "
                     "completion, use fw_repair_workflow — it diagnoses and "
-                    "fixes multiple issues in one pass."
+                    "fixes multiple issues in one pass. By default refuses "
+                    "if the step's task is RUNNING (would race with the "
+                    "in-flight handler); pass force=true to override."
                 ),
                 inputSchema={
                     "type": "object",
@@ -190,6 +192,14 @@ def create_server(
                         "step_id": {
                             "type": "string",
                             "description": "ID of the failed step to retry",
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": (
+                                "Reset the step even if its task is currently RUNNING. "
+                                "Use only when the runner is known to be unresponsive."
+                            ),
                         },
                     },
                     "required": ["step_id"],
@@ -692,16 +702,40 @@ def _tool_retry_step(
     arguments: dict[str, Any],
     get_store: Any,
 ) -> list[TextContent]:
-    """Retry a failed step."""
+    """Retry a failed step.  Refuses if the step's task is RUNNING
+    unless ``force=true`` — mirrors the dashboard ``/steps/{id}/retry``
+    endpoint."""
     step_id = arguments.get("step_id", "")
+    force = bool(arguments.get("force", False))
 
     try:
         from facetwork.runtime import Evaluator
+        from facetwork.runtime.entities import TaskState
 
         store = get_store()
-        evaluator = Evaluator(store)
-        evaluator.retry_step(step_id)
-        result: dict[str, Any] = {"success": True}
+        task = store.get_task_for_step(step_id)
+        task_was_running = task is not None and task.state == TaskState.RUNNING
+        if task_was_running and not force:
+            step = store.get_step(step_id)
+            result: dict[str, Any] = {
+                "success": False,
+                "error": "step_task_running",
+                "message": (
+                    "Step's task is currently RUNNING. "
+                    "Pass force=true to reset it anyway."
+                ),
+                "blockers": [
+                    {
+                        "step_id": step_id,
+                        "facet_name": (step.facet_name if step else "") or "",
+                        "task_uuid": task.uuid,
+                    }
+                ],
+            }
+        else:
+            evaluator = Evaluator(store)
+            evaluator.retry_step(step_id)
+            result = {"success": True, "forced": bool(force and task_was_running)}
     except Exception as e:
         result = {"success": False, "error": str(e)}
     return [TextContent(type="text", text=json.dumps(result, default=str))]

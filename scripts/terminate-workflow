@@ -57,6 +57,26 @@ NON_TERMINAL_STEP_STATES = [
 NON_TERMINAL_TASK_STATES = ["pending", "running"]
 
 
+HEARTBEAT_WINDOW_MS = 30_000  # tasks heartbeating within this window are "live"
+
+
+def live_running_tasks(db: Any, runner_id: str, now_ms: int) -> list[dict[str, Any]]:
+    """Return RUNNING tasks for *runner_id* whose handler-level heartbeat
+    fired within HEARTBEAT_WINDOW_MS — the operator probably doesn't
+    want to terminate a workflow that's actively making progress."""
+    horizon = now_ms - HEARTBEAT_WINDOW_MS
+    return list(
+        db.tasks.find(
+            {
+                "runner_id": runner_id,
+                "state": "running",
+                "task_heartbeat": {"$gte": horizon},
+            },
+            {"uuid": 1, "name": 1, "step_id": 1, "task_heartbeat": 1, "_id": 0},
+        )
+    )
+
+
 def terminate_runner(db: Any, runner_id: str, dry: bool) -> dict[str, int]:
     runner = db.runners.find_one({"uuid": runner_id})
     if not runner:
@@ -130,6 +150,15 @@ def main() -> int:
     parser.add_argument(
         "--dry", action="store_true", help="Report what would change without writing."
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Terminate even if running tasks have heartbeats within the "
+            f"last {HEARTBEAT_WINDOW_MS // 1000}s (i.e. are actively making "
+            "progress). Default: refuse and report which tasks look live."
+        ),
+    )
     args = parser.parse_args()
 
     mongo_url = os.environ.get("AFL_MONGODB_URL", "mongodb://localhost:27017")
@@ -143,6 +172,37 @@ def main() -> int:
 
     if not ids:
         parser.error("No runner_ids given and --workflow matched nothing.")
+
+    # Safety: refuse to terminate runners with tasks actively heartbeating
+    # within the last HEARTBEAT_WINDOW_MS. --force overrides.
+    if not args.force and not args.dry:
+        import time as _time
+
+        now_ms = int(_time.time() * 1000)
+        blocked: list[tuple[str, list[dict[str, Any]]]] = []
+        for rid in ids:
+            live = live_running_tasks(db, rid, now_ms)
+            if live:
+                blocked.append((rid, live))
+        if blocked:
+            for rid, tasks in blocked:
+                print(
+                    f"REFUSED {rid[:12]}: {len(tasks)} task(s) heartbeating within "
+                    f"the last {HEARTBEAT_WINDOW_MS // 1000}s:",
+                    file=sys.stderr,
+                )
+                for t in tasks:
+                    age = (now_ms - int(t.get("task_heartbeat") or 0)) // 1000
+                    print(
+                        f"    {t['name']}  step={t['step_id'][:12]}  heartbeat={age}s ago",
+                        file=sys.stderr,
+                    )
+            print(
+                "\nRun with --force to terminate anyway, or --dry to preview "
+                "without writing.",
+                file=sys.stderr,
+            )
+            return 2
 
     total = {"runner": 0, "steps": 0, "tasks": 0}
     for rid in ids:
