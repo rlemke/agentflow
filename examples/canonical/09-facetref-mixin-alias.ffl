@@ -1,0 +1,58 @@
+// Mixin aliases on a FacetRef consumer.
+//
+// When a facet's signature declares mixins with `as <alias>`, a downstream
+// step that receives the facet by reference can address each mixin's
+// sub-step through `$.<fref>.<alias>.<field>`, alongside the facet's own
+// `$.<fref>.<field>` for primary attributes.
+//
+// In this example:
+//
+//   F2 has primary return `output` and two aliased mixins, `m1` and `m2`.
+//   Consumer takes an `f2: F2` parameter and reads all three:
+//     - `$.f2.output`       — F2's own return
+//     - `$.f2.m1.output`    — M1 mixin sub-step's return, via alias `m1`
+//     - `$.f2.m2.output`    — M2 mixin sub-step's return, via alias `m2`
+//
+// An alias may not collide with the facet's own param or return names
+// (MIXIN_ALIAS_NAME_CONFLICT). Mixins declared without an `as` alias are
+// deliberately unreachable from FacetRef consumers — see rule
+// REF_INVALID_FACET_REF_ATTRIBUTE.
+//
+// Caveat: facet-signature mixin execution is not yet fully wired in the
+// runtime (MixinBlocksBeginHandler is stubbed). The validator accepts
+// the syntax and the resolver knows how to follow an alias to a mixin
+// sub-step, but until the mixin sub-step rows are persisted at runtime
+// the `$.f2.m1.output` access will raise a `no param, return, or mixin
+// alias` ReferenceError. The grammar + validator side of this example
+// is fully exercised by the test suite.
+
+namespace alias_demo {
+    facet M1(input: String) => (output: String) andThen {
+        yield M1(output = $.input ++ "-m1")
+    }
+
+    facet M2(input: String) => (output: String) andThen {
+        yield M2(output = $.input ++ "-m2")
+    }
+
+    facet F2(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
+        yield F2(output = $.input ++ "-primary")
+    }
+
+    facet Sink(input: String) => (output: String) andThen {
+        yield Sink(output = $.input)
+    }
+
+    facet Consumer(f2: F2) => (primary: String, m1_out: String, m2_out: String) andThen {
+        v1 = Sink(input = $.f2.output)
+        v2 = Sink(input = $.f2.m1.output)
+        v3 = Sink(input = $.f2.m2.output)
+        yield Consumer(primary = v1.output, m1_out = v2.output, m2_out = v3.output)
+    }
+
+    workflow Demo(input: String) => (primary: String, m1_out: String, m2_out: String) andThen {
+        f2 = F2(input = $.input)
+        s  = Consumer(f2 = f2)
+        yield Demo(primary = s.primary, m1_out = s.m1_out, m2_out = s.m2_out)
+    }
+}

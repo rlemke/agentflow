@@ -29,6 +29,12 @@ from facetwork.validator import validate as validate_ast
 
 
 CANONICAL = Path(__file__).resolve().parents[2] / "examples" / "canonical" / "08-step-reference.ffl"
+CANONICAL_MIXIN_ALIAS = (
+    Path(__file__).resolve().parents[2]
+    / "examples"
+    / "canonical"
+    / "09-facetref-mixin-alias.ffl"
+)
 
 
 # =========================================================================
@@ -82,6 +88,16 @@ def test_bare_step_name_emits_stepref_with_single_path():
 def test_canonical_example_parses_and_validates():
     src = CANONICAL.read_text()
     ast = parse(src, str(CANONICAL))
+    result = validate_ast(ast)
+    assert not result.errors, f"unexpected validator errors: {result.errors}"
+
+
+def test_canonical_mixin_alias_example_parses_and_validates():
+    """09-facetref-mixin-alias.ffl exercises the full
+    pass-by-step + mixin-alias surface: with M() as m1 in a signature
+    and $.fref.m1.field on the consumer side. Must validate cleanly."""
+    src = CANONICAL_MIXIN_ALIAS.read_text()
+    ast = parse(src, str(CANONICAL_MIXIN_ALIAS))
     result = validate_ast(ast)
     assert not result.errors, f"unexpected validator errors: {result.errors}"
 

@@ -16,6 +16,8 @@ These files are also exposed via the MCP server at `afl://examples/canonical/`.
 | [`05-workflow-when.ffl`](05-workflow-when.ffl) | `when` block with a default branch. |
 | [`06-workflow-mixin.ffl`](06-workflow-mixin.ffl) | Mixin composition (`with Timestamp()`) on a workflow signature. |
 | [`07-schema-instantiation.ffl`](07-schema-instantiation.ffl) | Schema definition + instantiation, with field-by-field access. |
+| [`08-step-reference.ffl`](08-step-reference.ffl) | Pass a whole step by reference (FacetRef): `$.<fref>.field` reads the upstream step's attributes. |
+| [`09-facetref-mixin-alias.ffl`](09-facetref-mixin-alias.ffl) | Mixin aliases on FacetRef consumers: `with M() as m1` enables `$.<fref>.m1.field`. |
 
 ## Conventions worth noticing
 
