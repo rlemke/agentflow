@@ -496,6 +496,8 @@ facet F2(input: String) => (output: String)
 
 A single `yield F2(...) with M1(...) with M2(...)` is parsed as one statement per target — the compiler unpacks the chain into independent yields, each subject to the usual yield-target rules. The chained form removes the visual asymmetry between a signature that lists its mixins on stacked lines and a body that would otherwise need three separate `yield` statements to fan results back across them.
 
+The mixin sub-step a consumer sees through `$.fref.<alias>` is, in the current design, a **view** over the parent's persisted yields rather than a separately-executed step. When a consumer reads `$.f2.m1.output`, the runtime resolves it by examining `f2`'s yield steps, selecting those whose target facet is the one bound to `m1` on F2's signature, and exposing the merged contributions as the mixin sub-step's `returns`. This sits naturally inside the yield-aggregation discipline of §4.4.1: a FacetRef alias gives a name to a slice of what `MixinCaptureBegin` would have folded into the parent's returns, indexed by the producing mixin rather than collapsed into a single namespace. The consumer never observes mixin execution as a distinct activity; it observes the durable record the producer wrote on its way to completion. If a future revision adds first-class facet-signature mixin execution — separate sub-steps with their own state, retries, and dashboard visibility — the view becomes a direct lookup of those persisted rows, and no consumer-side code changes.
+
 ### 4.5 Mixins, implicits, and inheritance-by-composition
 
 Mixins let one facet be defined as the combination of several others:
