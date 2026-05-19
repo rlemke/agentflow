@@ -732,3 +732,92 @@ Each commit atomically persists all `IterationChanges` (created steps, updated s
 | External actors | None | CountDocuments microservice |
 | Events created | 0 | 1 (CountDocuments) |
 | Cache commits with events | 0 | 1 (commit 0 includes the event) |
+
+---
+
+## 5. Example — Aliased Mixin Execution + FacetRef Read
+
+```afl
+namespace alias_demo {
+    facet M(input: String) => (output: String) andThen {
+        yield M(output = $.input ++ "-tagged")
+    }
+
+    facet F(input: String) => (output: String)
+        with M(input = $.input) as m
+        andThen {
+            yield F(output = $.input ++ "-primary")
+        }
+
+    facet Consumer(f: F) => (primary: String, mixin_out: String) andThen {
+        yield Consumer(primary = $.f.output, mixin_out = $.f.m.output)
+    }
+
+    workflow Demo(input: String) => (primary: String, mixin_out: String) andThen {
+        f1 = F(input = $.input)
+        c  = Consumer(f = f1)
+        yield Demo(primary = c.primary, mixin_out = c.mixin_out)
+    }
+}
+```
+
+For `Demo(input = "alpha")` the result is
+`{primary: "alpha-primary", mixin_out: "alpha-tagged"}`.
+
+### Lifecycle highlights
+
+For the `f1 = F(input = "alpha")` step:
+
+1. **f1 `FACET_INIT_BEGIN`** — evaluate parent params (`input = "alpha"`),
+   then the sig-mixin args `M(input = $.input)` in parent scope.
+   `f1.attributes.params` now has `{input: "alpha", m: {input: "alpha"}}`.
+2. **f1 `MIXIN_BLOCKS_BEGIN`** — create one `CREATED` sub-step under
+   `f1` with `statement_name="m"`, `facet_name="M"`, and
+   `attributes.params={input: "alpha"}` (seeded from
+   `parent.params["m"]`).
+3. **Mixin sub-step lifecycle (in parallel with any other aliased
+   mixins)** — `FacetInitializationBeginHandler` detects the
+   pre-bound params (`_init_mixin_sub_step`) and skips arg-eval.
+   The sub-step enters `STATEMENT_BLOCKS_BEGIN`, picks up M's
+   `andThen` body, runs it with `$.` isolated to its own
+   attributes, yields `output = "alpha-tagged"` into its
+   `attributes.returns`. Sub-step reaches `STATEMENT_COMPLETE`.
+4. **f1 `MIXIN_BLOCKS_CONTINUE`** — the aliased sub-step is
+   terminal, no errors; f1 advances.
+5. **f1 `MIXIN_CAPTURE_BEGIN`** — snapshot the sub-step's merged
+   `{params: {input: "alpha"}, returns: {output: "alpha-tagged"}}`
+   into `parent.params["m"]`, replacing the FACET_INIT nested dict.
+6. **f1 `STATEMENT_BLOCKS_*`** — f1's body runs, yields
+   `F(output = "alpha-primary")`. Parent capture writes to
+   `f1.attributes.returns["output"]`.
+7. **f1 `STATEMENT_COMPLETE`**.
+
+For the `c = Consumer(f = f1)` step, `$.f` is a `StepReference` to
+f1. `$.f.output` resolves via `_resolve_path`'s StepReference
+branch: alias lookup misses (`output` is not a declared alias on
+F), then `f1.attributes.returns["output"]` returns `"alpha-primary"`.
+`$.f.m.output` resolves the alias `m` first (live sub-step lookup
+beats `f1.params["m"]` snapshot), then `output` from the sub-step's
+returns — `"alpha-tagged"`. This precedence is what makes
+parent-yield overrides applied at `STATEMENT_CAPTURE_BEGIN` visible
+to consumers; for un-overridden mixins, the values are the same as
+the snapshot.
+
+### Yield routing forms
+
+Inside F's body, both equivalent forms exist for writing to a mixin
+sub-step:
+
+```afl
+// Form 1 — bare target with single alias (back-compat).
+yield F(output = ...) with M(output = "override")
+
+// Form 2 — explicit alias name (required when one mixin target has
+// 2+ aliases, per YIELD_TARGET_AMBIGUOUS).
+yield m(output = "override")
+```
+
+Either form routes to the `m` sub-step's `attributes.returns` at
+parent `STATEMENT_CAPTURE_BEGIN`, **overwriting** the mixin body's
+contribution per the standard yield-merge rules (lists concat,
+sets union, everything else overwrites).

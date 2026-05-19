@@ -521,11 +521,58 @@ Both follow the same Begin → Continue → End pattern:
 
 ### Mixin Blocks
 
-Execute facet-level blocks (from mixin compositions):
+> Implements the **aliased mixin sub-step** lifecycle described in
+> [runtime.md](runtime.md) §8.x. Each aliased mixin on a facet sig
+> becomes a real persisted sub-step that runs the mixin facet's body
+> in parallel with sibling mixin sub-steps, before the parent body
+> runs.
 
-- **MixinBlocksBegin** - Creates block steps with `container_type="Facet"`
-- **MixinBlocksContinue** - Polls with `BlockAnalysis.load(step, blocks, mixins=True)`
-- **MixinBlocksEnd** - Advances to next state
+- **MixinBlocksBegin** — For each aliased mixin in the parent facet's
+  sig, creates a `VARIABLE_ASSIGNMENT` sub-step in `CREATED` state.
+  The sub-step's `statement_name` is the alias, its `facet_name` is
+  the mixin target, its `container_id` is the parent step, and its
+  `attributes.params` is seeded from `parent.params[alias]` (the
+  nested dict `FacetInitializationBeginHandler` already produced from
+  the mixin's evaluated sig-args). Un-aliased mixins are skipped —
+  their sig-args remain a flat-merge on parent.params (the v0.21.0
+  contract).
+- **MixinBlocksContinue** — Waits on the parent's aliased sub-steps
+  (children with `statement_name` in the parent facet's mixin
+  aliases). When any sub-step is in `STATEMENT_ERROR`, the parent
+  enters error with the first sub-step's error message. When all are
+  terminal, the parent advances.
+- **MixinBlocksEnd** — Pass-through to `MixinCaptureBegin`.
+
+The sub-step itself walks the full `STEP_TRANSITIONS` table.
+`FacetInitializationBeginHandler` detects the pre-bound mixin
+sub-step (`stmt_def is None and container_id is not None and
+statement_name != ""`) and routes to `_init_mixin_sub_step`, which
+skips call-arg evaluation and applies facet defaults only for
+attributes the parent didn't bind. The mixin sub-step's body
+executes through the normal block handlers, with one twist:
+`_resolve_inputs` recognises a mixin sub-step ancestor (`_is_mixin_sub_step`)
+and returns ONLY the mixin's own attributes — no workflow root
+inheritance, no parent reach-out. This enforces scope isolation at
+runtime; a `$.x` referencing an out-of-scope name raises
+`ReferenceError`.
+
+### Mixin Capture
+
+- **MixinCaptureBegin** — For each aliased mixin sub-step, builds a
+  merged `{params, returns}` dict (returns shadow params on key
+  collision) and writes it to `parent.attributes.params[alias]`,
+  overwriting the `FACET_INIT_BEGIN`-era sig-arg dict. This is what
+  the parent's andThen body reads as `$.alias.field`.
+- **MixinCaptureEnd** — Pass-through.
+
+**FacetRef consumers** (downstream steps holding a `StepReference` to
+the parent) bypass this snapshot. The resolver
+(`expression._resolve_path`) tries the live persisted mixin sub-step
+first via `get_mixin_step_by_alias`, falling through to `attrs.returns`
+and `attrs.params` only when no alias matches. This ensures that
+parent-yield overrides applied to a mixin sub-step at parent
+`STATEMENT_CAPTURE_BEGIN` (see §11 below) are visible to FacetRef
+consumers.
 
 ### Statement Blocks
 
@@ -593,28 +640,59 @@ Catch sub-blocks use `ObjectType.AND_CATCH = "AndCatch"` (included in `is_block(
 
 ### StatementCaptureBegin
 
-**Location:** `afl/runtime/handlers/capture.py`
+**Location:** `facetwork/runtime/handlers/capture.py`
 
-Merges results from yield/capture blocks:
+Routes each completed yield in the parent's andThen blocks to its
+destination:
 
 ```python
 class StatementCaptureBeginHandler(StateHandler):
-    """Merge yield results from statement blocks (andThen)."""
+    """Route yields to parent returns OR an aliased mixin sub-step."""
 
     def process_state(self) -> StateChangeResult:
-        blocks = self.context.persistence.get_blocks_by_step(self.step.id)
-        statement_blocks = [b for b in blocks if b.is_complete]
+        # 1. Cache parent facet's alias map (alias → target facet,
+        #    plus inverse for unique-target back-compat).
+        # 2. For each yield collected under the parent's blocks,
+        #    call _route_yield to pick a destination.
+        ...
 
-        for block in statement_blocks:
-            self._merge_yields_from_block(block)
-
-        self.step.request_state_change(True)
-        return StateChangeResult(step=self.step)
-
-    def _merge_yield(self, yield_step: StepDefinition) -> None:
-        for name, attr in yield_step.attributes.params.items():
-            self.step.attributes.set_return(name, attr.value, attr.type_hint)
+    def _route_yield(self, yield_step):
+        target = (yield_step.facet_name or "").split(".")[-1]
+        if _names_match(yield_step.facet_name, self.step.facet_name):
+            # Parent destination — merge into parent.attributes.returns.
+            self._merge_yield_into_parent(yield_step)
+        elif target in self._mixin_aliases:
+            # Alias-by-name form: `yield aliasName(...)`.
+            self._merge_yield_into_mixin_substep(yield_step, alias=target)
+        else:
+            unique = [a for a in self._target_to_aliases.get(target, []) if a]
+            if len(unique) == 1:
+                # Bare-target back-compat: `yield F(...) with M(...)`
+                # when M is uniquely aliased on F.
+                self._merge_yield_into_mixin_substep(yield_step, alias=unique[0])
+            # else: not for this scope — dropped.
 ```
+
+Routing rules (mirror [runtime.md](runtime.md) §11.x):
+
+1. **Yield target matches parent facet name** → merge into
+   `parent.attributes.returns`.
+2. **Yield target matches a declared alias** on the parent's facet
+   → merge into the mixin sub-step's `attributes.returns`.
+3. **Yield target matches a mixin facet name with exactly one
+   alias** on the parent → that single sub-step. The validator's
+   `YIELD_TARGET_AMBIGUOUS` rule rejects the multi-alias case at
+   compile time, so the runtime never has to disambiguate.
+4. **Otherwise** → silently dropped (an inner-facet-body yield will
+   be captured by its own scope).
+
+Merge semantics within a destination follow `_merge_yield_value`:
+lists concat, sets/frozensets union, everything else overwrites.
+
+Mixin sub-step updates go through `add_updated_step` so the iteration
+commit persists the override. Working copies are cached on the handler
+(`_mixin_substep_working`) so multiple yields targeting the same alias
+accumulate in one update.
 
 ---
 

@@ -1348,16 +1348,37 @@ once and reuse the dict for multiple reads.
 
 #### Mixin sub-steps via alias
 
-If the referenced facet declares mixins with `as <alias>`, the
-upstream step's mixin sub-steps are addressable from inside an
-`andThen` body as `$.fref.<alias>.<field>` — the resolver follows the
-alias to the mixin's persisted step and reads the named attribute. In
-handler code, the same access path is available indirectly: a handler
-that needs a mixin sub-step's attributes should expose a parameter
-typed as the **mixin facet** and have the producing workflow pass the
-mixin step by reference into it, rather than navigating from the
-parent FacetRef. The JSON ref shape on the wire (the
-`{_facet_ref: true, ...}` envelope) is identical for both.
+If the referenced facet declares mixins with `as <alias>`, each
+aliased mixin is a **real persisted sub-step** that executed before
+the parent body — its `attributes.params` come from the mixin's
+sig-args (`with M(x = $.input) as alias`, evaluated in the parent's
+scope) and its `attributes.returns` come from running the mixin
+facet's own `andThen` body with `$.` isolated to its own attributes.
+The sub-step is then addressable from inside an `andThen` body as
+`$.fref.<alias>.<field>` — the resolver follows the alias to the
+mixin's persisted row and reads the named attribute (live state,
+including any parent-yield overrides applied at the parent's
+`STATEMENT_CAPTURE_BEGIN`).
+
+In handler code that holds the **parent** FacetRef, the parent's
+handler payload contains `params[alias]` as a snapshot dict of the
+mixin sub-step's `{params, returns}` taken at `MIXIN_CAPTURE_BEGIN`
+(before parent yields override). For the most up-to-date view of a
+mixin sub-step's state, a handler should either:
+
+1. Receive the **mixin facet** by reference directly (the producing
+   workflow passes the mixin step's id by reference), and read it via
+   `fetch_step`. Or
+2. Receive the parent FacetRef and use the snapshot in
+   `payload["params"][alias]` — sufficient when parent-yield
+   overrides aren't in play.
+
+The JSON ref shape on the wire (the `{_facet_ref: true, ...}`
+envelope) is identical for both.
+
+Un-aliased mixins on a facet sig do NOT execute as sub-steps; their
+sig-args flat-merge into the parent step's params per the v0.21.0
+contract and the mixin's body, if any, is unreachable from runtime.
 
 #### Read-only semantics
 

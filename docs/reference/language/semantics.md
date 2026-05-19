@@ -169,6 +169,56 @@ Program
   `params ∪ returns ∪ mixin_aliases` of the referenced facet (and the
   aliased mixin, when applicable).
 
+### Aliased Mixin Execution Lifecycle
+
+Every aliased mixin on a facet sig executes as a real sub-step, in
+parallel with sibling aliased mixins, fully before the parent body
+runs. Init order is strict:
+
+1. **Parent params** are bound from call args at parent
+   `FACET_INIT_BEGIN`.
+2. **Mixin sig-args** (`with M(x = $.input) as m` on the facet decl)
+   are evaluated in the parent's scope and become the mixin
+   sub-step's bound params.
+3. **Mixin bodies** run, each with `$.` isolated to the mixin's own
+   attributes — no workflow-root inheritance, no parent reach-out.
+   The mixin's own facet defaults populate any attributes the parent
+   didn't bind.
+4. **Parent body** runs after every aliased mixin sub-step has
+   terminated; `$.alias.field` reads a snapshot of the mixin
+   sub-step's `{params, returns}` written to `parent.params[alias]`
+   at `MIXIN_CAPTURE_BEGIN`.
+
+A mixin sub-step that errors propagates the error to the parent
+step. Un-aliased mixins remain purely configurational: their
+sig-args flat-merge into `parent.params` per the v0.21.0 contract
+and the mixin facet's body, if any, does NOT execute.
+
+### Yield Routing
+
+Yields collected at the parent's `STATEMENT_CAPTURE_BEGIN` are
+routed to one of two destinations:
+
+- **Parent step** if the yield target matches the parent's own
+  facet name (`yield F(output = ...)` inside `facet F`).
+- **Mixin sub-step** if the yield target is a declared alias
+  (`yield aliasName(out = ...)`), or a mixin facet name with
+  exactly one alias on the parent (`yield F(...) with M(out = ...)`
+  when M is uniquely aliased on F).
+
+Routing to a mixin sub-step writes the yield's values onto the
+sub-step's `attributes.returns`, applying the same yield-merge
+rules (lists concat, sets/frozensets union, scalars overwrite).
+The override is visible to FacetRef consumers via the live
+persisted sub-step but not to the parent's own snapshot reads —
+the snapshot was taken at `MIXIN_CAPTURE_BEGIN` before any parent
+yield runs.
+
+When two or more sig-level mixins target the same facet, the bare
+target form is ambiguous (it can't pick an alias). Validator rule
+`YIELD_TARGET_AMBIGUOUS` rejects this; the author must use the
+alias name in the yield.
+
 ### Default Parameter Values
 - Parameters can have optional default values: `name: Type = expr`
 - Supported default expressions: literals (`"hello"`, `42`, `3.14`, `true`, `null`), references, and concat expressions

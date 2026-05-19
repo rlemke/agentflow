@@ -483,46 +483,64 @@ class FacetInitializationBeginHandler(StateHandler):
 
 #### MixinBlocksBeginHandler
 
-**File:** `afl/runtime/handlers/blocks.py`
+**File:** `facetwork/runtime/handlers/blocks.py`
 
-**Purpose:** Creates block steps for mixin definitions. Requests state change.
+**Purpose:** For each aliased mixin declared on the parent's facet
+signature, creates a `VARIABLE_ASSIGNMENT` sub-step in `CREATED`
+state. The sub-step's `statement_name` is the alias, its
+`facet_name` is the mixin target, its `container_id` is the parent
+step, and its `attributes.params` is seeded from the parent's
+`params[alias]` (the nested dict `FacetInitializationBeginHandler`
+already produced from the mixin's evaluated sig-args). Un-aliased
+mixins are skipped — their sig-args remain a flat-merge on
+`parent.params` per the v0.21.0 contract and they do not execute as
+sub-steps.
 
 #### MixinBlocksContinueHandler
 
-**File:** `afl/runtime/handlers/blocks.py`
+**File:** `facetwork/runtime/handlers/blocks.py`
 
-**Purpose:** Monitors mixin block completion.
-
-**Processing:**
-1. Loads blocks via `persistence.get_blocks_by_step()`
-2. Filters to mixin blocks (`container_type == "Facet"`)
-3. Creates `BlockAnalysis.load(step, mixin_blocks, mixins=True)`
-4. If `analysis.done`: requests state change
-5. If not done: calls `self.stay(push=True)` to re-queue
+**Purpose:** Waits for every aliased mixin sub-step to reach a
+terminal state. Sub-step detection uses the parent facet's declared
+aliases (`statement_name` ∈ `facet_def.mixins[*].alias`). If any
+sub-step is in `STATEMENT_ERROR`, the parent step is also marked
+error with the first sub-step's error message. Otherwise the parent
+advances once every sub-step is complete.
 
 ```python
 class MixinBlocksContinueHandler(StateHandler):
     def process_state(self) -> StateChangeResult:
-        blocks = self.context.persistence.get_blocks_by_step(self.step.id)
-        mixin_blocks = [b for b in blocks if b.container_type == "Facet"]
-
-        if not mixin_blocks:
+        aliases = self._declared_aliases()
+        if not aliases:
             self.step.request_state_change(True)
             return StateChangeResult(step=self.step)
 
-        analysis = BlockAnalysis.load(self.step, mixin_blocks, mixins=True)
-        if analysis.done:
-            self.step.request_state_change(True)
-            return StateChangeResult(step=self.step)
-        else:
+        sub_steps = self._mixin_sub_steps(aliases)
+        if not sub_steps:
             return self.stay(push=True)
+
+        errored = [s for s in sub_steps if s.is_error]
+        if errored:
+            err = errored[0].transition.error
+            msg = (
+                f"{len(errored)} mixin sub-step(s) errored"
+                + (f": {err}" if err else "")
+            )
+            self.step.mark_error(RuntimeError(msg))
+            return StateChangeResult(step=self.step)
+
+        if any(not s.is_terminal for s in sub_steps):
+            return self.stay(push=True)
+
+        self.step.request_state_change(True)
+        return StateChangeResult(step=self.step)
 ```
 
 #### MixinBlocksEndHandler
 
-**File:** `afl/runtime/handlers/blocks.py`
+**File:** `facetwork/runtime/handlers/blocks.py`
 
-**Purpose:** Marks mixin blocks processing complete. Requests state change.
+**Purpose:** Pass-through. Marks mixin blocks processing complete.
 
 ---
 
@@ -530,20 +548,26 @@ class MixinBlocksContinueHandler(StateHandler):
 
 #### MixinCaptureBeginHandler
 
-**File:** `afl/runtime/handlers/capture.py`
+**File:** `facetwork/runtime/handlers/capture.py`
 
-**Purpose:** Extracts and merges captured data from mixin blocks.
-
-**Processing:**
-1. Gets completed mixin blocks via persistence
-2. For each block, finds yield steps (`ObjectType.YIELD_ASSIGNMENT`)
-3. Merges yield attributes into step's return values
+**Purpose:** Snapshots each aliased mixin sub-step's
+`{params, returns}` into `parent.attributes.params[alias]`,
+overwriting the `FACET_INIT`-era nested dict of sig-args. Returns
+shadow params on key collision (mirrors `FacetAttributes.merge`).
+The parent's andThen body then reads `$.alias.field` against this
+snapshot. Downstream FacetRef consumers do NOT read the snapshot —
+they go through `expression._resolve_path`, which checks the live
+persisted sub-step first via `get_mixin_step_by_alias` before
+falling through to `attrs.returns`/`attrs.params`. This precedence
+ensures Scope-A parent-yield overrides applied at the parent's
+`STATEMENT_CAPTURE_BEGIN` are visible to consumers but invisible to
+the parent's own snapshot read.
 
 #### MixinCaptureEndHandler
 
-**File:** `afl/runtime/handlers/capture.py`
+**File:** `facetwork/runtime/handlers/capture.py`
 
-**Purpose:** Marks mixin capture complete. Requests state change.
+**Purpose:** Pass-through. Marks mixin capture complete.
 
 ---
 

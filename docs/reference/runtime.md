@@ -150,13 +150,20 @@ During `state.facet.initialization.Begin`:
 - Results MUST be stored in the step’s persistent facet structure
 - Expressions MAY include arithmetic, grouping, and references
 
-### Call-Site Mixin Argument Evaluation
+### Mixin Argument Evaluation
 
-> **Implemented** (v0.21.0) — `FacetInitializationBeginHandler` in `afl/runtime/handlers/initialization.py`.
+> **Implemented** — `FacetInitializationBeginHandler` in
+> `facetwork/runtime/handlers/initialization.py`.
 
-A step’s call expression MAY include **call-site mixins**: `with MixinName(args) as alias`.
+A step's mixin args come from two sources, both evaluated in the
+parent's scope at `FACET_INIT_BEGIN`:
 
-The compiled AST stores these in the call’s `mixins` list:
+- **Sig-level mixins** declared on the facet signature
+  (`facet F(input: String) with M(x = $.input) as m`).
+- **Call-site mixins** declared on the call expression
+  (`s = F(input = ...) with M(x = 1) as m`).
+
+The compiled AST stores call-site mixins in the call's `mixins` list:
 
 ```json
 {
@@ -171,17 +178,34 @@ The compiled AST stores these in the call’s `mixins` list:
 }
 ```
 
-During `FACET_INIT_BEGIN`, after evaluating the step’s own call args, the runtime MUST evaluate mixin args with these rules:
+Sig-level mixins live on the facet declaration's `mixins` list with
+the same shape (`{type: MixinSig, target, alias?, args?}`).
 
-1. **Evaluation order:** Call args are evaluated first, then mixins in declaration order.
+During `FACET_INIT_BEGIN`, after evaluating the step's own call args,
+the runtime MUST evaluate mixin args with these rules:
 
-2. **Aliased mixins** (`with Foo(x=1) as alias`): The evaluated mixin args are stored as a **nested dict** under the alias key. The handler receives `params["alias"] = {"x": 1}`.
+1. **Evaluation order:** Call args first; then sig-level mixin args (in
+   declaration order); then call-site mixin args (in declaration order).
+   Call-site args override sig-level args on the same alias.
 
-3. **Non-aliased mixins** (`with Foo(x=1)`): The evaluated mixin args are **flat-merged** into the step params. A mixin arg MUST NOT override an explicit call arg with the same name.
+2. **Aliased mixins** (`with Foo(x=1) as alias`): The evaluated mixin
+   args are stored as a **nested dict** under the alias key. The
+   handler receives `params["alias"] = {"x": 1, ...}`. After
+   `MIXIN_CAPTURE_BEGIN` runs (see §8.x below), this dict is
+   **refreshed** to a `{params, returns}` snapshot of the executed
+   mixin sub-step.
 
-4. **Dependencies:** Mixin args MAY contain step references. The dependency graph MUST scan mixin args in addition to call args when computing step dependencies.
+3. **Non-aliased mixins** (`with Foo(x=1)`): The evaluated mixin args
+   are **flat-merged** into the step params. A mixin arg MUST NOT
+   override an explicit call arg with the same name. Un-aliased mixins
+   do NOT execute as sub-steps — they remain pure configuration.
 
-5. **Implicit fallback:** Implicit defaults still apply for params not provided by either the call args or the mixin args.
+4. **Dependencies:** Mixin args MAY contain step references. The
+   dependency graph MUST scan mixin args in addition to call args when
+   computing step dependencies.
+
+5. **Implicit fallback:** Implicit defaults still apply for params not
+   provided by either the call args or the mixin args.
 
 **Example:**
 
@@ -189,14 +213,18 @@ During `FACET_INIT_BEGIN`, after evaluating the step’s own call args, the runt
 ingest = IngestReading(sensor_id = $.id) with RetryPolicy(max_retries = 5) as retry
 ```
 
-The handler receives:
+The handler receives, immediately after `FACET_INIT_BEGIN`:
 
 ```python
 params = {
-    "sensor_id": "sensor_001",   # from call arg
-    "retry": {"max_retries": 5}, # from aliased mixin
+    "sensor_id": "sensor_001",
+    "retry": {"max_retries": 5},  # nested dict of evaluated mixin sig-args
 }
 ```
+
+After `MIXIN_CAPTURE_BEGIN` (post mixin-execution), the `retry` dict is
+refreshed to include the mixin sub-step's computed returns alongside
+its bound params.
 
 ### Dependency Enforcement
 
@@ -257,6 +285,69 @@ When a block step enters `BlockExecutionBegin`, the handler MUST resolve the cor
 - **Statement-level block**: The AST is the inline `andThen` body attached to the step statement in the compiled AST (from `StepStmt.body`).
 
 The evaluator MUST have access to the full Program AST to resolve these references (see §11.1).
+
+### 8.x Aliased Mixin Sub-Step Execution
+
+> **Implemented** — `MixinBlocksBeginHandler`,
+> `MixinBlocksContinueHandler`, `MixinCaptureBeginHandler` in
+> `facetwork/runtime/handlers/`.
+
+An **aliased mixin** (`with M(args) as alias` on a facet sig) executes
+as a real sub-step under the parent. The lifecycle, relative to the
+parent's state walk:
+
+```
+parent FACET_INIT_BEGIN         evaluate parent.params, then sig-mixin
+                                 args in parent scope → seed
+                                 parent.params[alias] as nested dict
+parent MIXIN_BLOCKS_BEGIN       create one CREATED sub-step per alias;
+                                 sub-step.params is seeded from
+                                 parent.params[alias]
+[aliased mixin sub-steps run in parallel through STEP_TRANSITIONS]
+  • mixin FACET_INIT_BEGIN      skip call-arg eval (already bound);
+                                 apply facet defaults for any params
+                                 or returns the parent didn't bind
+  • mixin STATEMENT_BLOCKS_*    execute the mixin facet's andThen
+                                 body, with `$.` isolated to the
+                                 mixin's own attributes (no workflow
+                                 root, no parent inheritance)
+  • mixin STATEMENT_CAPTURE_*   yields → mixin sub-step's returns
+  • → STATEMENT_COMPLETE        (or STATEMENT_ERROR)
+parent MIXIN_BLOCKS_CONTINUE    wait on every aliased sub-step.  If
+                                 any errored, parent step also errors
+                                 with the first error message.
+parent MIXIN_CAPTURE_BEGIN      for each alias, snapshot
+                                 {params + returns} of the sub-step
+                                 into parent.params[alias],
+                                 overwriting the FACET_INIT nested
+                                 dict.  Returns shadow params on key
+                                 collision (mirrors
+                                 FacetAttributes.merge).
+parent STATEMENT_BLOCKS_*       parent body runs; `$.alias.field`
+                                 reads the snapshot
+parent STATEMENT_CAPTURE_BEGIN  parent body's yields targeting an
+                                 alias (`yield aliasName(...)` or
+                                 `yield F(...) with M(...)`) merge
+                                 into the persisted sub-step's
+                                 returns per standard yield-merge
+                                 rules.  This is visible to FacetRef
+                                 consumers but NOT to the parent's
+                                 own snapshot read (the snapshot was
+                                 taken at MIXIN_CAPTURE_BEGIN, before
+                                 these yields are routed).
+```
+
+**FacetRef consumer reads.** When a downstream step receives the
+parent by reference and reads `$.<fref>.<alias>.<field>`, the
+resolver returns the **live persisted sub-step** — so parent-yield
+overrides applied at the parent's `STATEMENT_CAPTURE_BEGIN` are
+visible. This precedence is encoded in
+`expression._resolve_path`'s StepReference branch: mixin alias
+lookup first, then `attrs.returns`, then `attrs.params`.
+
+**Un-aliased mixins** do NOT execute as sub-steps. Their sig-args
+flat-merge into `parent.params` per the v0.21.0 contract (§7); they
+are unreachable from FacetRef consumers (`REF_INVALID_FACET_REF_ATTRIBUTE`).
 
 ### 8.4 Catch Block Semantics
 

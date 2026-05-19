@@ -493,6 +493,9 @@ Each map features:
 | **v0.22.0** | Site-selection debate — spatial + research + debate combined | 3,180 |
 | **v0.23.0** | Dashboard UI redesign — sidebar nav, command palette, search | 3,211 |
 | **v0.24.0** | SDK step-log emission, PyPI packaging, cleanups | **3,211** |
+| **v0.25.x** | FacetRef + mixin alias resolution: deeper `$.fref.x.y` validation, STEP_REF_FACET_MISMATCH mixin-compatible, cross-language `fetch_step` (Go/Java/Scala/TS), mixin placeholder sub-steps in dashboard | — |
+| **v0.26.x** | Mixin yield routing (Scope A): parent yields land on aliased mixin sub-steps at write time, synthesis path retired, YIELD_TARGET_AMBIGUOUS rule, `yield aliasName(...)` form | — |
+| **v0.27.x** | Aliased mixin body execution (Scope B): mixin sub-steps fully execute their facet body in parallel before parent body, with `$.` scope isolated to their own attributes; sig-args evaluated in parent scope; `parent.params[alias]` refreshed at MIXIN_CAPTURE; FacetRef consumers see live persisted sub-step (parent-yield overrides visible); mixin error → parent errors | — |
 
 ### The Numbers
 
