@@ -436,35 +436,75 @@ class TestMixins:
 
 
 class TestMultiTargetYield:
-    """Test comma-separated yield targets."""
+    """A single yield may target the primary facet plus zero or more
+    mixins via `with` chains — symmetric with how facet sigs declare
+    mixins. The transformer splits the chain into one YieldStmt per
+    target."""
 
-    def test_inline_comma_yield(self, parser):
-        """yield F(...), M1(...), M2(...) on a single line."""
+    def test_inline_with_chain(self, parser):
+        """yield F(...) with M1(...) with M2(...) on a single line."""
         source = """
         facet M1(x: String) => (y: String)
         facet M2(x: String) => (y: String)
         facet F(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
-            yield F(output = $.input), M1(y = $.input), M2(y = $.input)
+            yield F(output = $.input) with M1(y = $.input) with M2(y = $.input)
         }
         """
         ast = parser.parse(source)
         F = next(f for f in ast.facets if f.sig.name == "F")
         assert [y.call.name for y in F.body.block.yield_stmts] == ["F", "M1", "M2"]
 
-    def test_multi_line_yield_via_trailing_comma(self, parser):
-        """A comma at end-of-line allows continuing onto the next line."""
+    def test_with_chain_targets_carry_their_args(self, parser):
+        """Each call in the chain becomes its own YieldStmt with the
+        named args from that call (and no nested mixins)."""
+        source = """
+        facet M1(x: String) => (y: String)
+        facet F(input: String) => (output: String) with M1() as m1 andThen {
+            yield F(output = "p") with M1(y = "m")
+        }
+        """
+        ast = parser.parse(source)
+        F = next(f for f in ast.facets if f.sig.name == "F")
+        yields = F.body.block.yield_stmts
+        assert len(yields) == 2
+        assert yields[0].call.name == "F"
+        assert yields[0].call.mixins == []
+        assert yields[0].call.args[0].name == "output"
+        assert yields[1].call.name == "M1"
+        assert yields[1].call.mixins == []
+        assert yields[1].call.args[0].name == "y"
+
+    def test_multi_line_with_chain_yield(self, parser):
+        """`with` clauses stacked on separate lines should join."""
         source = """
         facet M1(x: String) => (y: String)
         facet M2(x: String) => (y: String)
         facet F(input: String) => (output: String) with M1() as m1 with M2() as m2 andThen {
-            yield F(output = $.input),
-                  M1(y = $.input),
-                  M2(y = $.input)
+            yield F(output = $.input)
+                with M1(y = $.input)
+                with M2(y = $.input)
         }
         """
         ast = parser.parse(source)
         F = next(f for f in ast.facets if f.sig.name == "F")
         assert [y.call.name for y in F.body.block.yield_stmts] == ["F", "M1", "M2"]
+
+    def test_multi_line_with_chain_mixin_sig(self, parser):
+        """`with` clauses in a facet signature should also chain across
+        lines via the same preprocessor."""
+        source = """
+        facet M1(x: String) => (y: String)
+        facet M2(x: String) => (y: String)
+        facet F(input: String) => (output: String)
+            with M1() as m1
+            with M2() as m2
+            andThen {
+                yield F(output = $.input)
+            }
+        """
+        ast = parser.parse(source)
+        F = next(f for f in ast.facets if f.sig.name == "F")
+        assert [(m.name, m.alias) for m in F.sig.mixins] == [("M1", "m1"), ("M2", "m2")]
 
     def test_single_target_yield_still_works(self, parser):
         """Backward compatibility: single-target yield is unchanged."""

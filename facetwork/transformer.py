@@ -463,15 +463,39 @@ class FFLTransformer(Transformer):
     def step_body(self, meta, items: list) -> AndThenBlock:
         return self._andthen_from_items(meta, items)
 
-    @v_args(meta=True)
-    def yield_stmt(self, meta, items: list) -> list[YieldStmt]:
+    @v_args(meta=True, inline=True)
+    def yield_stmt(self, meta, call: CallExpr) -> list[YieldStmt]:
         """A yield statement may target one or more facets/mixins, e.g.
-        ``yield F(a = 1), M(b = 2)``.  We return a list of YieldStmt
-        nodes — one per target call — at the same source location;
-        ``block_body`` flattens them into the block's yield list.
+        ``yield F(a = 1) with M(b = 2)``. The grammar uses the same
+        ``call_expr`` shape that statement-level calls accept, but in a
+        yield context a ``with`` clause introduces an **additional
+        yield target**, not a call-site mixin on the primary call.
+
+        We split the parsed call_expr into:
+          - one YieldStmt for the primary call (mixins stripped), and
+          - one YieldStmt per mixin_call (each with empty mixins).
+
+        ``block_body`` flattens the returned list into the block's
+        yield list.
         """
         loc = self._loc(meta)
-        return [YieldStmt(call=call, location=loc) for call in items if isinstance(call, CallExpr)]
+        primary = YieldStmt(
+            call=CallExpr(name=call.name, args=call.args, mixins=[], location=call.location),
+            location=loc,
+        )
+        extras = [
+            YieldStmt(
+                call=CallExpr(
+                    name=m.name,
+                    args=m.args,
+                    mixins=[],
+                    location=m.location,
+                ),
+                location=loc,
+            )
+            for m in call.mixins
+        ]
+        return [primary, *extras]
 
     # Blocks
     @v_args(meta=True)

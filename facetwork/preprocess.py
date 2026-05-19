@@ -150,6 +150,120 @@ def preprocess_script_braces(source: str) -> str:
     return "".join(result)
 
 
+def join_with_continuations(source: str) -> str:
+    """Join lines whose first non-whitespace token is ``with``.
+
+    The Lark LALR(1) grammar cannot disambiguate `_NL` before `with`
+    inside ``call_expr``'s mixin chain (it conflicts with the
+    surrounding `block_body`'s ``_NL*``). This preprocessor turns
+
+        yield F(...)
+            with M1(...)
+            with M2(...)
+
+    into
+
+        yield F(...) with M1(...) with M2(...)
+
+    by replacing each ``\\n[ \\t]*with`` with `` with``, but only when
+    ``with`` is a real keyword token — not inside an FFL string,
+    line comment, or block comment.  Strings in FFL are single-line,
+    so any newline we see is outside a string; comments are skipped
+    with the same scanner pattern as ``preprocess_script_braces``.
+
+    Each consumed newline is reinserted after the joined ``with``
+    clause so trailing line numbers shift by at most one — error
+    messages on the joined line itself may report a line shifted by
+    the number of preceding continuations on that same line.
+    """
+    result: list[str] = []
+    i = 0
+    length = len(source)
+    while i < length:
+        c = source[i]
+        # FFL line comment
+        if c == "/" and i + 1 < length and source[i + 1] == "/":
+            while i < length and source[i] != "\n":
+                result.append(source[i])
+                i += 1
+            continue
+        # FFL block comment
+        if c == "/" and i + 1 < length and source[i + 1] == "*":
+            result.append(c)
+            result.append(source[i + 1])
+            i += 2
+            while i + 1 < length and not (source[i] == "*" and source[i + 1] == "/"):
+                result.append(source[i])
+                i += 1
+            if i + 1 < length:
+                result.append(source[i])
+                result.append(source[i + 1])
+                i += 2
+            continue
+        # FFL string literal — copy through, single-line by language rule
+        if c == '"':
+            result.append(c)
+            i += 1
+            while i < length and source[i] != '"':
+                if source[i] == "\\" and i + 1 < length:
+                    result.append(source[i])
+                    i += 1
+                result.append(source[i])
+                i += 1
+            if i < length:
+                result.append(source[i])  # closing quote
+                i += 1
+            continue
+        # Candidate: newline (one or more) followed by optional whitespace
+        # then `with` as a keyword token.
+        if c == "\n":
+            # Look ahead past `\n`+whitespace; if next token is `with`,
+            # join by replacing the run with a single space and append
+            # the consumed newlines after `with`'s clause.
+            j = i
+            while j < length and source[j] in " \t\n\r":
+                j += 1
+            if j < length and _match_keyword(source, j, "with"):
+                # Chain-join all consecutive `with` continuations onto
+                # the prior line, then reinsert one `\n` per consumed
+                # newline so downstream line numbers stay aligned.
+                consumed_newlines = 0
+                cursor = i
+                while True:
+                    # Skip newlines + horizontal whitespace.
+                    nj = cursor
+                    while nj < length and source[nj] in " \t\n\r":
+                        nj += 1
+                    if not (nj < length and _match_keyword(source, nj, "with")):
+                        break
+                    consumed_newlines += source[cursor:nj].count("\n")
+                    # Emit ` with-clause` glued to the prior line.
+                    result.append(" ")
+                    paren_depth = 0
+                    nk = nj
+                    while nk < length:
+                        ch = source[nk]
+                        if ch == "(":
+                            paren_depth += 1
+                        elif ch == ")":
+                            paren_depth -= 1
+                        elif ch == "\n" and paren_depth <= 0:
+                            break
+                        nk += 1
+                    result.append(source[nj:nk])
+                    cursor = nk  # at the trailing `\n` or end-of-source
+                # Account for the trailing newline that ends the last
+                # joined `with` clause — we advance past it below, so
+                # it must be reinserted along with the leading ones.
+                trailing = 1 if cursor < length and source[cursor] == "\n" else 0
+                result.append("\n" * (consumed_newlines + trailing))
+                i = cursor + trailing
+                continue
+        result.append(c)
+        i += 1
+    return "".join(result)
+
+
 def _match_keyword(source: str, pos: int, keyword: str) -> bool:
     """Check if *keyword* starts at *pos* and is not part of a larger identifier."""
     end = pos + len(keyword)

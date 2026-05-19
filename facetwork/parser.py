@@ -23,7 +23,11 @@ from lark import Lark
 from lark.exceptions import UnexpectedCharacters, UnexpectedInput, UnexpectedToken
 
 from .ast import Program
-from .preprocess import PreprocessError, preprocess_script_braces
+from .preprocess import (
+    PreprocessError,
+    join_with_continuations,
+    preprocess_script_braces,
+)
 from .source import CompilerInput, SourceRegistry
 from .transformer import FFLTransformer
 
@@ -112,6 +116,11 @@ class FFLParser:
                 str(e),
                 line=e.line,
             ) from e
+
+        # Stitch `with`-continuation lines back onto the preceding line so
+        # mixin chains and multi-target yields parse with the existing
+        # LALR grammar.  No-op for sources without that pattern.
+        preprocessed = join_with_continuations(preprocessed)
 
         try:
             tree = self._parser.parse(preprocessed)

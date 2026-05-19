@@ -588,13 +588,13 @@ on their own lines:
         with M1() as m1
         with M2() as m2
         andThen {
-            yield F2(output = $.input),
-                  M1(output = $.input),
-                  M2(output = $.input)
+            yield F2(output = $.input)
+                with M1(output = $.input)
+                with M2(output = $.input)
         }
 
-(The trailing comma on a `yield` statement continues the targets onto
-the next line — see "Multi-target yields" below.)
+(`with` chains on a `yield` statement add additional targets — see
+"Multi-target yields" below.)
 
 The alias becomes the consumer-side name for that mixin's sub-step on a
 FacetRef:
@@ -642,17 +642,25 @@ There can be more than one yield. Each one referencing a different mixin in the 
 
 #### Multi-target yields
 
-A single `yield` statement may name multiple targets separated by
-commas — sugar for several yield statements at the same source
-location. Each target must still resolve to a distinct facet or mixin
-(rule `YIELD_DUPLICATE_TARGET`):
+A single `yield` statement may name multiple targets by chaining
+`with` clauses — symmetric with how a facet signature attaches
+mixins. The parser unpacks the chain into one yield per target. Each
+target must still resolve to a distinct facet or mixin (rule
+`YIELD_DUPLICATE_TARGET`):
 
-    yield F(out = v1.output), M1(out = v2.output), M2(out = v3.output)
+    yield F(out = v1.output) with M1(out = v2.output) with M2(out = v3.output)
 
-The grammar accepts an optional newline after each comma, so authors
-may continue onto the next line:
+Authors may stack the `with` clauses on separate lines — a small
+preprocessor stitches continuation lines back onto the prior line so
+the LALR grammar sees them inline. The mixin sigs on a facet
+signature can be split across lines the same way:
 
-    yield F(out = v1.output),
-          M1(out = v2.output),
-          M2(out = v3.output)
+    facet F(input: String) => (output: String)
+        with M1() as m1
+        with M2() as m2
+        andThen {
+            yield F(out = v1.output)
+                with M1(out = v2.output)
+                with M2(out = v3.output)
+        }
 
