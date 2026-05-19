@@ -92,6 +92,40 @@ export class MongoOps {
   }
 
   /**
+   * Fetches the full snapshot of a referenced step.  Mirrors Python
+   * `HandlerContext.fetch_step`: given a tagged JSON FacetRef
+   * (`{_facet_ref: true, step_id, ...}`), return a snapshot dict
+   * containing the upstream step's id, workflow_id, facet_name,
+   * params, and returns.  The snapshot is read-only by contract.
+   */
+  async fetchStep(ref: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const stepId = typeof ref.step_id === 'string' ? ref.step_id : '';
+    if (!stepId) {
+      throw new Error("fetch_step: ref missing 'step_id'");
+    }
+    const collection = this.db.collection<StepDocument>(CollectionSteps);
+    const step = await collection.findOne({ uuid: stepId });
+    if (!step) {
+      throw new Error(`Step not found: ${stepId}`);
+    }
+    const params: Record<string, unknown> = {};
+    for (const [name, attr] of Object.entries(step.attributes?.params || {})) {
+      params[name] = attr.value;
+    }
+    const returns: Record<string, unknown> = {};
+    for (const [name, attr] of Object.entries(step.attributes?.returns || {})) {
+      returns[name] = attr.value;
+    }
+    return {
+      step_id: step.uuid,
+      workflow_id: step.workflow_id,
+      facet_name: step.facet_name,
+      params,
+      returns,
+    };
+  }
+
+  /**
    * Writes return attributes to a step.
    */
   async writeStepReturns(

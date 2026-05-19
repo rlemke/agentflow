@@ -68,6 +68,34 @@ class MongoOps(db: MongoDatabase, timeout: Duration = 10.seconds):
         logger.warn(s"Step not found: $stepId")
         Map.empty
 
+  /** Fetch a referenced step's full snapshot.  Mirrors Python
+    * `HandlerContext.fetch_step`: given a tagged JSON FacetRef
+    * (a Map containing at least `step_id`), return a Map containing
+    * the upstream step's `step_id`, `workflow_id`, `facet_name`,
+    * `params`, and `returns`.  The snapshot is read-only by contract.
+    */
+  def fetchStep(ref: Map[String, Any]): Map[String, Any] =
+    val stepId = ref.get("step_id") match
+      case Some(s: String) if s.nonEmpty => s
+      case _ =>
+        throw new IllegalArgumentException("fetch_step: ref missing 'step_id'")
+    val filter = Filters.eq("uuid", stepId)
+    val result = Await.result(steps.find(filter).first().toFuture(), timeout)
+    Option(result) match
+      case Some(doc) =>
+        val stepDoc = Document(doc.toBsonDocument)
+        val params = StepAttributes.extractParams(stepDoc).map((k, v) => k -> v.value)
+        val returns = StepAttributes.extractReturns(stepDoc).map((k, v) => k -> v.value)
+        Map(
+          "step_id" -> stepDoc.get("uuid").map(_.asString().getValue).getOrElse(""),
+          "workflow_id" -> stepDoc.get("workflow_id").map(_.asString().getValue).getOrElse(""),
+          "facet_name" -> stepDoc.get("facet_name").map(_.asString().getValue).getOrElse(""),
+          "params" -> params,
+          "returns" -> returns,
+        )
+      case None =>
+        throw new IllegalArgumentException(s"Step not found: $stepId")
+
   /** Write return attributes to a step at EVENT_TRANSMIT state.
     *
     * @param stepId   The step UUID

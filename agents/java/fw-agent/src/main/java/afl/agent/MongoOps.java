@@ -103,6 +103,59 @@ public class MongoOps {
     }
 
     /**
+     * Fetches the full snapshot of a referenced step.  Mirrors Python
+     * {@code HandlerContext.fetch_step}: given a tagged JSON FacetRef
+     * ({@code {_facet_ref:true, step_id, ...}}), return a map shaped
+     * like {@code {step_id, workflow_id, facet_name, params, returns}}.
+     * The snapshot is read-only by contract.
+     */
+    public Map<String, Object> fetchStep(Map<String, Object> ref) {
+        Object idObj = ref.get("step_id");
+        if (!(idObj instanceof String) || ((String) idObj).isEmpty()) {
+            throw new IllegalArgumentException("fetch_step: ref missing 'step_id'");
+        }
+        String stepId = (String) idObj;
+
+        MongoCollection<Document> collection = db.getCollection(Protocol.COLLECTION_STEPS);
+        Document step = collection.find(eq("uuid", stepId)).first();
+        if (step == null) {
+            throw new IllegalArgumentException("Step not found: " + stepId);
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        Map<String, Object> returns = new HashMap<>();
+        Document attributes = step.get("attributes", Document.class);
+        if (attributes != null) {
+            Document p = attributes.get("params", Document.class);
+            if (p != null) {
+                for (String name : p.keySet()) {
+                    Document attr = p.get(name, Document.class);
+                    if (attr != null) {
+                        params.put(name, attr.get("value"));
+                    }
+                }
+            }
+            Document r = attributes.get("returns", Document.class);
+            if (r != null) {
+                for (String name : r.keySet()) {
+                    Document attr = r.get(name, Document.class);
+                    if (attr != null) {
+                        returns.put(name, attr.get("value"));
+                    }
+                }
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("step_id", step.getString("uuid"));
+        result.put("workflow_id", step.getString("workflow_id"));
+        result.put("facet_name", step.getString("facet_name"));
+        result.put("params", params);
+        result.put("returns", returns);
+        return result;
+    }
+
+    /**
      * Writes return attributes to a step.
      */
     public void writeStepReturns(String stepId, Map<String, Object> returns) {

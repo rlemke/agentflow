@@ -1376,11 +1376,15 @@ terminal completed state.
 
 #### Cross-language SDKs
 
-Only the Python SDK ports `fetch_step` today. Non-Python SDKs that need
-to consume FacetRef parameters must implement the same RPC contract: a
-client-side helper that accepts the tagged JSON ref and returns the
-five-key snapshot dict (`step_id`, `workflow_id`, `facet_name`,
-`params`, `returns`).
+All four non-Python SDKs (`agents/go/fw-agent`, `agents/java/fw-agent`,
+`agents/scala/fw-agent`, `agents/typescript/fw-agent`) expose
+`fetchStep`/`FetchStep` on their `MongoOps` class. Implementation is
+a direct read on the `steps` collection (handlers in these languages
+talk to Mongo directly rather than RPCing the Python runner). All four
+return the same five-key snapshot dict — `step_id`, `workflow_id`,
+`facet_name`, `params`, `returns` — so a handler authored in any
+language can consume FacetRef params written against the JSON ref
+contract.
 
 ### 9.16 Streaming/Partial Updates (All SDKs)
 

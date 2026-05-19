@@ -16,6 +16,7 @@ package fwagent
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/google/uuid"
@@ -82,6 +83,50 @@ func (m *MongoOps) ReadStepParams(ctx context.Context, stepID string) (map[strin
 	}
 
 	return result, nil
+}
+
+// FetchStep returns the full snapshot of a referenced step's
+// persisted attributes.  Mirrors Python HandlerContext.fetch_step:
+// given a tagged JSON FacetRef ({_facet_ref:true, step_id, ...}),
+// fetch the step row and return a map shaped like:
+//
+//	{
+//	  "step_id":     ...,
+//	  "workflow_id": ...,
+//	  "facet_name":  ...,
+//	  "params":      {name: value, ...},
+//	  "returns":     {name: value, ...},
+//	}
+//
+// The snapshot is read-only by contract — mutating the returned map
+// does not propagate to the upstream step.
+func (m *MongoOps) FetchStep(ctx context.Context, ref map[string]interface{}) (map[string]interface{}, error) {
+	stepID, _ := ref["step_id"].(string)
+	if stepID == "" {
+		return nil, fmt.Errorf("fetch_step: ref missing 'step_id'")
+	}
+
+	collection := m.db.Collection(CollectionSteps)
+	var step StepDocument
+	if err := collection.FindOne(ctx, bson.M{"uuid": stepID}).Decode(&step); err != nil {
+		return nil, err
+	}
+
+	params := make(map[string]interface{}, len(step.Attributes.Params))
+	for name, attr := range step.Attributes.Params {
+		params[name] = attr.Value
+	}
+	returns := make(map[string]interface{}, len(step.Attributes.Returns))
+	for name, attr := range step.Attributes.Returns {
+		returns[name] = attr.Value
+	}
+	return map[string]interface{}{
+		"step_id":     step.UUID,
+		"workflow_id": step.WorkflowID,
+		"facet_name":  step.FacetName,
+		"params":      params,
+		"returns":     returns,
+	}, nil
 }
 
 // WriteStepReturns writes return attributes to a step.
