@@ -1252,6 +1252,53 @@ class TestFacetRefAttributePath:
         assert "'F1'" in str(errs[0])
         assert "'M1'" in str(errs[0])
 
+    _DEEP_SETUP = """
+    namespace _test {
+        schema Report {
+            title: String,
+            count: Long
+        }
+        facet Producer(input: String) => (report: Report) andThen {
+            r = Report(title = $.input, count = 1)
+            yield Producer(report = r)
+        }
+    """
+
+    def test_deep_schema_field_via_facet_ref(self, validator):
+        """`$.fref.return_field.schema_field` walks into the return's
+        schema and validates the schema field."""
+        src = self._DEEP_SETUP + """
+        facet Consumer(p: Producer) => (out: String) andThen {
+            yield Consumer(out = $.p.report.title)
+        }
+    }
+    """
+        result = validator.validate(parse(src))
+        assert not [
+            e for e in result.errors
+            if e.rule_id in ("REF_INVALID_FACET_REF_ATTRIBUTE", "SCHEMA_UNKNOWN_FIELD")
+        ], f"unexpected: {result.errors}"
+
+    def test_deep_schema_field_unknown_flagged(self, validator):
+        """A misspelled schema field on a deep FacetRef path is flagged
+        via SCHEMA_UNKNOWN_FIELD (the rule used elsewhere for nested
+        schema chains)."""
+        src = self._DEEP_SETUP + """
+        facet Consumer(p: Producer) => (out: String) andThen {
+            yield Consumer(out = $.p.report.bogus)
+        }
+    }
+    """
+        result = validator.validate(parse(src))
+        warnings = [
+            w for w in (getattr(result, "warnings", None) or [])
+            if getattr(w, "rule_id", "") == "SCHEMA_UNKNOWN_FIELD"
+        ]
+        errs = [e for e in result.errors if e.rule_id == "SCHEMA_UNKNOWN_FIELD"]
+        assert (warnings or errs), (
+            f"expected SCHEMA_UNKNOWN_FIELD diagnostic, got errors={result.errors}"
+        )
+
 
 class TestSchemaInstantiation:
     """Test schema instantiation validation in step statements."""

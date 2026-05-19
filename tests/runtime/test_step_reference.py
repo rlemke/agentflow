@@ -184,6 +184,54 @@ namespace refs {
     assert not [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"]
 
 
+def test_step_ref_mixin_compatible_passes():
+    """A step whose facet declares the expected target as a mixin
+    satisfies the FacetRef param type check."""
+    src = """
+namespace refs {
+    facet Base(input: String) => (output: String) andThen {
+        yield Base(output = $.input)
+    }
+    facet Specialized(input: String) => (output: String) with Base() andThen {
+        yield Specialized(output = $.input) with Base(output = $.input)
+    }
+    facet Consumer(b: Base) => (output: String) andThen {
+        yield Consumer(output = $.b.output)
+    }
+    workflow Demo(input: String) => (output: String) andThen {
+        s = Specialized(input = $.input)
+        c = Consumer(b = s)
+        yield Demo(output = c.output)
+    }
+}
+"""
+    result = validate_ast(parse(src))
+    assert not [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"], (
+        f"unexpected mismatch: {result.errors}"
+    )
+
+
+def test_step_ref_mismatch_for_unrelated_facet_still_errors():
+    """An unrelated source facet (not a mixin) still fails."""
+    src = """
+namespace refs {
+    facet A(input: String) => (output: String) andThen { yield A(output = $.input) }
+    facet B(input: String) => (output: String) andThen { yield B(output = $.input) }
+    facet Consumer(a: A) => (output: String) andThen { yield Consumer(output = $.a.output) }
+    workflow Demo(input: String) => (output: String) andThen {
+        b = B(input = $.input)
+        c = Consumer(a = b)
+        yield Demo(output = c.output)
+    }
+}
+"""
+    result = validate_ast(parse(src))
+    mismatches = [e for e in result.errors if e.rule_id == "STEP_REF_FACET_MISMATCH"]
+    assert len(mismatches) == 1
+    assert "'A'" in str(mismatches[0])
+    assert "'B'" in str(mismatches[0])
+
+
 def test_step_ref_mismatch_in_mixin_args():
     """Mixin call args should also be checked."""
     src = """

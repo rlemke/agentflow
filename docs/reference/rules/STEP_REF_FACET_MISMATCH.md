@@ -1,8 +1,9 @@
 # STEP_REF_FACET_MISMATCH — Step reference facet does not match the parameter's declared facet type
 
 When a parameter is typed as a facet (a step-reference parameter), the step
-passed to it must be a call to **that exact facet**. Passing a step that calls
-a different facet is flagged statically.
+passed to it must satisfy that facet's type — either the **same facet**, or
+one whose signature declares the expected facet as a mixin (transitively).
+Passing a step that calls an unrelated facet is flagged statically.
 
 ## Wrong
 
@@ -58,8 +59,23 @@ A step-reference parameter (`ds: DoSomething`) tells the runtime two things:
    written against `DoSomething`'s shape; a step of another facet would
    silently mismatch.
 
-Mixin compatibility is **not** considered: the check is exact facet-name
-equality. This is intentional for the first cut and may be relaxed later.
+**Mixin compatibility is considered.** A facet whose signature declares the
+expected facet as a `with M(...)` mixin (aliased or not) satisfies the type,
+and so does any facet transitively composed through such mixins:
+
+```ffl
+facet Base(input: String) => (output: String)
+facet Specialized(input: String) => (output: String) with Base()
+facet Consumer(b: Base) => (output: String) andThen {
+    yield Consumer(output = $.b.output)
+}
+
+workflow Demo(input: String) => (output: String) andThen {
+    s = Specialized(input = $.input)
+    c = Consumer(b = s)              // ← Specialized IS-A Base via mixin
+    yield Demo(output = c.output)
+}
+```
 
 If you genuinely need to pass an unrelated step, project the fields you want
 into a schema-typed parameter instead, or read individual fields via

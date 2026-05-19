@@ -159,6 +159,7 @@ class FacetInfo:
     returns_types: dict[str, str] = field(default_factory=dict)  # Return field name → type
     params_types: dict[str, str] = field(default_factory=dict)  # Param name → type
     mixin_aliases: dict[str, str] = field(default_factory=dict)  # Alias → mixin facet target
+    mixin_targets: list[str] = field(default_factory=list)  # All mixin targets (aliased + un-aliased)
     location: SourceLocation | None = None
 
 
@@ -292,9 +293,11 @@ class FFLValidator:
             for p in sig.returns.params:
                 returns_types[p.name] = self._type_ref_to_str(p.type)
         mixin_aliases: dict[str, str] = {}
+        mixin_targets: list[str] = []
         for m in sig.mixins:
             if m.alias:
                 mixin_aliases[m.alias] = m.name
+            mixin_targets.append(m.name)
         self._facets[full_name] = FacetInfo(
             name=sig.name,
             params=params,
@@ -302,6 +305,7 @@ class FFLValidator:
             returns_types=returns_types,
             params_types=params_types,
             mixin_aliases=mixin_aliases,
+            mixin_targets=mixin_targets,
             location=sig.location,
         )
         # Track by short name for ambiguity detection
@@ -1574,8 +1578,12 @@ class FFLValidator:
         For a step-ref param `param_name: <FacetType>`:
           - The next path segment must be one of <FacetType>'s
             params, returns, or mixin aliases.
-          - If it matches a mixin alias, one further segment may be
-            validated against that mixin facet's params/returns/aliases.
+          - If it matches a mixin alias, one further segment must be
+            on the mixin facet's params/returns/aliases.
+          - Segments past that level are resolved through the type of
+            the previously-matched attribute (via
+            ``_resolve_nested_field_type``), the same way a normal
+            ``step.result.<field>`` schema chain is validated.
 
         Mixins on the param's facet that have *no* alias are
         unaddressable through a FacetRef — by design, so the
@@ -1587,37 +1595,86 @@ class FFLValidator:
         facet = self._lookup_facet_for_type(facet_type)
         if facet is None:
             return  # facet type unresolvable; other rules report this
+
         segment = ref.path[1]
-        if (
-            segment in facet.params
-            or segment in facet.returns
-            or segment in facet.mixin_aliases
-        ):
-            # Recurse one level into a mixin alias to validate `<alias>.<field>`.
+        # Resolve the first segment against params ∪ returns ∪ mixin_aliases.
+        attr_type, deeper_path_base = self._resolve_facet_ref_first_segment(
+            facet, segment, param_name, ref
+        )
+        if attr_type is None:
+            return  # error already emitted (or alias->mixin needs sub-segment)
+
+        # Deeper-path validation — chain through schema fields, transitive
+        # FacetRefs, or aliased mixin sub-attributes.
+        for i in range(2, len(ref.path)):
+            sub = ref.path[i]
+            base = deeper_path_base
+            attr_type, deeper_path_base = self._resolve_facet_ref_deep_segment(
+                attr_type, sub, base, ref
+            )
+            if attr_type is None:
+                return
+
+    def _resolve_facet_ref_first_segment(
+        self,
+        facet: FacetInfo,
+        segment: str,
+        param_name: str,
+        ref: Reference,
+    ) -> tuple[str | None, str]:
+        """Validate the segment immediately after ``$.<param>``.
+
+        Returns ``(type_of_segment, base_path_for_errors)`` on success,
+        or ``(None, _)`` on a definitive error.  When the segment is a
+        mixin alias, the second-level segment is also validated here so
+        the caller can resume deep-path resolution against the mixin
+        attribute's type.
+        """
+        base = f"$.{param_name}.{segment}"
+        if segment in facet.returns:
+            return (facet.returns_types.get(segment, "Unknown"), base)
+        if segment in facet.params:
+            return (facet.params_types.get(segment, "Unknown"), base)
+        if segment in facet.mixin_aliases:
+            mixin_type = facet.mixin_aliases[segment]
+            mixin = self._lookup_facet_for_type(mixin_type)
+            if mixin is None:
+                return (None, base)
+            # The alias needs a sub-attribute to be useful; if the path
+            # ends at the alias, that's a partial reference and another
+            # rule path will report it as a type error.
+            if len(ref.path) < 3:
+                return (None, base)
+            sub = ref.path[2]
+            sub_type = (
+                mixin.returns_types.get(sub)
+                or mixin.params_types.get(sub)
+            )
             if (
-                segment in facet.mixin_aliases
-                and len(ref.path) >= 3
+                sub not in mixin.params
+                and sub not in mixin.returns
+                and sub not in mixin.mixin_aliases
             ):
-                mixin_type = facet.mixin_aliases[segment]
-                mixin = self._lookup_facet_for_type(mixin_type)
-                if mixin is not None:
-                    sub = ref.path[2]
-                    if (
-                        sub not in mixin.params
-                        and sub not in mixin.returns
-                        and sub not in mixin.mixin_aliases
-                    ):
-                        valid = sorted(
-                            mixin.params | mixin.returns | set(mixin.mixin_aliases)
-                        )
-                        self._result.add_error(
-                            f"Invalid mixin attribute '$.{param_name}.{segment}.{sub}': "
-                            f"mixin facet '{mixin.name}' has no param, return, or "
-                            f"mixin alias named '{sub}'. Valid names: {valid}",
-                            ref.location,
-                            rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
-                        )
-            return
+                valid = sorted(
+                    mixin.params | mixin.returns | set(mixin.mixin_aliases)
+                )
+                self._result.add_error(
+                    f"Invalid mixin attribute '{base}.{sub}': "
+                    f"mixin facet '{mixin.name}' has no param, return, or "
+                    f"mixin alias named '{sub}'. Valid names: {valid}",
+                    ref.location,
+                    rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
+                )
+                return (None, base)
+            # Skip the alias-substep level for the caller's deep loop —
+            # it has already validated `ref.path[2]`. The caller's loop
+            # starts at index 2, so signal that by returning a base that
+            # already includes the sub.  We do this by returning the
+            # mixin attribute's type but a base path that already covers
+            # `ref.path[:3]`.  The caller's loop will then advance one
+            # more iteration than needed; to keep loop logic simple we
+            # let it run and treat unknown types as no-ops.
+            return (sub_type or "Unknown", f"{base}.{sub}")
         valid = sorted(facet.params | facet.returns | set(facet.mixin_aliases))
         self._result.add_error(
             f"Invalid FacetRef attribute '$.{param_name}.{segment}': "
@@ -1626,6 +1683,60 @@ class FFLValidator:
             ref.location,
             rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
         )
+        return (None, base)
+
+    def _resolve_facet_ref_deep_segment(
+        self,
+        current_type: str,
+        segment: str,
+        base: str,
+        ref: Reference,
+    ) -> tuple[str | None, str]:
+        """Walk one segment of a deep `$.fref.<...>.<segment>` path.
+
+        Resolves ``segment`` against the current type:
+          - If the type is a schema, look the segment up on the
+            schema's fields.
+          - If the type is itself a facet, treat segments transitively
+            (params ∪ returns ∪ aliases).
+          - Unknown/primitive/collection types: don't error (we don't
+            have enough info), just return Unknown so the loop ends.
+        """
+        if current_type == "Unknown" or not current_type:
+            return ("Unknown", f"{base}.{segment}")
+        # Transitive FacetRef
+        inner_facet = self._lookup_facet_for_type(current_type)
+        if inner_facet is not None:
+            if (
+                segment in inner_facet.params
+                or segment in inner_facet.returns
+                or segment in inner_facet.mixin_aliases
+            ):
+                next_type = (
+                    inner_facet.returns_types.get(segment)
+                    or inner_facet.params_types.get(segment)
+                    or "Unknown"
+                )
+                return (next_type, f"{base}.{segment}")
+            valid = sorted(
+                inner_facet.params | inner_facet.returns | set(inner_facet.mixin_aliases)
+            )
+            self._result.add_error(
+                f"Invalid FacetRef attribute '{base}.{segment}': "
+                f"facet '{inner_facet.name}' has no param, return, or "
+                f"mixin alias named '{segment}'. Valid names: {valid}",
+                ref.location,
+                rule_id="REF_INVALID_FACET_REF_ATTRIBUTE",
+            )
+            return (None, base)
+        # Schema chain — reuse the existing helper.
+        if self._is_schema_type(current_type):
+            next_type = self._resolve_nested_field_type(
+                current_type, [segment], ref.location
+            )
+            return (next_type, f"{base}.{segment}")
+        # Primitive / collection — nothing further to check.
+        return ("Unknown", f"{base}.{segment}")
 
     def _lookup_facet_for_type(self, type_name: str) -> FacetInfo | None:
         """Resolve a type name to a FacetInfo without emitting errors.
@@ -1653,7 +1764,9 @@ class FFLValidator:
 
         - the target param's type is a known facet (step-reference param),
         - the arg value is a bare step ref (e.g. ``ds = s1``), and
-        - the referenced step's call target is a different facet.
+        - the referenced step's facet doesn't satisfy the expected
+          facet — i.e. it isn't the same facet AND doesn't declare the
+          expected facet as one of its mixins (transitively).
         """
         if target_facet is None:
             return
@@ -1670,15 +1783,51 @@ class FFLValidator:
         if source is None:
             return
         source_facet = self._lookup_facet_for_type(source.facet_name)
-        if source_facet is None or source_facet is expected_facet:
+        if source_facet is None:
+            return
+        if self._facet_satisfies(source_facet, expected_facet):
             return
         self._result.add_error(
             f"Step '{source.name}' is a '{source_facet.name}', "
             f"but parameter '{arg.name}' expects a step of facet "
-            f"'{expected_facet.name}'",
+            f"'{expected_facet.name}' (or one whose signature mixes in "
+            f"'{expected_facet.name}')",
             value.location,
             rule_id="STEP_REF_FACET_MISMATCH",
         )
+
+    def _facet_satisfies(
+        self, source: FacetInfo, expected: FacetInfo, _seen: set[str] | None = None
+    ) -> bool:
+        """Mixin-compatible identity check.
+
+        Returns True when ``source`` IS-A ``expected``:
+          - same facet (identity), or
+          - ``source`` declares ``expected`` as one of its signature
+            mixins (aliased or un-aliased), or
+          - any of ``source``'s mixin targets transitively satisfies
+            ``expected`` (one facet's mixin being itself composed of
+            further mixins).
+
+        The transitive check has a per-call ``_seen`` set to guard
+        against accidental cycles in malformed sources.
+        """
+        if source is expected:
+            return True
+        if _seen is None:
+            _seen = set()
+        if source.name in _seen:
+            return False
+        _seen.add(source.name)
+        for target_name in source.mixin_targets:
+            mixin_facet = self._lookup_facet_for_type(target_name)
+            if mixin_facet is None:
+                continue
+            if mixin_facet is expected:
+                return True
+            if self._facet_satisfies(mixin_facet, expected, _seen):
+                return True
+        return False
 
     def _validate_reference(
         self,
