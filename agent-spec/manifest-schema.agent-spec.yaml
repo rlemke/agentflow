@@ -105,7 +105,7 @@ forward_compatibility:
 # ---------------------------------------------------------------------------
 cache_type_variants:
   pbf:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/pbf_download.agent-spec.yaml"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/pbf_download.agent-spec.yaml"
     extra_fields:
       - "source_url"
       - "source_checksum"
@@ -114,13 +114,13 @@ cache_type_variants:
       - "clip (for clips/ subdir)"
 
   geojson:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/pbf_geojson.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/pbf_geojson.agent-spec.yaml (not yet written)"
     extra_fields:
       - "format"
       - "duration_seconds"
 
   shapefiles:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/pbf_shapefile.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/pbf_shapefile.agent-spec.yaml (not yet written)"
     extra_fields:
       - "requested_layers"
       - "total_size_bytes"
@@ -129,14 +129,14 @@ cache_type_variants:
 
   extract_categories:
     description: "water, parks, forests, protected_areas, roads_routable, turn_restrictions, railways_routable, cycle_routes, hiking_routes, and all 16 POI categories."
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/pbf_extract.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/pbf_extract.agent-spec.yaml (not yet written)"
     extra_fields:
       - "category"
       - "filter"
       - "feature_count"
 
   graphhopper:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/graphhopper_build.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/graphhopper_build.agent-spec.yaml (not yet written)"
     extra_fields:
       - "region"
       - "profile"
@@ -145,7 +145,7 @@ cache_type_variants:
       - "edge_count"
 
   valhalla:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/valhalla_build.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/valhalla_build.agent-spec.yaml (not yet written)"
     extra_fields:
       - "region"
       - "valhalla_version"
@@ -153,7 +153,7 @@ cache_type_variants:
       - "tile_levels"
 
   osrm:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/osrm_build.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/osrm_build.agent-spec.yaml (not yet written)"
     extra_fields:
       - "region"
       - "profile"
@@ -161,13 +161,13 @@ cache_type_variants:
       - "algorithm"
 
   vector_tiles:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/vector_tiles_build.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/vector_tiles_build.agent-spec.yaml (not yet written)"
     extra_fields:
       - "source_kind"
       - "options"
 
   gtfs:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/gtfs_download.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/gtfs_download.agent-spec.yaml (not yet written)"
     extra_fields:
       - "agency"
       - "source_url"
@@ -175,7 +175,7 @@ cache_type_variants:
       - "feed_info"
 
   elevation:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/elevation_download.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/elevation_download.agent-spec.yaml (not yet written)"
     extra_fields:
       - "source"
       - "bbox"
@@ -184,7 +184,7 @@ cache_type_variants:
       - "elevation_version"
 
   html:
-    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/html_render.agent-spec.yaml (not yet written)"
+    spec: "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/html_render.agent-spec.yaml (not yet written)"
     extra_fields:
       - "region"
       - "style_version"
@@ -219,7 +219,7 @@ dependencies:
 
 implementation_notes: |
   The reference implementation is in
-  https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/manifest.py. It exposes
+  https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/manifest.py. It exposes
   manifest_transaction(cache_type) as the primary write API (context
   manager that holds the exclusive lock for the duration) and
   read_manifest(cache_type) for snapshot reads.
@@ -231,4 +231,4 @@ implementation_notes: |
 
 human_docs:
   - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/README.md cache-layout-and-manifests section"
-  - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/manifest.py"
+  - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/manifest.py"

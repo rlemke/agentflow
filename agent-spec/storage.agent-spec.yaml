@@ -135,7 +135,7 @@ dependencies:
 
 implementation_notes: |
   The reference Python impl is in
-  https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/storage.py. LocalStorage uses
+  https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/storage.py. LocalStorage uses
   fcntl.flock and subprocess cp; HdfsStorage soft-imports
   facetwork.runtime.storage.HDFSStorageBackend and reaches into
   its private helpers for the WebHDFS RENAME call (mild private-
@@ -149,5 +149,5 @@ implementation_notes: |
 
 human_docs:
   - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/README.md backends section"
-  - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_lib/storage.py"
+  - "https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/tools/_osm_tools/storage.py"
   - "facetwork/runtime/storage.py"

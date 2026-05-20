@@ -106,7 +106,7 @@ When building a new domain pipeline that ingests from multiple data sources, mir
 | Deployment guide | [docs/operations/deployment.md](docs/operations/deployment.md) |
 | Full-stack Docker Compose (one runner per fwh_* example) | [docs/operations/full-stack-compose.md](docs/operations/full-stack-compose.md) |
 | Tutorial | [docs/getting-started/tutorial.md](docs/getting-started/tutorial.md) |
-| Tools + handlers pattern (per-domain CLI + `_lib/` + shim) | [agent-spec/tools-pattern.agent-spec.yaml](agent-spec/tools-pattern.agent-spec.yaml) |
+| Tools + handlers pattern (per-domain CLI + `_<pkg>_tools/` + shim) | [agent-spec/tools-pattern.agent-spec.yaml](agent-spec/tools-pattern.agent-spec.yaml) |
 | Cache layout (sidecars, namespaces, cache types) | [agent-spec/cache-layout.agent-spec.yaml](agent-spec/cache-layout.agent-spec.yaml) |
 | MCP context-engineering design (rule_ids, docs URIs) | [docs/architecture/mcp-context-engineering.md](docs/architecture/mcp-context-engineering.md) |
 | Validator rule docs (one file per rule_id) | [docs/reference/rules/](docs/reference/rules/) |
@@ -169,16 +169,16 @@ surface as `--example <name>` exactly like in-repo examples:
 - [genomics](https://github.com/rlemke/fwh_genomics) — foreach fan-out, joint genotyping
 - [sensor-monitoring](https://github.com/rlemke/fwh_sensor_monitoring) — sensor pipelines, RegistryRunner-first
 - [anthropic](https://github.com/rlemke/fwh_anthropic) — multi-area wrappers for surfaces at github.com/anthropics (16 facets across Messages / Batch / Files / Agent SDK / Claude Code / Computer Use + `DocumentQA` composition workflow + opt-in live tests)
-- [save-earth](https://github.com/rlemke/fwh_save_earth) — open environmental datasets (OpenLitterMap, EPA Superfund/Brownfields, EPA TRI) → cached GeoJSON → MapLibre HTML maps; source-adapter + tools/`_lib`/shim pattern
+- [save-earth](https://github.com/rlemke/fwh_save_earth) — open environmental datasets (OpenLitterMap, EPA Superfund/Brownfields, EPA TRI) → cached GeoJSON → MapLibre HTML maps; source-adapter + tools/`_<pkg>_tools`/shim pattern
 
 ## Domain pipelines — tools / handlers / cache pattern
 
-Every domain ingestion pipeline (osm-geocoder, noaa-weather, …) follows one contract: a `tools/` dir of Python CLIs + shell wrappers backed by `tools/_lib/`, FFL handlers that call into the same `_lib/` via a `handlers/shared/<domain>_utils.py` shim, and a sidecar-backed cache under `$AFL_CACHE_ROOT/<namespace>/`. Canonical examples:
+Every domain ingestion pipeline (osm-geocoder, noaa-weather, …) follows one contract: a `tools/` dir of Python CLIs + shell wrappers backed by `tools/_<pkg>_tools/`, FFL handlers that call into the same `_<pkg>_tools/` via a `handlers/shared/<domain>_utils.py` shim, and a sidecar-backed cache under `$AFL_CACHE_ROOT/<namespace>/`. Canonical examples:
 
 - [github.com/rlemke/fwh_osm](https://github.com/rlemke/fwh_osm) — OSM PBF → GeoJSON → tiles → HTML maps (standalone repo)
 - [github.com/rlemke/fwh_noaa_weather](https://github.com/rlemke/fwh_noaa_weather) — NOAA GHCN → station CSVs → climate trends (standalone repo; `pip install -e ~/fw_handlers/fwh_noaa_weather`)
 
-When building or modifying a domain pipeline, read [`agent-spec/tools-pattern.agent-spec.yaml`](agent-spec/tools-pattern.agent-spec.yaml) first — it defines the directory layout, CLI contract (argparse / stderr / stdout / exit codes), `_lib/` vs handler split, cache sidecar protocol, and test-writing rules.
+When building or modifying a domain pipeline, read [`agent-spec/tools-pattern.agent-spec.yaml`](agent-spec/tools-pattern.agent-spec.yaml) first — it defines the directory layout, CLI contract (argparse / stderr / stdout / exit codes), `_<pkg>_tools/` vs handler split, cache sidecar protocol, and test-writing rules.
 
 ---
 
