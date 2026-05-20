@@ -38,6 +38,7 @@ REGISTRY=(
     "census-us|fwh_census_us||US Census ACS + TIGER demographics"
     "genomics|fwh_genomics||Bioinformatics foreach fan-out demo"
     "sensor-monitoring|fwh_sensor_monitoring||Sensor pipelines (RegistryRunner-first)"
+    "save-earth|fwh_save_earth||Open environmental datasets (OpenLitterMap, EPA Superfund/Brownfields/TRI) → MapLibre HTML maps"
 )
 
 usage() {

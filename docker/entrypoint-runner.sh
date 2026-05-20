@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Entrypoint for the "main" Facetwork runner container — the one that
-# hosts the bundled in-repo examples (save_earth, multi-agent-debate,
-# research-agent, etc.).
+# hosts the bundled in-repo examples (multi-agent-debate, research-agent,
+# etc.). Extracted examples (save-earth, osm-geocoder, …) ship as their
+# own pip-installable packages and run in per-example runner containers.
 #
 # Per-example runners get one Python package per container (bind-mounted
 # at /handlers/fwh_<name>) and seed exactly that package. The main runner
