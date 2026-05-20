@@ -389,10 +389,19 @@ def retry_block(step_id: str, force: bool = False, store=Depends(get_store)):
                 },
             )
 
-    # Retry each leaf
+    # Retry each leaf.  Mixin sub-steps reset to CREATED (so they walk
+    # the full STEP_TRANSITIONS lifecycle and re-execute their body)
+    # with cleared returns; regular leaves reset to EVENT_TRANSMIT.  The
+    # ancestor-walk below picks MIXIN_BLOCKS_CONTINUE vs
+    # STATEMENT_BLOCKS_CONTINUE per the leaf's mixin status.
     for leaf in errored_leaves:
-        leaf.state = StepState.EVENT_TRANSMIT
-        leaf.transition.current_state = StepState.EVENT_TRANSMIT
+        if _is_mixin_sub_step(leaf):
+            leaf.state = StepState.CREATED
+            leaf.transition.current_state = StepState.CREATED
+            leaf.attributes.returns = {}
+        else:
+            leaf.state = StepState.EVENT_TRANSMIT
+            leaf.transition.current_state = StepState.EVENT_TRANSMIT
         leaf.transition.clear_error()
         leaf.transition.request_transition = False
         leaf.transition.changed = True

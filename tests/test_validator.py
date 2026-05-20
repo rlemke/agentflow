@@ -454,6 +454,33 @@ class TestYieldValidation:
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
+    def test_yield_to_outer_alias_inside_mixin_body_rejected(self, validator):
+        """Inside a mixin facet's own body, yield targets must be the
+        facet itself or its own declared mixin targets/aliases.  An
+        alias name from a CONSUMER's perspective (the parent facet
+        that uses this one via ``with M() as some_alias``) is unknown
+        to M at its declaration site and falls under
+        YIELD_INVALID_TARGET — exactly the behavior we want, since
+        ``yield some_alias(...)`` from inside M would be a meaningless
+        cross-scope reference.
+        """
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String) andThen {
+            yield some_outer_alias(output = $.input)
+        }
+        workflow W(input: String) => (r: String)
+            with M(input = $.input) as m
+            andThen { yield W(r = "x") }
+        """)
+        )
+        result = validator.validate(ast)
+        assert not result.is_valid
+        scope_errors = [e for e in result.errors if e.rule_id == "YIELD_INVALID_TARGET"]
+        assert any(
+            "some_outer_alias" in str(e) for e in scope_errors
+        ), f"expected YIELD_INVALID_TARGET for stray alias, got {result.errors}"
+
 
 class TestConvenienceFunction:
     """Test module-level validate function."""

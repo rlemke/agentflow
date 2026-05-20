@@ -308,3 +308,79 @@ class TestRerunMixinSubStep:
         assert m1_after.attributes.returns == {}
         assert m2_after.state == StepState.STATEMENT_COMPLETE
         assert m2_after.attributes.returns["output"].value == "v2"
+
+
+# ---------------------------------------------------------------------------
+# retry-block on a parent that has errored mixin sub-steps in its tree
+# ---------------------------------------------------------------------------
+
+
+@needs_fastapi
+class TestRetryBlockMixinSubStep:
+    """Retry All Errors clicked on a parent whose mixin sub-step
+    errored should treat the mixin sub-step as a leaf and reset it
+    to CREATED (not EVENT_TRANSMIT); the parent container ancestor
+    resumes at MIXIN_BLOCKS_CONTINUE."""
+
+    def test_retry_block_resets_errored_mixin_leaf_to_created(self, client):
+        tc, store = client
+        parent = _step(
+            id="parent-rb",
+            facet_name="Parent",
+            state=StepState.STATEMENT_ERROR,
+        )
+        store.save_step(parent)
+        mixin = _step(
+            id="mixin-rb",
+            facet_name="M",
+            statement_name="m",
+            container_id="parent-rb",
+            state=StepState.STATEMENT_ERROR,
+            returns={"output": "stale"},
+        )
+        store.save_step(mixin)
+
+        resp = tc.post(f"/steps/{parent.id}/retry-block")
+        assert resp.status_code == 303
+
+        mixin_after = store.get_step(mixin.id)
+        assert mixin_after.state == StepState.CREATED, (
+            f"errored mixin leaf must reset to CREATED, not EVENT_TRANSMIT; "
+            f"got {mixin_after.state}"
+        )
+        assert mixin_after.attributes.returns == {}
+
+        parent_after = store.get_step(parent.id)
+        assert parent_after.state == StepState.MIXIN_BLOCKS_CONTINUE
+
+
+# ---------------------------------------------------------------------------
+# reset-block deletes mixin sub-steps as descendants — they regenerate.
+# ---------------------------------------------------------------------------
+
+
+@needs_fastapi
+class TestResetBlockMixinSubStep:
+    def test_reset_block_on_parent_deletes_mixin_sub_steps(self, client):
+        """Resetting a parent step's "block" wipes everything beneath
+        it — mixin sub-steps included — so the next pass through
+        MixinBlocksBeginHandler recreates them."""
+        tc, store = client
+        parent = _step(id="parent-rsb", facet_name="Parent")
+        store.save_step(parent)
+        mixin = _step(
+            id="mixin-rsb",
+            facet_name="M",
+            statement_name="m",
+            container_id="parent-rsb",
+            state=StepState.STATEMENT_COMPLETE,
+        )
+        store.save_step(mixin)
+
+        resp = tc.post(f"/steps/{parent.id}/reset-block")
+        assert resp.status_code == 303
+
+        # Mixin sub-step deleted as a descendant — it will be re-created
+        # by MixinBlocksBeginHandler when the parent walks the mixin
+        # phase again.
+        assert store.get_step(mixin.id) is None
