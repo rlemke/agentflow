@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..changers.base import StateChangeResult
+from ..errors import EvaluationError
 from ..expression import EvaluationContext, ExpressionEvaluator, evaluate_args
 from ..types import ObjectType
 from .base import StateHandler
@@ -65,6 +66,14 @@ class FacetInitializationBeginHandler(StateHandler):
         """Evaluate facet attribute expressions."""
         # Get the statement definition for this step
         stmt_def = self.context.get_statement_definition(self.step)
+
+        # Inline diagnostic statements: sys.log / sys.assert.  They use
+        # SYS_STMT_TRANSITIONS, so FACET_INIT_BEGIN is the one place
+        # their side effect runs.  No subsequent state evaluates args
+        # for them.
+        if self.step.object_type in (ObjectType.SYS_LOG, ObjectType.SYS_ASSERT):
+            return self._execute_sys_stmt(stmt_def)
+
         if stmt_def is None:
             # Two cases land here:
             # 1. Mixin sub-step — written by MixinBlocksBeginHandler with
@@ -373,6 +382,130 @@ class FacetInitializationBeginHandler(StateHandler):
         # Look in the workflow's default values
         defaults = self.context.workflow_defaults
         return defaults.get(param_name)
+
+    def _execute_sys_stmt(self, stmt_def) -> StateChangeResult:
+        """Execute a sys.log / sys.assert inline diagnostic statement.
+
+        sys.log: evaluate every named arg in the current scope, build
+        the Splunk JSON envelope with the user's name/value pairs
+        plus the runtime context (workflow_id, runner_id, server_id,
+        step_id, facet_name, source location), emit to stdout via
+        Python's logging machinery (so the SplunkJsonFormatter
+        configured in ``facetwork.logging`` picks it up), and mirror
+        an INFO-level step-log entry.
+
+        sys.assert: evaluate the condition expression.  False → mark
+        the step errored with an ``AssertionError`` carrying the
+        source location.  True → step transitions normally.
+
+        Either way the step exits FACET_INIT_BEGIN and the transition
+        table walks it through STATEMENT_END → STATEMENT_COMPLETE.
+        """
+        from ..types import ObjectType
+
+        if stmt_def is None:
+            self.step.request_state_change(True)
+            return StateChangeResult(step=self.step)
+
+        ctx = self._build_context()
+        evaluator = ExpressionEvaluator()
+
+        try:
+            if self.step.object_type == ObjectType.SYS_LOG:
+                fields: dict = {}
+                for arg in stmt_def.args or []:
+                    name = arg.get("name") if isinstance(arg, dict) else None
+                    if not name:
+                        continue
+                    value_expr = arg.get("value") if isinstance(arg, dict) else None
+                    fields[name] = evaluator.evaluate(value_expr, ctx)
+                self._emit_sys_log(fields)
+            else:  # SYS_ASSERT
+                condition_expr = getattr(stmt_def, "sys_condition", None)
+                if condition_expr is None:
+                    raise EvaluationError(
+                        "sys.assert",
+                        "missing condition expression",
+                        self.step.id,
+                    )
+                result = evaluator.evaluate(condition_expr, ctx)
+                if not result:
+                    loc = ""
+                    if self.step.statement_id:
+                        loc = f" (statement_id={self.step.statement_id})"
+                    raise AssertionError(f"sys.assert failed{loc}")
+        except _StepNotReady:
+            return self.stay(push=True)
+        except AssertionError as ae:
+            return self.error(ae)
+        except Exception as e:
+            if isinstance(getattr(e, "__cause__", None), _StepNotReady):
+                return self.stay(push=True)
+            return self.error(e)
+
+        self.step.request_state_change(True)
+        return StateChangeResult(step=self.step)
+
+    def _emit_sys_log(self, fields: dict) -> None:
+        """Write a Splunk-format JSON log line for a sys.log statement
+        and mirror it as an INFO step-log entry.
+
+        The Python ``logging`` machinery handles the stdout side: the
+        ``facetwork.sys.log`` logger inherits any handler configured by
+        ``configure_logging``, which in production uses
+        :class:`SplunkJsonFormatter`.  The handler picks up ``extra``
+        keys as additional JSON fields, so ``workflow_id``,
+        ``runner_id``, ``server_id``, ``step_id``, ``facet_name``,
+        ``line``, and ``column`` show up alongside the user's named
+        args.
+        """
+        import socket
+        import time as _time
+
+        from ..entities import StepLogEntry, StepLogLevel, StepLogSource
+        from ..types import generate_id
+
+        sys_log_logger = logging.getLogger("facetwork.sys.log")
+        try:
+            hostname = socket.gethostname()
+        except Exception:
+            hostname = ""
+
+        line = column = None
+        if self.step.transition and self.step.transition.error:
+            # not expected to fire at the sys.log path, but keep
+            # defensive for future routing.
+            pass
+
+        extra: dict = {
+            "workflow_id": self.step.workflow_id,
+            "runner_id": getattr(self.context, "runner_id", "") or "",
+            "server_id": getattr(self.context, "server_id", "") or "",
+            "step_id": self.step.id,
+            "facet_name": self.step.facet_name or "",
+            "hostname": hostname,
+            "event": fields,
+        }
+        sys_log_logger.info("sys.log", extra={"_sys_log": extra})
+
+        try:
+            import json as _json
+
+            self.context.persistence.save_step_log(
+                StepLogEntry(
+                    uuid=generate_id(),
+                    step_id=self.step.id,
+                    workflow_id=self.step.workflow_id,
+                    facet_name=self.step.facet_name or "",
+                    source=StepLogSource.FRAMEWORK,
+                    level=StepLogLevel.INFO,
+                    message=_json.dumps({"sys.log": fields}, default=str),
+                    time=int(_time.time() * 1000),
+                )
+            )
+        except Exception:
+            # step-log mirror is best-effort; logging still went out.
+            pass
 
     def _init_mixin_sub_step(self) -> StateChangeResult:
         """Initialize a mixin sub-step whose params were pre-bound by

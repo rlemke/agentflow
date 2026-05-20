@@ -51,6 +51,8 @@ from .ast import (
     ScriptBlock,
     SourceLocation,
     StepStmt,
+    SysAssertStmt,
+    SysLogStmt,
     TypeRef,
     UnaryExpr,
     UsesDecl,
@@ -157,6 +159,10 @@ class JSONEmitter:
             return self._named_arg(node)
         if isinstance(node, StepStmt):
             return self._step_stmt(node)
+        if isinstance(node, SysLogStmt):
+            return self._sys_log_stmt(node)
+        if isinstance(node, SysAssertStmt):
+            return self._sys_assert_stmt(node)
         if isinstance(node, YieldStmt):
             return self._yield_stmt(node)
         if isinstance(node, Block):
@@ -508,6 +514,21 @@ class JSONEmitter:
         data = {
             "type": "YieldStmt",
             "call": self._convert(node.call),
+        }
+        return self._add_metadata(data, node)
+
+    def _sys_log_stmt(self, node: SysLogStmt) -> dict:
+        """Convert SysLogStmt node — ``sys.log(name = expr, ...)``."""
+        data: dict[str, Any] = {"type": "SysLogStmt"}
+        if node.args:
+            data["args"] = self._convert(node.args)
+        return self._add_metadata(data, node)
+
+    def _sys_assert_stmt(self, node: SysAssertStmt) -> dict:
+        """Convert SysAssertStmt node — ``sys.assert(expr)``."""
+        data = {
+            "type": "SysAssertStmt",
+            "condition": self._convert(node.condition),
         }
         return self._add_metadata(data, node)
 

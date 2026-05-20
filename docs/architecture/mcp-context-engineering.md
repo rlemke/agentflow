@@ -32,7 +32,7 @@ A naive MCP only covers layer 3. The most leverage comes from layer 4: a tight v
 
 `ValidationError` carries `rule_id`, `severity`, `line`, `column`, `docs_uri`, `suggested_fix`. The `add_error` and `add_warning` methods accept `rule_id` as a keyword-only argument with a default of `"UNKNOWN"` — backward-compatible with any caller that doesn't pass one. The `docs_uri` is auto-populated from the `rule_id` as `afl://docs/rules/{rule_id}` when not explicitly provided.
 
-The validator emits **44 distinct rule_ids** across these categories:
+The validator emits **47 distinct rule_ids** across these categories:
 
 - **Placement** — `WORKFLOW_AT_TOP_LEVEL`, `SCHEMA_AT_TOP_LEVEL`
 - **Reference resolution** — `REF_UNKNOWN_FACET`, `REF_AMBIGUOUS_FACET`, `REF_UNKNOWN_SCHEMA`, `REF_AMBIGUOUS_SCHEMA`, `REF_UNKNOWN_TYPE`, `REF_UNDEFINED_STEP`, `REF_INVALID_STEP_FORMAT`, `REF_INVALID_STEP_ATTRIBUTE`, `REF_INVALID_INPUT`, `REF_CROSS_BLOCK_STEP`, `REF_FORWARD_STEP`, `STEP_REF_FACET_MISMATCH`, `REF_INVALID_FACET_REF_ATTRIBUTE`
@@ -42,14 +42,15 @@ The validator emits **44 distinct rule_ids** across these categories:
 - **Prompt blocks** — `PROMPT_MISSING_TEMPLATE`, `PROMPT_INVALID_PLACEHOLDER`
 - **Script blocks** — `SCRIPT_EMPTY`, `SCRIPT_UNSUPPORTED_LANGUAGE`
 - **Schemas** — `SCHEMA_INSTANTIATION_NO_MIXINS`, `SCHEMA_UNKNOWN_FIELD`
-- **Type checking** — `TYPE_BOOLEAN_OPERAND_REQUIRED`, `TYPE_ORDERED_COMPARISON_BOOLEAN`, `TYPE_ORDERED_COMPARISON_SCHEMA`, `TYPE_ARITHMETIC_STRING`, `TYPE_ARITHMETIC_BOOLEAN`, `TYPE_ARITHMETIC_SCHEMA`, `TYPE_NOT_OPERAND_REQUIRED`, `TYPE_NEGATE_STRING`, `TYPE_NEGATE_BOOLEAN`, `TYPE_NEGATE_SCHEMA`
+- **Type checking** — `TYPE_BOOLEAN_OPERAND_REQUIRED`, `TYPE_ORDERED_COMPARISON_BOOLEAN`, `TYPE_ORDERED_COMPARISON_SCHEMA`, `TYPE_ARITHMETIC_STRING`, `TYPE_ARITHMETIC_BOOLEAN`, `TYPE_ARITHMETIC_SCHEMA`, `TYPE_NOT_OPERAND_REQUIRED`, `TYPE_NEGATE_STRING`, `TYPE_NEGATE_BOOLEAN`, `TYPE_NEGATE_SCHEMA`, `TYPE_CONTAINMENT_OPERAND`, `TYPE_STRING_MATCH_OPERAND`
+- **Inline diagnostics** — `SYS_ASSERT_NOT_BOOLEAN`
 - **Implicits** — `IMPLICIT_UNKNOWN_PARAM`
 
 `PARSE_ERROR` is reported by the MCP serializer when the parser itself fails (the validator never emits it — there's no AST to walk).
 
 ### Rule documentation (`docs/reference/rules/{rule_id}.md`)
 
-45 files (44 rules + `PARSE_ERROR`), one per emitted rule_id, all following the same template:
+48 files (47 rules + `PARSE_ERROR`), one per emitted rule_id, all following the same template:
 
 ```markdown
 # RULE_ID — One-line summary

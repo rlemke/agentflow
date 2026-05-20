@@ -55,6 +55,8 @@ from .ast import (
     ScriptBlock,
     SourceLocation,
     StepStmt,
+    SysAssertStmt,
+    SysLogStmt,
     TypeRef,
     UnaryExpr,
     UsesDecl,
@@ -345,12 +347,36 @@ class FFLTransformer(Transformer):
     def comparison_expr(self, meta, items: list):
         if len(items) == 1:
             return items[0]
+        op = items[1]
+        # `op` is either a COMP_OP token (basic comparison) or the
+        # string produced by one of the compare_op_* alias rules below.
+        op_str = op if isinstance(op, str) else str(op)
         return BinaryExpr(
-            operator=str(items[1]), left=items[0], right=items[2], location=self._loc(meta)
+            operator=op_str, left=items[0], right=items[2], location=self._loc(meta)
         )
 
     def COMP_OP(self, token: Token) -> str:
         return str(token)
+
+    # compare_op alias rules — each returns the canonical operator
+    # spelling so ``comparison_expr`` can build a uniform BinaryExpr.
+    def compare_op_basic(self, items: list) -> str:
+        return str(items[0])
+
+    def compare_op_in(self, _items: list) -> str:
+        return "in"
+
+    def compare_op_not_in(self, _items: list) -> str:
+        return "not in"
+
+    def compare_op_contains(self, _items: list) -> str:
+        return "contains"
+
+    def compare_op_starts_with(self, _items: list) -> str:
+        return "startsWith"
+
+    def compare_op_ends_with(self, _items: list) -> str:
+        return "endsWith"
 
     @v_args(meta=True)
     def not_expr(self, meta, items: list):
@@ -497,13 +523,40 @@ class FFLTransformer(Transformer):
         ]
         return [primary, *extras]
 
+    # sys.log / sys.assert — inline diagnostic statements
+    @v_args(meta=True)
+    def sys_log_stmt(self, meta, items: list) -> SysLogStmt:
+        """``sys.log(name = expr, ...)`` — Splunk-format diagnostic log."""
+        args = items[0] if items and isinstance(items[0], list) else []
+        return SysLogStmt(args=list(args), location=self._loc(meta))
+
+    @v_args(meta=True, inline=True)
+    def sys_assert_stmt(self, meta, condition) -> SysAssertStmt:
+        """``sys.assert(condition)`` — runtime invariant check."""
+        return SysAssertStmt(condition=condition, location=self._loc(meta))
+
+    @v_args(inline=True)
+    def block_stmt(self, item):
+        """``block_stmt`` wraps a step_stmt / sys_log_stmt / sys_assert_stmt
+        so the block_body rule can interleave them.  Pass-through."""
+        return item
+
     # Blocks
     @v_args(meta=True)
-    def block_body(self, meta, items: list) -> tuple[list[StepStmt], list[YieldStmt]]:
-        steps = self._find_all(items, StepStmt)
+    def block_body(self, meta, items: list) -> tuple[list, list[YieldStmt]]:
+        # ``items`` is a flat sequence of StepStmt / SysLogStmt /
+        # SysAssertStmt (in source order) followed by YieldStmt instances
+        # (which may also be wrapped in lists from yield-with-chain
+        # transforms).  We preserve source order across statement types
+        # so the runtime evaluator can interleave step assignments with
+        # inline diagnostics; yield statements stay as their own list
+        # (semantically separate, captured at parent STATEMENT_CAPTURE).
+        steps: list = []
         yields: list[YieldStmt] = []
         for item in items:
-            if isinstance(item, YieldStmt):
+            if isinstance(item, (StepStmt, SysLogStmt, SysAssertStmt)):
+                steps.append(item)
+            elif isinstance(item, YieldStmt):
                 yields.append(item)
             elif isinstance(item, list):
                 yields.extend(y for y in item if isinstance(y, YieldStmt))

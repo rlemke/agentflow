@@ -1,0 +1,49 @@
+// Inline diagnostic statements — sys.log and sys.assert.
+//
+// `sys.log(name = expr, ...)` and `sys.assert(boolean_expr)` are
+// side-effect-only statements that sit alongside step assignments
+// inside an andThen block. They produce no value and create no step
+// row in the dashboard tree (a minimal sys-statement transition
+// table walks them through FACET_INIT_BEGIN → STATEMENT_COMPLETE in
+// one tick). The dependency graph still tracks them: a sys.log that
+// references a step waits for that step to complete.
+//
+// sys.log emits a Splunk-format JSON record on the
+// `facetwork.sys.log` logger; the record carries the evaluated
+// name/value pairs in an `event` sub-object plus runtime context
+// (workflow_id, runner_id, server_id, step_id, facet_name,
+// hostname).  It also mirrors to the step-log collection at INFO
+// level so the dashboard surfaces it.
+//
+// sys.assert fires if the condition is false: the containing step is
+// marked errored with an AssertionError; standard catch handling
+// applies.  Validator rule SYS_ASSERT_NOT_BOOLEAN rejects non-Boolean
+// conditions at compile time.
+//
+// Both can use the new containment / string-match operators:
+//   x in [...]            // collection membership
+//   x not in [...]        // negated membership
+//   "phrase" contains "p" // substring (or container membership)
+//   url startsWith "/api" // string prefix
+//   file endsWith ".csv"  // string suffix
+
+namespace diagnostics_demo {
+    facet ToLower(input: String) => (output: String) andThen {
+        // Real handlers would do work; here we just pass through.
+        yield ToLower(output = $.input)
+    }
+
+    facet Validate(input: String) => (output: String) andThen {
+        s = ToLower(input = $.input)
+        sys.log(name = "validate.start", input = $.input, normalized = s.output)
+        sys.assert(s.output != "")
+        sys.assert(s.output startsWith "http")
+        sys.assert(s.output in ["http://example", "http://x.test"])
+        yield Validate(output = s.output)
+    }
+
+    workflow Demo(url: String) => (out: String) andThen {
+        v = Validate(input = $.url)
+        yield Demo(out = v.output)
+    }
+}

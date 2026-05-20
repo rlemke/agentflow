@@ -49,6 +49,9 @@ from .ast import (
     SchemaDecl,
     ScriptBlock,
     SourceLocation,
+    StepStmt,
+    SysAssertStmt,
+    SysLogStmt,
     TypeRef,
     UnaryExpr,
     WhenBlock,
@@ -1034,8 +1037,18 @@ class FFLValidator:
         elif parent_foreach_var:
             foreach_var = parent_foreach_var
 
-        # Validate each step
+        # Validate each step.  body.block.steps is a flat list that may
+        # interleave StepStmt, SysLogStmt, and SysAssertStmt; the
+        # diagnostic statements are validated separately below and
+        # skipped in the main step-iteration logic (they have no
+        # ``name`` or ``call`` field).
         for step in body.block.steps:
+            if isinstance(step, (SysLogStmt, SysAssertStmt)):
+                self._validate_sys_stmt(
+                    step, input_attrs, steps, step_returns,
+                    foreach_var, step_returns_types, other_block_steps,
+                )
+                continue
             # Check step name uniqueness
             if step.name in steps:
                 prev = steps[step.name]
@@ -1322,6 +1335,11 @@ class FFLValidator:
     _COMPARISON_OPS = {"==", "!=", ">", "<", ">=", "<="}
     _BOOLEAN_OPS = {"&&", "||"}
     _ORDERED_COMPARISON_OPS = {">", "<", ">=", "<="}
+    # Containment operators: left ∈ right (or vice-versa for `contains`).
+    # Right side must be a collection (array) or string (substring search).
+    _CONTAINMENT_OPS = {"in", "not in", "contains"}
+    # String-match operators: both operands must be String.
+    _STRING_MATCH_OPS = {"startsWith", "endsWith"}
     _ARITHMETIC_OPS = {"+", "-", "*", "/", "%"}
     _NON_SCHEMA_TYPES = {
         "String",
@@ -1454,6 +1472,38 @@ class FFLValidator:
                                 rule_id="TYPE_ORDERED_COMPARISON_SCHEMA",
                             )
                             return "Unknown"
+                return "Boolean"
+
+            # Containment operators: in / not in / contains.  Right
+            # side (or left for `contains`) must be a collection or
+            # string; the other operand is the element.  We don't
+            # have an Array-of-T type in the validator scope today,
+            # so the check is permissive: reject only obviously
+            # malformed cases (e.g. Boolean as collection).
+            if expr.operator in self._CONTAINMENT_OPS:
+                collection_side = left_type if expr.operator == "contains" else right_type
+                if collection_side == "Boolean":
+                    self._result.add_error(
+                        f"Type error: operator '{expr.operator}' requires a collection or "
+                        f"String operand, got Boolean",
+                        getattr(expr, "location", None),
+                        rule_id="TYPE_CONTAINMENT_OPERAND",
+                    )
+                    return "Unknown"
+                return "Boolean"
+
+            # String-match operators: startsWith / endsWith — both
+            # operands must be String.
+            if expr.operator in self._STRING_MATCH_OPS:
+                for t in (left_type, right_type):
+                    if t != "Unknown" and t != "String":
+                        self._result.add_error(
+                            f"Type error: operator '{expr.operator}' requires String "
+                            f"operands, got {t}",
+                            getattr(expr, "location", None),
+                            rule_id="TYPE_STRING_MATCH_OPERAND",
+                        )
+                        return "Unknown"
                 return "Boolean"
 
             # Arithmetic operators: + - * / %
@@ -1991,6 +2041,63 @@ class FFLValidator:
             step_returns_types=step_returns_types,
             other_block_steps=other_block_steps,
         )
+
+    def _validate_sys_stmt(
+        self,
+        stmt: "SysLogStmt | SysAssertStmt",
+        input_attrs: set[str],
+        steps: dict[str, "StepInfo"],
+        step_returns: dict[str, set[str]],
+        foreach_var: str | None,
+        step_returns_types: dict[str, dict[str, str]] | None,
+        other_block_steps: set[str] | None,
+    ) -> None:
+        """Validate ``sys.log`` and ``sys.assert`` inline diagnostic
+        statements.
+
+        ``sys.log`` args: each ``NamedArg`` value goes through the
+        standard reference + type-inference checks (the same
+        machinery step call args use).  Names are free-form
+        identifiers per the named-args grammar — no further check
+        needed.
+
+        ``sys.assert`` condition: the expression's inferred type must
+        be Boolean.  Anything else fires ``SYS_ASSERT_NOT_BOOLEAN``.
+        """
+        if isinstance(stmt, SysLogStmt):
+            for arg in stmt.args:
+                for ref in self._extract_references(arg.value):
+                    self._validate_reference(
+                        ref,
+                        input_attrs,
+                        steps,
+                        step_returns,
+                        foreach_var,
+                        None,
+                        other_block_steps,
+                    )
+                self._infer_type(arg.value, step_returns_types)
+            return
+
+        # SysAssertStmt
+        condition = stmt.condition
+        for ref in self._extract_references(condition):
+            self._validate_reference(
+                ref,
+                input_attrs,
+                steps,
+                step_returns,
+                foreach_var,
+                None,
+                other_block_steps,
+            )
+        inferred = self._infer_type(condition, step_returns_types)
+        if inferred and inferred != "Boolean" and inferred != "Unknown":
+            self._result.add_error(
+                f"sys.assert condition must be Boolean, got {inferred}",
+                stmt.location,
+                rule_id="SYS_ASSERT_NOT_BOOLEAN",
+            )
 
     def _validate_schema_instantiation(self, call: CallExpr, schema_info: SchemaInfo) -> None:
         """Validate a schema instantiation call.

@@ -46,7 +46,7 @@ class SplunkJsonFormatter(logging.Formatter):
         dt = datetime.fromtimestamp(record.created, tz=UTC)
         timestamp = dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{int(dt.microsecond / 1000):03d}Z"
 
-        obj: dict[str, str] = {
+        obj: dict = {
             "timestamp": timestamp,
             "level": record.levelname,
             "logger": record.name,
@@ -54,10 +54,21 @@ class SplunkJsonFormatter(logging.Formatter):
             "source": "facetwork",
         }
 
+        # `sys.log(...)` from FFL passes its evaluated args + the
+        # runtime context as the ``_sys_log`` extra.  We merge those
+        # fields into the top-level envelope so the result is a
+        # flat Splunk-friendly JSON record (workflow_id,
+        # runner_id, step_id, facet_name, hostname, and an ``event``
+        # sub-object with the user's named-arg pairs).
+        sys_log = getattr(record, "_sys_log", None)
+        if isinstance(sys_log, dict):
+            for k, v in sys_log.items():
+                obj[k] = v
+
         if record.exc_info and record.exc_info[0] is not None:
             obj["exc_info"] = "".join(traceback.format_exception(*record.exc_info))
 
-        return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(obj, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
 def configure_logging(

@@ -44,6 +44,9 @@ class StatementDefinition:
     args: list[dict] = field(default_factory=list)  # Named arguments
     mixins: list[dict] = field(default_factory=list)  # Call-site mixin calls
     is_yield: bool = False
+    # For SysAssertStmt the condition expression is stashed here so the
+    # runtime evaluator can read it without rerouting through the AST.
+    sys_condition: dict | None = None
 
 
 @dataclass

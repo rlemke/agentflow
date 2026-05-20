@@ -437,6 +437,18 @@ class ExpressionEvaluator:
                 return left / right
             elif operator == "%":
                 return left % right
+            # Containment + string-match operators (Scope: sys.log/assert
+            # work, but usable anywhere a Boolean expression is valid).
+            elif operator == "in":
+                return left in right
+            elif operator == "not in":
+                return left not in right
+            elif operator == "contains":
+                return right in left
+            elif operator == "startsWith":
+                return str(left).startswith(str(right))
+            elif operator == "endsWith":
+                return str(left).endswith(str(right))
             else:
                 raise EvaluationError(
                     str(expr),

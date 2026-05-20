@@ -193,6 +193,36 @@ class YieldStmt(ASTNode):
     call: CallExpr
 
 
+@dataclass
+class SysLogStmt(ASTNode):
+    """Inline diagnostic log statement: ``sys.log(name = expr, ...)``.
+
+    Side-effect-only — produces no value and creates no step row.
+    The andThen evaluator runs it inline alongside ordinary step
+    statements, evaluates each named arg, and emits a Splunk-format
+    JSON record with the computed name/value pairs alongside the
+    standard execution context (workflow_id, runner_id, server_id,
+    step_id, facet_name, source location).  Also mirrors to the
+    step-log collection at INFO level for dashboard visibility.
+    """
+
+    args: list["NamedArg"] = field(default_factory=list)
+
+
+@dataclass
+class SysAssertStmt(ASTNode):
+    """Inline assertion: ``sys.assert(boolean_expression)``.
+
+    Side-effect-only.  At runtime the expression is evaluated and, on
+    a false result, the containing step is marked errored with an
+    ``AssertionError`` carrying the source location.  Standard catch
+    handling applies.  The expression must be Boolean-typed; see rule
+    ``SYS_ASSERT_NOT_BOOLEAN``.
+    """
+
+    condition: "Literal | Reference | ConcatExpr | BinaryExpr"
+
+
 # Blocks
 @dataclass
 class ForeachClause(ASTNode):

@@ -148,9 +148,18 @@ script_block       := string
 
 block              := "{" block_stmt* yield_stmt? "}" ;
 
-block_stmt         := step_stmt ;
+block_stmt         := step_stmt
+                    | sys_log_stmt
+                    | sys_assert_stmt ;
 
 yield_stmt         := "yield" call_expr (stmt_sep)? ;
+
+// Inline diagnostic statements — side-effect only, no return value,
+// no place in expression position.  Live alongside step_stmt inside
+// an andThen block; the runtime executes them inline via a minimal
+// transition table (CREATED → FACET_INIT_BEGIN → STATEMENT_COMPLETE).
+sys_log_stmt       := "sys" "." "log" "(" named_args? ")" ;
+sys_assert_stmt    := "sys" "." "assert" "(" expr ")" ;
 
 named_args          := named_arg ("," named_arg)* ;
 named_arg           := ident "=" expr ;
@@ -159,7 +168,7 @@ expr                := or_expr ;
 
 or_expr             := and_expr ("||" and_expr)* ;
 and_expr            := comparison_expr ("&&" comparison_expr)* ;
-comparison_expr     := concat_expr (COMP_OP concat_expr)? ;
+comparison_expr     := concat_expr (compare_op concat_expr)? ;
 concat_expr         := additive_expr ("++" additive_expr)* ;
 additive_expr       := multiplicative_expr (ADD_OP multiplicative_expr)* ;
 multiplicative_expr := unary_expr (MUL_OP unary_expr)* ;
@@ -167,6 +176,15 @@ unary_expr          := ADD_OP unary_expr | "!" unary_expr | postfix_expr ;
 postfix_expr        := atom_expr ("[" expr "]")* ;
 atom_expr           := literal | reference | array_literal | map_literal | "(" expr ")" ;
 
+// Comparison operators include the standard relational set plus the
+// containment/string-match keywords.  All are non-associative — only
+// one operator may appear in a comparison_expr.
+compare_op         := COMP_OP
+                    | "in"
+                    | "not" "in"
+                    | "contains"
+                    | "startsWith"
+                    | "endsWith" ;
 COMP_OP             := "==" | "!=" | ">=" | "<=" | ">" | "<" ;
 ADD_OP              := "+" | "-" ;
 MUL_OP              := "*" | "/" | "%" ;

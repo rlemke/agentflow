@@ -70,9 +70,18 @@ class DependencyGraph:
         yields = block_ast.get("yields", [])
         single_yield = block_ast.get("yield")
 
-        # First pass: collect all statement names and IDs
+        # First pass: collect all statement names and IDs.  The block's
+        # ``steps`` list may interleave regular step assignments with
+        # inline diagnostic statements (``sys.log``/``sys.assert``);
+        # both shapes become StatementDefinitions and participate in
+        # the dependency graph so a sys statement that references a
+        # step waits until the step completes.
         for step_ast in steps:
-            stmt = graph._parse_step(step_ast)
+            stmt_type = step_ast.get("type", "")
+            if stmt_type in ("SysLogStmt", "SysAssertStmt"):
+                stmt = graph._parse_sys_stmt(step_ast)
+            else:
+                stmt = graph._parse_step(step_ast)
             graph.statements[stmt.id] = stmt
             graph.name_to_id[stmt.name] = stmt.id
             graph.dependencies[stmt.id] = set()
@@ -125,6 +134,42 @@ class DependencyGraph:
             mixins=mixins,
             is_yield=False,
         )
+
+    def _parse_sys_stmt(self, stmt_ast: dict) -> StatementDefinition:
+        """Parse a SysLogStmt / SysAssertStmt AST into a StatementDefinition.
+
+        These are inline diagnostic statements — they have no facet
+        call, no return values, no downstream consumers.  But their
+        argument expressions may reference upstream steps, so they
+        participate in the dependency graph: they're created and
+        executed only after every referenced step is complete.
+        """
+        stmt_type = stmt_ast.get("type", "")
+        stmt_id = stmt_ast.get("id") or f"sys-{stmt_type}-{id(stmt_ast)}"
+
+        if stmt_type == "SysLogStmt":
+            object_type = ObjectType.SYS_LOG
+            # Args list shape matches NamedArg list elsewhere; keep
+            # it raw so the runtime handler can evaluate each value.
+            args = stmt_ast.get("args", [])
+            condition = None
+        else:  # SysAssertStmt
+            object_type = ObjectType.SYS_ASSERT
+            args = []
+            condition = stmt_ast.get("condition")
+
+        stmt = StatementDefinition(
+            id=stmt_id,
+            name=f"_sys_{stmt_id}",
+            object_type=object_type,
+            facet_name="",
+            args=args,
+            is_yield=False,
+        )
+        # Stash the assert condition on the StatementDefinition via a
+        # custom attribute the runtime evaluator reads back.
+        stmt.sys_condition = condition
+        return stmt
 
     def _parse_yield(self, yield_ast: dict) -> StatementDefinition:
         """Parse a yield AST into StatementDefinition."""

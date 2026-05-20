@@ -454,6 +454,60 @@ class TestYieldValidation:
         result = validator.validate(ast)
         assert result.is_valid, [str(e) for e in result.errors]
 
+    def test_sys_assert_requires_boolean(self, validator):
+        """`sys.assert(...)` arg must be Boolean-typed."""
+        ast = parse(
+            _ns("""
+        facet Identity(input: String) => (output: String) andThen {
+            yield Identity(output = $.input)
+        }
+        workflow W(input: String) => (out: String) andThen {
+            s1 = Identity(input = $.input)
+            sys.assert(s1.output)
+            yield W(out = s1.output)
+        }
+        """)
+        )
+        result = validator.validate(ast)
+        assert not result.is_valid
+        rule_errors = [e for e in result.errors if e.rule_id == "SYS_ASSERT_NOT_BOOLEAN"]
+        assert rule_errors, f"expected SYS_ASSERT_NOT_BOOLEAN, got {result.errors}"
+
+    def test_sys_assert_boolean_passes(self, validator):
+        ast = parse(
+            _ns("""
+        facet Identity(input: String) => (output: String) andThen {
+            yield Identity(output = $.input)
+        }
+        workflow W(input: String) => (out: String) andThen {
+            s1 = Identity(input = $.input)
+            sys.assert(s1.output == "x")
+            sys.assert(s1.output startsWith "h")
+            sys.assert(s1.output in ["a", "b"])
+            yield W(out = s1.output)
+        }
+        """)
+        )
+        result = validator.validate(ast)
+        assert result.is_valid, [str(e) for e in result.errors]
+
+    def test_string_match_rejects_non_string_operands(self, validator):
+        ast = parse(
+            _ns("""
+        facet Identity(value: Long) => (output: Long) andThen {
+            yield Identity(output = $.value)
+        }
+        workflow W(value: Long) => (out: Long) andThen {
+            s1 = Identity(value = $.value)
+            sys.assert(s1.output startsWith "x")
+            yield W(out = s1.output)
+        }
+        """)
+        )
+        result = validator.validate(ast)
+        rule_errors = [e for e in result.errors if e.rule_id == "TYPE_STRING_MATCH_OPERAND"]
+        assert rule_errors, f"expected TYPE_STRING_MATCH_OPERAND, got {result.errors}"
+
     def test_yield_to_outer_alias_inside_mixin_body_rejected(self, validator):
         """Inside a mixin facet's own body, yield targets must be the
         facet itself or its own declared mixin targets/aliases.  An

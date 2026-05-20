@@ -78,7 +78,13 @@ script_block: STRING
             | _NL* IDENT STRING                 -> script_dialect
 
 block: "{" _NL* block_body "}" _NL*
-block_body: (step_stmt _NL*)* (yield_stmt _NL*)*
+// Inline diagnostic statements (sys.log, sys.assert) are interleaved
+// with step statements.  They produce no value and create no step row;
+// the andThen evaluator runs them inline as side effects.
+block_body: (block_stmt _NL*)* (yield_stmt _NL*)*
+block_stmt: step_stmt | sys_log_stmt | sys_assert_stmt
+sys_log_stmt: "sys" "." "log" "(" [named_args] ")"
+sys_assert_stmt: "sys" "." "assert" "(" expr ")"
 
 // When blocks for conditional branching
 when_block: "{" _NL* when_case+ "}" _NL*
@@ -114,7 +120,17 @@ named_arg: IDENT "=" _NL* expr
 expr: or_expr
 or_expr: and_expr ("||" _NL* and_expr)*
 and_expr: comparison_expr ("&&" _NL* comparison_expr)*
-comparison_expr: concat_expr (COMP_OP _NL* concat_expr)?
+comparison_expr: concat_expr (compare_op _NL* concat_expr)?
+// Comparison operators include the standard relational set plus the
+// containment/string-match keywords (`in`, `not in`, `contains`,
+// `startsWith`, `endsWith`).  All are non-associative — exactly one
+// operator may appear, like `a == b`.
+compare_op: COMP_OP                  -> compare_op_basic
+          | "in"                     -> compare_op_in
+          | "not" "in"               -> compare_op_not_in
+          | "contains"               -> compare_op_contains
+          | "startsWith"             -> compare_op_starts_with
+          | "endsWith"               -> compare_op_ends_with
 concat_expr: additive_expr ("++" _NL* additive_expr)*
 additive_expr: multiplicative_expr (ADD_OP _NL* multiplicative_expr)*
 multiplicative_expr: unary_expr (MUL_OP _NL* unary_expr)*

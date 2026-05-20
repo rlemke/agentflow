@@ -18,6 +18,7 @@ These files are also exposed via the MCP server at `afl://examples/canonical/`.
 | [`07-schema-instantiation.ffl`](07-schema-instantiation.ffl) | Schema definition + instantiation, with field-by-field access. |
 | [`08-step-reference.ffl`](08-step-reference.ffl) | Pass a whole step by reference (FacetRef): `$.<fref>.field` reads the upstream step's attributes. |
 | [`09-facetref-mixin-alias.ffl`](09-facetref-mixin-alias.ffl) | Mixin aliases on FacetRef consumers: `with M() as m1` enables `$.<fref>.m1.field`. |
+| [`10-sys-log-assert.ffl`](10-sys-log-assert.ffl) | Inline diagnostic statements: `sys.log(...)` writes Splunk JSON, `sys.assert(...)` enforces runtime invariants. Demonstrates new operators `in`, `not in`, `contains`, `startsWith`, `endsWith`. |
 
 ## Conventions worth noticing
 

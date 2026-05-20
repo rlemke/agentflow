@@ -61,6 +61,13 @@ class ObjectType:
     WORKFLOW = "Workflow"
     FACET = "Facet"
     SCHEMA_INSTANTIATION = "SchemaInstantiation"
+    # Inline diagnostic statements. They live in the block alongside
+    # step assignments but skip the full STEP_TRANSITIONS lifecycle:
+    # a tiny SYS_TRANSITIONS table walks them through a single
+    # execution step then to STATEMENT_COMPLETE (or STATEMENT_ERROR
+    # for a failing sys.assert).
+    SYS_LOG = "SysLog"
+    SYS_ASSERT = "SysAssert"
 
     # Block types
     AND_THEN = "AndThen"

@@ -140,6 +140,18 @@ YIELD_TRANSITIONS: dict[str, str] = {
 }
 
 
+# Inline diagnostic statements (sys.log, sys.assert).  The execution
+# fits in a single state transition: FACET_INIT_BEGIN evaluates args
+# and performs the side effect (log emission or assertion); on
+# success the step proceeds to STATEMENT_COMPLETE, on assertion
+# failure to STATEMENT_ERROR via the handler's mark_error path.
+SYS_STMT_TRANSITIONS: dict[str, str] = {
+    StepState.CREATED: StepState.FACET_INIT_BEGIN,
+    StepState.FACET_INIT_BEGIN: StepState.STATEMENT_END,
+    StepState.STATEMENT_END: StepState.STATEMENT_COMPLETE,
+}
+
+
 # Simplified state machine for SchemaInstantiation steps
 # Evaluates arguments and stores them as returns, skips all other phases
 SCHEMA_TRANSITIONS: dict[str, str] = {
@@ -176,6 +188,8 @@ def select_transitions(object_type: str) -> dict[str, str]:
 
     if object_type == ObjectType.YIELD_ASSIGNMENT:
         return YIELD_TRANSITIONS
+    elif object_type in (ObjectType.SYS_LOG, ObjectType.SYS_ASSERT):
+        return SYS_STMT_TRANSITIONS
     elif object_type == ObjectType.SCHEMA_INSTANTIATION:
         return SCHEMA_TRANSITIONS
     elif ObjectType.is_block(object_type):

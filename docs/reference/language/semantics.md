@@ -219,6 +219,61 @@ target form is ambiguous (it can't pick an alias). Validator rule
 `YIELD_TARGET_AMBIGUOUS` rejects this; the author must use the
 alias name in the yield.
 
+### Inline Diagnostic Statements (`sys.log` / `sys.assert`)
+
+Two side-effect-only statements live alongside step assignments
+inside any andThen block (and inside catch handlers, foreach
+bodies, when cases, mixin bodies — anywhere a step statement is
+valid):
+
+```ffl
+andThen {
+    s1 = Download(url = $.url)
+    sys.log(name = s1.body, size = s1.length)
+    sys.assert(s1.body startsWith "<html")
+    s2 = Parse(data = s1.body)
+}
+```
+
+* `sys.log(name = expr, ...)` evaluates each named arg, then emits a
+  Splunk-format JSON record on the `facetwork.sys.log` logger.  The
+  record carries the evaluated name/value pairs in an `event`
+  sub-object plus the runtime context (`workflow_id`, `runner_id`,
+  `server_id`, `step_id`, `facet_name`, `hostname`).  It also writes
+  an INFO step-log entry so the dashboard surfaces it.
+* `sys.assert(boolean_expr)` evaluates the condition; on `false` the
+  containing step is marked errored with an
+  `AssertionError`.  Standard catch handling applies.  Rule
+  `SYS_ASSERT_NOT_BOOLEAN` rejects non-Boolean conditions at
+  validate time.
+
+These statements produce no value and never appear in expression
+position.  At runtime they walk a tiny three-state transition table
+(`CREATED → FACET_INIT_BEGIN → STATEMENT_END → STATEMENT_COMPLETE`)
+that completes in a single tick — no facet body, no event dispatch.
+The dependency graph treats them like any other statement: a sys
+statement that references a step waits for that step to complete
+before firing.
+
+### Containment and String-Match Operators
+
+The comparison level of the expression grammar accepts these
+non-associative keyword operators alongside `==` / `!=` / `<` /
+`<=` / `>` / `>=`:
+
+| Operator | Operand types | Result |
+|----------|---------------|--------|
+| `a in B` | `a: any`, `B: collection \| string` | `Boolean` |
+| `a not in B` | same as `in` | `Boolean` |
+| `A contains b` | `A: collection \| string`, `b: any` | `Boolean` |
+| `a startsWith b` | both `String` | `Boolean` |
+| `a endsWith b` | both `String` | `Boolean` |
+
+They're usable anywhere a Boolean expression is valid — `sys.assert`
+conditions, `when` cases, `andThen when` guards.  Validator rules
+`TYPE_CONTAINMENT_OPERAND` and `TYPE_STRING_MATCH_OPERAND` reject
+malformed combinations at compile time.
+
 ### Default Parameter Values
 - Parameters can have optional default values: `name: Type = expr`
 - Supported default expressions: literals (`"hello"`, `42`, `3.14`, `true`, `null`), references, and concat expressions
