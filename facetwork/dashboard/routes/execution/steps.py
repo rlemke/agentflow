@@ -33,10 +33,17 @@ def step_detail(step_id: str, request: Request, store=Depends(get_store)):
     names = _resolve_step_names(step, store) if step else {}
     step_logs = store.get_step_logs_by_step(step_id) if step else []
     heartbeat_ts = _get_heartbeat_ts(step, store) if step else None
+    is_mixin = _is_mixin_sub_step(step) if step else False
     return request.app.state.templates.TemplateResponse(
         request,
         "steps/detail.html",
-        {"step": step, "names": names, "step_logs": step_logs, "heartbeat_ts": heartbeat_ts},
+        {
+            "step": step,
+            "names": names,
+            "step_logs": step_logs,
+            "heartbeat_ts": heartbeat_ts,
+            "is_mixin_sub_step": is_mixin,
+        },
     )
 
 
@@ -179,10 +186,17 @@ def step_detail_partial(step_id: str, request: Request, store=Depends(get_store)
     names = _resolve_step_names(step, store) if step else {}
     step_logs = store.get_step_logs_by_step(step_id) if step else []
     heartbeat_ts = _get_heartbeat_ts(step, store) if step else None
+    is_mixin = _is_mixin_sub_step(step) if step else False
     return request.app.state.templates.TemplateResponse(
         request,
         "steps/_detail_content.html",
-        {"step": step, "names": names, "step_logs": step_logs, "heartbeat_ts": heartbeat_ts},
+        {
+            "step": step,
+            "names": names,
+            "step_logs": step_logs,
+            "heartbeat_ts": heartbeat_ts,
+            "is_mixin_sub_step": is_mixin,
+        },
     )
 
 
@@ -235,9 +249,20 @@ def retry_step(step_id: str, force: bool = False, store=Depends(get_store)):
             },
         )
 
-    # Reset step state to EVENT_TRANSMIT (matches evaluator.retry_step logic)
-    step.state = StepState.EVENT_TRANSMIT
-    step.transition.current_state = StepState.EVENT_TRANSMIT
+    # Mixin sub-steps walk the full STEP_TRANSITIONS lifecycle starting
+    # from CREATED (FACET_INIT re-binds params, body re-executes, capture
+    # rewrites returns).  Resetting to EVENT_TRANSMIT — the default for
+    # regular event-facet steps — would skip the body re-execution.
+    # Resetting to CREATED makes the retry semantics match the runtime's
+    # own creation path written by MixinBlocksBeginHandler.
+    if _is_mixin_sub_step(step):
+        step.state = StepState.CREATED
+        step.transition.current_state = StepState.CREATED
+        step.attributes.returns = {}
+    else:
+        # Reset step state to EVENT_TRANSMIT (matches evaluator.retry_step logic)
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
     step.transition.clear_error()
     step.transition.request_transition = False
     step.transition.changed = True
@@ -567,6 +592,20 @@ def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
     prev_state = step.state
     block_id = step.block_id
 
+    # Mixin sub-steps don't live in a block, so the normal
+    # find-downstream-in-the-same-block path skips them entirely.  We
+    # re-target the search at the parent step (the mixin's container)
+    # so the rerun picks up everything that depended on the parent's
+    # output — typically the natural intent of "re-run this mixin".
+    # The mixin sub-step itself is reset to CREATED below in the same
+    # path as a regular target, just with a different reset state.
+    search_step = step
+    if _is_mixin_sub_step(step) and step.container_id:
+        parent = store.get_step(step.container_id)
+        if parent is not None:
+            search_step = parent
+            block_id = parent.block_id
+
     # Find all steps in the workflow
     all_steps = list(store.get_steps_by_workflow(step.workflow_id))
 
@@ -579,10 +618,11 @@ def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
         if s.container_id:
             by_container.setdefault(s.container_id, []).append(s.id)
 
-    # Find downstream sibling steps in the same block
-    # A step is downstream if it was created after this step's statement
-    # and depends on this step's results (inferred from statement ordering)
-    target_stmt_id = str(step.statement_id) if step.statement_id else ""
+    # Find downstream sibling steps in the same block of search_step
+    # (the parent step when target is a mixin sub-step, otherwise the
+    # target itself).  A step is downstream if it was created after
+    # search_step's statement and depends on its results.
+    target_stmt_id = str(search_step.statement_id) if search_step.statement_id else ""
     downstream_step_ids: list[str] = []
 
     if block_id and target_stmt_id:
@@ -592,8 +632,8 @@ def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
             if s.block_id == block_id and s.statement_name:
                 stmt_name_to_id[s.statement_name] = str(s.statement_id)
 
-        # Find steps that reference this step's statement_name in their params
-        target_name = step.statement_name or ""
+        # Find steps that reference search_step's statement_name in their params
+        target_name = search_step.statement_name or ""
         downstream_stmts = _find_downstream_by_name(
             target_name,
             all_steps,
@@ -615,6 +655,35 @@ def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
                             seen.add(child_id)
                             downstream_step_ids.append(child_id)
                             stack.append(child_id)
+
+    # When re-running a mixin sub-step we also need to clear the
+    # parent's body so the parent's andThen re-executes fresh against
+    # the new mixin returns.  Otherwise the body's already-completed
+    # child steps stay put and the parent skips them on the second
+    # pass.  Delete the parent's body block(s) and their descendants;
+    # the parent will re-create them when it walks STATEMENT_BLOCKS
+    # again.
+    if _is_mixin_sub_step(step) and step.container_id:
+        body_block_ids = [
+            s.id
+            for s in all_steps
+            if s.container_id == step.container_id
+            and s.id != step.id  # don't delete the mixin sub-step itself
+            and not s.statement_name  # skip sibling mixin sub-steps
+        ]
+        for bid in body_block_ids:
+            if bid not in downstream_step_ids:
+                downstream_step_ids.append(bid)
+            stack = [bid]
+            seen = {bid}
+            while stack:
+                sid = stack.pop()
+                for child_id in by_block.get(sid, []) + by_container.get(sid, []):
+                    if child_id not in seen:
+                        seen.add(child_id)
+                        if child_id not in downstream_step_ids:
+                            downstream_step_ids.append(child_id)
+                        stack.append(child_id)
 
     # Safety: refuse to delete dependents that have a running task unless
     # the caller explicitly forces.  Re-running a step while a dependent is
@@ -674,15 +743,32 @@ def rerun_step(step_id: str, force: bool = False, store=Depends(get_store)):
         store.delete_tasks_for_steps(downstream_step_ids)
         store.delete_steps(downstream_step_ids)
 
-    # Reset the target step
-    step.state = StepState.EVENT_TRANSMIT
-    step.transition.current_state = StepState.EVENT_TRANSMIT
+    # Reset the target step.  Mixin sub-steps reset to CREATED so they
+    # walk the whole STEP_TRANSITIONS lifecycle again (re-bind params,
+    # re-run body, re-capture); other steps reset to EVENT_TRANSMIT,
+    # matching the regular evaluator.retry_step semantics.
+    if _is_mixin_sub_step(step):
+        step.state = StepState.CREATED
+        step.transition.current_state = StepState.CREATED
+    else:
+        step.state = StepState.EVENT_TRANSMIT
+        step.transition.current_state = StepState.EVENT_TRANSMIT
     step.transition.clear_error()
     step.transition.request_transition = False
     step.transition.changed = True
     # Clear old return values so downstream steps get fresh data
     step.attributes.returns = {}
     store.save_step(step)
+
+    # When the rerun target is a mixin sub-step, also clear the parent's
+    # returns so the parent's body re-yields fresh results.  The parent's
+    # body was deleted above (via downstream_step_ids), so capture will
+    # rebuild returns from scratch on the second pass.
+    if _is_mixin_sub_step(step) and step.container_id:
+        parent = store.get_step(step.container_id)
+        if parent is not None:
+            parent.attributes.returns = {}
+            store.save_step(parent)
 
     # Reset associated task
     task = store.get_task_for_step(step_id)
@@ -760,7 +846,12 @@ def _find_downstream_by_name(
 
 
 def _reset_ancestors_to_continue(step, store) -> None:
-    """Reset ancestor blocks/containers to continue state (any terminal state)."""
+    """Reset ancestor blocks/containers to continue state (any terminal state).
+
+    When the immediate descendant being re-run is a mixin sub-step, the
+    container resumes at ``MIXIN_BLOCKS_CONTINUE`` so it re-waits on the
+    aliased mixin instead of skipping past the mixin phase entirely.
+    """
     from facetwork.runtime.states import StepState
 
     seen: set[str] = set()
@@ -781,20 +872,51 @@ def _reset_ancestors_to_continue(step, store) -> None:
         current_id = ancestor.block_id
 
     current_id = step.container_id
+    immediate_child = step
     while current_id and current_id not in seen:
         seen.add(current_id)
         ancestor = store.get_step(current_id)
         if ancestor is None:
             break
         if StepState.is_terminal(ancestor.state):
-            ancestor.state = StepState.STATEMENT_BLOCKS_CONTINUE
-            ancestor.transition.current_state = StepState.STATEMENT_BLOCKS_CONTINUE
+            resume_state = _reset_container_resume_state(ancestor, immediate_child)
+            ancestor.state = resume_state
+            ancestor.transition.current_state = resume_state
             ancestor.transition.clear_error()
             ancestor.transition.request_transition = False
             ancestor.transition.changed = True
             store.save_step(ancestor)
         next_id = ancestor.block_id or ancestor.container_id
+        immediate_child = ancestor
         current_id = next_id
+
+
+def _is_mixin_sub_step(step) -> bool:
+    """A step is an aliased mixin sub-step when it is a direct child of
+    a parent step (``container_id`` set, ``block_id`` unset) and has a
+    ``statement_name`` — the alias.  This is the persistence shape
+    ``MixinBlocksBeginHandler`` writes for every aliased mixin on a
+    facet sig.  Regular sibling steps inside a parent's andThen body
+    always have ``block_id`` set, so the ``block_id is None`` check is
+    what distinguishes the two."""
+    return bool(
+        step
+        and step.statement_name
+        and step.container_id
+        and not step.block_id
+    )
+
+
+def _reset_container_resume_state(ancestor, child) -> str:
+    """Return the resume state for an errored container step depending
+    on whether the immediate child being restarted is a mixin sub-step
+    (errored at the parent's mixin phase) or a regular body step
+    (errored at the parent's statement-block phase)."""
+    from facetwork.runtime.states import StepState
+
+    if _is_mixin_sub_step(child):
+        return StepState.MIXIN_BLOCKS_CONTINUE
+    return StepState.STATEMENT_BLOCKS_CONTINUE
 
 
 def _reset_errored_ancestors(step, store) -> None:
@@ -819,19 +941,26 @@ def _reset_errored_ancestors(step, store) -> None:
             store.save_step(ancestor)
         current_id = ancestor.block_id
 
-    # Walk up container_id chain (statement containers)
+    # Walk up container_id chain (statement containers).  When the
+    # immediate descendant being restarted is a mixin sub-step, the
+    # container errored at its mixin phase (MIXIN_BLOCKS_CONTINUE) —
+    # not at its statement phase — so we resume the container there
+    # instead, otherwise it would skip waiting on the mixin entirely.
     current_id = step.container_id
+    immediate_child = step
     while current_id and current_id not in seen:
         seen.add(current_id)
         ancestor = store.get_step(current_id)
         if ancestor is None:
             break
         if ancestor.state == StepState.STATEMENT_ERROR:
-            ancestor.state = StepState.STATEMENT_BLOCKS_CONTINUE
-            ancestor.transition.current_state = StepState.STATEMENT_BLOCKS_CONTINUE
+            resume_state = _reset_container_resume_state(ancestor, immediate_child)
+            ancestor.state = resume_state
+            ancestor.transition.current_state = resume_state
             ancestor.transition.clear_error()
             ancestor.transition.request_transition = False
             ancestor.transition.changed = True
             store.save_step(ancestor)
         next_id = ancestor.block_id or ancestor.container_id
+        immediate_child = ancestor
         current_id = next_id
