@@ -12,7 +12,7 @@ This guide helps you choose the right example as a starting point for your own F
 | [jenkins](https://github.com/rlemke/fwh_jenkins) | Intermediate | Mixin composition (`with`) | 17 | Cross-cutting concerns (retry, timeout, auth). **Standalone repo.** |
 | [aws-lambda](../aws-lambda/) | Intermediate | Real cloud calls + mixins | 12 | Cloud service integration with LocalStack |
 | [census-us](https://github.com/rlemke/fwh_census_us) | Intermediate | API + shapefile ETL, DB ingestion | 36 | US Census ACS + TIGER county demographics with dashboard map visualization. **Standalone repo.** |
-| [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/_lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
+| [noaa-weather](https://github.com/rlemke/fwh_noaa_weather) | Intermediate | Tools/handlers/shared-lib pattern, deterministic mocks | 13 | NOAA GHCN/NDBC ingest + climate trends. **Standalone repo.** |
 | [osm-geocoder](https://github.com/rlemke/fwh_osm) | Advanced | Large-scale event facets, source adapters | 132+ | Production-scale OSM ingestion + PostGIS + routing graphs. **Standalone repo.** |
 | [osm-lz](https://github.com/rlemke/fwh_osm_lz) | Advanced | Pure-FFL composition (workflow catalog) | 0 (consumes fwh_osm) | Continental-scale OSM LZ road infra + GTFS transit. **Standalone repo, depends on fwh_osm.** |
 | [site-selection](../site-selection/) | Intermediate | OSM + Census scoring | 22 | Spatial scoring pipelines |
@@ -122,7 +122,7 @@ Study **[osm-geocoder](https://github.com/rlemke/fwh_osm)** (standalone repo). W
 
 ### "I want a domain pipeline with both CLIs and FFL handlers backed by one library"
 
-Study **[noaa-weather](https://github.com/rlemke/fwh_noaa_weather)** (standalone repo). It is the canonical reference for the **tools / handlers / `_lib`** pattern: every operation has a CLI under `tools/` *and* an FFL handler, and both call into the same `tools/_lib/` modules via a `handlers/shared/<domain>_utils.py` shim. Run a single ingest step from the shell or thread it into a workflow — the cache + outputs are identical either way. Install with `pip install -e ~/fw_handlers/fwh_noaa_weather`.
+Study **[noaa-weather](https://github.com/rlemke/fwh_noaa_weather)** (standalone repo). It is the canonical reference for the **tools / handlers / shared-lib** pattern: every operation has a CLI under `tools/` *and* an FFL handler, and both call into the same `tools/_noaa_tools/` modules via a `handlers/shared/<domain>_utils.py` shim. Run a single ingest step from the shell or thread it into a workflow — the cache + outputs are identical either way. Install with `pip install -e ~/fw_handlers/fwh_noaa_weather`.
 
 ### "I want to simulate financial risk or run pure-Python analytics"
 
@@ -373,7 +373,7 @@ scripts/start-runner --example <name> -- --log-format text
 The `facetwork.examples` entry point declared in each standalone repo's
 `pyproject.toml` makes it discoverable without any edits to the
 Facetwork repo. Each standalone repo also ships a `tools/` directory
-with CLIs that call the same `_lib/` simulators the FFL handlers use.
+with CLIs that call the same shared tool-library the FFL handlers use.
 
 ## Detailed Documentation
 

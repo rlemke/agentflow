@@ -40,7 +40,7 @@ logger = logging.getLogger("afl.cache-index")
 
 
 def _default_cache_root() -> Path:
-    """Same resolution order as the _lib/storage modules in each example."""
+    """Same resolution order as the per-example tool-lib storage modules."""
     env = os.environ.get("AFL_CACHE_ROOT")
     if env:
         return Path(env)
@@ -348,7 +348,7 @@ def _render_html(cards: list[PipelineCard]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Sidecar write (minimal, no dependency on the example _lib modules so
+# Sidecar write (minimal, no dependency on the example tool-lib modules so
 # this runs standalone).
 # ---------------------------------------------------------------------------
 
