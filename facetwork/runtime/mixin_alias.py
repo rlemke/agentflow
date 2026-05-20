@@ -25,6 +25,32 @@ from typing import Any
 from .step import StepDefinition
 
 
+def is_mixin_sub_step(step: StepDefinition | None) -> bool:
+    """Return True iff ``step`` is an aliased mixin sub-step.
+
+    Mixin sub-steps land in persistence with a distinct shape:
+    ``container_id`` set (their parent step), ``block_id`` *unset*
+    (they don't live inside any andThen block), and ``statement_name``
+    set to the alias name (e.g. ``m1`` for ``with M() as m1``).  This
+    is exactly what ``MixinBlocksBeginHandler`` writes when it creates
+    a sub-step for each aliased mixin on a facet sig.
+
+    Sibling body steps inside a parent's andThen always have
+    ``block_id`` populated, so the ``not block_id`` check is what
+    distinguishes a mixin sub-step from a regular body step.
+
+    Callers (dashboard recovery endpoints, evaluator retry/rerun
+    helpers, repair-workflow, MCP fw_retry_step) share this helper so
+    every recovery path agrees on what a mixin sub-step looks like.
+    """
+    return bool(
+        step
+        and step.statement_name
+        and step.container_id
+        and not step.block_id
+    )
+
+
 def resolve_mixin_step_by_alias(
     parent_step_id: str,
     alias: str,

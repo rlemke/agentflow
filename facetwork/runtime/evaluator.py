@@ -1292,16 +1292,28 @@ class Evaluator:
         return ctx._find_statement_catch(step)
 
     def retry_step(self, step_id: StepId) -> None:
-        """Retry a failed step by resetting it to EVENT_TRANSMIT.
+        """Retry a failed step.
 
-        Resets a step from STATEMENT_ERROR back to EVENT_TRANSMIT so that
-        the agent can re-execute it. Also resets the associated task from
-        failed back to pending, and resets any errored ancestor blocks so
-        execution can continue once the retried step completes.
+        Regular steps reset to ``EVENT_TRANSMIT`` so the agent can
+        re-execute them.  Mixin sub-steps — children of a parent step
+        with ``container_id`` set, ``block_id`` unset, and an alias in
+        ``statement_name`` — reset to ``CREATED`` instead so they walk
+        the full ``STEP_TRANSITIONS`` lifecycle again (re-binding
+        params, re-running the mixin facet's body, re-capturing); their
+        returns are also cleared so capture doesn't see stale data.
+
+        Errored ancestor containers/blocks are reset so execution
+        resumes.  When the immediate descendant being restarted is a
+        mixin sub-step, the parent container resumes at
+        ``MIXIN_BLOCKS_CONTINUE`` rather than ``STATEMENT_BLOCKS_CONTINUE``
+        so it re-waits on the mixin instead of skipping the mixin phase
+        entirely.
 
         Args:
             step_id: The step ID to retry
         """
+        from .mixin_alias import is_mixin_sub_step
+
         logger.info("Retry step: step_id=%s", step_id)
         step = self.persistence.get_step(step_id)
         if step is None:
@@ -1311,9 +1323,13 @@ class Evaluator:
                 f"Step {step_id} is at {step.state}, expected {StepState.STATEMENT_ERROR}"
             )
 
-        # Reset step state to EVENT_TRANSMIT
-        step.state = StepState.EVENT_TRANSMIT
-        step.transition.current_state = StepState.EVENT_TRANSMIT
+        if is_mixin_sub_step(step):
+            step.state = StepState.CREATED
+            step.transition.current_state = StepState.CREATED
+            step.attributes.returns = {}
+        else:
+            step.state = StepState.EVENT_TRANSMIT
+            step.transition.current_state = StepState.EVENT_TRANSMIT
         step.transition.clear_error()
         step.transition.request_transition = False
         step.transition.changed = True
@@ -1623,8 +1639,13 @@ class Evaluator:
         """Reset ancestor blocks/containers to continue state.
 
         Like _reset_errored_ancestors but works on any terminal state,
-        not just errors.
+        not just errors.  When the immediate descendant being restarted
+        is a mixin sub-step, the container resumes at
+        MIXIN_BLOCKS_CONTINUE so it re-waits on the aliased mixin
+        instead of skipping past the mixin phase entirely.
         """
+        from .mixin_alias import is_mixin_sub_step
+
         seen: set[str] = set()
 
         current_id = step.block_id
@@ -1643,19 +1664,26 @@ class Evaluator:
             current_id = ancestor.block_id
 
         current_id = step.container_id
+        immediate_child = step
         while current_id and current_id not in seen:
             seen.add(current_id)
             ancestor = self.persistence.get_step(current_id)
             if ancestor is None:
                 break
             if StepState.is_terminal(ancestor.state):
-                ancestor.state = StepState.STATEMENT_BLOCKS_CONTINUE
-                ancestor.transition.current_state = StepState.STATEMENT_BLOCKS_CONTINUE
+                resume_state = (
+                    StepState.MIXIN_BLOCKS_CONTINUE
+                    if is_mixin_sub_step(immediate_child)
+                    else StepState.STATEMENT_BLOCKS_CONTINUE
+                )
+                ancestor.state = resume_state
+                ancestor.transition.current_state = resume_state
                 ancestor.transition.clear_error()
                 ancestor.transition.request_transition = False
                 ancestor.transition.changed = True
                 self.persistence.save_step(ancestor)
             next_id = ancestor.block_id or ancestor.container_id
+            immediate_child = ancestor
             current_id = next_id
 
     def _reset_errored_ancestors(self, step: StepDefinition) -> None:
@@ -1663,9 +1691,16 @@ class Evaluator:
 
         Walks up the block_id and container_id chain from *step*, resetting
         any ancestor that is in STATEMENT_ERROR back to its appropriate
-        continue state (BLOCK_EXECUTION_CONTINUE for andThen blocks,
-        STATEMENT_BLOCKS_CONTINUE for statement containers).
+        continue state.  Block ancestors resume at
+        ``BLOCK_EXECUTION_CONTINUE``.  Container ancestors resume at
+        ``MIXIN_BLOCKS_CONTINUE`` when the immediate descendant being
+        restarted is a mixin sub-step, otherwise at
+        ``STATEMENT_BLOCKS_CONTINUE``.  This ensures a parent step that
+        errored at its mixin phase actually re-waits on the mixin instead
+        of jumping ahead to its own body.
         """
+        from .mixin_alias import is_mixin_sub_step
+
         seen: set[str] = set()
 
         # Walk up block_id chain (andThen blocks)
@@ -1690,24 +1725,32 @@ class Evaluator:
 
         # Walk up container_id chain (statement containers)
         current_id = step.container_id
+        immediate_child = step
         while current_id and current_id not in seen:
             seen.add(current_id)
             ancestor = self.persistence.get_step(current_id)
             if ancestor is None:
                 break
             if ancestor.state == StepState.STATEMENT_ERROR:
-                ancestor.state = StepState.STATEMENT_BLOCKS_CONTINUE
-                ancestor.transition.current_state = StepState.STATEMENT_BLOCKS_CONTINUE
+                resume_state = (
+                    StepState.MIXIN_BLOCKS_CONTINUE
+                    if is_mixin_sub_step(immediate_child)
+                    else StepState.STATEMENT_BLOCKS_CONTINUE
+                )
+                ancestor.state = resume_state
+                ancestor.transition.current_state = resume_state
                 ancestor.transition.clear_error()
                 ancestor.transition.request_transition = False
                 ancestor.transition.changed = True
                 self.persistence.save_step(ancestor)
                 logger.info(
-                    "Reset ancestor container: step_id=%s to STATEMENT_BLOCKS_CONTINUE",
+                    "Reset ancestor container: step_id=%s to %s",
                     current_id,
+                    resume_state,
                 )
             # Continue up: block_id then container_id
             next_id = ancestor.block_id or ancestor.container_id
+            immediate_child = ancestor
             current_id = next_id
 
     def resume(

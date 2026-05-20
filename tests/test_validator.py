@@ -194,6 +194,33 @@ class TestStepReferences:
         assert not result.is_valid
         assert any("Invalid input reference '$.nonexistent'" in str(e) for e in result.errors)
 
+    def test_mixin_body_scope_isolation_via_ref_invalid_input(self, validator):
+        """When a facet is used as an aliased mixin, the runtime
+        isolates ``$.`` to the mixin's own attributes (no workflow root
+        inheritance).  The compile-time check for this is the existing
+        ``REF_INVALID_INPUT`` rule: a mixin facet's body can only
+        reference its own params, so a reference to a workflow-root
+        param name fails validation regardless of which call site
+        invokes the facet.
+        """
+        ast = parse(
+            _ns("""
+        facet M(input: String) => (output: String) andThen {
+            yield M(output = $.workflow_only)
+        }
+        workflow W(workflow_only: String) => (r: String) andThen {
+            m = M(input = "x")
+            yield W(r = m.output)
+        }
+        """)
+        )
+        result = validator.validate(ast)
+        assert not result.is_valid
+        scope_errors = [e for e in result.errors if e.rule_id == "REF_INVALID_INPUT"]
+        assert any(
+            "$.workflow_only" in str(e) for e in scope_errors
+        ), f"expected REF_INVALID_INPUT for $.workflow_only, got {result.errors}"
+
     def test_valid_step_reference(self, validator):
         """Valid step.attr reference should pass."""
         ast = parse(

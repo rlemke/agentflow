@@ -103,6 +103,86 @@ class RepairMixin(_MixinBase):
                 ancestors_reset.append(ancestor.id)
             current_id = advance(ancestor)
 
+    def _reset_failed_step_and_ancestors(
+        self,
+        step: StepDefinition,
+        step_by_id: dict[str, StepDefinition],
+        ancestors_reset: list[str],
+    ) -> None:
+        """Reset an errored step plus its ancestor chain so the runtime
+        will retry it on the next iteration.
+
+        For regular steps this resets the step itself to
+        ``EVENT_TRANSMIT`` and walks the block + container chains with
+        the standard continue states.  For **aliased mixin sub-steps**
+        (``container_id`` set, ``block_id`` unset, ``statement_name``
+        populated) it resets the step to ``CREATED`` (so the full
+        STEP_TRANSITIONS lifecycle re-walks, re-running the mixin
+        facet's body), clears its returns, and resets the immediate
+        parent container at ``MIXIN_BLOCKS_CONTINUE`` instead of
+        ``STATEMENT_BLOCKS_CONTINUE`` so the parent re-waits on the
+        mixin instead of skipping the mixin phase.  Higher ancestors
+        revert to ``STATEMENT_BLOCKS_CONTINUE`` as usual.
+
+        Centralises the mixin-aware reset logic so every repair
+        branch agrees on it; mirrors the dashboard's
+        ``_reset_errored_ancestors`` after Scope C.
+        """
+        from ..mixin_alias import is_mixin_sub_step
+        from ..states import StepState
+
+        seen: set[str] = set()
+        if is_mixin_sub_step(step):
+            self._set_step_state(step, StepState.CREATED)
+            step.attributes.returns = {}
+            self.save_step(step)
+            # Reset the immediate parent at MIXIN_BLOCKS_CONTINUE if it
+            # errored at its mixin phase.
+            parent_id = step.container_id
+            higher_start: str | None = None
+            if parent_id and parent_id not in seen:
+                seen.add(parent_id)
+                parent = step_by_id.get(parent_id) or self.get_step(parent_id)
+                if parent is not None:
+                    if parent.state == StepState.STATEMENT_ERROR:
+                        self._set_step_state(parent, StepState.MIXIN_BLOCKS_CONTINUE)
+                        ancestors_reset.append(parent_id)
+                    higher_start = parent.block_id or parent.container_id
+            self._walk_errored_ancestors(
+                step.block_id,
+                lambda a: a.block_id,
+                StepState.BLOCK_EXECUTION_CONTINUE,
+                seen,
+                step_by_id,
+                ancestors_reset,
+            )
+            self._walk_errored_ancestors(
+                higher_start,
+                lambda a: a.block_id or a.container_id,
+                StepState.STATEMENT_BLOCKS_CONTINUE,
+                seen,
+                step_by_id,
+                ancestors_reset,
+            )
+        else:
+            self._set_step_state(step, StepState.EVENT_TRANSMIT)
+            self._walk_errored_ancestors(
+                step.block_id,
+                lambda a: a.block_id,
+                StepState.BLOCK_EXECUTION_CONTINUE,
+                seen,
+                step_by_id,
+                ancestors_reset,
+            )
+            self._walk_errored_ancestors(
+                step.container_id,
+                lambda a: a.block_id or a.container_id,
+                StepState.STATEMENT_BLOCKS_CONTINUE,
+                seen,
+                step_by_id,
+                ancestors_reset,
+            )
+
     def repair_workflow(self, runner_id: str, dry_run: bool = False) -> dict:
         """Diagnose and repair a stuck workflow.
 
@@ -231,7 +311,14 @@ class RepairMixin(_MixinBase):
                 }
             )
             if not dry_run:
-                self._set_step_state(step, StepState.EVENT_TRANSMIT)
+                # Mixin-aware reset: regular steps go to EVENT_TRANSMIT,
+                # mixin sub-steps to CREATED with cleared returns, and
+                # the parent container resumes at MIXIN_BLOCKS_CONTINUE
+                # vs STATEMENT_BLOCKS_CONTINUE per the descendant's
+                # mixin status.
+                self._reset_failed_step_and_ancestors(
+                    step, step_by_id, result["ancestors_reset"]
+                )
 
                 self._repair_log(
                     step_id=step.id,
@@ -252,25 +339,6 @@ class RepairMixin(_MixinBase):
                         {"uuid": task_doc["uuid"]},
                         {"$set": _reset_task_to_pending(now, clear_error=True)},
                     )
-
-                # -- 4. Reset errored ancestors --
-                seen: set[str] = set()
-                self._walk_errored_ancestors(
-                    step.block_id,
-                    lambda a: a.block_id,
-                    StepState.BLOCK_EXECUTION_CONTINUE,
-                    seen,
-                    step_by_id,
-                    result["ancestors_reset"],
-                )
-                self._walk_errored_ancestors(
-                    step.container_id,
-                    lambda a: a.block_id or a.container_id,
-                    StepState.STATEMENT_BLOCKS_CONTINUE,
-                    seen,
-                    step_by_id,
-                    result["ancestors_reset"],
-                )
 
         # -- 5. Re-enqueue dead-lettered tasks --
         result["dead_letter_tasks_reset"] = []
@@ -303,17 +371,12 @@ class RepairMixin(_MixinBase):
                     ),
                     facet_name=t.name,
                 )
-                # Reset the associated errored step + its block ancestors
+                # Reset the associated errored step + its ancestors,
+                # mixin-aware.
                 dl_step = step_by_id.get(t.step_id) or self.get_step(t.step_id)
                 if dl_step and dl_step.state == StepState.STATEMENT_ERROR:
-                    self._set_step_state(dl_step, StepState.EVENT_TRANSMIT)
-                    self._walk_errored_ancestors(
-                        dl_step.block_id,
-                        lambda a: a.block_id,
-                        StepState.BLOCK_EXECUTION_CONTINUE,
-                        set(),
-                        step_by_id,
-                        result["ancestors_reset"],
+                    self._reset_failed_step_and_ancestors(
+                        dl_step, step_by_id, result["ancestors_reset"]
                     )
 
         # -- 6. Detect steps marked Complete but with failed tasks --
@@ -339,13 +402,18 @@ class RepairMixin(_MixinBase):
                     }
                 )
                 if not dry_run:
-                    self._set_step_state(step, StepState.EVENT_TRANSMIT)
+                    # Use the mixin-aware reset path so an inconsistent
+                    # mixin sub-step (marked Complete despite a failed
+                    # task) lands at CREATED rather than EVENT_TRANSMIT.
+                    self._reset_failed_step_and_ancestors(
+                        step, step_by_id, result["ancestors_reset"]
+                    )
                     self._repair_log(
                         step_id=step.id,
                         workflow_id=workflow_id,
                         message=(
                             f"Repair: inconsistent step reset — {step.facet_name or 'unknown'} "
-                            f"was marked complete but has failed tasks, resetting to EventTransmit"
+                            f"was marked complete but has failed tasks, resetting to retry"
                         ),
                         facet_name=step.facet_name or "",
                     )

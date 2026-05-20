@@ -891,20 +891,7 @@ def _reset_ancestors_to_continue(step, store) -> None:
         current_id = next_id
 
 
-def _is_mixin_sub_step(step) -> bool:
-    """A step is an aliased mixin sub-step when it is a direct child of
-    a parent step (``container_id`` set, ``block_id`` unset) and has a
-    ``statement_name`` — the alias.  This is the persistence shape
-    ``MixinBlocksBeginHandler`` writes for every aliased mixin on a
-    facet sig.  Regular sibling steps inside a parent's andThen body
-    always have ``block_id`` set, so the ``block_id is None`` check is
-    what distinguishes the two."""
-    return bool(
-        step
-        and step.statement_name
-        and step.container_id
-        and not step.block_id
-    )
+from facetwork.runtime.mixin_alias import is_mixin_sub_step as _is_mixin_sub_step
 
 
 def _reset_container_resume_state(ancestor, child) -> str:

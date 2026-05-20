@@ -233,6 +233,55 @@ class TestRetryStep:
         reloaded = mem.get_step(step.id)
         assert reloaded.state == StepState.EVENT_TRANSMIT
 
+    def test_retry_step_mixin_substep_resets_to_created(self):
+        """An aliased mixin sub-step retried via the MCP tool resets to
+        CREATED (so it walks the full lifecycle and re-runs its body),
+        and its parent ancestor in STATEMENT_ERROR resumes at
+        MIXIN_BLOCKS_CONTINUE rather than STATEMENT_BLOCKS_CONTINUE."""
+        from facetwork.runtime.types import FacetAttributes, AttributeValue
+
+        mem = MemoryStore()
+        parent = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="Parent",
+        )
+        parent.state = StepState.STATEMENT_ERROR
+        parent.transition.current_state = StepState.STATEMENT_ERROR
+        mem.save_step(parent)
+
+        mixin_sub = StepDefinition.create(
+            workflow_id="wf-1",
+            object_type=ObjectType.VARIABLE_ASSIGNMENT,
+            facet_name="M",
+            statement_name="m",
+            container_id=parent.id,
+        )
+        # Mixin sub-step shape: container_id set, block_id unset,
+        # statement_name = alias.
+        mixin_sub.attributes = FacetAttributes(
+            returns={"output": AttributeValue("output", "stale")}
+        )
+        mixin_sub.mark_error(RuntimeError("oops"))
+        mem.save_step(mixin_sub)
+
+        result = _tool_retry_step({"step_id": mixin_sub.id}, lambda: mem)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        reloaded_mixin = mem.get_step(mixin_sub.id)
+        assert reloaded_mixin.state == StepState.CREATED, (
+            f"mixin sub-step should reset to CREATED, got {reloaded_mixin.state}"
+        )
+        assert reloaded_mixin.attributes.returns == {}, (
+            "mixin sub-step's returns must be cleared so capture re-builds them"
+        )
+
+        reloaded_parent = mem.get_step(parent.id)
+        assert reloaded_parent.state == StepState.MIXIN_BLOCKS_CONTINUE, (
+            f"parent should resume at MIXIN_BLOCKS_CONTINUE, got {reloaded_parent.state}"
+        )
+
 
 # ============================================================================
 # Tool: afl_resume_workflow
