@@ -42,7 +42,7 @@ You don't need to be a developer to use Facetwork — if you can fill in a form,
 | **Build agents** in other languages | [Agent Libraries](#agent-integration-libraries) |
 | **Deploy to a cluster** | [Deployment Guide](docs/operations/deployment.md) |
 | **Understand the architecture** | [Architecture](docs/architecture/overview.md) |
-| **Contribute to Facetwork** | [Full Technical Reference](claude.md) |
+| **Contribute to Facetwork** | [Full Technical Reference](CLAUDE.md) |
 
 ## Quick Start
 
