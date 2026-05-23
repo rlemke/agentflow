@@ -52,15 +52,49 @@ def _parse_version(raw: str | None) -> int | None:
 
 
 @router.get("")
-def catalog_list(request: Request, q: str = "", store=Depends(get_store)):
-    """List catalog entries (optionally filtered by a free-text query)."""
+def catalog_list(request: Request, q: str = "", package: str = "", store=Depends(get_store)):
+    """Catalog browser with three modes:
+
+    - ``?q=`` — ranked search results (flat).
+    - ``?package=<slug>`` — the workflows belonging to one library/package (flat).
+    - neither — a grouped overview: packages/libraries (with member counts),
+      standalone workflows, and a per-package workflow tally.
+    """
     svc = _service(store)
-    entries = svc.search(q) if svc else []
-    return request.app.state.templates.TemplateResponse(
-        request,
-        "catalog/list.html",
-        {"entries": entries, "q": q, "unavailable": svc is None, "active_tab": "catalog"},
+    ctx: dict = {
+        "q": q,
+        "package": package,
+        "unavailable": svc is None,
+        "active_tab": "catalog",
+    }
+    if svc is None:
+        ctx["flat"] = True
+        ctx["entries"] = []
+        return request.app.state.templates.TemplateResponse(request, "catalog/list.html", ctx)
+
+    if q:
+        ctx["flat"] = True
+        ctx["entries"] = svc.search(q)
+        return request.app.state.templates.TemplateResponse(request, "catalog/list.html", ctx)
+
+    rows = svc.list_all()
+    if package:
+        ctx["flat"] = True
+        ctx["entries"] = [s for s in rows if s.get("package") == package]
+        return request.app.state.templates.TemplateResponse(request, "catalog/list.html", ctx)
+
+    counts: dict[str, int] = {}
+    for s in rows:
+        if s["kind"] == "workflow" and s.get("package"):
+            counts[s["package"]] = counts.get(s["package"], 0) + 1
+    ctx.update(
+        flat=False,
+        libraries=[s for s in rows if s["kind"] == "library"],
+        standalone=[s for s in rows if s["kind"] == "workflow" and not s.get("package")],
+        package_counts=sorted(counts.items()),
+        total=len(rows),
     )
+    return request.app.state.templates.TemplateResponse(request, "catalog/list.html", ctx)
 
 
 @router.get("/{slug}")

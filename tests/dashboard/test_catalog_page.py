@@ -26,6 +26,19 @@ ADDER = """namespace claude.demo {
     }
 }"""
 
+LIB = """namespace claude.lib.geo {
+    schema Pt { lat: Double, lon: Double }
+    event facet Locate(name: String) => (point: Pt)
+}"""
+
+DEP_WF = """namespace claude.demo2 {
+    use claude.lib.geo
+    workflow Find(name: String = "x") => (lat: Double) andThen {
+        p = Locate(name = $.name)
+        yield Find(lat = p.point.lat)
+    }
+}"""
+
 
 @pytest.fixture
 def client():
@@ -107,3 +120,36 @@ def test_publish_via_button_then_visible(client):
     _seed(store, publish=True)
     body = tc.get("/catalog/demo.adder").text
     assert "published" in body
+
+
+def _seed_package(store):
+    """A library + a workflow depending on it + a standalone workflow."""
+    from facetwork.catalog import CatalogService, MongoCatalogStore
+
+    svc = CatalogService(MongoCatalogStore(store._db), store)
+    svc.save("lib.geo", kind="library", ffl_source=LIB, title="Geo lib", tags=["geo"])
+    svc.publish("lib.geo")
+    svc.save("demo.find", ffl_source=DEP_WF, depends_on=[{"slug": "lib.geo"}])
+    svc.save("demo.adder", ffl_source=ADDER, title="Adder")
+    return svc
+
+
+def test_catalog_overview_groups_packages_and_standalone(client):
+    tc, store = client
+    _seed_package(store)
+    body = tc.get("/catalog").text
+    assert "Packages" in body  # libraries section heading
+    assert "lib.geo" in body  # the library/package
+    assert "Standalone workflows" in body
+    assert "demo.adder" in body  # standalone listed
+    # The dependent workflow is summarized as a package member, not in standalone.
+    assert "?package=lib.geo" in body
+
+
+def test_catalog_package_drilldown_lists_members(client):
+    tc, store = client
+    _seed_package(store)
+    body = tc.get("/catalog?package=lib.geo").text
+    assert "workflows in package" in body
+    assert "demo.find" in body  # the member workflow
+    assert "demo.adder" not in body  # standalone is not a member of lib.geo
