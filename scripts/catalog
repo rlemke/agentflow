@@ -2,6 +2,8 @@
 # Claude workflow catalog: backup / restore / import.
 #
 # Usage:
+#   scripts/catalog list                       # packages + workflows overview
+#   scripts/catalog list --package osm-geocoder # workflows in a package
 #   scripts/catalog backup catalog.json
 #   scripts/catalog restore catalog.json [--no-recompile]
 #   scripts/catalog import path/to/workflow.ffl --slug demo.x --publish

@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""CLI for the Claude workflow catalog: backup, restore, import.
+"""CLI for the Claude workflow catalog: list, backup, restore, import.
 
+    python -m facetwork.catalog.cli list
+    python -m facetwork.catalog.cli list --package osm-geocoder
     python -m facetwork.catalog.cli backup catalog.json
     python -m facetwork.catalog.cli restore catalog.json
     python -m facetwork.catalog.cli import path/to/workflow.ffl --slug demo.x --publish
@@ -58,6 +60,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--config", default=None, help="FFL config file path")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    pl = sub.add_parser("list", help="List catalog entries (packages/libraries + workflows)")
+    pl.add_argument("query", nargs="?", default="", help="Optional keyword filter")
+    pl.add_argument("--kind", default=None, help="Filter by kind: workflow | library")
+    pl.add_argument("--tag", default=None, help="Filter by tag")
+    pl.add_argument("--package", default=None, help="List workflows belonging to this library/package")
+    pl.add_argument("--published", action="store_true", help="Only entries with a published revision")
+    pl.add_argument("--all", action="store_true", dest="show_all",
+                    help="Flat list of every entry (including package workflows)")
+    pl.add_argument("--json", action="store_true", help="Machine-readable JSON output")
+    pl.add_argument("--limit", type=int, default=0, help="Max rows (0 = no limit)")
+
     pb = sub.add_parser("backup", help="Export the catalog to a JSON file")
     pb.add_argument("outfile", help="Destination .json path")
 
@@ -99,6 +112,90 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _fmt_row(s: dict) -> str:
+    state = "published" if s.get("published_version") else f"draft v{s.get('latest_version')}"
+    invalid = "" if s.get("is_valid", True) else " INVALID"
+    title = f"  {s['title']}" if s.get("title") and s["title"] != s["slug"] else ""
+    tags = f"  [{', '.join(s['tags'])}]" if s.get("tags") else ""
+    return f"  {s['slug']:<44} v{s.get('latest_version', '?')} {state}{invalid}{title}{tags}"
+
+
+def _cmd_list(svc: Any, args: argparse.Namespace) -> int:
+    rows = svc.list_all()
+
+    def keep(s: dict) -> bool:
+        if args.kind and s["kind"] != args.kind:
+            return False
+        if args.tag and args.tag.lower() not in {t.lower() for t in s.get("tags", [])}:
+            return False
+        if args.published and not s.get("published_version"):
+            return False
+        if args.package and s.get("package") != args.package:
+            return False
+        if args.query:
+            hay = " ".join(
+                [s["slug"], s.get("title", ""), s.get("description", ""), " ".join(s.get("tags", []))]
+            ).lower()
+            if args.query.lower() not in hay:
+                return False
+        return True
+
+    rows = [s for s in rows if keep(s)]
+    if args.limit:
+        rows = rows[: args.limit]
+
+    if args.json:
+        import json as _json
+
+        print(_json.dumps(rows, indent=2, default=str))
+        return 0
+
+    flat = bool(
+        args.query or args.kind or args.tag or args.package or args.published or args.show_all
+    )
+    if flat:
+        if not rows:
+            print("No matching catalog entries.")
+            return 0
+        for s in rows:
+            extra = (
+                f"  ({s['member_count']} workflows)"
+                if s["kind"] == "library" and s["member_count"]
+                else ""
+            )
+            print(_fmt_row(s) + extra)
+        print(f"\n{len(rows)} entr{'y' if len(rows) == 1 else 'ies'}.")
+        return 0
+
+    # Default: grouped overview (packages, standalone workflows, package summary).
+    libraries = [s for s in rows if s["kind"] == "library"]
+    standalone = [s for s in rows if s["kind"] == "workflow" and not s["package"]]
+    package_wfs = [s for s in rows if s["kind"] == "workflow" and s["package"]]
+
+    if libraries:
+        print("Packages / libraries:")
+        for s in libraries:
+            n = s["member_count"]
+            members = f"{n} workflow{'' if n == 1 else 's'}" if n else "no members"
+            print(_fmt_row(s) + f"  ({members})")
+
+    print(f"\nStandalone workflows ({len(standalone)}):")
+    for s in standalone:
+        print(_fmt_row(s))
+
+    if package_wfs:
+        by_pkg: dict[str, int] = {}
+        for s in package_wfs:
+            by_pkg[s["package"]] = by_pkg.get(s["package"], 0) + 1
+        print(f"\nPackage workflows: {len(package_wfs)} "
+              f"(use 'list --package <slug>' or 'list --all' to list them)")
+        for pkg, n in sorted(by_pkg.items()):
+            print(f"  {pkg}: {n}")
+
+    print(f"\n{len(rows)} total entries.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     from facetwork.catalog import backup
@@ -108,6 +205,9 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:
         print(f"Error connecting to MongoDB: {e}", file=sys.stderr)
         return 1
+
+    if args.cmd == "list":
+        return _cmd_list(svc, args)
 
     if args.cmd == "backup":
         summary = backup.export_to_file(svc, args.outfile)

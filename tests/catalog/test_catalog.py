@@ -188,3 +188,23 @@ def test_search_ranks_by_query_and_filters_by_tag():
     assert any(s["slug"] == "demo.hello" for s in svc.search("greet"))
     assert any(s["slug"] == "demo.hello" for s in svc.search("", tags=["greeting"]))
     assert svc.search("nonexistent-zzz") == []
+
+
+def test_list_all_groups_packages_and_members():
+    svc = _svc()
+    svc.save("lib.geo", kind="library", ffl_source=LIB)
+    svc.publish("lib.geo")
+    svc.save("demo.find", ffl_source=DEP_WF, depends_on=[{"slug": "lib.geo"}])
+    svc.save("demo.hello", ffl_source=WF)  # standalone (no library dep)
+
+    rows = svc.list_all()
+    by_slug = {r["slug"]: r for r in rows}
+    # Libraries sort first.
+    assert rows[0]["slug"] == "lib.geo" and rows[0]["kind"] == "library"
+    # The library counts its dependents; the dependent records its package.
+    assert by_slug["lib.geo"]["member_count"] == 1
+    assert by_slug["demo.find"]["package"] == "lib.geo"
+    assert by_slug["demo.find"]["depends_on"] == ["lib.geo"]
+    # A standalone workflow has no package and no members.
+    assert by_slug["demo.hello"]["package"] is None
+    assert by_slug["demo.hello"]["member_count"] == 0

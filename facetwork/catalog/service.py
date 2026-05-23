@@ -241,6 +241,31 @@ class CatalogService:
         out.sort(key=lambda x: (-x[0], x[1]["slug"]))
         return [s for _, s in out]
 
+    def list_all(self) -> list[dict]:
+        """Every catalog entry as a summary, annotated for grouping:
+        ``depends_on`` (dep slugs of the resolved revision), ``package`` (the
+        first library dep, if any — i.e. the package a thin workflow belongs to),
+        and ``member_count`` (workflows depending on this entry — non-zero for
+        package libraries). Used by ``scripts/catalog list`` and any UI."""
+        entries = self._catalog.list_entries()
+        resolved: list[tuple] = []
+        members: dict[str, int] = {}
+        for e in entries:
+            rev = self._resolve_revision(e.slug, None, prefer_published=False)
+            deps = [p.slug for p in rev.depends_on] if rev else []
+            for d in deps:
+                members[d] = members.get(d, 0) + 1
+            resolved.append((e, rev, deps))
+        out: list[dict] = []
+        for e, rev, deps in resolved:
+            s = self._summary(e, rev)
+            s["depends_on"] = deps
+            s["package"] = deps[0] if deps else None
+            s["member_count"] = members.get(e.slug, 0)
+            out.append(s)
+        out.sort(key=lambda s: (s["kind"] != KIND_LIBRARY, s["slug"]))
+        return out
+
     def get(self, slug: str, version: int | None = None) -> dict | None:
         """Full detail for one entry + a specific (or latest) revision."""
         entry = self._catalog.get_entry(slug)
