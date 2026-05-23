@@ -62,6 +62,12 @@ compiled program (the same multi-file merge the seeder uses). Because deps are
 pinned by revision, evolving a base library never alters an existing dependent —
 upgrading is an explicit new dependent revision.
 
+FFL `use` statements resolve **only** against this merged set (own source +
+pinned libraries) — the catalog never reads the filesystem or the resolver's
+`afl_sources` collection, so a `use` of a file-based namespace must first be
+imported as a library and pinned. See
+[`use` resolution: file-based vs. the catalog](catalog-use-resolution.md).
+
 ## MCP tools (the author-facing API)
 
 On the `agentflow` MCP server:
