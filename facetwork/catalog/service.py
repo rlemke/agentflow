@@ -516,12 +516,20 @@ class CatalogService:
             from facetwork.runtime.dispatcher import RegistryDispatcher
 
             disp = RegistryDispatcher(self._flows)
-            disp.preload(verify=True)  # drops registrations not importable here
+            disp.preload()  # populate the registration cache (keep all)
         except Exception:
             return []
         if not disp.dispatchable_facets():
             return []  # empty registry — no runner up yet; don't false-positive
-        return sorted(q for q in needed if not disp.can_dispatch(q))
+        # check_loadable imports each handler + scans its (unguarded) imports,
+        # so a broken lazy `from x import y` in the handler body is caught here
+        # rather than dead-lettering at dispatch.
+        problems: list[str] = []
+        for q in needed:
+            reason = disp.check_loadable(q)
+            if reason:
+                problems.append(f"{q} ({reason})")
+        return sorted(problems)
 
     def _reuse_library_flow(self, rev: CatalogRevision) -> CatalogRevision | None:
         """If ``rev`` is a thin per-workflow handle onto a package library

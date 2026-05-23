@@ -59,13 +59,18 @@ Two further guards on `CatalogService.run`:
 
 - **Handler preflight.** Before posting the bootstrap task, `run` computes the
   event facets transitively reachable from the entry workflow (scoped to the
-  entry — *not* every facet in a large pinned library) and checks each against
-  the fleet's registry (`RegistryDispatcher.preload(verify=True)`). If any has no
-  loadable handler, `run` raises `CatalogRunBlocked` naming it — before any task
-  is posted — instead of letting the run dead-letter mid-flight on a
-  declared-but-unimplemented facet. Skipped when no registry is populated (no
-  runner up yet — can't assess). It cannot catch a handler whose *lazily-imported*
-  dependency is broken; that still surfaces at dispatch.
+  entry — *not* every facet in a large pinned library) and, for each, calls
+  `RegistryDispatcher.check_loadable`: it must be registered, its module must
+  import, and its (unguarded) import statements must resolve. If any fails, `run`
+  raises `CatalogRunBlocked` naming the facet and reason — before any task is
+  posted — instead of letting the run dead-letter mid-flight. Skipped when no
+  registry is populated (no runner up yet — can't assess). `check_loadable`
+  **AST-scans the handler module's imports, including lazy `from x import y`
+  inside the handler body**, so a broken lazy import (the classic
+  "declared facet whose handler imports a function that no longer exists") is
+  caught here, not at dispatch. Imports guarded by `try/except` or
+  `if TYPE_CHECKING:` are skipped (optional / type-only); the scan is one level
+  deep (the handler module's own imports) and best-effort.
 - **Execution isolation.** Each run mints a **fresh execution `workflow_id`** plus
   a per-run `WorkflowDefinition` (same immutable flow + entry workflow, new uuid).
   `rev.workflow_id` is the *definition* id, shared by every run of the revision;
@@ -163,6 +168,6 @@ degrades to an "unavailable" notice. The grouping is backed by
 ## What's not here yet
 
 - Semantic/embedding search (current search is tags + keyword ranking).
-- Deeper run preflight: the handler preflight catches missing / non-importable
-  handlers, but a handler whose *lazily-imported* dependency is broken still
-  surfaces only at dispatch.
+- Preflight import scan is one level deep (the handler module's own imports) and
+  skips guarded imports — a break in a *transitively* imported module, or a
+  dynamic `importlib.import_module(name)`, still surfaces only at dispatch.

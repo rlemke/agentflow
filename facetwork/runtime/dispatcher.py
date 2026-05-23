@@ -154,6 +154,35 @@ class RegistryDispatcher:
         reg = self._find_registration(facet_name)
         return reg is not None
 
+    def check_loadable(self, facet_name: str) -> str | None:
+        """Return ``None`` if the facet's handler is registered, importable, and
+        its (unguarded) imports resolve; otherwise a short reason string.
+
+        Stronger than :meth:`can_dispatch`: it actually imports the handler
+        module (catching a broken top-level import or a missing/non-callable
+        entrypoint) and AST-scans the module's import statements — *including
+        lazy ``from x import y`` inside the handler body* — verifying each
+        resolves. That catches a handler which loads but would dead-letter at
+        dispatch on a broken lazy import (e.g. importing a function that no
+        longer exists). Imports guarded by ``try/except`` or ``if
+        TYPE_CHECKING:`` are skipped (optional / type-only). The import scan is
+        best-effort: if the scan itself errors it reports no problem.
+        """
+        reg = self._find_registration(facet_name)
+        if reg is None:
+            return "no handler registered"
+        try:
+            module = self._import_module(reg)
+            if not callable(getattr(module, reg.entrypoint, None)):
+                return f"entrypoint '{reg.entrypoint}' is not callable"
+        except Exception as e:  # module won't import
+            return f"{type(e).__name__}: {str(e)[:140]}"
+        try:
+            errors = _scan_module_imports(module)
+        except Exception:
+            return None
+        return errors[0] if errors else None
+
     def get_timeout_ms(self, facet_name: str) -> int:
         """Return timeout_ms for the handler, or 0 if not found."""
         reg = self._find_registration(facet_name)
@@ -224,21 +253,20 @@ class RegistryDispatcher:
             self._module_cache[cache_key] = handler
             return handler
 
-    def _import_handler(self, reg: Any) -> Callable:
-        """Import and return the handler callable from a registration.
+    def _import_module(self, reg: Any) -> Any:
+        """Import and return the handler's *module*.
 
-        Supports two URI formats:
-        - ``file:///path/to/module.py`` — loaded as a proper package import
-          so that relative imports work. Walks up from the file to find
-          the package root (furthest ancestor with ``__init__.py``), adds
-          the root's parent to ``sys.path``, and uses ``import_module``.
-        - ``my.package.module`` — loaded via ``importlib.import_module``
+        ``file:///path/to/module.py`` is loaded as a proper package import so
+        relative imports work; a dotted ``my.package.module`` via
+        ``importlib.import_module``.
         """
         if reg.module_uri.startswith("file://"):
-            module = self._import_from_file(reg.module_uri[7:])
-        else:
-            module = importlib.import_module(reg.module_uri)
+            return self._import_from_file(reg.module_uri[7:])
+        return importlib.import_module(reg.module_uri)
 
+    def _import_handler(self, reg: Any) -> Callable:
+        """Import and return the handler callable from a registration."""
+        module = self._import_module(reg)
         attr = getattr(module, reg.entrypoint)
         if not callable(attr):
             raise TypeError(f"Entrypoint '{reg.entrypoint}' in '{reg.module_uri}' is not callable")
@@ -421,3 +449,88 @@ class CompositeDispatcher:
             if d.can_dispatch(facet_name):
                 return d.dispatch(facet_name, payload)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Handler import verification (used by RegistryDispatcher.check_loadable)
+# ---------------------------------------------------------------------------
+
+
+def _is_type_checking(test: Any) -> bool:
+    import ast
+
+    if isinstance(test, ast.Name):
+        return test.id == "TYPE_CHECKING"
+    if isinstance(test, ast.Attribute):
+        return test.attr == "TYPE_CHECKING"
+    if isinstance(test, ast.Constant):
+        return test.value is False
+    return False
+
+
+def _collect_unguarded_imports(node: Any, out: list) -> None:
+    """Collect ``Import`` / ``ImportFrom`` nodes that are NOT inside a
+    ``try`` (optional-dep fallback) or ``if TYPE_CHECKING:`` (type-only) block —
+    including imports inside function bodies (lazy imports)."""
+    import ast
+
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, ast.Try):
+            continue
+        if isinstance(child, ast.If) and _is_type_checking(child.test):
+            for n in child.orelse:
+                _collect_unguarded_imports(n, out)
+            continue
+        if isinstance(child, (ast.Import, ast.ImportFrom)):
+            out.append(child)
+        else:
+            _collect_unguarded_imports(child, out)
+
+
+def _scan_module_imports(module: Any) -> list[str]:
+    """Verify a handler module's unguarded imports resolve.
+
+    Catches the lazy ``from x import y`` (often inside a handler body) where the
+    module imports fine but ``y`` is absent — the failure that otherwise only
+    surfaces at dispatch. One level deep (the handler module's own imports).
+    """
+    import ast
+    import importlib
+    import importlib.util
+    from pathlib import Path
+
+    file = getattr(module, "__file__", None)
+    if not file or not str(file).endswith(".py"):
+        return []
+    tree = ast.parse(Path(file).read_text())
+    pkg = getattr(module, "__package__", "") or ""
+
+    nodes: list = []
+    _collect_unguarded_imports(tree, nodes)
+
+    errors: list[str] = []
+    for node in nodes:
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                try:
+                    importlib.import_module(alias.name)
+                except Exception as e:
+                    errors.append(f"import {alias.name}: {str(e)[:80]}")
+        else:  # ast.ImportFrom
+            rel = "." * node.level + (node.module or "")
+            try:
+                base = importlib.util.resolve_name(rel, pkg) if node.level else node.module
+                if not base:
+                    continue
+                mod = importlib.import_module(base)
+            except Exception as e:
+                errors.append(f"from {rel or node.module}: {str(e)[:80]}")
+                continue
+            for alias in node.names:
+                if alias.name == "*" or hasattr(mod, alias.name):
+                    continue
+                try:
+                    importlib.import_module(f"{base}.{alias.name}")
+                except Exception:
+                    errors.append(f"cannot import '{alias.name}' from '{base}'")
+    return errors
