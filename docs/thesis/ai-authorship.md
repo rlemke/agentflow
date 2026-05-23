@@ -133,7 +133,23 @@ With the false paths ruled out, the constructive direction follows. Given that A
 - **The FFL/handler separation stays.** Generation is a two-phase process whose phases have different properties; conflating them sacrifices the static checkability that makes AI generation tractable.
 - **Human-readability stays.** For the reasons in §5.1, the artifact remains inspectable. Review is not a matter of trusting AI self-reports.
 
-## 7. Summary
+## 7. Implemented: the workflow catalog
+
+The "sealed skills" of §4 and the content-addressed skill registry + discovery protocol of §6.3 are no longer only proposals. Facetwork now ships a **workflow catalog** (`facetwork/catalog/`, the `claude_workflows` + `claude_workflow_revisions` collections, and the `fw_catalog_*` MCP tools) that implements the core of that infrastructure — and makes the team-collaboration shape "AI generates, human reviews, skill seals, fleet executes" concrete.
+
+A cataloged workflow is authored, stored, and run **without a file**. Each save is an immutable, content-hashed *revision*: identical content de-dupes, any change is a new version, and old versions stay runnable. A revision is a `draft` until a reviewer **publishes** it, and `run` refuses an unpublished revision unless an operator explicitly opts into an attended test. Running pins a revision, so re-running with different parameters re-uses an identical body. The mapping to §4 is almost one-to-one — content-addressable identity, immutability, provenance (author, version, validation status, note), and the **generate → review/seal → execute** division of labour — with publish playing the role of the reviewer's signature.
+
+In a team environment this is the difference between an LLM that *suggests* automation and one a team can *depend on*:
+
+- **No silent drift.** A workflow others rely on cannot change underneath them. An LLM editing the logic produces a new version; the version a scheduled job or a teammate pinned keeps executing the body it was reviewed against. Reproducibility is structural, not a convention.
+- **Review as the gate, not an afterthought.** Draft → published is a governance checkpoint: AI-authored automation does not run unattended until a human approves it. The cost of that control is one explicit, auditable action.
+- **Discover before regenerating.** `fw_catalog_search` lets an agent (or a person) find an existing workflow whose description, tags, and parameter contract fit a request, and reuse it — the compounding-value property §6.3 argues is essential. Without it, every teammate's agent regenerates the same workflow slightly differently.
+- **Provenance and audit by construction.** Every revision records who authored it, its version, whether it validated, and a content hash. "What ran, who approved it, and what changed since" is answerable from the catalog — what a regulated or simply careful team needs before trusting AI-authored steps.
+- **Shared, pinned libraries.** A `library` entry is a reusable base that workflows depend on *by pinned revision*, so improving a base never breaks a dependent — composition without the fragility that makes shared code scary.
+
+The loop is verified end-to-end: an agent authors FFL, stores it as a draft, a reviewer publishes it, and the runner fleet executes the pinned revision against MongoDB, producing the expected outputs — and re-running with new parameters reuses the identical sealed body. What remains from §6 is additive: semantic-diff review of regenerations (§6.3), auto-generated property tests and confidence markers (§6.4), and effect/refinement annotations (§6.1). The catalog is the substrate those refinements attach to.
+
+## 8. Summary
 
 The shift from human-authored to AI-authored Facetwork is not a departure from the thesis's design position; it is an evolution that *vindicates* that position. The DSL's smallness and type discipline, defended in the thesis as supporting domain-expert authorship, turn out to support AI authorship for the same underlying reasons: the compiler catches boring mistakes, the runtime catches operational mistakes, and the review burden is bounded by the size of the semantic surface.
 
@@ -141,7 +157,7 @@ The false paths — optimising the language for AI at the cost of human inspecta
 
 The correct direction is a set of additive refinements: richer *checkable* types, effect annotations, lightweight contracts, two-phase generation with typed stubs, structured provenance, a content-addressable skill registry, a discovery protocol, semantic-diff review, property-based testing, confidence markers, counterfactual replay. Removal of the `script python` escape hatch and of any un-checkable surface. Preservation of everything that makes the compiler effective.
 
-The operational shape that results is: **AI generates, human reviews, skill seals, fleet executes**. The thesis's four design properties — typed DSL, lock-free coordination, state-persisted recovery, live updatability — are unchanged; a fifth property, *AI-author-ready artifact discipline*, is added. The thesis's forward-looking section (§15.3) flags this direction as the fourth natural evolution of the design, and this document is its extended form.
+The operational shape that results is: **AI generates, human reviews, skill seals, fleet executes** — now realized by the workflow catalog (§7). The thesis's four design properties — typed DSL, lock-free coordination, state-persisted recovery, live updatability — are unchanged; a fifth property, *AI-author-ready artifact discipline*, is added. The thesis's forward-looking section (§15.3) flags this direction as the fourth natural evolution of the design, and this document is its extended form.
 
 ---
 

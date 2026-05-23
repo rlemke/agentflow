@@ -159,6 +159,28 @@ namespace analytics.reports {
 
 This means a domain expert can build a workflow by composing facets from across the organization — data engineering, ML, visualization, notification — without needing to know how any of them are implemented. It's the same idea as `pip install` or `npm install`, but for workflow steps.
 
+## Claude-Authored Workflows (the Catalog)
+
+The same DSL that lets teams share workflows also lets an AI agent **author, version, and run** them — without a file, and without the risk of an LLM silently changing a workflow a team depends on. Claude writes FFL and stores it in a **workflow catalog** (MongoDB collections `claude_workflows` + `claude_workflow_revisions`), exposed through MCP tools:
+
+| Tool | What it does |
+|------|--------------|
+| `fw_catalog_search` | Find an existing workflow to reuse before authoring a new one |
+| `fw_catalog_get` | Inspect an entry + a revision (FFL, parameters, dependencies, versions) |
+| `fw_catalog_save` | Store FFL as an immutable, content-hashed revision (no file) |
+| `fw_catalog_publish` | Review-approve a revision so it can run unattended |
+| `fw_catalog_run` | Run a pinned revision with given parameters (executes on the runner fleet) |
+
+**Why this is safe in a team:**
+- **Immutable, versioned revisions.** Saving identical FFL de-dupes; any change creates a new version, and the old version stays runnable — so a teammate or a scheduled job that pinned v3 keeps getting v3 even after Claude writes v4.
+- **Run with different parameters, same workflow.** Parameters are runtime inputs, never baked into the body; re-running pins a revision, so you get the identical workflow every time and never worry the LLM changed it underneath you.
+- **Review gate.** Every revision starts as a `draft`; `fw_catalog_run` refuses to run it unattended until a human **publishes** it. AI proposes, a person approves, the fleet executes.
+- **Discover and reuse.** Claude searches the catalog for a workflow that fits the request instead of regenerating one — the team accumulates a shared, searchable library rather than N near-duplicates.
+- **Composable, pinned libraries.** Mark an entry as a `library`; other workflows depend on it by pinned revision, so improving the base never breaks anything built on it.
+- **Viewable in the UI.** Each revision materializes a normal flow, so it appears in the dashboard (source, compiled graph, runs) like any other workflow.
+
+The full loop — Claude authors FFL → stores a draft → a reviewer publishes → the runner fleet executes the pinned revision — is verified end to end. See [docs/architecture/claude-workflow-catalog.md](docs/architecture/claude-workflow-catalog.md) for the design.
+
 ## Built for Long-Running, Distributed Work
 
 Facetwork doesn't run workflows on a single machine and hope for the best. It runs on a **cluster of runner servers** backed by MongoDB, designed for workloads that take minutes, hours, or days.
