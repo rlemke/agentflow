@@ -386,8 +386,19 @@ class CatalogService:
         depends_on); only the runnable flow is regenerated. Used by restore to
         rebuild flows in a fresh database from the FFL alone. The pinned
         dependency revisions must already exist in the catalog store.
+
+        A *thin* revision — no own FFL, exactly one ``library`` dependency — is
+        a per-workflow handle onto a package library (see ``import_package``).
+        It does NOT materialize its own flow; it reuses the library's single
+        compiled flow and points at its own workflow within it. This keeps a
+        restored N-workflow package at one shared flow instead of N copies of
+        the (large) compiled program.
         """
         import copy
+
+        thin = self._reuse_library_flow(rev)
+        if thin is not None:
+            return thin
 
         ordered: list[str] = []
         try:
@@ -413,6 +424,44 @@ class CatalogService:
         out.workflow_id = workflow_id
         out.is_valid = is_valid
         out.warnings = warnings
+        return out
+
+    def _reuse_library_flow(self, rev: CatalogRevision) -> CatalogRevision | None:
+        """If ``rev`` is a thin per-workflow handle onto a package library
+        (empty own FFL + exactly one library dep), return a copy bound to the
+        library's already-materialized flow instead of building a new one;
+        otherwise ``None`` (caller falls through to normal materialization).
+
+        The library flow is rematerialized on demand if missing, so restore
+        order does not matter.
+        """
+        import copy
+
+        if rev.ffl_source.strip() or len(rev.depends_on) != 1:
+            return None
+        pin = rev.depends_on[0]
+        dep_entry = self._catalog.get_entry(pin.slug)
+        if dep_entry is None or dep_entry.kind != KIND_LIBRARY:
+            return None
+        lib_rev = self._catalog.get_revision(pin.revision_id)
+        if lib_rev is None:
+            return None
+        if not lib_rev.flow_id or self._flows.get_flow(lib_rev.flow_id) is None:
+            lib_rev = self.rematerialize(lib_rev)
+            self._catalog.save_revision(lib_rev)
+        wf_id = next(
+            (w.uuid for w in self._flows.get_workflows_by_flow(lib_rev.flow_id)
+             if w.name == rev.entry_workflow),
+            "",
+        )
+        out = copy.deepcopy(rev)
+        out.flow_id = lib_rev.flow_id
+        out.workflow_id = wf_id
+        out.is_valid = lib_rev.is_valid and bool(wf_id)
+        if not wf_id:
+            out.warnings = [
+                f"workflow {rev.entry_workflow!r} not found in library {pin.slug}"
+            ]
         return out
 
     # =====================================================================

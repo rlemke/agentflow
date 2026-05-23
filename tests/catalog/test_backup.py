@@ -45,6 +45,9 @@ class _FlowStore(MemoryStore):
     def get_workflow(self, workflow_id):
         return self._wf_defs.get(workflow_id)
 
+    def get_workflows_by_flow(self, flow_id):
+        return [w for w in self._wf_defs.values() if w.flow_id == flow_id]
+
 
 def _svc():
     return CatalogService(InMemoryCatalogStore(), _FlowStore())
@@ -143,3 +146,79 @@ def test_restore_is_idempotent():
     assert r2["entries"] == 3
     # still exactly one revision per (slug, version)
     assert len(dst._catalog.get_revisions_for_slug("demo.adder")) == 1
+
+
+# --- package import (one shared library flow + one entry per workflow) -------
+
+PKG_FACETS = """namespace pkg.lib {
+    event facet Greet(name: String) => (msg: String)
+}"""
+
+PKG_FLOWS = """namespace pkg.flows {
+    use pkg.lib
+    workflow Hello(name: String = "a") => (msg: String) andThen {
+        g = Greet(name = $.name)
+        yield Hello(msg = g.msg)
+    }
+    workflow Hola(name: String = "b") => (msg: String) andThen {
+        g = Greet(name = $.name)
+        yield Hola(msg = g.msg)
+    }
+}"""
+
+
+def _write_pkg(tmp_path):
+    # Two files that only compile together (cross-file `use`) — like a real package.
+    (tmp_path / "facets.ffl").write_text(PKG_FACETS)
+    (tmp_path / "flows.ffl").write_text(PKG_FLOWS)
+    return str(tmp_path)
+
+
+def test_import_package_one_library_many_thin_workflows(tmp_path):
+    svc = _svc()
+    results = backup.import_package(svc, ffl_dir=_write_pkg(tmp_path), lib_slug="pkg", tags=["t"])
+
+    libname, libres = results[0]
+    workflows = results[1:]
+    assert libres.is_valid and svc._catalog.get_entry("pkg").kind == "library"
+    assert {s for s, _ in workflows} == {"pkg.flows.Hello", "pkg.flows.Hola"}
+
+    hello = svc._catalog.get_revision_by_version("pkg.flows.Hello", 1)
+    hola = svc._catalog.get_revision_by_version("pkg.flows.Hola", 1)
+    # Both are published, valid, and SHARE the library's single flow.
+    assert hello.status == "published" and hola.status == "published"
+    assert hello.flow_id == hola.flow_id == libres.flow_id
+    assert hello.workflow_id != hola.workflow_id  # distinct workflows in that flow
+    assert hello.ffl_source == "" and hello.depends_on[0].slug == "pkg"
+    # Exactly one materialized flow for the whole package.
+    assert len(svc._flows._flow_defs) == 1
+    # A thin entry is runnable through the shared flow.
+    run = svc.run("pkg.flows.Hello", inputs={"name": "z"})
+    assert run["workflow"] == "pkg.flows.Hello"
+
+
+def test_import_package_is_idempotent(tmp_path):
+    svc = _svc()
+    d = _write_pkg(tmp_path)
+    backup.import_package(svc, ffl_dir=d, lib_slug="pkg")
+    backup.import_package(svc, ffl_dir=d, lib_slug="pkg")  # again — no version churn
+    assert len(svc._catalog.get_revisions_for_slug("pkg.flows.Hello")) == 1
+    assert len(svc._flows._flow_defs) == 1
+
+
+def test_import_package_backup_restore_keeps_one_flow(tmp_path):
+    src = _svc()
+    backup.import_package(src, ffl_dir=_write_pkg(tmp_path), lib_slug="pkg")
+    data = backup.export(src)
+
+    dst = _svc()
+    res = backup.restore(data, dst)
+    assert res["rematerialized"] == 3 and not res["failed"]  # 1 lib + 2 workflows
+    # Restore rebuilt ONE shared flow, not one per workflow.
+    assert len(dst._flows._flow_defs) == 1
+    hello = dst._catalog.get_revision_by_version("pkg.flows.Hello", 1)
+    hola = dst._catalog.get_revision_by_version("pkg.flows.Hola", 1)
+    lib = dst._catalog.get_revision_by_version("pkg", 1)
+    assert hello.flow_id == hola.flow_id == lib.flow_id
+    assert hello.status == "published"
+    assert dst.run("pkg.flows.Hola", inputs={"name": "q"})["workflow"] == "pkg.flows.Hola"

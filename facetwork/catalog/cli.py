@@ -18,6 +18,7 @@
     python -m facetwork.catalog.cli restore catalog.json
     python -m facetwork.catalog.cli import path/to/workflow.ffl --slug demo.x --publish
     python -m facetwork.catalog.cli import examples/dir/ --tags imported
+    python -m facetwork.catalog.cli import-package osm-geocoder --tags osm
 
 Connects to MongoDB via the FFL config (AFL_MONGODB_URL etc.).
 """
@@ -78,6 +79,23 @@ def _build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--entry-workflow", default=None, help="Entry workflow name if multiple")
     pi.add_argument("--depends-on", default="", help="Comma-separated lib slugs, e.g. lib.a,lib.b@2")
     pi.add_argument("--publish", action="store_true", help="Publish each imported revision")
+
+    pp = sub.add_parser(
+        "import-package",
+        help="Import a whole multi-file FFL package: one shared library + one entry per workflow",
+    )
+    pp.add_argument("name", nargs="?", default=None,
+                    help="Registered facetwork example/package name (e.g. osm-geocoder)")
+    pp.add_argument("--dir", default=None,
+                    help="Import every .ffl under this directory instead of a registered package")
+    pp.add_argument("--lib-slug", default=None,
+                    help="Slug for the shared library entry (default: package name)")
+    pp.add_argument("--also", default="",
+                    help="Comma-separated extra package names to merge (cross-package use deps)")
+    pp.add_argument("--prefix", default="", help="Prefix prepended to every workflow slug")
+    pp.add_argument("--tags", default="", help="Comma-separated tags")
+    pp.add_argument("--no-publish", action="store_true",
+                    help="Import as drafts (default: publish valid revisions)")
     return p
 
 
@@ -100,7 +118,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "restore":
         res = backup.restore_from_file(args.infile, svc, rematerialize=not args.no_recompile)
         print(f"Restored {res['entries']} entries / {res['revisions']} revisions; "
-              f"rebuilt {res['rematerialized']} flow(s).")
+              f"made {res['rematerialized']} revision(s) runnable "
+              f"(package workflows share their library's flow).")
         for f in res["failed"]:
             print(f"  WARN {f['slug']} v{f['version']} not runnable: {'; '.join(f['warnings'])}",
                   file=sys.stderr)
@@ -135,6 +154,38 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  FAILED {path}: {res.error}", file=sys.stderr)
                 rc = 1
         return rc
+
+    if args.cmd == "import-package":
+        from facetwork.catalog.entities import STATUS_PUBLISHED
+
+        if not args.name and not args.dir:
+            print("Error: provide a package name or --dir", file=sys.stderr)
+            return 2
+        try:
+            results = backup.import_package(
+                svc,
+                name=(None if args.dir else args.name),
+                ffl_dir=args.dir,
+                lib_slug=args.lib_slug,
+                also=[a.strip() for a in args.also.split(",") if a.strip()] or None,
+                prefix=args.prefix,
+                tags=[t.strip() for t in args.tags.split(",") if t.strip()] or None,
+                publish=not args.no_publish,
+            )
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 2
+        libname, libres = results[0]
+        workflows = results[1:]
+        npub = sum(1 for _, r in workflows if getattr(r, "status", "") == STATUS_PUBLISHED)
+        print(f"{libname} v{libres.version} "
+              f"[{'valid' if libres.is_valid else 'INVALID'}] — {len(workflows)} workflows")
+        for slug, rev in workflows[:12]:
+            print(f"  {slug} [{rev.status}]")
+        if len(workflows) > 12:
+            print(f"  ... +{len(workflows) - 12} more")
+        print(f"Imported {len(workflows)} workflows ({npub} published) sharing 1 flow.")
+        return 0 if libres.is_valid else 1
 
     return 0
 

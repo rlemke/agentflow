@@ -91,6 +91,7 @@ scripts/catalog backup catalog.json          # dump entries + revisions to JSON
 scripts/catalog restore catalog.json          # restore + rebuild runnable flows
 scripts/catalog import path/to/wf.ffl --slug demo.x --publish   # file -> catalog
 scripts/catalog import examples/dir/ --tags imported            # whole directory
+scripts/catalog import-package osm-geocoder --tags osm          # whole package
 ```
 
 - **Backup** writes a portable, readable, git-friendly JSON (`format:
@@ -106,6 +107,18 @@ scripts/catalog import examples/dir/ --tags imported            # whole director
   validated and (optionally) published. This is how existing file-based workflows
   enter the catalog. Verified end-to-end against MongoDB: import → backup → wipe
   DB → restore → published + runnable.
+- **Import-package** brings a whole multi-file FFL package (e.g. `osm-geocoder`,
+  84 files / 99 workflows that only compile together via cross-file `use`) into
+  the catalog. It merges every `.ffl` once into a single `kind="library"` entry —
+  the **one shared flow** holding all the workflows — then creates one thin
+  `kind="workflow"` entry per workflow: empty own FFL, a single pinned dependency
+  on the library, pointing at its workflow within the shared flow. This keeps the
+  catalog at one materialized flow per package instead of one (multi-MB) compiled
+  program per workflow. `rematerialize` is shared-flow aware: a thin entry rebinds
+  to the library's flow rather than building its own, so backup/restore stays at
+  one flow per package too (verified live: 99 osm workflows → 1 `FlowDefinition`,
+  preserved across a full backup → restore into a wiped DB). `--also <pkg>` merges
+  extra packages for cross-package `use` deps; `--dir` imports a loose directory.
 
 ## Dashboard
 

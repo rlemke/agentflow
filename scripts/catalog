@@ -6,6 +6,7 @@
 #   scripts/catalog restore catalog.json [--no-recompile]
 #   scripts/catalog import path/to/workflow.ffl --slug demo.x --publish
 #   scripts/catalog import examples/dir/ --tags imported
+#   scripts/catalog import-package osm-geocoder --tags osm
 #
 # Connects to MongoDB via .env (AFL_MONGODB_URL etc.).
 
