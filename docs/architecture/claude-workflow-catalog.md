@@ -67,17 +67,16 @@ Two further guards on `CatalogService.run`:
 - **Handler preflight.** Before posting the bootstrap task, `run` computes the
   event facets transitively reachable from the entry workflow (scoped to the
   entry — *not* every facet in a large pinned library) and, for each, calls
-  `RegistryDispatcher.check_loadable`: it must be registered, its module must
-  import, and its (unguarded) import statements must resolve. If any fails, `run`
+  `RegistryDispatcher.check_loadable`: the facet must be registered, its handler
+  module must import, and its entrypoint must be callable. If any fails, `run`
   raises `CatalogRunBlocked` naming the facet and reason — before any task is
-  posted — instead of letting the run dead-letter mid-flight. Skipped when no
-  registry is populated (no runner up yet — can't assess). `check_loadable`
-  **AST-scans the handler module's imports, including lazy `from x import y`
-  inside the handler body**, so a broken lazy import (the classic
-  "declared facet whose handler imports a function that no longer exists") is
-  caught here, not at dispatch. Imports guarded by `try/except` or
-  `if TYPE_CHECKING:` are skipped (optional / type-only); the scan is one level
-  deep (the handler module's own imports) and best-effort.
+  posted — instead of letting the run dead-letter mid-flight on an unimplemented
+  or unimportable handler (e.g. `osm.Roads.Motorways`, declared with no handler).
+  Skipped when no registry is populated (no runner up yet — can't assess). A
+  broken *lazy* import inside a dispatched handler body is **not** caught here:
+  handler modules commonly host many facets' handlers behind one dispatch
+  entrypoint, so a module-level scan can't attribute a sibling's broken import to
+  this facet without false-positives — that surfaces at dispatch.
 - **Execution isolation.** Each run mints a **fresh execution `workflow_id`** plus
   a per-run `WorkflowDefinition` (same immutable flow + entry workflow, new uuid).
   `rev.workflow_id` is the *definition* id, shared by every run of the revision;
@@ -176,6 +175,7 @@ degrades to an "unavailable" notice. The grouping is backed by
 ## What's not here yet
 
 - Semantic/embedding search (current search is tags + keyword ranking).
-- Preflight import scan is one level deep (the handler module's own imports) and
-  skips guarded imports — a break in a *transitively* imported module, or a
-  dynamic `importlib.import_module(name)`, still surfaces only at dispatch.
+- The handler preflight catches a missing / unimportable handler module +
+  entrypoint, but a broken *lazy* import inside a dispatched handler body still
+  surfaces only at dispatch — it can't be attributed to one facet in a shared
+  dispatch module without false-positives.

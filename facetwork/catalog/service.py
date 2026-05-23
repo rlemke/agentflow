@@ -529,9 +529,10 @@ class CatalogService:
             return []
         if not disp.dispatchable_facets():
             return []  # empty registry — no runner up yet; don't false-positive
-        # check_loadable imports each handler + scans its (unguarded) imports,
-        # so a broken lazy `from x import y` in the handler body is caught here
-        # rather than dead-lettering at dispatch.
+        # check_loadable imports each handler module + resolves its entrypoint,
+        # catching a missing or unimportable handler before launch. (A broken
+        # lazy import inside a dispatched handler body still surfaces at
+        # dispatch — it can't be attributed to one facet in a shared module.)
         problems: list[str] = []
         for q in needed:
             reason = disp.check_loadable(q)

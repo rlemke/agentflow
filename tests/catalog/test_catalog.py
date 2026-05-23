@@ -261,17 +261,13 @@ def test_run_preflight_skipped_when_registry_empty():
     assert out["workflow"] == "claude.demo.Hello"
 
 
-def test_run_preflight_catches_broken_lazy_import_in_handler(tmp_path):
-    # Handler loads fine, but a lazy `from x import y` in its body is broken —
-    # would dead-letter at dispatch. The preflight's import scan catches it.
+def test_run_preflight_catches_unimportable_handler_module(tmp_path):
+    # A handler whose MODULE won't import (broken top-level import) is caught by
+    # check_loadable before launch.
     from facetwork.runtime.entities.server import HandlerRegistration
 
-    h = tmp_path / "lazyhandler.py"
-    h.write_text(
-        "def handle(payload):\n"
-        "    from totally_missing_pkg_xyz import thing  # broken lazy import\n"
-        "    return {}\n"
-    )
+    h = tmp_path / "brokenmodule.py"
+    h.write_text("import totally_missing_top_level_pkg_xyz\n\ndef handle(payload):\n    return {}\n")
     reg = HandlerRegistration(
         facet_name="claude.demo.Greet", module_uri=f"file://{h}", entrypoint="handle"
     )
@@ -280,22 +276,22 @@ def test_run_preflight_catches_broken_lazy_import_in_handler(tmp_path):
     svc.publish("demo.hello")
     with pytest.raises(CatalogRunBlocked) as ei:
         svc.run("demo.hello", inputs={"name": "x"})
-    msg = str(ei.value)
-    assert "claude.demo.Greet" in msg and "totally_missing_pkg_xyz" in msg
+    assert "claude.demo.Greet" in str(ei.value)
 
 
-def test_run_preflight_ignores_guarded_optional_import(tmp_path):
-    # A broken import guarded by try/except (optional dep) must NOT be flagged.
+def test_run_preflight_passes_handler_with_lazy_sibling_import(tmp_path):
+    # A shared handler module may host other facets' handlers with their own
+    # (possibly broken) lazy imports; that must NOT false-block this facet — the
+    # module imports + the entrypoint is callable, so the preflight passes.
     from facetwork.runtime.entities.server import HandlerRegistration
 
-    h = tmp_path / "guardedhandler.py"
+    h = tmp_path / "sharedmodule.py"
     h.write_text(
         "def handle(payload):\n"
-        "    try:\n"
-        "        from totally_missing_optional_pkg import x\n"
-        "    except ImportError:\n"
-        "        x = None\n"
-        "    return {}\n"
+        "    return {'result': {}}\n\n"
+        "def _other_facet(payload):\n"
+        "    from totally_missing_sibling_pkg import x  # a sibling's broken lazy import\n"
+        "    return x\n"
     )
     reg = HandlerRegistration(
         facet_name="claude.demo.Greet", module_uri=f"file://{h}", entrypoint="handle"
@@ -303,7 +299,7 @@ def test_run_preflight_ignores_guarded_optional_import(tmp_path):
     svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([reg]))
     svc.save("demo.hello", ffl_source=WF)
     svc.publish("demo.hello")
-    out = svc.run("demo.hello", inputs={"name": "x"})  # guarded import not flagged
+    out = svc.run("demo.hello", inputs={"name": "x"})  # not false-blocked
     assert out["workflow"] == "claude.demo.Hello"
 
 

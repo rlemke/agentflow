@@ -155,18 +155,18 @@ class RegistryDispatcher:
         return reg is not None
 
     def check_loadable(self, facet_name: str) -> str | None:
-        """Return ``None`` if the facet's handler is registered, importable, and
-        its (unguarded) imports resolve; otherwise a short reason string.
+        """Return ``None`` if the facet has a registered handler whose module
+        imports and whose entrypoint is callable; otherwise a short reason
+        string. Stronger than :meth:`can_dispatch` (which only checks that a
+        registration exists): it actually imports the handler module and
+        resolves the entrypoint, catching a missing registration, a module that
+        won't import, or a missing/non-callable entrypoint.
 
-        Stronger than :meth:`can_dispatch`: it actually imports the handler
-        module (catching a broken top-level import or a missing/non-callable
-        entrypoint) and AST-scans the module's import statements — *including
-        lazy ``from x import y`` inside the handler body* — verifying each
-        resolves. That catches a handler which loads but would dead-letter at
-        dispatch on a broken lazy import (e.g. importing a function that no
-        longer exists). Imports guarded by ``try/except`` or ``if
-        TYPE_CHECKING:`` are skipped (optional / type-only). The import scan is
-        best-effort: if the scan itself errors it reports no problem.
+        It does NOT trace *lazy* imports inside dispatched handler bodies: a
+        handler module commonly hosts many facets' handlers behind one dispatch
+        entrypoint, so a module-level import scan cannot attribute a sibling
+        handler's broken lazy import to this facet (it would false-positive).
+        A broken lazy import therefore surfaces at dispatch, not here.
         """
         reg = self._find_registration(facet_name)
         if reg is None:
@@ -177,11 +177,7 @@ class RegistryDispatcher:
                 return f"entrypoint '{reg.entrypoint}' is not callable"
         except Exception as e:  # module won't import
             return f"{type(e).__name__}: {str(e)[:140]}"
-        try:
-            errors = _scan_module_imports(module)
-        except Exception:
-            return None
-        return errors[0] if errors else None
+        return None
 
     def get_timeout_ms(self, facet_name: str) -> int:
         """Return timeout_ms for the handler, or 0 if not found."""
@@ -449,88 +445,3 @@ class CompositeDispatcher:
             if d.can_dispatch(facet_name):
                 return d.dispatch(facet_name, payload)
         return None
-
-
-# ---------------------------------------------------------------------------
-# Handler import verification (used by RegistryDispatcher.check_loadable)
-# ---------------------------------------------------------------------------
-
-
-def _is_type_checking(test: Any) -> bool:
-    import ast
-
-    if isinstance(test, ast.Name):
-        return test.id == "TYPE_CHECKING"
-    if isinstance(test, ast.Attribute):
-        return test.attr == "TYPE_CHECKING"
-    if isinstance(test, ast.Constant):
-        return test.value is False
-    return False
-
-
-def _collect_unguarded_imports(node: Any, out: list) -> None:
-    """Collect ``Import`` / ``ImportFrom`` nodes that are NOT inside a
-    ``try`` (optional-dep fallback) or ``if TYPE_CHECKING:`` (type-only) block —
-    including imports inside function bodies (lazy imports)."""
-    import ast
-
-    for child in ast.iter_child_nodes(node):
-        if isinstance(child, ast.Try):
-            continue
-        if isinstance(child, ast.If) and _is_type_checking(child.test):
-            for n in child.orelse:
-                _collect_unguarded_imports(n, out)
-            continue
-        if isinstance(child, (ast.Import, ast.ImportFrom)):
-            out.append(child)
-        else:
-            _collect_unguarded_imports(child, out)
-
-
-def _scan_module_imports(module: Any) -> list[str]:
-    """Verify a handler module's unguarded imports resolve.
-
-    Catches the lazy ``from x import y`` (often inside a handler body) where the
-    module imports fine but ``y`` is absent — the failure that otherwise only
-    surfaces at dispatch. One level deep (the handler module's own imports).
-    """
-    import ast
-    import importlib
-    import importlib.util
-    from pathlib import Path
-
-    file = getattr(module, "__file__", None)
-    if not file or not str(file).endswith(".py"):
-        return []
-    tree = ast.parse(Path(file).read_text())
-    pkg = getattr(module, "__package__", "") or ""
-
-    nodes: list = []
-    _collect_unguarded_imports(tree, nodes)
-
-    errors: list[str] = []
-    for node in nodes:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                try:
-                    importlib.import_module(alias.name)
-                except Exception as e:
-                    errors.append(f"import {alias.name}: {str(e)[:80]}")
-        else:  # ast.ImportFrom
-            rel = "." * node.level + (node.module or "")
-            try:
-                base = importlib.util.resolve_name(rel, pkg) if node.level else node.module
-                if not base:
-                    continue
-                mod = importlib.import_module(base)
-            except Exception as e:
-                errors.append(f"from {rel or node.module}: {str(e)[:80]}")
-                continue
-            for alias in node.names:
-                if alias.name == "*" or hasattr(mod, alias.name):
-                    continue
-                try:
-                    importlib.import_module(f"{base}.{alias.name}")
-                except Exception:
-                    errors.append(f"cannot import '{alias.name}' from '{base}'")
-    return errors
