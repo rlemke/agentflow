@@ -1,6 +1,28 @@
 # Implementation Changelog
 
-**Current version: v0.45.0**
+**Current version: v0.46.0**
+
+## Completed (v0.46.0) — Claude Workflow Catalog (store / version / run FFL with no file)
+
+A layer (`facetwork/catalog/`) that lets Claude author, store, version, discover, and run FFL workflows **without a file**, re-running them against a frozen immutable body. Two collections: `claude_workflows` (mutable index) + `claude_workflow_revisions` (append-only, content-hashed). Reuses existing machinery — each revision materializes a normal `FlowDefinition` under `claude:<slug>:v<N>` and runs via the standard `fw:execute` bootstrap. Design: [docs/architecture/claude-workflow-catalog.md](../architecture/claude-workflow-catalog.md).
+
+**Core (`entities.py` / `store.py` / `service.py`):**
+- Immutable revisions: `content_hash = sha256(ffl_source + sorted pinned-dep hashes)`; identical content de-dupes, any change bumps the version; params are runtime inputs, never baked in.
+- **Review gate**: `status: draft | published`; `run` requires published on the unattended path (`allow_unpublished=True` opts into a draft); `publish()` refuses invalid FFL.
+- **Library composition**: `kind="library"` entries; workflows `depends_on` libraries pinned by revision, merged at compile time. FFL `use` resolves only against own source + pinned libs — the catalog is hermetic (never the filesystem or the resolver's `afl_sources`): [docs/architecture/catalog-use-resolution.md](../architecture/catalog-use-resolution.md).
+- MCP tools: `fw_catalog_{search,get,save,publish,run}`.
+
+**`scripts/catalog` CLI + `backup.py`:**
+- `backup` / `restore` (JSON; preserves revision_id/version/content_hash/status/pins, rebuilds flows by recompiling), `import` (file/dir → catalog), and **`import-package`** — a whole multi-file package (e.g. osm-geocoder: 84 files / 99 workflows) → one shared-flow `library` + one thin entry per workflow (`rematerialize` is shared-flow aware, so backup/restore stays at 1 flow per package). `list` — grouped packages + workflows overview.
+- `catalog-backup.json` committed as a portable dev seed (3 standalone + the osm package).
+
+**Dashboard**: `/catalog` grouped overview (packages w/ member counts, standalone, per-package tally) + `?package=` drill-in + `?q=` search + per-revision Publish/Run, backed by `CatalogService.list_all()`.
+
+**Run safety**: handler **preflight** — `run` refuses with `CatalogRunBlocked` if any event facet reachable from the entry workflow has no loadable handler in the fleet registry (catches declared-but-unimplemented facets before launch, instead of dead-lettering mid-flight). **Execution isolation** — each run mints a fresh execution `workflow_id` + per-run `WorkflowDefinition` (was reusing the revision's definition id, so a prior terminated run's state collided with the next).
+
+**Standalone-repo additions (`fwh_osm`)**: `osm.Filters.FilterGeoJSONByTagPrefix` facet+handler (tag-value prefix match, e.g. `ref` → "I " for Interstates — fills the gap vs `FilterByOSMTag`'s exact match); implemented the missing `extract_roads` (osmium way extraction → GeoJSON LineStrings preserving all tags incl. `ref`, classified by road class), which had left `osm.Source.PBF.ExtractRoads` dead-lettering. End-to-end demo `CaliforniaInterstateFreeways` (cache → motorways → ref-prefix filter → MapLibre HTML) authored in the catalog and run on the fleet → 16,594 Interstate segments.
+
+**Repo hygiene**: root `claude.md` → `CLAUDE.md` (lowercase wouldn't load as project instructions on a case-sensitive filesystem).
 
 ## Completed (v0.45.0) — Standalone Example Packages, Package-Unique Tool Libs, AFL_CACHE_DIR Retirement
 

@@ -53,6 +53,26 @@ with `allow_unpublished=True` (an explicit attended test). `publish()` refuses
 an invalid revision. This keeps LLM-authored drafts from running unattended
 until reviewed.
 
+## Run safety — handler preflight & execution isolation
+
+Two further guards on `CatalogService.run`:
+
+- **Handler preflight.** Before posting the bootstrap task, `run` computes the
+  event facets transitively reachable from the entry workflow (scoped to the
+  entry — *not* every facet in a large pinned library) and checks each against
+  the fleet's registry (`RegistryDispatcher.preload(verify=True)`). If any has no
+  loadable handler, `run` raises `CatalogRunBlocked` naming it — before any task
+  is posted — instead of letting the run dead-letter mid-flight on a
+  declared-but-unimplemented facet. Skipped when no registry is populated (no
+  runner up yet — can't assess). It cannot catch a handler whose *lazily-imported*
+  dependency is broken; that still surfaces at dispatch.
+- **Execution isolation.** Each run mints a **fresh execution `workflow_id`** plus
+  a per-run `WorkflowDefinition` (same immutable flow + entry workflow, new uuid).
+  `rev.workflow_id` is the *definition* id, shared by every run of the revision;
+  reusing it as the execution scope let a prior terminated/failed run's steps
+  collide with the next. The fresh id keeps runs independent — mirroring the CLI
+  `submit` path, which already generates a fresh `wf_id` per run.
+
 ## Library composition
 
 A `kind="library"` entry defines reusable facets/sub-workflows (no entry
@@ -93,6 +113,7 @@ JSON; the materialized `FlowDefinition`s are NOT backed up (they're regenerable)
 `scripts/catalog`:
 
 ```bash
+scripts/catalog list                          # packages + workflows overview
 scripts/catalog backup catalog.json          # dump entries + revisions to JSON
 scripts/catalog restore catalog.json          # restore + rebuild runnable flows
 scripts/catalog import path/to/wf.ffl --slug demo.x --publish   # file -> catalog
@@ -129,15 +150,19 @@ scripts/catalog import-package osm-geocoder --tags osm          # whole package
 ## Dashboard
 
 A **Catalog** page (`/catalog`, `facetwork/dashboard/routes/execution/catalog.py`)
-lists entries (search by name/description/tag/facet) and, per entry, shows the
-revision history with **Publish** buttons, the parameter schema, pinned library
-deps, the FFL source, a link to the materialized compiled flow, and a **Run**
-form (inputs as JSON, with an "allow unpublished" opt-in) that submits a
-bootstrap run to the fleet. With a non-Mongo store the page degrades to an
-"unavailable" notice.
+with three modes: a **grouped overview** (packages/libraries with member counts,
+standalone workflows, and a per-package workflow tally), a `?package=<slug>`
+drill-in listing one package's workflows, and `?q=` ranked search. Per entry it
+shows the revision history with **Publish** buttons, the parameter schema, pinned
+library deps, the FFL source, a link to the materialized compiled flow, links to
+these design docs, and a **Run** form (inputs as JSON, with an "allow unpublished"
+opt-in) that submits a bootstrap run to the fleet. With a non-Mongo store the page
+degrades to an "unavailable" notice. The grouping is backed by
+`CatalogService.list_all()` — the same data the `scripts/catalog list` CLI uses.
 
 ## What's not here yet
 
 - Semantic/embedding search (current search is tags + keyword ranking).
-- Handler-availability preflight on run (the catalog records `facets_used`;
-  cross-checking against `fw_list_handlers` before running is a follow-up).
+- Deeper run preflight: the handler preflight catches missing / non-importable
+  handlers, but a handler whose *lazily-imported* dependency is broken still
+  surfaces only at dispatch.
