@@ -418,6 +418,117 @@ def create_server(
                     "required": ["sql"],
                 },
             ),
+            Tool(
+                name="fw_catalog_search",
+                description=(
+                    "Search the Claude workflow catalog for a reusable workflow "
+                    "BEFORE authoring a new one. Returns ranked summaries "
+                    "{slug, title, description, tags, version, status, "
+                    "param_schema, facets_used}. Filter by tags / facet / kind "
+                    "(workflow|library). Re-use an existing slug when one fits."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Free-text query"},
+                        "tags": {"type": "array", "items": {"type": "string"}},
+                        "facet": {"type": "string", "description": "Require this facet in facets_used"},
+                        "kind": {"type": "string", "description": "workflow | library"},
+                    },
+                },
+            ),
+            Tool(
+                name="fw_catalog_get",
+                description=(
+                    "Fetch one catalog entry + a specific (or latest) revision: "
+                    "FFL source, param schema, pinned dependencies, and the full "
+                    "version list. Use after fw_catalog_search to inspect a "
+                    "candidate before reusing or revising it."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "slug": {"type": "string"},
+                        "version": {"type": "integer", "description": "Defaults to latest"},
+                    },
+                    "required": ["slug"],
+                },
+            ),
+            Tool(
+                name="fw_catalog_save",
+                description=(
+                    "Store an FFL workflow (or library) in the catalog WITHOUT a "
+                    "file. Validates, merges pinned library deps, compiles, and "
+                    "creates an immutable, content-hashed revision (identical "
+                    "content de-dupes; any change bumps the version — the old "
+                    "version stays runnable). Saved as a DRAFT: call fw_validate "
+                    "first, then fw_catalog_publish before unattended runs. "
+                    "Returns {ok, slug, version, revision_id, deduped, is_valid, "
+                    "status, warnings}."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "slug": {"type": "string", "description": "Stable id, e.g. 'geo.region-summary'"},
+                        "ffl_source": {"type": "string", "description": "The FFL (this entry's own source)"},
+                        "kind": {"type": "string", "description": "workflow (default) | library"},
+                        "title": {"type": "string"},
+                        "description": {"type": "string", "description": "What it does (for discovery)"},
+                        "tags": {"type": "array", "items": {"type": "string"}},
+                        "entry_workflow": {
+                            "type": "string",
+                            "description": "Qualified/short name of the workflow to run (required if the FFL defines more than one)",
+                        },
+                        "depends_on": {
+                            "type": "array",
+                            "description": "Pinned library deps: [{slug, version?}]",
+                            "items": {"type": "object"},
+                        },
+                        "note": {"type": "string", "description": "Changelog note for this revision"},
+                    },
+                    "required": ["slug", "ffl_source"],
+                },
+            ),
+            Tool(
+                name="fw_catalog_publish",
+                description=(
+                    "Publish (review-approve) a catalog revision so it can run "
+                    "unattended. Refuses an invalid revision. Drafts can only be "
+                    "run with allow_unpublished=True (an attended test); "
+                    "publishing is the gate for fw_catalog_run's default path."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "slug": {"type": "string"},
+                        "version": {"type": "integer", "description": "Defaults to latest"},
+                    },
+                    "required": ["slug"],
+                },
+            ),
+            Tool(
+                name="fw_catalog_run",
+                description=(
+                    "Run a cataloged workflow by pinning a revision and posting a "
+                    "fw:execute bootstrap task with the given inputs (distributed "
+                    "execution on the runner fleet; view it in the dashboard). "
+                    "Re-running with different inputs re-uses the IDENTICAL pinned "
+                    "revision. Default path requires a PUBLISHED revision; pass "
+                    "allow_unpublished=true for an attended test of a draft. "
+                    "Returns {runner_id, task_id, version, workflow} or "
+                    "{ok:false, blocked, error}."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "slug": {"type": "string"},
+                        "version": {"type": "integer", "description": "Defaults to latest published"},
+                        "inputs": {"type": "object", "description": "Workflow parameter values"},
+                        "allow_unpublished": {"type": "boolean", "description": "Attended run of a draft"},
+                    },
+                    "required": ["slug"],
+                },
+            ),
         ]
 
     @server.call_tool()
@@ -446,6 +557,16 @@ def create_server(
             return _tool_repair_workflow(arguments, _get_store)
         elif name == "fw_postgis_query":
             return _tool_postgis_query(arguments)
+        elif name == "fw_catalog_search":
+            return _tool_catalog_search(arguments, _get_store)
+        elif name == "fw_catalog_get":
+            return _tool_catalog_get(arguments, _get_store)
+        elif name == "fw_catalog_save":
+            return _tool_catalog_save(arguments, _get_store)
+        elif name == "fw_catalog_publish":
+            return _tool_catalog_publish(arguments, _get_store)
+        elif name == "fw_catalog_run":
+            return _tool_catalog_run(arguments, _get_store)
         else:
             return [
                 TextContent(
@@ -1278,6 +1399,106 @@ def _find_workflow(compiled: dict, workflow_name: str) -> dict | None:
     from facetwork.ast_utils import find_workflow
 
     return find_workflow(compiled, workflow_name)
+
+
+# =============================================================================
+# Claude workflow catalog tools
+# =============================================================================
+
+
+def _catalog_service(store: Any) -> Any:
+    """Build a CatalogService over the MongoStore's `_db` + the store itself
+    (for FlowDefinition materialization and bootstrap-task submission)."""
+    from facetwork.catalog import CatalogService, MongoCatalogStore
+
+    db = getattr(store, "_db", None)
+    if db is None:
+        raise RuntimeError(
+            "the workflow catalog requires a MongoStore-backed store (no _db on "
+            f"{type(store).__name__})"
+        )
+    return CatalogService(MongoCatalogStore(db), store)
+
+
+def _catalog_text(payload: Any) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, default=str))]
+
+
+def _tool_catalog_search(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    try:
+        svc = _catalog_service(get_store())
+        results = svc.search(
+            arguments.get("query", ""),
+            tags=arguments.get("tags"),
+            facet=arguments.get("facet"),
+            kind=arguments.get("kind"),
+        )
+        return _catalog_text({"results": results, "count": len(results)})
+    except Exception as e:
+        return _catalog_text({"error": str(e)})
+
+
+def _tool_catalog_get(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    try:
+        svc = _catalog_service(get_store())
+        detail = svc.get(arguments["slug"], arguments.get("version"))
+        if detail is None:
+            return _catalog_text({"error": f"no such workflow: {arguments['slug']}"})
+        return _catalog_text(detail)
+    except Exception as e:
+        return _catalog_text({"error": str(e)})
+
+
+def _tool_catalog_save(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    from dataclasses import asdict
+
+    try:
+        svc = _catalog_service(get_store())
+        res = svc.save(
+            arguments["slug"],
+            ffl_source=arguments["ffl_source"],
+            kind=arguments.get("kind", "workflow"),
+            title=arguments.get("title", ""),
+            description=arguments.get("description", ""),
+            tags=arguments.get("tags"),
+            depends_on=arguments.get("depends_on"),
+            entry_workflow=arguments.get("entry_workflow"),
+            author=arguments.get("author", "claude"),
+            note=arguments.get("note", ""),
+        )
+        return _catalog_text(asdict(res))
+    except Exception as e:
+        return _catalog_text({"ok": False, "error": str(e)})
+
+
+def _tool_catalog_publish(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    try:
+        svc = _catalog_service(get_store())
+        rev = svc.publish(arguments["slug"], arguments.get("version"))
+        return _catalog_text(
+            {"ok": True, "slug": rev.slug, "version": rev.version, "status": rev.status}
+        )
+    except Exception as e:
+        return _catalog_text({"ok": False, "error": str(e)})
+
+
+def _tool_catalog_run(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    from facetwork.catalog import CatalogRunBlocked
+
+    try:
+        svc = _catalog_service(get_store())
+        res = svc.run(
+            arguments["slug"],
+            version=arguments.get("version"),
+            inputs=arguments.get("inputs"),
+            allow_unpublished=bool(arguments.get("allow_unpublished", False)),
+        )
+        res["ok"] = True
+        return _catalog_text(res)
+    except CatalogRunBlocked as e:
+        return _catalog_text({"ok": False, "blocked": True, "error": str(e)})
+    except Exception as e:
+        return _catalog_text({"ok": False, "error": str(e)})
 
 
 # =============================================================================

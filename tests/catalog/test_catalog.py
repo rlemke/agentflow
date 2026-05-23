@@ -1,0 +1,190 @@
+"""Tests for the Claude workflow catalog (facetwork.catalog).
+
+Exercises the service against an in-memory catalog store + MemoryStore for flow
+materialization — fully offline, no Mongo.
+"""
+
+import pytest
+
+from facetwork.catalog import (
+    CatalogError,
+    CatalogRunBlocked,
+    CatalogService,
+    InMemoryCatalogStore,
+)
+from facetwork.catalog.entities import STATUS_DRAFT, STATUS_PUBLISHED
+from facetwork.runtime import MemoryStore
+
+WF = """namespace claude.demo {
+    schema R { message: String }
+    event facet Greet(name: String) => (result: R)
+    workflow Hello(name: String = "world") => (greeting: R) andThen {
+        greeting = Greet(name = $.name)
+    }
+}"""
+
+WF_V2 = WF.replace('"world"', '"earth"')
+
+# Validator error (WORKFLOW_AT_TOP_LEVEL): parses, but workflow is outside a namespace.
+INVALID = """workflow Oops(x: String = "a") => (y: String) andThen {
+    yield Oops(y = $.x)
+}"""
+
+LIB = """namespace claude.lib.geo {
+    schema Pt { lat: Double, lon: Double }
+    event facet Locate(name: String) => (point: Pt)
+}"""
+
+DEP_WF = """namespace claude.demo2 {
+    use claude.lib.geo
+    workflow Find(name: String = "x") => (lat: Double) andThen {
+        p = Locate(name = $.name)
+        yield Find(lat = p.point.lat)
+    }
+}"""
+
+
+class _FlowStore(MemoryStore):
+    """MemoryStore + in-memory flow/workflow CRUD.
+
+    Flows/workflows are a MongoStore concern in production (the catalog wires a
+    MongoStore as its flow_store); this adds the same surface in memory so the
+    store-agnostic CatalogService can be exercised fully offline.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._flow_defs = {}
+        self._wf_defs = {}
+
+    def save_flow(self, flow):
+        self._flow_defs[flow.uuid] = flow
+
+    def get_flow(self, flow_id):
+        return self._flow_defs.get(flow_id)
+
+    def save_workflow(self, wf):
+        self._wf_defs[wf.uuid] = wf
+
+    def get_workflow(self, workflow_id):
+        return self._wf_defs.get(workflow_id)
+
+
+def _svc():
+    return CatalogService(InMemoryCatalogStore(), _FlowStore())
+
+
+def test_save_creates_draft_and_materializes_viewable_flow():
+    svc = _svc()
+    r = svc.save("demo.hello", ffl_source=WF, title="Hello", description="greets", tags=["demo"])
+    assert r.ok and r.version == 1 and r.is_valid and r.status == STATUS_DRAFT
+    # Materialized FlowDefinition is viewable (same path the dashboard renders).
+    flow = svc._flows.get_flow(r.flow_id)
+    assert flow is not None and flow.compiled_sources[0].content
+    assert flow.name.path == "claude:demo.hello:v1"
+    # Entry workflow + param schema surfaced for the UI / Claude.
+    detail = svc.get("demo.hello")
+    assert detail["entry_workflow"] == "claude.demo.Hello"
+    assert any(p["name"] == "name" and p["default"] == "world" for p in detail["param_schema"])
+
+
+def test_dedup_identical_content_no_new_version():
+    svc = _svc()
+    r1 = svc.save("demo.hello", ffl_source=WF)
+    r2 = svc.save("demo.hello", ffl_source=WF, description="only metadata changed")
+    assert r2.deduped and r2.version == r1.version == 1
+    assert len(svc._catalog.get_revisions_for_slug("demo.hello")) == 1
+
+
+def test_edit_bumps_version_old_revision_immutable():
+    svc = _svc()
+    r1 = svc.save("demo.hello", ffl_source=WF)
+    r2 = svc.save("demo.hello", ffl_source=WF_V2)
+    assert r2.version == 2 and not r2.deduped
+    assert [x.version for x in svc._catalog.get_revisions_for_slug("demo.hello")] == [1, 2]
+    v1 = svc._catalog.get_revision_by_version("demo.hello", 1)
+    assert '"world"' in v1.ffl_source and v1.flow_id == r1.flow_id  # unchanged
+    assert r2.flow_id != r1.flow_id  # new immutable flow per revision
+
+
+def test_publish_gate_blocks_unattended_run():
+    svc = _svc()
+    svc.save("demo.hello", ffl_source=WF)
+    with pytest.raises(CatalogRunBlocked):
+        svc.run("demo.hello")  # draft → blocked
+    # Attended override is allowed (interactive test run).
+    res = svc.run("demo.hello", allow_unpublished=True, inputs={"name": "a"})
+    assert res["workflow"] == "claude.demo.Hello"
+    # After publish, an unattended run works.
+    rev = svc.publish("demo.hello")
+    assert rev.status == STATUS_PUBLISHED
+    assert svc.run("demo.hello", inputs={"name": "b"})["version"] == 1
+
+
+def test_run_creates_bootstrap_task_and_runner():
+    svc = _svc()
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    res = svc.run("demo.hello", inputs={"name": "z"})
+    task = svc._flows.get_task(res["task_id"])
+    assert task.name == "fw:execute:claude.demo.Hello"
+    assert task.data["inputs"] == {"name": "z"}
+    assert task.data["flow_id"] and task.data["workflow_id"]
+    assert svc._flows.get_runner(res["runner_id"]) is not None
+
+
+def test_rerun_with_different_params_reuses_pinned_revision():
+    svc = _svc()
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    a = svc.run("demo.hello", inputs={"name": "a"})
+    b = svc.run("demo.hello", inputs={"name": "b"})
+    assert a["version"] == b["version"]  # same pinned revision
+    ta, tb = svc._flows.get_task(a["task_id"]), svc._flows.get_task(b["task_id"])
+    assert ta.flow_id == tb.flow_id  # identical workflow body
+    assert ta.data["inputs"] != tb.data["inputs"]  # only params differ
+
+
+def test_invalid_ffl_stored_as_draft_but_not_publishable_or_runnable():
+    svc = _svc()
+    r = svc.save("bad.oops", ffl_source=INVALID)
+    assert r.ok and not r.is_valid and r.warnings
+    with pytest.raises(CatalogError):
+        svc.publish("bad.oops")
+    with pytest.raises(CatalogError):
+        svc.run("bad.oops", allow_unpublished=True)
+
+
+def test_library_composition_merges_and_pins_dependency():
+    svc = _svc()
+    lib = svc.save("lib.geo", kind="library", ffl_source=LIB)
+    svc.publish("lib.geo")
+    dep = svc.save("demo.find", ffl_source=DEP_WF, depends_on=[{"slug": "lib.geo"}])
+    assert dep.ok and dep.is_valid, dep.warnings  # merged compile resolved Locate/Pt
+    rev = svc._catalog.get_revision_by_version("demo.find", 1)
+    assert rev.depends_on and rev.depends_on[0].slug == "lib.geo"
+    assert rev.depends_on[0].version == lib.version
+    # The library FFL was merged into the materialized flow source.
+    flow = svc._flows.get_flow(dep.flow_id)
+    assert "claude.lib.geo" in flow.compiled_sources[0].content
+
+
+def test_library_change_does_not_alter_pinned_dependent():
+    svc = _svc()
+    svc.save("lib.geo", kind="library", ffl_source=LIB)
+    svc.publish("lib.geo")
+    svc.save("demo.find", ffl_source=DEP_WF, depends_on=[{"slug": "lib.geo"}])
+    pinned = svc._catalog.get_revision_by_version("demo.find", 1).depends_on[0].revision_id
+    # Evolve the base library → new library revision.
+    svc.save("lib.geo", kind="library", ffl_source=LIB.replace("lon: Double", "lon: Double, alt: Double"))
+    # The dependent's pinned dependency is unchanged.
+    still = svc._catalog.get_revision_by_version("demo.find", 1).depends_on[0].revision_id
+    assert still == pinned
+
+
+def test_search_ranks_by_query_and_filters_by_tag():
+    svc = _svc()
+    svc.save("demo.hello", ffl_source=WF, title="Hello", description="greets a name", tags=["greeting"])
+    assert any(s["slug"] == "demo.hello" for s in svc.search("greet"))
+    assert any(s["slug"] == "demo.hello" for s in svc.search("", tags=["greeting"]))
+    assert svc.search("nonexistent-zzz") == []

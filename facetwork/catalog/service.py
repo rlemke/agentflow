@@ -1,0 +1,653 @@
+# Copyright 2025 Ralph Lemke
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Catalog service — the logic for storing, versioning, and running Claude
+workflows. Storage-agnostic: it depends on a ``CatalogStore`` (catalog +
+revisions) and a ``flow_store`` (a ``PersistenceAPI`` such as ``MongoStore`` or
+``MemoryStore``) that holds the materialized ``FlowDefinition``/``WorkflowDefinition``
+rows and the bootstrap task that runs them.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+from .entities import (
+    KIND_LIBRARY,
+    KIND_WORKFLOW,
+    STATUS_DRAFT,
+    STATUS_PUBLISHED,
+    CatalogEntry,
+    CatalogRevision,
+    DependencyPin,
+)
+from .store import CatalogStore
+
+
+class CatalogError(Exception):
+    """A catalog operation could not be completed."""
+
+
+class CatalogRunBlocked(CatalogError):
+    """A run was refused by the review gate (revision not published)."""
+
+
+@dataclass
+class SaveResult:
+    """Outcome of ``CatalogService.save``."""
+
+    ok: bool
+    slug: str
+    version: int | None = None
+    revision_id: str | None = None
+    flow_id: str | None = None
+    deduped: bool = False  # identical content already existed; no new version
+    is_valid: bool = True
+    status: str = STATUS_DRAFT
+    warnings: list[str] = field(default_factory=list)
+    error: str | None = None
+
+
+def _now_ms() -> int:
+    return int(time.time() * 1000)
+
+
+class CatalogService:
+    """Store, version, discover, and run Claude-authored FFL workflows."""
+
+    def __init__(self, catalog: CatalogStore, flow_store: Any) -> None:
+        self._catalog = catalog
+        self._flows = flow_store
+
+    # =====================================================================
+    # save — validate, merge pinned deps, compile, content-hash, version
+    # =====================================================================
+
+    def save(
+        self,
+        slug: str,
+        *,
+        ffl_source: str,
+        kind: str = KIND_WORKFLOW,
+        title: str = "",
+        description: str = "",
+        tags: list[str] | None = None,
+        depends_on: list[dict] | None = None,
+        entry_workflow: str | None = None,
+        author: str = "claude",
+        note: str = "",
+    ) -> SaveResult:
+        """Create (or dedup to) an immutable revision of ``slug``.
+
+        Resolves and pins the requested library dependencies, hashes the FFL +
+        pins, and — if that exact content does not already exist — compiles the
+        merged program, materializes a ``FlowDefinition`` + ``WorkflowDefinition``s,
+        and records a new draft revision (version = previous + 1). Identical
+        content returns the existing revision without bumping the version.
+        """
+        tags = tags or []
+        try:
+            direct_pins, dep_sources = self._resolve_deps(depends_on or [])
+        except CatalogError as e:
+            return SaveResult(ok=False, slug=slug, error=str(e))
+
+        content_hash = self._content_hash(ffl_source, direct_pins)
+
+        existing = self._catalog.find_revision_by_hash(slug, content_hash)
+        if existing is not None:
+            # Same body + same pinned deps — reuse it; refresh mutable metadata.
+            self._upsert_entry(slug, kind, title, description, tags, author, existing.version)
+            return SaveResult(
+                ok=True,
+                slug=slug,
+                version=existing.version,
+                revision_id=existing.revision_id,
+                flow_id=existing.flow_id,
+                deduped=True,
+                is_valid=existing.is_valid,
+                status=existing.status,
+                warnings=existing.warnings,
+            )
+
+        # Compile the merged program (deepest deps first, then this source).
+        try:
+            program_dict, combined, is_valid, warnings = self._compile(dep_sources + [ffl_source])
+        except Exception as e:  # parse error — cannot build an AST at all
+            return SaveResult(ok=False, slug=slug, is_valid=False, error=f"parse error: {e}")
+
+        from facetwork.examples import _collect_workflow_names
+
+        workflow_names = _collect_workflow_names(program_dict)
+        entry_name, perr = self._resolve_entry(kind, workflow_names, entry_workflow)
+        if perr:
+            return SaveResult(ok=False, slug=slug, error=perr)
+
+        prev = self._catalog.get_entry(slug)
+        version = (prev.latest_version if prev else 0) + 1
+
+        flow_id, workflow_id = self._materialize(
+            slug, version, combined, program_dict, workflow_names, entry_name
+        )
+
+        wf_ast = self._find_wf(program_dict, entry_name) if entry_name else None
+        from facetwork.runtime.types import generate_id
+
+        rev = CatalogRevision(
+            revision_id=generate_id(),
+            slug=slug,
+            version=version,
+            content_hash=content_hash,
+            ffl_source=ffl_source,
+            flow_id=flow_id,
+            entry_workflow=entry_name or "",
+            workflow_id=workflow_id,
+            workflow_names=workflow_names,
+            param_schema=_param_schema(wf_ast) if wf_ast else [],
+            returns_schema=_returns_schema(wf_ast) if wf_ast else [],
+            facets_used=_collect_call_targets(program_dict),
+            depends_on=direct_pins,
+            status=STATUS_DRAFT,
+            is_valid=is_valid,
+            warnings=warnings,
+            author=author,
+            note=note,
+            created_at=_now_ms(),
+        )
+        self._catalog.save_revision(rev)
+        self._upsert_entry(slug, kind, title, description, tags, author, version)
+
+        return SaveResult(
+            ok=True,
+            slug=slug,
+            version=version,
+            revision_id=rev.revision_id,
+            flow_id=flow_id,
+            is_valid=is_valid,
+            status=STATUS_DRAFT,
+            warnings=warnings,
+        )
+
+    # =====================================================================
+    # publish — the review gate
+    # =====================================================================
+
+    def publish(self, slug: str, version: int | None = None) -> CatalogRevision:
+        """Mark a revision published so it may run unattended. Refuses an
+        invalid revision."""
+        rev = self._require_revision(slug, version)
+        if not rev.is_valid:
+            raise CatalogError(
+                f"{slug} v{rev.version} failed validation and cannot be published: "
+                f"{'; '.join(rev.warnings) or 'invalid FFL'}"
+            )
+        rev.status = STATUS_PUBLISHED
+        self._catalog.save_revision(rev)
+        entry = self._catalog.get_entry(slug)
+        if entry is not None:
+            entry.published_version = max(entry.published_version or 0, rev.version)
+            entry.updated_at = _now_ms()
+            self._catalog.save_entry(entry)
+        return rev
+
+    # =====================================================================
+    # search / get
+    # =====================================================================
+
+    def search(
+        self,
+        query: str = "",
+        *,
+        tags: list[str] | None = None,
+        facet: str | None = None,
+        kind: str | None = None,
+        include_drafts: bool = True,
+    ) -> list[dict]:
+        """Rank catalog entries against a free-text query + filters. Returns
+        lightweight summaries (slug, title, description, tags, versions, param
+        schema of the resolved revision) so Claude can decide reuse vs. author."""
+        q = query.lower().strip()
+        want_tags = {t.lower() for t in (tags or [])}
+        out: list[tuple[int, dict]] = []
+        for entry in self._catalog.list_entries():
+            if kind and entry.kind != kind:
+                continue
+            rev = self._resolve_revision(
+                entry.slug, None, prefer_published=not include_drafts
+            )
+            if rev is None:
+                continue
+            if facet and facet not in rev.facets_used:
+                continue
+            if want_tags and not want_tags.issubset({t.lower() for t in entry.tags}):
+                continue
+            score = self._score(q, entry, rev)
+            if q and score == 0:
+                continue
+            out.append((score, self._summary(entry, rev)))
+        out.sort(key=lambda x: (-x[0], x[1]["slug"]))
+        return [s for _, s in out]
+
+    def get(self, slug: str, version: int | None = None) -> dict | None:
+        """Full detail for one entry + a specific (or latest) revision."""
+        entry = self._catalog.get_entry(slug)
+        if entry is None:
+            return None
+        rev = self._resolve_revision(slug, version, prefer_published=False)
+        detail = self._summary(entry, rev) if rev else {"slug": slug}
+        if rev is not None:
+            detail["ffl_source"] = rev.ffl_source
+            detail["depends_on"] = [
+                {"slug": p.slug, "version": p.version, "revision_id": p.revision_id}
+                for p in rev.depends_on
+            ]
+            detail["all_versions"] = [
+                {"version": r.version, "status": r.status, "is_valid": r.is_valid}
+                for r in self._catalog.get_revisions_for_slug(slug)
+            ]
+        return detail
+
+    # =====================================================================
+    # run — gated bootstrap submission
+    # =====================================================================
+
+    def run(
+        self,
+        slug: str,
+        *,
+        version: int | None = None,
+        inputs: dict | None = None,
+        allow_unpublished: bool = False,
+        task_list: str | None = None,
+    ) -> dict:
+        """Submit a bootstrap ``fw:execute`` task pinned to a revision.
+
+        The review gate: unless ``allow_unpublished`` is set (an explicit
+        opt-in for interactive testing), the resolved revision MUST be
+        published — so unattended runs only ever execute reviewed workflows.
+        Re-running with different ``inputs`` re-uses the identical pinned
+        revision; the workflow body cannot change underneath it.
+        """
+        revs = self._catalog.get_revisions_for_slug(slug)
+        if not revs:
+            raise CatalogError(f"no such workflow: {slug}")
+        if version is not None:
+            rev = self._catalog.get_revision_by_version(slug, version)
+            if rev is None:
+                raise CatalogError(f"no such version: {slug} v{version}")
+        elif allow_unpublished:
+            rev = revs[-1]
+        else:
+            published = [r for r in revs if r.status == STATUS_PUBLISHED]
+            if not published:
+                raise CatalogRunBlocked(
+                    f"{slug} has no published revision (latest is v{revs[-1].version}, "
+                    f"{revs[-1].status}); publish it or pass allow_unpublished=True "
+                    f"for an attended test run."
+                )
+            rev = published[-1]
+        # Per-version gate: a pinned draft still requires the opt-in.
+        if rev.status != STATUS_PUBLISHED and not allow_unpublished:
+            raise CatalogRunBlocked(
+                f"{slug} v{rev.version} is a {rev.status} revision; publish it "
+                f"(or pass allow_unpublished=True for an attended test run) before running."
+            )
+        if not rev.is_valid:
+            raise CatalogError(f"{slug} v{rev.version} is invalid and cannot run")
+        entry = self._catalog.get_entry(slug)
+        if entry and entry.kind == KIND_LIBRARY:
+            raise CatalogError(f"{slug} is a library, not a runnable workflow")
+
+        from facetwork.runtime.entities import (
+            RunnerDefinition,
+            RunnerState,
+            TaskDefinition,
+            TaskState,
+        )
+        from facetwork.runtime.types import generate_id
+
+        try:
+            from facetwork.runtime.task_list_routing import resolve_task_list
+
+            resolved_list = task_list or resolve_task_list(rev.entry_workflow)
+        except Exception:
+            resolved_list = task_list or "default"
+
+        runner_id = generate_id()
+        task_id = generate_id()
+        now = _now_ms()
+        workflow = self._flows.get_workflow(rev.workflow_id)
+
+        self._flows.save_runner(
+            RunnerDefinition(
+                uuid=runner_id,
+                workflow_id=rev.workflow_id,
+                workflow=workflow,
+                state=RunnerState.CREATED,
+            )
+        )
+        self._flows.save_task(
+            TaskDefinition(
+                uuid=task_id,
+                name=f"fw:execute:{rev.entry_workflow}",
+                runner_id=runner_id,
+                workflow_id=rev.workflow_id,
+                flow_id=rev.flow_id,
+                step_id="",
+                state=TaskState.PENDING,
+                created=now,
+                updated=now,
+                task_list_name=resolved_list,
+                data={
+                    "flow_id": rev.flow_id,
+                    "workflow_id": rev.workflow_id,
+                    "workflow_name": rev.entry_workflow,
+                    "inputs": inputs or {},
+                    "runner_id": runner_id,
+                },
+            )
+        )
+        return {
+            "runner_id": runner_id,
+            "task_id": task_id,
+            "slug": slug,
+            "version": rev.version,
+            "workflow": rev.entry_workflow,
+            "task_list": resolved_list,
+        }
+
+    # =====================================================================
+    # internals
+    # =====================================================================
+
+    def _resolve_deps(
+        self, depends_on: list[dict]
+    ) -> tuple[list[DependencyPin], list[str]]:
+        """Pin each requested dependency to a concrete revision and gather the
+        transitive FFL sources (deepest first, deduped by slug)."""
+        direct: list[DependencyPin] = []
+        for spec in depends_on:
+            dep_slug = spec["slug"]
+            dep_rev = self._resolve_revision(
+                dep_slug, spec.get("version"), prefer_published=True
+            )
+            if dep_rev is None:
+                raise CatalogError(f"dependency not found: {dep_slug} v{spec.get('version')}")
+            direct.append(
+                DependencyPin(
+                    slug=dep_slug,
+                    revision_id=dep_rev.revision_id,
+                    version=dep_rev.version,
+                    content_hash=dep_rev.content_hash,
+                )
+            )
+        ordered: list[str] = []
+        seen: set[str] = set()
+        self._gather_sources(direct, seen, ordered, set())
+        return direct, ordered
+
+    def _gather_sources(
+        self,
+        pins: list[DependencyPin],
+        seen: set[str],
+        ordered: list[str],
+        in_progress: set[str],
+    ) -> None:
+        for pin in pins:
+            if pin.slug in seen:
+                continue
+            if pin.slug in in_progress:
+                raise CatalogError(f"dependency cycle through {pin.slug}")
+            rev = self._catalog.get_revision(pin.revision_id)
+            if rev is None:
+                raise CatalogError(f"pinned dependency revision missing: {pin.revision_id}")
+            in_progress.add(pin.slug)
+            self._gather_sources(rev.depends_on, seen, ordered, in_progress)
+            in_progress.discard(pin.slug)
+            seen.add(pin.slug)
+            ordered.append(rev.ffl_source)
+
+    @staticmethod
+    def _content_hash(ffl_source: str, pins: list[DependencyPin]) -> str:
+        key = ffl_source.strip() + "\n--deps--\n" + "\n".join(
+            f"{p.slug}:{p.content_hash}" for p in sorted(pins, key=lambda p: p.slug)
+        )
+        return "sha256:" + hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _compile(sources: list[str]) -> tuple[dict, str, bool, list[str]]:
+        import json
+
+        from facetwork.ast import Program
+        from facetwork.emitter import JSONEmitter
+        from facetwork.parser import FFLParser
+        from facetwork.validator import validate
+
+        parser = FFLParser()
+        programs = [parser.parse(s) for s in sources]
+        merged = Program.merge(programs)
+        result = validate(merged)
+        warnings = [] if result.is_valid else [str(e) for e in result.errors]
+        program_dict = json.loads(JSONEmitter(include_locations=False).emit(merged))
+        return program_dict, "\n\n".join(sources), result.is_valid, warnings
+
+    @staticmethod
+    def _resolve_entry(
+        kind: str, workflow_names: list[str], entry_workflow: str | None
+    ) -> tuple[str | None, str | None]:
+        if kind == KIND_LIBRARY:
+            return (entry_workflow or None), None
+        if not workflow_names:
+            return None, "no workflow defined in the FFL (use kind='library' for facet-only libs)"
+        if entry_workflow:
+            for q in workflow_names:
+                if q == entry_workflow or q.split(".")[-1] == entry_workflow:
+                    return q, None
+            return None, f"entry_workflow {entry_workflow!r} not found in {workflow_names}"
+        if len(workflow_names) == 1:
+            return workflow_names[0], None
+        return None, f"multiple workflows {workflow_names}; specify entry_workflow"
+
+    def _materialize(
+        self,
+        slug: str,
+        version: int,
+        combined_source: str,
+        program_dict: dict,
+        workflow_names: list[str],
+        entry_name: str | None,
+    ) -> tuple[str, str]:
+        """Create the runnable FlowDefinition + WorkflowDefinitions (one
+        immutable flow per revision). Returns (flow_id, entry workflow_id)."""
+        from facetwork.runtime.entities import (
+            FlowDefinition,
+            FlowIdentity,
+            SourceText,
+            WorkflowDefinition,
+        )
+        from facetwork.runtime.types import generate_id
+
+        flow_id = generate_id()
+        now = _now_ms()
+        self._flows.save_flow(
+            FlowDefinition(
+                uuid=flow_id,
+                name=FlowIdentity(name=slug, path=f"claude:{slug}:v{version}", uuid=flow_id),
+                compiled_sources=[SourceText(name="source.ffl", content=combined_source)],
+                compiled_ast=program_dict,
+            )
+        )
+        entry_workflow_id = ""
+        for qname in workflow_names:
+            wf_id = generate_id()
+            if qname == entry_name:
+                entry_workflow_id = wf_id
+            self._flows.save_workflow(
+                WorkflowDefinition(
+                    uuid=wf_id,
+                    name=qname,
+                    namespace_id=f"claude:{slug}",
+                    facet_id=wf_id,
+                    flow_id=flow_id,
+                    starting_step="",
+                    version=str(version),
+                    date=now,
+                )
+            )
+        return flow_id, entry_workflow_id
+
+    @staticmethod
+    def _find_wf(program_dict: dict, name: str) -> dict | None:
+        from facetwork.ast_utils import find_workflow
+
+        return find_workflow(program_dict, name)
+
+    def _resolve_revision(
+        self, slug: str, version: int | None, *, prefer_published: bool
+    ) -> CatalogRevision | None:
+        if version is not None:
+            return self._catalog.get_revision_by_version(slug, version)
+        revs = self._catalog.get_revisions_for_slug(slug)
+        if not revs:
+            return None
+        if prefer_published:
+            pub = [r for r in revs if r.status == STATUS_PUBLISHED]
+            if pub:
+                return pub[-1]
+            return None  # gate: nothing published
+        return revs[-1]
+
+    def _require_revision(self, slug: str, version: int | None) -> CatalogRevision:
+        rev = self._catalog.get_revision_by_version(slug, version) if version is not None else None
+        if rev is None and version is None:
+            revs = self._catalog.get_revisions_for_slug(slug)
+            rev = revs[-1] if revs else None
+        if rev is None:
+            raise CatalogError(f"no such workflow/version: {slug} v{version}")
+        return rev
+
+    def _upsert_entry(
+        self,
+        slug: str,
+        kind: str,
+        title: str,
+        description: str,
+        tags: list[str],
+        author: str,
+        version: int,
+    ) -> None:
+        entry = self._catalog.get_entry(slug)
+        now = _now_ms()
+        if entry is None:
+            entry = CatalogEntry(
+                slug=slug, kind=kind, title=title, description=description, tags=tags,
+                latest_version=version, author=author, created_at=now, updated_at=now,
+            )
+        else:
+            if title:
+                entry.title = title
+            if description:
+                entry.description = description
+            if tags:
+                entry.tags = tags
+            entry.latest_version = max(entry.latest_version, version)
+            entry.updated_at = now
+        self._catalog.save_entry(entry)
+
+    @staticmethod
+    def _score(q: str, entry: CatalogEntry, rev: CatalogRevision) -> int:
+        if not q:
+            return 1
+        score = 0
+        if q in entry.slug.lower():
+            score += 5
+        if q in entry.title.lower():
+            score += 3
+        if q in entry.description.lower():
+            score += 2
+        for t in entry.tags:
+            if q in t.lower():
+                score += 2
+        for f in rev.facets_used:
+            if q in f.lower():
+                score += 1
+        return score
+
+    @staticmethod
+    def _summary(entry: CatalogEntry, rev: CatalogRevision | None) -> dict:
+        s = {
+            "slug": entry.slug,
+            "kind": entry.kind,
+            "title": entry.title,
+            "description": entry.description,
+            "tags": entry.tags,
+            "latest_version": entry.latest_version,
+            "published_version": entry.published_version,
+        }
+        if rev is not None:
+            s.update(
+                {
+                    "version": rev.version,
+                    "status": rev.status,
+                    "is_valid": rev.is_valid,
+                    "entry_workflow": rev.entry_workflow,
+                    "param_schema": rev.param_schema,
+                    "facets_used": rev.facets_used,
+                }
+            )
+        return s
+
+
+# ---------------------------------------------------------------------------
+# AST extraction helpers
+# ---------------------------------------------------------------------------
+
+
+def _param_schema(wf_ast: dict) -> list[dict]:
+    out = []
+    for p in wf_ast.get("params", []) or []:
+        d = p.get("default")
+        if isinstance(d, dict) and "value" in d:
+            d = d["value"]
+        out.append({"name": p.get("name"), "type": p.get("type", "Any"), "default": d})
+    return out
+
+
+def _returns_schema(wf_ast: dict) -> list[dict]:
+    out = []
+    rets = wf_ast.get("returns") or wf_ast.get("return") or []
+    if isinstance(rets, dict):
+        rets = rets.get("fields", []) or rets.get("params", [])
+    for r in rets or []:
+        if isinstance(r, dict):
+            out.append({"name": r.get("name"), "type": r.get("type", "Any")})
+    return out
+
+
+def _collect_call_targets(node: Any, acc: set[str] | None = None) -> list[str]:
+    """Best-effort set of facet/workflow names this program calls (for
+    discovery + a 'facets this needs' hint)."""
+    if acc is None:
+        acc = set()
+    if isinstance(node, dict):
+        if node.get("type") == "CallExpr" and isinstance(node.get("target"), str):
+            acc.add(node["target"])
+        for v in node.values():
+            _collect_call_targets(v, acc)
+    elif isinstance(node, list):
+        for v in node:
+            _collect_call_targets(v, acc)
+    return sorted(acc)
