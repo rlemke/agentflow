@@ -258,6 +258,11 @@ class CatalogService:
                 {"version": r.version, "status": r.status, "is_valid": r.is_valid}
                 for r in self._catalog.get_revisions_for_slug(slug)
             ]
+            detail["flow_id"] = rev.flow_id
+            detail["workflow_id"] = rev.workflow_id
+            detail["author"] = entry.author
+            detail["note"] = rev.note
+            detail["warnings"] = rev.warnings
         return detail
 
     # =====================================================================

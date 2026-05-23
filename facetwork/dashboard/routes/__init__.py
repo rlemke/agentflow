@@ -30,6 +30,7 @@ def register_routes(app: FastAPI) -> None:
     from .domain.census_maps import router as census_maps_router
     from .domain.climate_trends import router as climate_trends_router
     from .domain.site_selection import router as site_selection_router
+    from .execution.catalog import router as catalog_router
     from .execution.events import router as events_router
     from .execution.flows import router as flows_router
     from .execution.runners import router as runners_router
@@ -58,6 +59,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(namespaces_router)
     app.include_router(api_router)
     app.include_router(workflows_router)
+    app.include_router(catalog_router)
     app.include_router(dashboard_v2_router)
     app.include_router(output_router)
     app.include_router(census_maps_router)

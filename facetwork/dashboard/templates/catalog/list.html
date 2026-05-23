@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Catalog — Facetwork{% endblock %}
+{% block content %}
+<h1>Claude Workflow Catalog</h1>
+<p>Versioned, reviewable FFL workflows authored via the <code>fw_catalog_*</code> tools.</p>
+
+{% if unavailable %}
+<article>The workflow catalog requires a MongoDB-backed store; none is configured.</article>
+{% else %}
+<form method="get" action="/catalog" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name, description, tag, or facet…">
+    <button type="submit">Search</button>
+</form>
+
+<figure>
+<table>
+    <thead>
+        <tr>
+            <th>Slug</th>
+            <th>Title</th>
+            <th>Kind</th>
+            <th>Tags</th>
+            <th>Latest</th>
+            <th>Published</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in entries %}
+        <tr>
+            <td><a href="/catalog/{{ e.slug }}">{{ e.slug }}</a></td>
+            <td>{{ e.title }}</td>
+            <td>{{ e.kind }}</td>
+            <td>{% for t in e.tags %}<code>{{ t }}</code> {% endfor %}</td>
+            <td>v{{ e.latest_version }}</td>
+            <td>{% if e.published_version %}v{{ e.published_version }}{% else %}—{% endif %}</td>
+            <td>{{ e.status }}{% if not e.is_valid %} ⚠{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No workflows in the catalog yet. Author one with <code>fw_catalog_save</code>.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</figure>
+{% endif %}
+{% endblock %}

@@ -78,10 +78,18 @@ Typical loop: `fw_catalog_search` → reuse, or `fw_validate` → `fw_catalog_sa
 → (review) `fw_catalog_publish` → `fw_catalog_run` (re-run with new inputs any
 time; the body is pinned).
 
+## Dashboard
+
+A **Catalog** page (`/catalog`, `facetwork/dashboard/routes/execution/catalog.py`)
+lists entries (search by name/description/tag/facet) and, per entry, shows the
+revision history with **Publish** buttons, the parameter schema, pinned library
+deps, the FFL source, a link to the materialized compiled flow, and a **Run**
+form (inputs as JSON, with an "allow unpublished" opt-in) that submits a
+bootstrap run to the fleet. With a non-Mongo store the page degrades to an
+"unavailable" notice.
+
 ## What's not here yet
 
-- A dedicated dashboard "Catalog" page (revisions are already viewable via the
-  existing flow detail pages; a catalog browser is a follow-up).
 - Semantic/embedding search (current search is tags + keyword ranking).
 - Handler-availability preflight on run (the catalog records `facets_used`;
   cross-checking against `fw_list_handlers` before running is a follow-up).
