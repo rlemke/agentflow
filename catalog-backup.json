@@ -1,0 +1,186 @@
+{
+  "format": "facetwork-catalog-backup",
+  "version": 1,
+  "exported_at": 1779544020397,
+  "entries": [
+    {
+      "slug": "greeter",
+      "kind": "workflow",
+      "title": "Greeter",
+      "description": "",
+      "tags": [
+        "example"
+      ],
+      "latest_version": 1,
+      "published_version": 1,
+      "author": "import",
+      "created_at": 1779544015456,
+      "updated_at": 1779544015458
+    },
+    {
+      "slug": "canonical.workflow-andthen",
+      "kind": "workflow",
+      "title": "andThen workflow",
+      "description": "",
+      "tags": [
+        "canonical"
+      ],
+      "latest_version": 1,
+      "published_version": 1,
+      "author": "import",
+      "created_at": 1779544017049,
+      "updated_at": 1779544017052
+    },
+    {
+      "slug": "save-earth.global-map",
+      "kind": "workflow",
+      "title": "Save Earth global map",
+      "description": "",
+      "tags": [
+        "save-earth",
+        "geo"
+      ],
+      "latest_version": 1,
+      "published_version": 1,
+      "author": "import",
+      "created_at": 1779544018785,
+      "updated_at": 1779544018788
+    }
+  ],
+  "revisions": [
+    {
+      "revision_id": "8eb26034-ad95-4eab-b05b-1a2d846da2fa",
+      "slug": "greeter",
+      "version": 1,
+      "content_hash": "sha256:5dddc9e3c59bd19663ca4e859e8a6073f9e9b722c0994464177504f80ce6bf60",
+      "ffl_source": "namespace example_template {\n\n    schema GreetResult {\n        message: String\n    }\n\n    event facet Greet(name: String) => (result: GreetResult)\n\n    workflow Hello(name: String = \"world\") => (greeting: GreetResult) andThen {\n        greeting = Greet(name = $.name)\n    }\n}\n",
+      "flow_id": "6dc185c5-362b-4127-9e2d-86e941bb15cd",
+      "entry_workflow": "example_template.Hello",
+      "workflow_id": "43d21c27-7aa5-40be-ace3-b86cf8864240",
+      "workflow_names": [
+        "example_template.Hello"
+      ],
+      "param_schema": [
+        {
+          "name": "name",
+          "type": "String",
+          "default": "world"
+        }
+      ],
+      "returns_schema": [
+        {
+          "name": "greeting",
+          "type": "GreetResult"
+        }
+      ],
+      "facets_used": [
+        "Greet"
+      ],
+      "depends_on": [],
+      "status": "published",
+      "is_valid": true,
+      "warnings": [],
+      "author": "import",
+      "note": "",
+      "created_at": 1779544015456
+    },
+    {
+      "revision_id": "c9377e16-9bae-45c1-8c5d-b1f4ff5a4cd1",
+      "slug": "canonical.workflow-andthen",
+      "version": 1,
+      "content_hash": "sha256:66946fccaa35a2ed427187bcb18a6e36a081fa892d977d5fe78fb87994eedb6b",
+      "ffl_source": "// Workflow with two sequential steps in one andThen block.\n//\n// Steps inside the same andThen block see each other's results.\n// Reference a previous step's return as `step_name.attribute`.\n\nnamespace etl {\n    event facet Fetch(url: String) => (body: String)\n    event facet Parse(body: String) => (count: Long)\n\n    workflow CountWords(url: String) => (count: Long) andThen {\n        fetched = Fetch(url = $.url)\n        parsed = Parse(body = fetched.body)\n        yield CountWords(count = parsed.count)\n    }\n}\n",
+      "flow_id": "6d63edb7-2c8d-47c8-b830-702b59a010b3",
+      "entry_workflow": "etl.CountWords",
+      "workflow_id": "10199a26-f829-47ad-845b-07ddf39e9f77",
+      "workflow_names": [
+        "etl.CountWords"
+      ],
+      "param_schema": [
+        {
+          "name": "url",
+          "type": "String",
+          "default": null
+        }
+      ],
+      "returns_schema": [
+        {
+          "name": "count",
+          "type": "Long"
+        }
+      ],
+      "facets_used": [
+        "CountWords",
+        "Fetch",
+        "Parse"
+      ],
+      "depends_on": [],
+      "status": "published",
+      "is_valid": true,
+      "warnings": [],
+      "author": "import",
+      "note": "",
+      "created_at": 1779544017047
+    },
+    {
+      "revision_id": "263479e5-b036-4d2d-a149-398238f26b89",
+      "slug": "save-earth.global-map",
+      "version": 1,
+      "content_hash": "sha256:65c54d1cf12a61178a98788d8529b0308110065d51da8753d9f1df5f8528053f",
+      "ffl_source": "// save-earth \u2014 FFL definitions for the environmental-action map pipeline.\n//\n// Mirrors the CLI surface in ``save_earth/tools/`` \u2014 each\n// event facet wraps one _save_earth_tools function, handlers are thin\n// dispatchers that import from _save_earth_tools/ via a sys.path shim.\n// The runtime and the\n// terminal produce identical outputs and share the cache rooted at\n// ``$AFL_CACHE_ROOT/save-earth/``.\n//\n// Data sources covered in this pass:\n//   - OpenLitterMap (crowd-sourced geotagged litter observations)\n//   - EPA Superfund NPL + Brownfields (authoritative remediation sites)\n// Later PRs can add Tree Equity Score, Open311 cleanup feeds, and\n// Surfrider chapters by defining new event facets in save_earth.sources\n// without touching the map-build facet.\n\n// ---------------------------------------------------------------------------\n// Schemas\n// ---------------------------------------------------------------------------\n\nnamespace save_earth.types {\n    /** Result of any source download \u2014 one cached GeoJSON + sidecar.\n      *\n      * Matches the ``FetchResult`` dataclass the _save_earth_tools modules return so\n      * FFL workflows can key downstream steps on ``relative_path`` or\n      * ``feature_count`` without parsing the cached file. */\n    schema SourceFetchResult {\n        cache_type: String,\n        relative_path: String,\n        feature_count: Int,\n        size_bytes: Int,\n        sha256: String,\n        source_url: String,\n        was_cached: Boolean,\n        used_mock: Boolean\n    }\n\n    /** Output of BuildMap: filesystem paths to the rendered bundle.\n      *\n      * ``layer_counts`` is ``{layer_name: feature_count}`` as a JSON\n      * object so the schema stays flat even when new sources get\n      * added later. */\n    schema MapBundle {\n        region_key: String,\n        output_dir: String,\n        html_path: String,\n        layer_count: Int,\n        layer_counts: Json\n    }\n}\n\n// ---------------------------------------------------------------------------\n// Shared mixins\n// ---------------------------------------------------------------------------\n\nnamespace save_earth.mixins {\n    /** Retry a step with exponential backoff. Applied to every\n      * network-facing source download \u2014 OpenLitterMap's servers can\n      * rate-limit, EPA's ArcGIS fronts occasionally 5xx. */\n    facet RetryPolicy(\n        max_retries: Int = 3,\n        backoff_ms: Int = 2000\n    ) => (max_retries: Int, backoff_ms: Int)\n\n    implicit default_retry = RetryPolicy()\n}\n\n// ---------------------------------------------------------------------------\n// Sources \u2014 one event facet per cached data source.\n// ---------------------------------------------------------------------------\n\nnamespace save_earth.sources {\n    use save_earth.types\n\n    /** Download OpenLitterMap geotagged litter observations.\n      *\n      * ``mode = \"clusters\"`` (default) works at any zoom; returns\n      * aggregated cluster points. ``mode = \"points\"`` returns\n      * individual photos but the upstream server enforces\n      * ``zoom >= 15`` and a bounded ``bbox``.\n      *\n      * ``bbox`` is a comma-separated ``min_lon,min_lat,max_lon,max_lat``\n      * string (empty = no bbox). Keeping it a String avoids making\n      * Json mandatory; handlers parse it at dispatch time. */\n    event facet DownloadOpenLitterMap(\n        mode: String = \"clusters\",\n        zoom: Int = 4,\n        bbox: String = \"\",\n        force: Boolean = false,\n        use_mock: Boolean = false\n    ) => (\n        cache_type: String,\n        relative_path: String,\n        feature_count: Int,\n        size_bytes: Int,\n        sha256: String,\n        source_url: String,\n        was_cached: Boolean,\n        used_mock: Boolean\n    ) with RetryPolicy()\n\n    /** Download the EPA Toxic Release Inventory facility table.\n      *\n      * Fetches TRI_FACILITY from ``data.epa.gov/efservice/`` (the\n      * old ``enviro.epa.gov`` URL redirects there). ~65 k rows\n      * total, paginated at 10 k/request. Normalizes longitude sign\n      * for western-hemisphere state codes.\n      *\n      * ``active_only`` (default true) drops facilities whose\n      * ``fac_closed_ind`` is ``\"1\"``. */\n    event facet DownloadTri(\n        active_only: Boolean = true,\n        force: Boolean = false,\n        use_mock: Boolean = false\n    ) => (\n        cache_type: String,\n        relative_path: String,\n        feature_count: Int,\n        size_bytes: Int,\n        sha256: String,\n        source_url: String,\n        was_cached: Boolean,\n        used_mock: Boolean\n    ) with RetryPolicy()\n\n    /** Download an EPA remediation-site dataset.\n      *\n      * ``dataset`` = ``\"superfund\"`` (NPL sites, ~1.4k) or\n      * ``\"brownfields\"`` (ACRES, tens of thousands \u2014 paginated\n      * transparently by the handler). */\n    event facet DownloadEpaCleanups(\n        dataset: String = \"superfund\",\n        force: Boolean = false,\n        use_mock: Boolean = false\n    ) => (\n        cache_type: String,\n        relative_path: String,\n        feature_count: Int,\n        size_bytes: Int,\n        sha256: String,\n        source_url: String,\n        was_cached: Boolean,\n        used_mock: Boolean\n    ) with RetryPolicy()\n}\n\n// ---------------------------------------------------------------------------\n// Maps \u2014 stitch cached GeoJSON into a MapLibre HTML bundle.\n// ---------------------------------------------------------------------------\n\nnamespace save_earth.maps {\n    use save_earth.types\n\n    /** Build a MapLibre HTML map with every cached save-earth layer.\n      *\n      * Auto-discovers cached files \u2014 every OpenLitterMap GeoJSON under\n      * ``cache/save-earth/openlittermap/`` and every EPA dataset\n      * becomes its own toggleable layer. Passing a dependency signal\n      * (e.g. the ``feature_count`` from a just-finished download) lets\n      * the runtime sequence the map build after the downloads it\n      * relies on.\n      *\n      * ``basemap_url`` / ``basemap_attribution`` let the caller swap\n      * the raster basemap. Default is CARTO Voyager \u2014 free, no API\n      * key, works from ``file://`` (unlike tile.openstreetmap.org,\n      * which requires a Referer header per its volunteer-tile\n      * policy). Supports ``{z}/{x}/{y}`` plus optional ``{s}`` for\n      * subdomain rotation. */\n    event facet BuildMap(\n        region: String = \"global\",\n        center_lat: Double = 39.8283,\n        center_lon: Double = -98.5795,\n        zoom: Double = 4.0,\n        basemap_url: String = \"\",\n        basemap_attribution: String = \"\",\n        dependency_signal: Int = 0\n    ) => (\n        region_key: String,\n        output_dir: String,\n        html_path: String,\n        layer_count: Int,\n        layer_counts: Json\n    )\n}\n\n// ---------------------------------------------------------------------------\n// Workflows\n// ---------------------------------------------------------------------------\n\nnamespace save_earth.workflows {\n    use save_earth.types\n\n    /** Download every source and build the combined global map.\n      *\n      * Downloads run in parallel (FFL ``andThen`` siblings are\n      * scheduled concurrently when they don't reference each other).\n      * Any download failure yields ``partial_failure`` with a\n      * describing ``detail`` but does not stop the map build \u2014 the\n      * map-render tool skips absent layers gracefully. */\n    workflow BuildGlobalMap(\n        openlittermap_zoom: Int = 4,\n        include_brownfields: Boolean = true,\n        use_mock: Boolean = false\n    ) => (\n        status: String,\n        html_path: String,\n        detail: String\n    ) andThen {\n        olm = DownloadOpenLitterMap(\n            mode = \"clusters\",\n            zoom = $.openlittermap_zoom,\n            use_mock = $.use_mock\n        ) catch {\n            yield BuildGlobalMap(\n                status = \"partial_failure\",\n                html_path = \"\",\n                detail = \"openlittermap download failed\"\n            )\n        }\n        superfund = DownloadEpaCleanups(\n            dataset = \"superfund\",\n            use_mock = $.use_mock\n        ) catch {\n            yield BuildGlobalMap(\n                status = \"partial_failure\",\n                html_path = \"\",\n                detail = \"epa superfund download failed\"\n            )\n        }\n        brownfields = DownloadEpaCleanups(\n            dataset = \"brownfields\",\n            use_mock = $.use_mock\n        ) catch {\n            yield BuildGlobalMap(\n                status = \"partial_failure\",\n                html_path = \"\",\n                detail = \"epa brownfields download failed\"\n            )\n        }\n        // dependency_signal pins the map build after every download\n        // by referencing a field each produced \u2014 the runtime\n        // resolves that as a data-flow edge.\n        map = BuildMap(\n            region = \"global\",\n            dependency_signal = olm.feature_count + superfund.feature_count + brownfields.feature_count\n        ) catch {\n            yield BuildGlobalMap(\n                status = \"failed\",\n                html_path = \"\",\n                detail = \"map build failed\"\n            )\n        }\n        yield BuildGlobalMap(\n            status = \"completed\",\n            html_path = map.html_path,\n            detail = \"map \" ++ map.region_key ++ \" with \" ++ map.layer_count ++ \" layer(s)\"\n        )\n    }\n\n    /** Download OpenLitterMap at a tighter zoom for a specific region\n      * (useful for country/state maps where the zoom-4 global feed is\n      * too coarse). Chains into the global map build so the new layer\n      * is picked up automatically. */\n    workflow BuildRegionalMap(\n        region_key: String = \"us\",\n        openlittermap_zoom: Int = 8,\n        center_lat: Double = 39.8283,\n        center_lon: Double = -98.5795,\n        zoom: Double = 4.0,\n        use_mock: Boolean = false\n    ) => (status: String, html_path: String) andThen {\n        olm = DownloadOpenLitterMap(\n            mode = \"clusters\",\n            zoom = $.openlittermap_zoom,\n            use_mock = $.use_mock\n        ) catch {\n            yield BuildRegionalMap(status = \"partial_failure\", html_path = \"\")\n        }\n        superfund = DownloadEpaCleanups(\n            dataset = \"superfund\",\n            use_mock = $.use_mock\n        ) catch {\n            yield BuildRegionalMap(status = \"partial_failure\", html_path = \"\")\n        }\n        map = BuildMap(\n            region = $.region_key,\n            center_lat = $.center_lat,\n            center_lon = $.center_lon,\n            zoom = $.zoom,\n            dependency_signal = olm.feature_count + superfund.feature_count\n        ) catch {\n            yield BuildRegionalMap(status = \"failed\", html_path = \"\")\n        }\n        yield BuildRegionalMap(\n            status = \"completed\",\n            html_path = map.html_path\n        )\n    }\n}\n",
+      "flow_id": "892927c4-fa3b-41c7-8e27-28367b4a3353",
+      "entry_workflow": "save_earth.workflows.BuildGlobalMap",
+      "workflow_id": "fe8862c4-e704-4a15-abb8-8caa7f216924",
+      "workflow_names": [
+        "save_earth.workflows.BuildGlobalMap",
+        "save_earth.workflows.BuildRegionalMap"
+      ],
+      "param_schema": [
+        {
+          "name": "openlittermap_zoom",
+          "type": "Int",
+          "default": 4
+        },
+        {
+          "name": "include_brownfields",
+          "type": "Boolean",
+          "default": true
+        },
+        {
+          "name": "use_mock",
+          "type": "Boolean",
+          "default": false
+        }
+      ],
+      "returns_schema": [
+        {
+          "name": "status",
+          "type": "String"
+        },
+        {
+          "name": "html_path",
+          "type": "String"
+        },
+        {
+          "name": "detail",
+          "type": "String"
+        }
+      ],
+      "facets_used": [
+        "BuildGlobalMap",
+        "BuildMap",
+        "BuildRegionalMap",
+        "DownloadEpaCleanups",
+        "DownloadOpenLitterMap",
+        "RetryPolicy"
+      ],
+      "depends_on": [],
+      "status": "published",
+      "is_valid": true,
+      "warnings": [],
+      "author": "import",
+      "note": "",
+      "created_at": 1779544018782
+    }
+  ]
+}
