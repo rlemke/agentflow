@@ -375,6 +375,47 @@ class CatalogService:
         }
 
     # =====================================================================
+    # rematerialize — rebuild a revision's runnable flow (used by restore)
+    # =====================================================================
+
+    def rematerialize(self, rev: CatalogRevision) -> CatalogRevision:
+        """Recompile ``rev`` (own FFL + its pinned dep sources) and materialize
+        a fresh FlowDefinition, returning a copy with new flow_id/workflow_id.
+
+        Preserves identity (revision_id, version, content_hash, status,
+        depends_on); only the runnable flow is regenerated. Used by restore to
+        rebuild flows in a fresh database from the FFL alone. The pinned
+        dependency revisions must already exist in the catalog store.
+        """
+        import copy
+
+        ordered: list[str] = []
+        try:
+            self._gather_sources(rev.depends_on, set(), ordered, set())
+            program_dict, combined, is_valid, warnings = self._compile(ordered + [rev.ffl_source])
+        except Exception as e:
+            broken = copy.deepcopy(rev)
+            broken.flow_id = ""
+            broken.workflow_id = ""
+            broken.is_valid = False
+            broken.warnings = [f"recompile failed: {e}"]
+            return broken
+
+        from facetwork.examples import _collect_workflow_names
+
+        workflow_names = _collect_workflow_names(program_dict)
+        entry_name = rev.entry_workflow or (workflow_names[0] if workflow_names else None)
+        flow_id, workflow_id = self._materialize(
+            rev.slug, rev.version, combined, program_dict, workflow_names, entry_name
+        )
+        out = copy.deepcopy(rev)
+        out.flow_id = flow_id
+        out.workflow_id = workflow_id
+        out.is_valid = is_valid
+        out.warnings = warnings
+        return out
+
+    # =====================================================================
     # internals
     # =====================================================================
 

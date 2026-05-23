@@ -78,6 +78,35 @@ Typical loop: `fw_catalog_search` → reuse, or `fw_validate` → `fw_catalog_sa
 → (review) `fw_catalog_publish` → `fw_catalog_run` (re-run with new inputs any
 time; the body is pinned).
 
+## Backup / restore / import (`scripts/catalog`)
+
+The catalog is self-describing — each revision carries its FFL, content hash,
+version, status, and pinned deps — so a backup is just the entries + revisions as
+JSON; the materialized `FlowDefinition`s are NOT backed up (they're regenerable).
+`facetwork/catalog/backup.py` + `facetwork/catalog/cli.py`, driven by
+`scripts/catalog`:
+
+```bash
+scripts/catalog backup catalog.json          # dump entries + revisions to JSON
+scripts/catalog restore catalog.json          # restore + rebuild runnable flows
+scripts/catalog import path/to/wf.ffl --slug demo.x --publish   # file -> catalog
+scripts/catalog import examples/dir/ --tags imported            # whole directory
+```
+
+- **Backup** writes a portable, readable, git-friendly JSON (`format:
+  facetwork-catalog-backup`).
+- **Restore** writes entries + revisions verbatim — **preserving revision_id,
+  version, content_hash, status, and pinned deps** — then recompiles each
+  revision to rebuild a runnable flow in the target DB (so the publish gate and
+  dependency pins survive a wipe). A revision whose FFL no longer compiles is
+  restored as a non-runnable record and reported. `--no-recompile` skips the flow
+  rebuild.
+- **Import** registers file-based `.ffl` workflows so Claude can discover and run
+  them: each file becomes a catalog entry (slug from the file stem or `--slug`),
+  validated and (optionally) published. This is how existing file-based workflows
+  enter the catalog. Verified end-to-end against MongoDB: import → backup → wipe
+  DB → restore → published + runnable.
+
 ## Dashboard
 
 A **Catalog** page (`/catalog`, `facetwork/dashboard/routes/execution/catalog.py`)
