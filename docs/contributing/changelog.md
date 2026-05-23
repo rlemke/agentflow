@@ -1,6 +1,39 @@
 # Implementation Changelog
 
-**Current version: v0.44.0**
+**Current version: v0.45.0**
+
+## Completed (v0.45.0) — Standalone Example Packages, Package-Unique Tool Libs, AFL_CACHE_DIR Retirement
+
+Extraction of the save-earth example into a standalone package, an ecosystem-wide fix for a shared-`_lib` import collision across co-installed example packages, the tools-pattern contract rewritten for the standalone-package layout, retirement of the legacy `AFL_CACHE_DIR`, and a full modernization of the osm-geocoder test suite. Changes span the framework repo plus the standalone example repos `fwh_save_earth`, `fwh_osm`, and `fwh_noaa_weather`.
+
+**save-earth extracted to a standalone package (`fwh_save_earth`):**
+- `examples/save-earth/` removed from the framework repo; it now ships as the pip-installable `fwh_save_earth` package (`src/save_earth/`), discovered via the `facetwork.examples` entry point (`save-earth = "save_earth:example"`) — mirrors the osm-geocoder / noaa-weather extraction.
+- Handler imports converted to package-relative (`from ..shared.save_earth_utils import ...`); registered as `save-earth` in `scripts/install-example`; added to the CLAUDE.md standalone-examples list; `docker/entrypoint-runner.sh` comment updated (no longer an in-repo example).
+- Verified end-to-end: `BuildGlobalMap(use_mock=true)` → completed, 3-layer MapLibre HTML.
+
+**Package-unique tool-library naming — retire the shared `_lib` (collision fix):**
+- `facetwork.examples.discover_entry_point_examples()` (called by every runner at startup) imports ALL installed example packages into one process. Packages whose handlers imported a bare top-level `_lib` via a `sys.path` shim (osm-geocoder, noaa-weather, save-earth) collided in `sys.modules` — the first cached `_lib` shadowed the rest, so co-installed packages failed handler dispatch with `ImportError: cannot import name X from '_lib'`.
+- Renamed each package's tool library to a package-unique top-level name: `_osm_tools` (fwh_osm), `_noaa_tools` (fwh_noaa_weather), `_save_earth_tools` (fwh_save_earth). Whole-word rename so substrings like `is_library` are untouched. Verified via cold dispatcher loads with another package's lib already cached.
+- Packages already using the package-qualified form (`<pkg>.tools._lib`: jenkins, anthropic, genomics, census-us, sensor-monitoring) were already collision-safe and unchanged.
+- `agent-spec/tools-pattern.agent-spec.yaml`: new `lib_contract.naming` rule mandating a package-unique lib name (with the `sys.modules`-collision rationale and the qualified-import alternative). Repointed ~20 now-dead GitHub source URLs (`fwh_osm/.../tools/_lib/` → `_osm_tools/`).
+
+**tools-pattern contract rewritten for the standalone-package layout (v2):**
+- `agent-spec/tools-pattern.agent-spec.yaml` bumped to version 2: the layout now describes a standalone `fwh_<domain>` package (`src/<import_pkg>/{ffl,handlers,tools}/` + a `pyproject.toml` `facetwork.examples` entry point + vendored `agent-spec/`) instead of an in-repo `examples/<name>/` dir, with an `in_repo_variant` note for the still-supported `discover_local_examples()` form. New-domain checklist + out-of-scope sections updated. The shell-wrapper `../../..` and shim `parents[2]` path math are layout-invariant and unchanged.
+- Re-vendored the corrected `tools-pattern` + `cache-layout` agent-specs byte-identically into `fwh_save_earth`, `fwh_osm`, `fwh_noaa_weather`.
+
+**`AFL_CACHE_DIR` retired in favor of `AFL_DATA_ROOT` / `AFL_CACHE_ROOT`:**
+- The legacy `AFL_CACHE_DIR` had a single consumer — `fwh_osm`'s `handlers/shared/downloader.py` — which was first migrated to the unified sidecar-cache root (`$AFL_DATA_ROOT/cache/osm`, override `AFL_CACHE_ROOT`, `AFL_STORAGE=hdfs` for HDFS) and then deleted entirely (unused legacy, superseded by `_osm_tools/pbf_download.py`).
+- Removed `AFL_CACHE_DIR` from `.env.example`, `docker-compose.yml` (→ `AFL_DATA_ROOT` + `AFL_CACHE_ROOT` passthrough), `docker-compose.hdfs.yml`, `agent-spec/facetwork.agent-spec.yaml`, `docs/reference/cli.md`, and `docs/operations/deployment.md`. No live consumers remain; the current cache root is `$AFL_DATA_ROOT/cache/<namespace>/`.
+
+**osm-geocoder test suite modernized (`fwh_osm`):**
+- Offline suite: 110 failed → 0 (669 passed). Root cause: post-split, handler modules live at `osm_geocoder.handlers.<subpkg>.<module>`, but mock-patch target strings, a dynamic importer, fixture dirs, and `sys.path` conftest hacks still assumed the old flat in-repo layout (the mocks fell through to real Mongo/OSRM/`/Volumes`).
+- Fixed stale `patch("handlers.X...")` strings → package-qualified; rewrote `test_handler_dispatch_osm.py`'s `_osm_import` to locate modules by filesystem search; corrected `afl/` → `ffl/` fixture dirs; neutralized the obsolete `handlers` `sys.path` conftest hacks; untracked 12 committed `.pyc` files.
+- `tests/real/` integration suite modernized to current contracts: ResolveRegion `=> (region: Region)` rewrite of `resolve_region_test.ffl` + `test_region_resolution.py`, a `Download` step added to `population_pipeline.ffl`, the `tests.hdfs_helpers` collection error + `afl.` → `facetwork.` import fixed, and `--mongodb`/`--hdfs` opt-in flags registered so the live suites skip cleanly during a normal offline run.
+
+**Docs:**
+- `docs/thesis/thesis.md` (+ rebuilt `thesis.pdf`): example-package layout `tools/_lib/` → `tools/_<pkg>_tools/`.
+- `examples/doc/GUIDE.md` and `scripts/build-cache-index.py` comments aligned to the package-unique tool-lib naming.
+- `fwh_osm` `cache/README.md` + `shapefiles/README.md`: repointed downloader references to `_osm_tools/pbf_download.py` and corrected the PBF cache-freshness description (MD5-sidecar, not exists-on-disk).
 
 ## Completed (v0.44.0) — Workflow Resilience, Dashboard Reaper, osm2pgsql Compatibility
 
