@@ -81,6 +81,39 @@ def test_catalog_page_links_to_docs(client):
     assert "docs/architecture/claude-workflow-catalog.md" in r.text  # catalog overview doc
 
 
+def test_render_summary_md_renders_subset_safely():
+    from facetwork.dashboard.routes.execution.catalog import render_summary_md
+
+    html = render_summary_md(
+        "Built from a request.\n\n"
+        "**Approach**:\n\n"
+        "1. step `one`\n"
+        "2. step *two*\n\n"
+        "See [docs](https://example.com/x)."
+    )
+    assert "<strong>Approach</strong>" in html
+    assert "<ol>" in html and "<li>step <code>one</code></li>" in html
+    assert "<em>two</em>" in html
+    assert '<a href="https://example.com/x" target="_blank" rel="noopener">docs</a>' in html
+    # raw HTML is escaped (XSS-safe), markdown still applies around it
+    evil = render_summary_md("<script>alert(1)</script> **bold**")
+    assert "<script>" not in evil and "&lt;script&gt;" in evil
+    assert "<strong>bold</strong>" in evil
+
+
+def test_catalog_detail_renders_summary_markdown(client):
+    tc, store = client
+    from facetwork.catalog import CatalogService, MongoCatalogStore
+
+    svc = CatalogService(MongoCatalogStore(store._db), store)
+    svc.save(
+        "demo.adder", ffl_source=ADDER, title="Adder",
+        summary="**Why**: adds ints.\n\n1. take a\n2. take b",
+    )
+    body = tc.get("/catalog/demo.adder").text
+    assert "<strong>Why</strong>" in body and "<ol>" in body
+
+
 def test_catalog_detail_shows_authoring_summary(client):
     tc, store = client
     from facetwork.catalog import CatalogService, MongoCatalogStore

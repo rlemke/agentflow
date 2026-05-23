@@ -22,10 +22,10 @@
 </p>
 {% if d.warnings %}<article><strong>Validation:</strong> {{ d.warnings | join("; ") }}</article>{% endif %}
 
-{% if d.summary %}
+{% if summary_html %}
 <article>
     <header><strong>Purpose &amp; authoring summary</strong></header>
-    <div style="white-space: pre-wrap">{{ d.summary }}</div>
+    {{ summary_html | safe }}
 </article>
 {% endif %}
 

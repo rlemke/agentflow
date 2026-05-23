@@ -42,6 +42,79 @@ def _service(store):
     return CatalogService(MongoCatalogStore(db), store)
 
 
+def render_summary_md(text: str | None) -> str:
+    """Render a workflow's authoring summary (a small markdown subset) to safe
+    HTML. HTML in the source is escaped first (XSS-safe), then only our own tags
+    are emitted: paragraphs, line breaks, `**bold**`, `*italic*`, `` `code` ``,
+    `# headings`, ordered/unordered lists, and `[text](http(s)://…)` links. No
+    third-party dependency. Unrecognized syntax stays as escaped text."""
+    import html
+    import re
+
+    if not text or not text.strip():
+        return ""
+
+    text = html.escape(text, quote=False)  # neutralize raw HTML; keep quotes readable
+
+    # Stash inline-code spans so their contents aren't further formatted.
+    codes: list[str] = []
+
+    def _stash(m: re.Match) -> str:
+        codes.append(m.group(1))
+        return f"\x00{len(codes) - 1}\x00"
+
+    text = re.sub(r"`([^`]+)`", _stash, text)
+
+    def inline(s: str) -> str:
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"(?<!\*)\*(?!\s)([^*\n]+?)\*", r"<em>\1</em>", s)
+        s = re.sub(
+            r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+            r'<a href="\2" target="_blank" rel="noopener">\1</a>',
+            s,
+        )
+        return re.sub(r"\x00(\d+)\x00", lambda m: f"<code>{codes[int(m.group(1))]}</code>", s)
+
+    lines = text.split("\n")
+    out: list[str] = []
+    para: list[str] = []
+
+    def flush() -> None:
+        if para:
+            out.append("<p>" + "<br>".join(inline(x) for x in para) + "</p>")
+            para.clear()
+
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        if not s:
+            flush()
+            i += 1
+        elif h := re.match(r"^(#{1,6})\s+(.*)", s):
+            flush()
+            out.append(f"<h{min(len(h.group(1)) + 3, 6)}>{inline(h.group(2))}</h{min(len(h.group(1)) + 3, 6)}>")
+            i += 1
+        elif re.match(r"^\d+\.\s+", s):
+            flush()
+            items = []
+            while i < len(lines) and re.match(r"^\s*\d+\.\s+", lines[i]):
+                items.append(inline(re.sub(r"^\s*\d+\.\s+", "", lines[i].strip())))
+                i += 1
+            out.append("<ol>" + "".join(f"<li>{x}</li>" for x in items) + "</ol>")
+        elif re.match(r"^[-*]\s+", s):
+            flush()
+            items = []
+            while i < len(lines) and re.match(r"^\s*[-*]\s+", lines[i]):
+                items.append(inline(re.sub(r"^\s*[-*]\s+", "", lines[i].strip())))
+                i += 1
+            out.append("<ul>" + "".join(f"<li>{x}</li>" for x in items) + "</ul>")
+        else:
+            para.append(s)
+            i += 1
+    flush()
+    return "\n".join(out)
+
+
 def _parse_version(raw: str | None) -> int | None:
     if raw is None or str(raw).strip() == "":
         return None
@@ -115,6 +188,7 @@ def catalog_detail(
             "d": detail,
             "slug": slug,
             "error": error,
+            "summary_html": render_summary_md(detail.get("summary")) if detail else "",
             "default_inputs_json": json.dumps(default_inputs, indent=2, default=str),
             "unavailable": svc is None,
             "active_tab": "catalog",
