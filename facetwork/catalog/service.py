@@ -354,11 +354,14 @@ class CatalogService:
                 f"(or fix the handler), then retry."
             )
 
+        import copy
+
         from facetwork.runtime.entities import (
             RunnerDefinition,
             RunnerState,
             TaskDefinition,
             TaskState,
+            WorkflowDefinition,
         )
         from facetwork.runtime.types import generate_id
 
@@ -371,14 +374,38 @@ class CatalogService:
 
         runner_id = generate_id()
         task_id = generate_id()
+        # Fresh EXECUTION workflow id per run. rev.workflow_id is the immutable
+        # *definition* id (shared by every run of this revision); reusing it as
+        # the execution scope let a prior run's steps/terminal state collide with
+        # a new run. Mint a per-run WorkflowDefinition pointing at the same flow +
+        # entry workflow — exactly what the CLI submit path does (a fresh wf_id
+        # each run).
+        exec_workflow_id = generate_id()
         now = _now_ms()
-        workflow = self._flows.get_workflow(rev.workflow_id)
+
+        definition = self._flows.get_workflow(rev.workflow_id)
+        if definition is not None:
+            run_workflow = copy.deepcopy(definition)
+            run_workflow.uuid = exec_workflow_id
+            run_workflow.facet_id = exec_workflow_id
+        else:
+            run_workflow = WorkflowDefinition(
+                uuid=exec_workflow_id,
+                name=rev.entry_workflow,
+                namespace_id=f"claude:{slug}",
+                facet_id=exec_workflow_id,
+                flow_id=rev.flow_id,
+                starting_step="",
+                version=str(rev.version),
+                date=now,
+            )
+        self._flows.save_workflow(run_workflow)
 
         self._flows.save_runner(
             RunnerDefinition(
                 uuid=runner_id,
-                workflow_id=rev.workflow_id,
-                workflow=workflow,
+                workflow_id=exec_workflow_id,
+                workflow=run_workflow,
                 state=RunnerState.CREATED,
             )
         )
@@ -387,7 +414,7 @@ class CatalogService:
                 uuid=task_id,
                 name=f"fw:execute:{rev.entry_workflow}",
                 runner_id=runner_id,
-                workflow_id=rev.workflow_id,
+                workflow_id=exec_workflow_id,
                 flow_id=rev.flow_id,
                 step_id="",
                 state=TaskState.PENDING,
@@ -396,7 +423,7 @@ class CatalogService:
                 task_list_name=resolved_list,
                 data={
                     "flow_id": rev.flow_id,
-                    "workflow_id": rev.workflow_id,
+                    "workflow_id": exec_workflow_id,
                     "workflow_name": rev.entry_workflow,
                     "inputs": inputs or {},
                     "runner_id": runner_id,
@@ -406,6 +433,7 @@ class CatalogService:
         return {
             "runner_id": runner_id,
             "task_id": task_id,
+            "workflow_id": exec_workflow_id,
             "slug": slug,
             "version": rev.version,
             "workflow": rev.entry_workflow,

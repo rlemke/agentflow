@@ -230,6 +230,28 @@ def test_run_preflight_passes_when_handler_registered():
     assert out["workflow"] == "claude.demo.Hello"
 
 
+def test_run_mints_fresh_execution_workflow_id_per_run():
+    # Each run gets its own execution workflow_id (distinct from the definition
+    # and from other runs) so a prior run's state can't collide.
+    svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([_reg("claude.demo.Greet")]))
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    rev = svc._catalog.get_revision_by_version("demo.hello", 1)
+
+    r1 = svc.run("demo.hello", inputs={"name": "a"})
+    r2 = svc.run("demo.hello", inputs={"name": "b"})
+
+    assert r1["workflow_id"] != r2["workflow_id"]
+    assert r1["workflow_id"] != rev.workflow_id and r2["workflow_id"] != rev.workflow_id
+    assert r1["workflow"] == r2["workflow"] == rev.entry_workflow
+    # both per-run WorkflowDefinitions reference the same immutable flow
+    wf1 = svc._flows.get_workflow(r1["workflow_id"])
+    wf2 = svc._flows.get_workflow(r2["workflow_id"])
+    assert wf1.flow_id == wf2.flow_id == rev.flow_id
+    # the bootstrap task carries the execution id, not the definition id
+    assert r1["workflow_id"] != rev.workflow_id
+
+
 def test_run_preflight_skipped_when_registry_empty():
     # No registrations at all (no runner up) -> can't assess -> don't false-block.
     svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([]))
