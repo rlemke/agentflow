@@ -32,6 +32,11 @@
 {% block content %}
 <h1>Claude Workflow Catalog</h1>
 <p>Versioned, reviewable FFL workflows authored via the <code>fw_catalog_*</code> tools.</p>
+<p><small>Docs:
+    <a href="https://github.com/rlemke/facetwork/blob/main/docs/architecture/claude-workflow-catalog.md" target="_blank" rel="noopener">how the catalog works</a>
+    ·
+    <a href="https://github.com/rlemke/facetwork/blob/main/docs/architecture/catalog-use-resolution.md" target="_blank" rel="noopener"><code>use</code> resolution in the catalog</a>
+</small></p>
 
 {% if unavailable %}
 <article>The workflow catalog requires a MongoDB-backed store; none is configured.</article>

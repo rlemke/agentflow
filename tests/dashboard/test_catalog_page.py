@@ -74,6 +74,13 @@ def test_catalog_list_renders_entry(client):
     assert "Catalog" in r.text and "demo.adder" in r.text
 
 
+def test_catalog_page_links_to_docs(client):
+    tc, store = client
+    r = tc.get("/catalog")
+    assert "docs/architecture/catalog-use-resolution.md" in r.text  # use-resolution doc
+    assert "docs/architecture/claude-workflow-catalog.md" in r.text  # catalog overview doc
+
+
 def test_catalog_detail_shows_ffl_params_and_run_form(client):
     tc, store = client
     _seed(store)
