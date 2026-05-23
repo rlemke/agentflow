@@ -129,7 +129,7 @@ Both deployment models support horizontal scaling across multiple machines. Mult
 
 1. **Shared MongoDB**: All machines point to the same `AFL_MONGODB_URL` (use IP or DNS hostname accessible from all nodes)
 2. **Handler code**: Same repo checkout with `.venv` and dependencies installed on each machine
-3. **Shared data** (optional): NFS/SMB mount for `AFL_GEOFABRIK_MIRROR`, `AFL_CACHE_DIR`, etc. — or let each machine download its own copies (cache misses are handled automatically)
+3. **Shared data** (optional): NFS/SMB mount for `AFL_GEOFABRIK_MIRROR`, `AFL_DATA_ROOT`, etc. — or let each machine download its own copies (cache misses are handled automatically)
 
 ```bash
 # On each machine: start local runner(s) pointing to shared MongoDB
@@ -369,7 +369,7 @@ When using the override file, the following environment variables are set automa
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `AFL_CACHE_DIR` | `hdfs://afl-hadoop-hdfs:8020/osm-cache` | OSM PBF download cache |
+| `AFL_CACHE_ROOT` | `hdfs://afl-hadoop-hdfs:8020/cache` | Sidecar cache root (OSM PBF + handler caches under `<root>/<namespace>/`). Or set `AFL_STORAGE=hdfs` to root everything at `/user/afl`. (Replaces the retired `AFL_CACHE_DIR`.) |
 | `GRAPHHOPPER_GRAPH_DIR` | `hdfs://afl-hadoop-hdfs:8020/graphhopper` | GraphHopper routing graphs |
 | `AFL_GTFS_CACHE_DIR` | `hdfs://afl-hadoop-hdfs:8020/gtfs-cache` | GTFS feed cache |
 

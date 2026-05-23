@@ -114,7 +114,7 @@ SMB (Samba/CIFS) volumes mounted on macOS (e.g. `/Volumes/afl_data/`) exhibit a 
 **Impact on Facetwork**: The Geofabrik mirror (`AFL_GEOFABRIK_MIRROR`) contains pre-existing `.osm.pbf` files in nested directories (e.g. `north-america/us/alabama-latest.osm.pbf`). When mounted from an SMB share, containers cannot read these files even though `listdir()` shows them.
 
 **Workarounds**:
-1. **Use a local APFS drive for the mirror** (recommended): Set `AFL_GEOFABRIK_MIRROR` to a local or directly-attached drive (e.g. `/Volumes/afl_data_local/osm`). SMB is fine for write targets (`AFL_CACHE_DIR`, `AFL_OSM_OUTPUT_BASE`, `AFL_LOCAL_OUTPUT_DIR`) since containers create those files.
+1. **Use a local APFS drive for the mirror** (recommended): Set `AFL_GEOFABRIK_MIRROR` to a local or directly-attached drive (e.g. `/Volumes/afl_data_local/osm`). SMB is fine for write targets (`AFL_DATA_ROOT`, `AFL_OSM_OUTPUT_BASE`, `AFL_LOCAL_OUTPUT_DIR`) since containers create those files.
 2. **NFS export from the NAS**: NFS does not have this VirtioFS bug. If your NAS supports NFS, export the data directory and mount via NFS on macOS.
 3. **readdir fallback**: The downloader (`https://github.com/rlemke/fwh_osm/blob/main/src/osm_geocoder/handlers/shared/downloader.py`) includes `_mirror_file_exists()` which falls back to `os.listdir()` when `os.path.isfile()` fails. This detects file presence but cannot fix the `open()` failure for actual reads.
 
@@ -138,7 +138,7 @@ SMB (Samba/CIFS) volumes mounted on macOS (e.g. `/Volumes/afl_data/`) exhibit a 
 AFL_GEOFABRIK_MIRROR=/Volumes/afl_data_local/osm
 
 # Write targets on NAS (SMB is fine for container-created files)
-AFL_CACHE_DIR=/Volumes/afl_data/osm-cache
+AFL_DATA_ROOT=/Volumes/afl_data
 AFL_OSM_OUTPUT_BASE=/Volumes/afl_data/osm-output
 AFL_LOCAL_OUTPUT_DIR=/Volumes/afl_data/output
 
@@ -181,7 +181,7 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | `AFL_JENKINS` | `false` | Enable Jenkins profile |
 | `AFL_GEOFABRIK_MIRROR` | `/Volumes/afl_data/osm` | Path to local Geofabrik mirror; mounted read-only at `/data/osm-mirror` in containers |
 | **OSM data paths** | | |
-| `AFL_CACHE_DIR` | `/tmp/osm-cache` | OSM cache directory (local path or HDFS URI) |
+| `AFL_DATA_ROOT` | `/Volumes/afl_data` | Unified data root; OSM/handler caches live under `$AFL_DATA_ROOT/cache/<namespace>/`. Override just the cache with `AFL_CACHE_ROOT`; set `AFL_STORAGE=hdfs` for HDFS. (Replaces the retired `AFL_CACHE_DIR`.) |
 | `AFL_OSM_OUTPUT_BASE` | `/tmp` | OSM extractor output base (local path or HDFS URI) |
 | `AFL_LOCAL_OUTPUT_DIR` | `/Volumes/afl_data/output` | Handler output files (reports, maps, stats, GeoJSON). Used by all examples: osm-geocoder, census-us, hiv-drug-resistance, monte-carlo-risk, maven. Falls back to `/tmp` when unset. |
 | `AFL_LOCALIZE_MOUNTS` | *(empty)* | Comma-separated path prefixes for Docker mount paths that `localize()` should copy to container-local storage before processing. Avoids VirtioFS hangs on large files. Example: `/data/osm-mirror` |
