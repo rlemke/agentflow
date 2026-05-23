@@ -485,6 +485,15 @@ def create_server(
                             "items": {"type": "object"},
                         },
                         "note": {"type": "string", "description": "Changelog note for this revision"},
+                        "summary": {
+                            "type": "string",
+                            "description": (
+                                "Markdown narrative of WHY this workflow exists — the request/intent "
+                                "it was built from and how it addresses it. Recorded with the revision "
+                                "and shown in the UI so the workflow can be understood, not just read "
+                                "as FFL. Provide this whenever you author a workflow from a description."
+                            ),
+                        },
                     },
                     "required": ["slug", "ffl_source"],
                 },
@@ -1465,6 +1474,7 @@ def _tool_catalog_save(arguments: dict[str, Any], get_store: Any) -> list[TextCo
             entry_workflow=arguments.get("entry_workflow"),
             author=arguments.get("author", "claude"),
             note=arguments.get("note", ""),
+            summary=arguments.get("summary", ""),
         )
         return _catalog_text(asdict(res))
     except Exception as e:

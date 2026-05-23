@@ -25,7 +25,7 @@ composition, and a review gate.
    - `claude_workflow_revisions` — append-only, immutable **`CatalogRevision`**s
      (frozen `ffl_source`, `content_hash`, the materialized `flow_id` +
      entry `workflow_id`, `param_schema`, `facets_used`, pinned `depends_on`,
-     `status`, `is_valid`).
+     `status`, `is_valid`, and a descriptive `summary`).
 
 `facetwork/catalog/`: `entities.py`, `store.py` (`CatalogStore` protocol +
 `InMemoryCatalogStore` + `MongoCatalogStore`), `service.py` (`CatalogService`).
@@ -44,6 +44,13 @@ testable offline.
   new version. The old revision — its own `FlowDefinition` — stays runnable
   forever. A run **pins a revision**, so re-running with new inputs always
   re-uses the identical body.
+- **The authoring summary travels with the body.** Each revision carries a
+  free-text (markdown) `summary` — the request the workflow was built from and
+  how it addresses it — recorded by the author (Claude via `fw_catalog_save`'s
+  `summary`, or `--summary` / `--summary-file` on `import`) and shown in the
+  dashboard, so the workflow can be *understood*, not just read as FFL. It is
+  descriptive metadata (not part of the content hash), so refining it on a
+  re-save updates it without churning the version.
 
 ## Review gate
 
@@ -101,7 +108,7 @@ On the `agentflow` MCP server:
 |------|---------|
 | `fw_catalog_search` | Find a reusable workflow before authoring (query/tags/facet/kind) |
 | `fw_catalog_get` | Inspect an entry + a revision (FFL, params, deps, versions) |
-| `fw_catalog_save` | Validate + merge deps + compile → immutable draft revision (no file) |
+| `fw_catalog_save` | Validate + merge deps + compile → immutable draft revision (no file). Pass `summary` to record *why* the workflow exists (intent / conversation), shown in the UI |
 | `fw_catalog_publish` | Review-approve a revision for unattended runs |
 | `fw_catalog_run` | Pin a revision + post a `fw:execute` task with inputs |
 
@@ -158,9 +165,10 @@ A **Catalog** page (`/catalog`, `facetwork/dashboard/routes/execution/catalog.py
 with three modes: a **grouped overview** (packages/libraries with member counts,
 standalone workflows, and a per-package workflow tally), a `?package=<slug>`
 drill-in listing one package's workflows, and `?q=` ranked search. Per entry it
-shows the revision history with **Publish** buttons, the parameter schema, pinned
-library deps, the FFL source, a link to the materialized compiled flow, links to
-these design docs, and a **Run** form (inputs as JSON, with an "allow unpublished"
+shows the authoring **summary** (purpose / intent), the revision history with
+**Publish** buttons, the parameter schema, pinned library deps, the FFL source, a
+link to the materialized compiled flow, links to these design docs, and a **Run**
+form (inputs as JSON, with an "allow unpublished"
 opt-in) that submits a bootstrap run to the fleet. With a non-Mongo store the page
 degrades to an "unavailable" notice. The grouping is backed by
 `CatalogService.list_all()` — the same data the `scripts/catalog list` CLI uses.

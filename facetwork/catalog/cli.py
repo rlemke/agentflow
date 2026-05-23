@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
 
 
@@ -92,6 +93,9 @@ def _build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--entry-workflow", default=None, help="Entry workflow name if multiple")
     pi.add_argument("--depends-on", default="", help="Comma-separated lib slugs, e.g. lib.a,lib.b@2")
     pi.add_argument("--publish", action="store_true", help="Publish each imported revision")
+    pi.add_argument("--summary", default="",
+                    help="Markdown narrative: why the workflow exists (intent / conversation summary)")
+    pi.add_argument("--summary-file", default=None, help="Read --summary from this file (long text)")
 
     pp = sub.add_parser(
         "import-package",
@@ -234,6 +238,7 @@ def main(argv: list[str] | None = None) -> int:
             "entry_workflow": args.entry_workflow,
             "depends_on": _parse_depends_on(args.depends_on) or None,
             "author": "import",
+            "summary": (Path(args.summary_file).read_text() if args.summary_file else args.summary),
         }
         try:
             results = backup.import_files(

@@ -81,6 +81,17 @@ def test_catalog_page_links_to_docs(client):
     assert "docs/architecture/claude-workflow-catalog.md" in r.text  # catalog overview doc
 
 
+def test_catalog_detail_shows_authoring_summary(client):
+    tc, store = client
+    from facetwork.catalog import CatalogService, MongoCatalogStore
+
+    svc = CatalogService(MongoCatalogStore(store._db), store)
+    svc.save("demo.adder", ffl_source=ADDER, title="Adder",
+             summary="Adds two integers; built from a calculator request.")
+    body = tc.get("/catalog/demo.adder").text
+    assert "Purpose" in body and "calculator request" in body
+
+
 def test_catalog_detail_shows_ffl_params_and_run_form(client):
     tc, store = client
     _seed(store)

@@ -69,6 +69,10 @@ class CatalogRevision:
     warnings: list[str] = field(default_factory=list)
     author: str = "claude"
     note: str = ""
+    # Free-text (markdown) narrative of *why* this revision exists — the request
+    # it was built from and how the workflow addresses it. Recorded by the author
+    # (Claude) so the catalog/UI can explain the workflow, not just show its FFL.
+    summary: str = ""
     created_at: int = 0
 
 

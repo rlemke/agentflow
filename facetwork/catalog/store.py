@@ -78,6 +78,7 @@ def _doc_to_revision(doc: dict) -> CatalogRevision:
         warnings=doc.get("warnings", []),
         author=doc.get("author", "claude"),
         note=doc.get("note", ""),
+        summary=doc.get("summary", ""),
         created_at=doc.get("created_at", 0),
     )
 

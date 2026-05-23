@@ -9,6 +9,7 @@ A layer (`facetwork/catalog/`) that lets Claude author, store, version, discover
 **Core (`entities.py` / `store.py` / `service.py`):**
 - Immutable revisions: `content_hash = sha256(ffl_source + sorted pinned-dep hashes)`; identical content de-dupes, any change bumps the version; params are runtime inputs, never baked in.
 - **Review gate**: `status: draft | published`; `run` requires published on the unattended path (`allow_unpublished=True` opts into a draft); `publish()` refuses invalid FFL.
+- **Authoring summary**: each revision carries a free-text `summary` (markdown) — the request the workflow was built from and how it addresses it — set via `fw_catalog_save`'s `summary` (or `import --summary`/`--summary-file`) and shown on the dashboard detail page, so an AI-authored workflow can be understood, not just read as FFL. Descriptive (not hashed); refreshable on a dedup re-save.
 - **Library composition**: `kind="library"` entries; workflows `depends_on` libraries pinned by revision, merged at compile time. FFL `use` resolves only against own source + pinned libs — the catalog is hermetic (never the filesystem or the resolver's `afl_sources`): [docs/architecture/catalog-use-resolution.md](../architecture/catalog-use-resolution.md).
 - MCP tools: `fw_catalog_{search,get,save,publish,run}`.
 

@@ -307,6 +307,17 @@ def test_run_preflight_ignores_guarded_optional_import(tmp_path):
     assert out["workflow"] == "claude.demo.Hello"
 
 
+def test_save_records_authoring_summary_and_dedup_refreshes_it():
+    svc = _svc()
+    svc.save("demo.hello", ffl_source=WF,
+             summary="Greets a user by name. Built from the 'greeter' request.")
+    assert "greet" in svc.get("demo.hello")["summary"].lower()
+    # Re-saving identical FFL de-dupes but updates the (descriptive) summary.
+    r2 = svc.save("demo.hello", ffl_source=WF, summary="Refined: greets by name, returns schema R.")
+    assert r2.deduped and r2.version == 1
+    assert "Refined" in svc.get("demo.hello")["summary"]
+
+
 def test_list_all_groups_packages_and_members():
     svc = _svc()
     svc.save("lib.geo", kind="library", ffl_source=LIB)

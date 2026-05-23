@@ -136,6 +136,16 @@ def test_import_directory_derives_slugs(tmp_path):
     assert "adder" in imported and "geo-lib" in imported  # stem, _ -> -
 
 
+def test_summary_survives_backup_restore():
+    src = _svc()
+    src.save("demo.adder", ffl_source=WF, summary="Adds two ints; from a calculator request.")
+    src.publish("demo.adder")
+    data = backup.export(src)
+    dst = _svc()
+    backup.restore(data, dst)
+    assert "calculator request" in dst.get("demo.adder")["summary"]
+
+
 def test_restore_is_idempotent():
     src = _svc()
     _seed_full(src)

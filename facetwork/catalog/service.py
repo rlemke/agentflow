@@ -90,6 +90,7 @@ class CatalogService:
         entry_workflow: str | None = None,
         author: str = "claude",
         note: str = "",
+        summary: str = "",
     ) -> SaveResult:
         """Create (or dedup to) an immutable revision of ``slug``.
 
@@ -111,6 +112,11 @@ class CatalogService:
         if existing is not None:
             # Same body + same pinned deps — reuse it; refresh mutable metadata.
             self._upsert_entry(slug, kind, title, description, tags, author, existing.version)
+            # The summary is descriptive (not part of the hash); let a re-save
+            # with a better narrative update it without churning the version.
+            if summary and existing.summary != summary:
+                existing.summary = summary
+                self._catalog.save_revision(existing)
             return SaveResult(
                 ok=True,
                 slug=slug,
@@ -165,6 +171,7 @@ class CatalogService:
             warnings=warnings,
             author=author,
             note=note,
+            summary=summary,
             created_at=_now_ms(),
         )
         self._catalog.save_revision(rev)
@@ -287,6 +294,7 @@ class CatalogService:
             detail["workflow_id"] = rev.workflow_id
             detail["author"] = entry.author
             detail["note"] = rev.note
+            detail["summary"] = rev.summary
             detail["warnings"] = rev.warnings
         return detail
 
