@@ -74,6 +74,27 @@ def _svc():
     return CatalogService(InMemoryCatalogStore(), _FlowStore())
 
 
+class _RegFlowStore(_FlowStore):
+    """_FlowStore + a handler registry, so the run() preflight is exercised."""
+
+    def __init__(self, regs):
+        super().__init__()
+        self._regs = list(regs)
+
+    def list_handler_registrations(self):
+        return list(self._regs)
+
+    def get_handler_registration(self, name):
+        return next((r for r in self._regs if r.facet_name == name), None)
+
+
+def _reg(facet_name):
+    # module_uri="json" is importable, so preload(verify=True) keeps it.
+    from facetwork.runtime.entities.server import HandlerRegistration
+
+    return HandlerRegistration(facet_name=facet_name, module_uri="json", entrypoint="dumps")
+
+
 def test_save_creates_draft_and_materializes_viewable_flow():
     svc = _svc()
     r = svc.save("demo.hello", ffl_source=WF, title="Hello", description="greets", tags=["demo"])
@@ -188,6 +209,34 @@ def test_search_ranks_by_query_and_filters_by_tag():
     assert any(s["slug"] == "demo.hello" for s in svc.search("greet"))
     assert any(s["slug"] == "demo.hello" for s in svc.search("", tags=["greeting"]))
     assert svc.search("nonexistent-zzz") == []
+
+
+def test_run_preflight_blocks_when_event_facet_handler_missing():
+    # Registry is non-empty (a dummy handler) but lacks a handler for the
+    # workflow's event facet (claude.demo.Greet) -> run is refused up front.
+    svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([_reg("other.Thing")]))
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    with pytest.raises(CatalogRunBlocked) as ei:
+        svc.run("demo.hello", inputs={"name": "x"})
+    assert "claude.demo.Greet" in str(ei.value)
+
+
+def test_run_preflight_passes_when_handler_registered():
+    svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([_reg("claude.demo.Greet")]))
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    out = svc.run("demo.hello", inputs={"name": "x"})  # preflight passes
+    assert out["workflow"] == "claude.demo.Hello"
+
+
+def test_run_preflight_skipped_when_registry_empty():
+    # No registrations at all (no runner up) -> can't assess -> don't false-block.
+    svc = CatalogService(InMemoryCatalogStore(), _RegFlowStore([]))
+    svc.save("demo.hello", ffl_source=WF)
+    svc.publish("demo.hello")
+    out = svc.run("demo.hello", inputs={"name": "x"})
+    assert out["workflow"] == "claude.demo.Hello"
 
 
 def test_list_all_groups_packages_and_members():

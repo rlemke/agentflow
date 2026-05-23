@@ -341,6 +341,19 @@ class CatalogService:
         if entry and entry.kind == KIND_LIBRARY:
             raise CatalogError(f"{slug} is a library, not a runnable workflow")
 
+        # Handler preflight: every event facet the workflow calls must have a
+        # loadable handler advertised by the fleet, else the run dead-letters
+        # mid-flight (e.g. a declared-but-unimplemented facet). Refuse up front
+        # with the offending facet names. Skipped when no registry is populated.
+        missing = self._missing_handlers(rev)
+        if missing:
+            raise CatalogRunBlocked(
+                f"{slug} v{rev.version} cannot run — no loadable handler advertised "
+                f"for: {', '.join(missing)}. Start a runner that registers "
+                f"{'these facets' if len(missing) > 1 else 'this facet'} "
+                f"(or fix the handler), then retry."
+            )
+
         from facetwork.runtime.entities import (
             RunnerDefinition,
             RunnerState,
@@ -450,6 +463,37 @@ class CatalogService:
         out.is_valid = is_valid
         out.warnings = warnings
         return out
+
+    def _missing_handlers(self, rev: CatalogRevision) -> list[str]:
+        """Event facets this revision calls that have no loadable handler in the
+        fleet's registry — calling them would dead-letter the run.
+
+        Returns the qualified names of unservable event facets. Returns ``[]``
+        (skips the preflight) when the flow store has no handler registry, the
+        registry is empty (no runner has registered yet — can't assess), or the
+        runtime dispatcher is unavailable.
+        """
+        if not hasattr(self._flows, "list_handler_registrations"):
+            return []
+        flow = self._flows.get_flow(rev.flow_id)
+        if flow is None or not getattr(flow, "compiled_ast", None):
+            return []
+        # Only the event facets the ENTRY workflow transitively reaches — not
+        # every facet in the (possibly large) pinned library, which other
+        # workflows there might call.
+        needed = _entry_event_facets(flow.compiled_ast, rev.entry_workflow)
+        if not needed:
+            return []
+        try:
+            from facetwork.runtime.dispatcher import RegistryDispatcher
+
+            disp = RegistryDispatcher(self._flows)
+            disp.preload(verify=True)  # drops registrations not importable here
+        except Exception:
+            return []
+        if not disp.dispatchable_facets():
+            return []  # empty registry — no runner up yet; don't false-positive
+        return sorted(q for q in needed if not disp.can_dispatch(q))
 
     def _reuse_library_flow(self, rev: CatalogRevision) -> CatalogRevision | None:
         """If ``rev`` is a thin per-workflow handle onto a package library
@@ -755,6 +799,73 @@ def _returns_schema(wf_ast: dict) -> list[dict]:
         if isinstance(r, dict):
             out.append({"name": r.get("name"), "type": r.get("type", "Any")})
     return out
+
+
+_DECL_KIND = {"EventFacetDecl": "event", "FacetDecl": "facet", "WorkflowDecl": "workflow"}
+
+
+def _build_call_graph(node: dict, prefix: str, graph: dict, kind: dict) -> None:
+    """Populate ``graph`` (qualified facet/workflow name -> call targets in its
+    body) and ``kind`` (qualified name -> 'event' | 'facet' | 'workflow') from a
+    compiled program dict. Handles nested and flat emitter shapes."""
+
+    def _name(d: dict) -> str | None:
+        return d.get("name") or (d.get("sig") or {}).get("name")
+
+    for key, k in (("event_facets", "event"), ("facets", "facet"), ("workflows", "workflow")):
+        for d in node.get(key, []):
+            n = _name(d)
+            if n:
+                q = f"{prefix}{n}" if prefix else n
+                graph[q] = _collect_call_targets(d)
+                kind[q] = k
+    for decl in node.get("declarations", []):
+        t = decl.get("type")
+        if t in _DECL_KIND:
+            n = _name(decl)
+            if n:
+                q = f"{prefix}{n}" if prefix else n
+                graph[q] = _collect_call_targets(decl)
+                kind[q] = _DECL_KIND[t]
+        elif t == "Namespace":
+            _build_call_graph(decl, f"{prefix}{decl['name']}.", graph, kind)
+    for ns in node.get("namespaces", []):
+        _build_call_graph(ns, f"{prefix}{ns['name']}.", graph, kind)
+
+
+def _entry_event_facets(program: dict, entry: str) -> set[str]:
+    """Qualified names of event facets transitively reachable from the entry
+    workflow's body — the handlers a run of ``entry`` will actually need."""
+    graph: dict[str, list[str]] = {}
+    kind: dict[str, str] = {}
+    _build_call_graph(program, "", graph, kind)
+    short: dict[str, str] = {}
+    for q in graph:  # last-wins; ambiguity is rare and the registry resolves shorts too
+        short[q.rsplit(".", 1)[-1]] = q
+
+    def resolve(target: str) -> str | None:
+        return target if target in graph else short.get(target.rsplit(".", 1)[-1])
+
+    start = resolve(entry)
+    if start is None:
+        return set()
+    seen: set[str] = set()
+    queue = [start]
+    events: set[str] = set()
+    while queue:
+        cur = queue.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        for target in graph.get(cur, []):
+            q = resolve(target)
+            if q is None:
+                continue
+            if kind.get(q) == "event":
+                events.add(q)
+            elif q not in seen:
+                queue.append(q)
+    return events
 
 
 def _collect_call_targets(node: Any, acc: set[str] | None = None) -> list[str]:
