@@ -180,7 +180,13 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
 1. **Extraction complete + uniform + cheap** — ✅ *shipped*. Holes filled (amenities, places,
    parks, buildings, roads); the uniform cached `ExtractCategory` facade warms the cheap point
    categories in one cached single pass (heartbeat-safe on full-state PBFs), so a business query
-   is seconds-then-instant instead of a 54-minute full-PBF filter. Remaining: `routes`/`pois`.
+   is seconds-then-instant instead of a 54-minute full-PBF filter. Proven end-to-end:
+   `FindBusinessMapCheap` on California rendered **12,189 `fast_food` outlets**
+   (`CacheRegion → ExtractCategory(amenities) → FilterGeoJSONByOSMType → RenderMap`), and the
+   warm cache makes subsequent business queries on the region an instant lookup. The run also
+   surfaced a real distributed-systems lesson: a multi-minute single pass must heartbeat (or
+   register `timeout_ms=0`) or the task lease expires and it retries forever. Remaining:
+   `routes`/`pois`, and a node-only-scan `locations=False` fast-path for the first warm.
 2. **`Clip` + the `Spatial` family** — `ClipByBBox`/`ClipByPolygon` (cheap sub-region), then
    `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer` — the ecosystem's universal verb
    and the unlock for complex requests ("food deserts", "schools without a pharmacy within 1mi").
