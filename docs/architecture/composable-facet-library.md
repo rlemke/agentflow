@@ -67,18 +67,51 @@ Closing this gap is the work this document specifies.
 A request decomposes through layers; each layer has one contract. (✓ = exists, ◐ = partial/
 inconsistent, ✗ = to build.)
 
-| Layer | Role | Contract | OSM today → target |
-|---|---|---|---|
-| **Source** | get a region's data into a cheap-to-query form | `region → handle` | `CacheRegion` ✓ (full PBF) → also emit **per-category extracts** ✗ / PostGIS source ◐ |
-| **Extract** | pull one category of features as GeoJSON | `handle + category → GeoJSON(path)` | roads ✓; amenities/places/parks/buildings ✓ (holes now filled); routes/pois ✗ (relation/aggregate shapes); uniform `Extract(category)` facade ✗ |
-| **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓ (added); **contains/regex** ✗; radius ✓; **bbox/polygon (sub-region)** ✗ |
-| **Transform / Analyze** | combine, reduce, relate | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐ (roads only); **merge layers** ✗; **count/summarize (generic)** ✗; **spatial join / within-distance / nearest** ✗; dedupe ✗ |
-| **Render** | produce a viewable artifact | `GeoJSON(s) → MapResult` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓ |
+The layering is corroborated by the open-source OSM ecosystem (see §4.1): the verbs below are
+exactly the ones that recur across osmium, Overpass, the routing engines, the geocoders, and the
+geometry kernels. The status column names a representative tool establishing each as a primitive.
 
-The biggest capability gaps are **complete category extraction**, **richer filters
-(contains/regex, spatial)**, and **spatial analysis (join / distance / nearest)** — the last is
-what unlocks genuinely complex requests like "food deserts" or "schools without a pharmacy within
-1 mile".
+| Layer | Role | Contract | Status — and the OSS tools that establish it |
+|---|---|---|---|
+| **Source** | region/file → queryable handle | `region → handle` | `CacheRegion` ✓; **per-category warm extracts** ✓ (`CombinedScan`/`ExtractCategory`, cached single pass); PostGIS source ◐; `Merge`/`Sort`/`ConvertFormat`/`ApplyChanges` ✗ (osmium, osmosis) |
+| **Clip** | spatial subset of a region | `handle + bbox/polygon → handle` | ✗ — `ClipByBBox`/`ClipByPolygon` (osmium-extract, osmconvert `-b`, ogr2ogr, Overpass bbox) |
+| **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
+| **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; by-element-type ✓; radius ✓; **contains/regex** ✗; `CompleteWays`/recurse ✗ (osmfilter, Overpass has-kv / recurse) |
+| **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Count` / `Summarize` / `Dissolve` ✗ (turf, shapely, PostGIS) |
+| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | **all ✗** — `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer`, `Intersect`/`Union`, `Centroid`, `Simplify` (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
+| **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
+| **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✗ (Nominatim, Photon, Pelias) |
+| **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓; `BuildVectorTiles` (→ MBTiles) ✗ (Mapnik, tippecanoe, OpenMapTiles) |
+
+The biggest capability gaps, in priority order: the **Spatial** family (`WithinDistance`/`Nearest`/
+`SpatialJoin`) — the single most universal verb across the ecosystem and the unlock for "food
+deserts" or "schools without a pharmacy within 1 mile"; **`Clip`** (cheap sub-region queries);
+then the two self-contained service families that turn our extracts into answers, **Routing** and
+**Geocoding**; and **vector tiles** for scalable visualization.
+
+### 4.1 Grounded in the OSS ecosystem
+
+This taxonomy isn't invented — it's the distillation of what the mature open-source OSM programs
+already do. Surveying them, the same handful of operations recur, and they fall cleanly onto the
+layers above:
+
+| Tool family | Programs | Operations they expose |
+|---|---|---|
+| Process / convert | [osmium-tool](https://osmcode.org/osmium-tool/manual.html), Osmosis, osmconvert/osmfilter, GDAL/ogr2ogr | [extract (bbox/polygon)](https://docs.osmcode.org/osmium/latest/osmium-extract.html), [tags-filter](https://docs.osmcode.org/osmium/latest/osmium-tags-filter.html), merge, sort, convert, apply diffs |
+| Spatial query | [Overpass API / QL](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL) | tag filter (has-kv), bbox, [`area`](https://dev.overpass-api.de/overpass-doc/en/full_data/area.html), `around` (radius), `recurse` (members/parents) |
+| Routing | [OSRM](https://project-osrm.org/docs/v5.5.1/api/), Valhalla, GraphHopper, pgRouting ([overview](https://gis-ops.com/open-source-routing-engines-and-algorithms-an-overview/)) | route, table/matrix, nearest, map-match, isochrone, trip (TSP) |
+| Geocoding | [Nominatim](https://github.com/osm-search/Nominatim), Photon, Pelias | forward geocode, reverse geocode, lookup |
+| Render / tiles | Mapnik, [tippecanoe](https://github.com/mapbox/tippecanoe), [OpenMapTiles](https://openmaptiles.org/docs/generate/custom-vector-from-shapefile-geojson/) | GeoJSON→raster, GeoJSON→vector tiles (MBTiles), style, serve |
+| Persist | [osm2pgsql](https://osm2pgsql.org/), imposm3 | import to PostGIS, schema mapping, keep-updated |
+| Geometry kernel | GEOS, shapely, turf.js, PostGIS `ST_*` | buffer, centroid, simplify, area/length, within/contains, intersect/union, nearest |
+
+The signal: a *small, stable* set of verbs underlies the whole ecosystem, and operations ranked by
+how many independent tools implement them are the highest-value primitives. **Spatial
+within-distance / nearest** appears in Overpass (`around`), every routing engine (as table /
+isochrone), turf, and PostGIS — it is the universal verb, and our largest gap. **Clip by
+bbox/polygon** appears in osmium, osmconvert, ogr2ogr, and Overpass. That cross-tool recurrence is
+what justifies promoting these to first-class facets, and the survey adds three coherent service
+families the original taxonomy didn't enumerate: Routing, Geocoding, and Tiles.
 
 ## 5. Contract conventions (the calling convention)
 
@@ -144,17 +177,21 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
 
 ## 9. Roadmap (prioritized)
 
-1. **Make extraction complete + uniform + cheap** — *holes mostly filled* (amenities, places,
-   parks, buildings, roads implemented; routes/pois remain). Still open: have `Source.Cache`
-   emit per-category extracts (or back the source with PostGIS) so filters/transforms run in
-   seconds, not 54 minutes — completeness is done, **cheapness** is the next half.
-2. **Add the missing filters/transforms** — contains/regex tag filter, bbox/polygon sub-region,
-   layer merge, generic count/summarize, and the **spatial join / within-distance / nearest**
-   family (the unlock for complex requests).
-3. **Build the discovery layer** — the capability index + the OSM tag vocabulary, exposed to the
+1. **Extraction complete + uniform + cheap** — ✅ *shipped*. Holes filled (amenities, places,
+   parks, buildings, roads); the uniform cached `ExtractCategory` facade warms the cheap point
+   categories in one cached single pass (heartbeat-safe on full-state PBFs), so a business query
+   is seconds-then-instant instead of a 54-minute full-PBF filter. Remaining: `routes`/`pois`.
+2. **`Clip` + the `Spatial` family** — `ClipByBBox`/`ClipByPolygon` (cheap sub-region), then
+   `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer` — the ecosystem's universal verb
+   and the unlock for complex requests ("food deserts", "schools without a pharmacy within 1mi").
+3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
+   `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
+4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
+   and `Geocoding` (forward/reverse), plus `BuildVectorTiles` for scalable visualization.
+5. **Build the discovery layer** — the capability index + the OSM tag vocabulary, exposed to the
    composer (an MCP `fw_capabilities`-style surface).
-4. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
-5. **Effect + cost annotations** — so the composer chooses efficient compositions.
+6. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
+7. **Effect + cost annotations** — so the composer chooses efficient compositions.
 
 Each item is additive — it extends the typed/validated/distributed substrate, never relaxes it
 — consistent with the thesis's design position. The end state: a complex OSM NL request is
