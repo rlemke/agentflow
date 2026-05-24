@@ -1,0 +1,16 @@
+pushd
+cd ~
+mkdir fw_handlers
+cd fw_handlers
+git clone https://github.com/rlemke/fwh_osm.git
+git clone https://github.com/rlemke/fwh_anthropic.git
+git clone https://github.com/rlemke/fwh_save_earth.git
+git clone https://github.com/rlemke/fwh_noaa_weather.git
+git clone https://github.com/rlemke/fwh_sensor_monitoring.git
+git clone https://github.com/rlemke/fwh_genomics.git
+git clone https://github.com/rlemke/fwh_census_us.git
+git clone https://github.com/rlemke/fwh_osm_lz.git
+git clone https://github.com/rlemke/fwh_jenkins.git
+popd
+
+
