@@ -34,8 +34,10 @@ which compositions recur → which primitives to harden and add.
 The osm package has ~99 workflows and many facets, but it grew *organically for humans*, so
 it is **not** a composable library. Symptoms observed in practice:
 
-- **Holes** — `Motorways`, `extract_amenities`, `extract_routes`, `extract_parks` are declared
-  but unimplemented (the `extract_*` functions were never written).
+- **Holes** — several `extract_*` functions were declared but never written. `extract_amenities`,
+  `extract_places_with_population`, `extract_parks`, and `extract_buildings` are now implemented
+  (joining `extract_roads`); `extract_routes` (relation stitching) and `extract_pois` (aggregate
+  shape) remain.
 - **Inconsistent contracts** — `FilterByOSMTag` filters a PBF; `FilterGeoJSONByOSMType` filters
   GeoJSON; `CacheRegion` yields the *full* region PBF, not category extracts.
 - **No semantic discovery** — Claude must already know "fast food" → `amenity=fast_food`. There
@@ -68,7 +70,7 @@ inconsistent, ✗ = to build.)
 | Layer | Role | Contract | OSM today → target |
 |---|---|---|---|
 | **Source** | get a region's data into a cheap-to-query form | `region → handle` | `CacheRegion` ✓ (full PBF) → also emit **per-category extracts** ✗ / PostGIS source ◐ |
-| **Extract** | pull one category of features as GeoJSON | `handle + category → GeoJSON(path)` | roads ✓ (`extract_roads`); amenities/parks/routes/places ✗ (fill holes); uniform `Extract(category)` ✗ |
+| **Extract** | pull one category of features as GeoJSON | `handle + category → GeoJSON(path)` | roads ✓; amenities/places/parks/buildings ✓ (holes now filled); routes/pois ✗ (relation/aggregate shapes); uniform `Extract(category)` facade ✗ |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓ (added); **contains/regex** ✗; radius ✓; **bbox/polygon (sub-region)** ✗ |
 | **Transform / Analyze** | combine, reduce, relate | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐ (roads only); **merge layers** ✗; **count/summarize (generic)** ✗; **spatial join / within-distance / nearest** ✗; dedupe ✗ |
 | **Render** | produce a viewable artifact | `GeoJSON(s) → MapResult` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓ |
@@ -142,9 +144,10 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
 
 ## 9. Roadmap (prioritized)
 
-1. **Make extraction complete + uniform + cheap** — fill the `extract_*` holes; have `Source.Cache`
+1. **Make extraction complete + uniform + cheap** — *holes mostly filled* (amenities, places,
+   parks, buildings, roads implemented; routes/pois remain). Still open: have `Source.Cache`
    emit per-category extracts (or back the source with PostGIS) so filters/transforms run in
-   seconds, not 54 minutes.
+   seconds, not 54 minutes — completeness is done, **cheapness** is the next half.
 2. **Add the missing filters/transforms** — contains/regex tag filter, bbox/polygon sub-region,
    layer merge, generic count/summarize, and the **spatial join / within-distance / nearest**
    family (the unlock for complex requests).
