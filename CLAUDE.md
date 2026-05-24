@@ -106,6 +106,7 @@ When building a new domain pipeline that ingests from multiple data sources, mir
 | Claude workflow catalog (store/version/run FFL with no file; `fw_catalog_*` MCP tools) | [docs/architecture/claude-workflow-catalog.md](docs/architecture/claude-workflow-catalog.md) |
 | `use` resolution: file-based compile vs. the catalog (hermetic pinned-dep model) | [docs/architecture/catalog-use-resolution.md](docs/architecture/catalog-use-resolution.md) |
 | Extending with new handlers (NL needs a capability no facet provides → detect gap → scaffold facet+handler+test) — `scripts/scaffold-handler` | [docs/architecture/extending-with-new-handlers.md](docs/architecture/extending-with-new-handlers.md) |
+| Composable facet library (design): orthogonal/complete/discoverable/distributed primitives for LLM-composed workflows + the memory-of-solved-requests moat | [docs/architecture/composable-facet-library.md](docs/architecture/composable-facet-library.md) |
 | Deployment guide | [docs/operations/deployment.md](docs/operations/deployment.md) |
 | Full-stack Docker Compose (one runner per fwh_* example) | [docs/operations/full-stack-compose.md](docs/operations/full-stack-compose.md) |
 | Tutorial | [docs/getting-started/tutorial.md](docs/getting-started/tutorial.md) |
