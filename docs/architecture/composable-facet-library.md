@@ -185,8 +185,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    (`CacheRegion → ExtractCategory(amenities) → FilterGeoJSONByOSMType → RenderMap`), and the
    warm cache makes subsequent business queries on the region an instant lookup. The run also
    surfaced a real distributed-systems lesson: a multi-minute single pass must heartbeat (or
-   register `timeout_ms=0`) or the task lease expires and it retries forever. Remaining:
-   `routes`/`pois`, and a node-only-scan `locations=False` fast-path for the first warm.
+   register `timeout_ms=0`) or the task lease expires and it retries forever. The first warm was
+   then made ~29× faster by pushing a C-level `KeyFilter` (union of the plugins' interest keys)
+   into osmium for node-only scans — benchmarking showed the node-location index wasn't the cost,
+   the per-element Python callback over ~99%-untagged nodes was (264 MB region: 347s → 12s, counts
+   unchanged), extrapolating California's warm from ~26 min to ~1 min. Remaining: `routes`/`pois`.
 2. **`Clip` + the `Spatial` family** — `ClipByBBox`/`ClipByPolygon` (cheap sub-region), then
    `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer` — the ecosystem's universal verb
    and the unlock for complex requests ("food deserts", "schools without a pharmacy within 1mi").
