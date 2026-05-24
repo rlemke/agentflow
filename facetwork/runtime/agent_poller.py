@@ -801,6 +801,11 @@ class AgentPoller:
 
             payload["_task_heartbeat"] = _task_heartbeat_callback
             payload["_task_uuid"] = task.uuid
+            # Execution scope (unique per run) — lets handlers isolate per-run
+            # output artifacts. EXECUTION id, distinct from the definition;
+            # do not use it to key cacheable intermediates.
+            payload["_workflow_id"] = task.workflow_id
+            payload["_step_id"] = task.step_id
 
             # Retry context
             retry_count = getattr(task, "retry_count", 0) or 0

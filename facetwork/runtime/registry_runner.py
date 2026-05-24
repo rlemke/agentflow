@@ -875,6 +875,11 @@ class RegistryRunner:
 
             payload["_task_heartbeat"] = _task_heartbeat_callback
             payload["_task_uuid"] = task.uuid
+            # Execution scope (unique per run) — lets handlers isolate per-run
+            # output artifacts. This is the EXECUTION id, distinct from the
+            # workflow definition; do not use it to key cacheable intermediates.
+            payload["_workflow_id"] = task.workflow_id
+            payload["_step_id"] = task.step_id
 
             # Retry context — lets handlers detect reclaims and skip
             # previously-completed operations (e.g. partial DB imports).
