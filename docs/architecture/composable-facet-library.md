@@ -74,7 +74,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | Layer | Role | Contract | Status — and the OSS tools that establish it |
 |---|---|---|---|
 | **Source** | region/file → queryable handle | `region → handle` | `CacheRegion` ✓; **per-category warm extracts** ✓ (`CombinedScan`/`ExtractCategory`, cached single pass); PostGIS source ◐; `Merge`/`Sort`/`ConvertFormat`/`ApplyChanges` ✗ (osmium, osmosis) |
-| **Clip** | spatial subset of a region | `handle + bbox/polygon → handle` | ✗ — `ClipByBBox`/`ClipByPolygon` (osmium-extract, osmconvert `-b`, ogr2ogr, Overpass bbox) |
+| **Clip** | spatial subset of a region | `handle + bbox/polygon → handle` | `ClipByBBox`/`ClipByPolygon` ✓ (`osm.Clip`, osmium-extract → clipped `OSMCache`; osmconvert `-b`, ogr2ogr, Overpass bbox) |
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; by-element-type ✓; radius ✓; **contains/regex** ✗; `CompleteWays`/recurse ✗ (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Count` / `Summarize` / `Dissolve` ✗ (turf, shapely, PostGIS) |
@@ -87,9 +87,9 @@ The biggest capability gaps, in priority order: the **Spatial** family (`WithinD
 `SpatialJoin`) — the single most universal verb across the ecosystem and the unlock for "food
 deserts" or "schools without a pharmacy within 1 mile". The distance core of this family —
 `WithinDistance`, its complement `BeyondDistance`, and `Nearest` — is now **shipped** (`osm.Spatial`,
-see §9 item 2); `SpatialJoin`/`Buffer`/`Intersect` remain. Then **`Clip`** (cheap sub-region
-queries); then the two self-contained service families that turn our extracts into answers,
-**Routing** and **Geocoding**; and **vector tiles** for scalable visualization.
+see §9 item 2); `SpatialJoin`/`Buffer`/`Intersect` remain. **`Clip`** (cheap sub-region queries) is
+also **shipped** (`osm.Clip`, §9 item 2). Then the two self-contained service families that turn our
+extracts into answers, **Routing** and **Geocoding**; and **vector tiles** for scalable visualization.
 
 ### 4.1 Grounded in the OSS ecosystem
 
@@ -213,9 +213,19 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    populated places** against them via the STRtree in ~1 s, and found **3,223 places (≈65%) beyond
    10 mi of the nearest hospital** — the rendered map (bounds spanning the whole state) flags exactly
    the rural places one expects (Buttonwillow, Desert Center). "Food deserts" is the same workflow
-   with `tag_key="shop", tag_value="supermarket"`. Remaining in this item: **`Clip`**
-   (`ClipByBBox`/`ClipByPolygon` — cheap sub-region queries that make continental-scale spatial work
-   tractable), and the relational/areal verbs `SpatialJoin`, `Buffer`, `Intersect`/`Union`.
+   with `tag_key="shop", tag_value="supermarket"` (verified live: 2,224 supermarkets → 4,075/4,992
+   places beyond 1 mi).
+   **`Clip` is also ✅ shipped**: `osm.Clip` exposes `ClipByBBox` / `ClipByPolygon`, wired to the
+   `osmium extract` tool (`pbf-clips` cache_type with SHA-validity sidecars) and returning a new
+   `OSMCache` over the clipped PBF — which composes with `ExtractCategory`/Spatial for free because
+   every extractor reads `cache.path`. The blocking clip runs under a heartbeat pump so the lease
+   survives a multi-minute extract. Proven live (`osm.Clip.workflows.ClipAndExtract`): clipping
+   California (**1,311 MB**) to a Bay-Area bbox produced a **162 MB** PBF (**8× smaller**), then
+   `ExtractCategory(amenities)` ran on the *clip* (77,377 features) — the "cheap sub-region query"
+   that makes continental-scale spatial work tractable. (The live run also surfaced + fixed a latent
+   bug in the previously-untested `pbf_clip` tool: `osmium extract` needs an explicit
+   `--output-format pbf` because the staging filename hides the extension.)
+   Remaining in this item: the relational/areal verbs `SpatialJoin`, `Buffer`, `Intersect`/`Union`.
 3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
    `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
 4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
