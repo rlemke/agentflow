@@ -401,6 +401,8 @@ Examples can override these defaults — local examples via a `runner.env` file 
 
 The MCP server (`python -m facetwork.mcp`) exposes FFL compiler tools, runtime management, and a PostGIS query tool. Configure it in `.mcp.json` for Claude Code integration.
 
+**Facet capability index** (`fw_capabilities`): the facet-level analogue of `fw_catalog_search` (which finds workflows). Searches the deployed/seeded facet library — or an FFL `source` snippet you're authoring — and returns ranked facets `{qualified_name, purpose, signature, params, returns, namespace, is_event}` so an LLM discovers composable primitives by *intent* ("what operates on a GeoJSON path?", "reverse geocode") instead of guessing names. Built from the compiled FFL (`emit_dict` / a flow's `compiled_ast`) by `facetwork/capabilities/`; pairs with a domain tag vocabulary (e.g. `osm.Vocab.ResolveTag`, NL term → `key=value`) for NL→tag, together turning compose-a-workflow into *lookup-then-compose*. See [docs/architecture/composable-facet-library.md](docs/architecture/composable-facet-library.md) §6.
+
 **PostGIS query tool** (`afl_postgis_query`): runs read-only SQL against the OSM database. Write operations are blocked at two levels (SQL keyword filter + `default_transaction_read_only=on`). Schema:
 - `osm_nodes` (osm_id, region, tags JSONB, geom Point)
 - `osm_ways` (osm_id, region, tags JSONB, geom LineString)

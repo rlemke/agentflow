@@ -79,7 +79,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; **contains/regex** ✓; by-element-type ✓; radius ✓; `CompleteWays`/recurse ✗ (PBF-only — N/A at GeoJSON level) (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
 | **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
-| **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
+| **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch` ✓ (`osm.Routing.{OSRM,API}`, OSRM HTTP + graceful great-circle fallback); `Trip` (TSP) ✗ (OSRM, Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓, `BuildVectorTiles` ✓ (`osm.Tiles`, tippecanoe → MBTiles/PMTiles) (Mapnik, OpenMapTiles) |
 
@@ -274,10 +274,14 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    (`osm.Tiles`): a path-based `build_from_geojson` over tippecanoe (→ MBTiles, → PMTiles when the
    pmtiles CLI is present), the scalable counterpart to `RenderMap` — tile any Extract/Filter/
    Transform output. Proven live: the 94.7 MB California amenities extract (278,795 features) → a
-   23 MB PMTiles at z0–14 in ~12 s. The remaining deferred verbs are the OSRM-backed `Matrix` /
-   `Nearest` / `MapMatch` (and a `Trip` facet) — code is straightforward (OSRM's `/table`,
-   `/nearest`, `/match` HTTP endpoints, like the existing `Route`), but a *live* proof needs a
-   running OSRM server with a built graph for the region.
+   23 MB PMTiles at z0–14 in ~12 s. **The OSRM-backed `Matrix` / `Nearest` / `MapMatch` verbs are now
+   ✅ shipped** (`osm.Routing.OSRM`, on `/table` / `/nearest` / `/match`, each with a graceful
+   great-circle fallback when OSRM is down — the `Route` philosophy). Proven live against an OSRM
+   graph built from an `osm.Clip` Bay-Area extract (osrm-extract→partition→customize→routed):
+   the 3×3 `Matrix` gave realistic drive times (SF→Oakland 20 min, SF→San Jose 60 min), `Nearest`
+   snapped an SF point to "Market Street" 6 m away, and `MapMatch` snapped a 4-point trace to an
+   82-vertex road-following line (`radiuses` loosens matching for noisy traces). Only the `Trip`
+   (TSP) facet remains unbuilt; the engine-independent core + tiles + routing are all done.
 5. **Build the discovery layer** — ✅ *shipped* (both halves). **The capability index**
    (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6.1): NL → *facet* lookup over
    the deployed library or an authored source snippet, proven over 813 osm facets. **The domain tag
