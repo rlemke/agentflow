@@ -438,6 +438,31 @@ def create_server(
                 },
             ),
             Tool(
+                name="fw_catalog_match",
+                description=(
+                    "Reuse-first matching — call this with a natural-language REQUEST "
+                    "BEFORE authoring a workflow. Unlike fw_catalog_search (keyword "
+                    "lookup), it matches by *intent* — primarily the recorded authoring "
+                    "summary of each workflow — and returns a verdict: 'reuse' (a strong "
+                    "match; fill best.param_schema and run via fw_catalog_run instead of "
+                    "authoring), 'review' (candidates exist — inspect first), or "
+                    "'author_new' (no good match — author one, which then joins the "
+                    "catalog for next time). Each candidate carries its summary (intent), "
+                    "param_schema, entry_workflow, and a 0-1 confidence. The workflow-level "
+                    "analogue of fw_capabilities."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "request": {"type": "string",
+                                    "description": "The natural-language request to satisfy."},
+                        "kind": {"type": "string", "description": "workflow | library"},
+                        "limit": {"type": "integer", "description": "Max candidates (default 5)."},
+                    },
+                    "required": ["request"],
+                },
+            ),
+            Tool(
                 name="fw_capabilities",
                 description=(
                     "Search the FACET capability index — the facet-level analogue of "
@@ -609,6 +634,8 @@ def create_server(
             return _tool_postgis_query(arguments)
         elif name == "fw_catalog_search":
             return _tool_catalog_search(arguments, _get_store)
+        elif name == "fw_catalog_match":
+            return _tool_catalog_match(arguments, _get_store)
         elif name == "fw_catalog_get":
             return _tool_catalog_get(arguments, _get_store)
         elif name == "fw_catalog_save":
@@ -1526,6 +1553,20 @@ def _tool_catalog_search(arguments: dict[str, Any], get_store: Any) -> list[Text
             kind=arguments.get("kind"),
         )
         return _catalog_text({"results": results, "count": len(results)})
+    except Exception as e:
+        return _catalog_text({"error": str(e)})
+
+
+def _tool_catalog_match(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    try:
+        svc = _catalog_service(get_store())
+        limit = arguments.get("limit", 5)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 5
+        result = svc.match(arguments.get("request", ""), kind=arguments.get("kind"), limit=limit)
+        return _catalog_text(result)
     except Exception as e:
         return _catalog_text({"error": str(e)})
 

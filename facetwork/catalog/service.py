@@ -22,6 +22,7 @@ rows and the bootstrap task that runs them.
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -247,6 +248,59 @@ class CatalogService:
             out.append((score, self._summary(entry, rev)))
         out.sort(key=lambda x: (-x[0], x[1]["slug"]))
         return [s for _, s in out]
+
+    def match(
+        self,
+        request: str,
+        *,
+        kind: str | None = None,
+        include_drafts: bool = True,
+        limit: int = 5,
+    ) -> dict:
+        """Reuse-first matching: given a natural-language *request*, find the
+        catalog workflow that already satisfies that request *family* — matched
+        primarily by **intent** (the revision's authoring ``summary``), not just
+        keywords.
+
+        Returns ``{request, terms, verdict, best, candidates, count}`` where
+        ``verdict`` is ``reuse`` (a strong match — fill ``best.param_schema`` and
+        run via :meth:`run` instead of authoring), ``review`` (candidates exist;
+        inspect before deciding), or ``author_new`` (no good match — author a new
+        workflow, which then *joins* the catalog). Each candidate carries its
+        ``summary`` (recorded intent), ``param_schema``, ``entry_workflow``, and a
+        0–1 ``confidence`` (the share of request terms it covers). The
+        workflow-level analogue of the facet capability index.
+        """
+        terms = _tokenize_request(request)
+        ranked: list[tuple[int, dict]] = []
+        for entry in self._catalog.list_entries():
+            if kind and entry.kind != kind:
+                continue
+            rev = self._resolve_revision(entry.slug, None, prefer_published=not include_drafts)
+            if rev is None:
+                continue
+            score, hit = _match_score(terms, entry, rev)
+            if terms and score == 0:
+                continue
+            summary = self._summary(entry, rev)
+            summary["summary"] = rev.summary
+            summary["confidence"] = round(len(hit) / len(terms), 2) if terms else 0.0
+            summary["matched_terms"] = sorted(hit)
+            ranked.append((score, summary))
+
+        ranked.sort(key=lambda x: (-x[0], x[1]["slug"]))
+        candidates = [s for _, s in ranked]
+        best = candidates[0] if candidates else None
+        best_conf = best["confidence"] if best else 0.0
+        verdict = _match_verdict(best_conf) if terms else "author_new"
+        return {
+            "request": request,
+            "terms": terms,
+            "verdict": verdict,
+            "best": best,
+            "candidates": candidates[: max(1, limit)],
+            "count": len(candidates),
+        }
 
     def list_all(self) -> list[dict]:
         """Every catalog entry as a summary, annotated for grouping:
@@ -818,6 +872,62 @@ class CatalogService:
                 }
             )
         return s
+
+
+# ---------------------------------------------------------------------------
+# Reuse-first matching helpers
+# ---------------------------------------------------------------------------
+
+# Generic request words that carry no domain signal (so they don't inflate a
+# match). Domain verbs like "route"/"map"-as-noun stay — only true filler drops.
+_MATCH_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "in", "on", "for", "to", "and", "or", "with", "by",
+    "me", "my", "is", "are", "that", "this", "show", "give", "get", "all", "any",
+    "please", "want", "need", "from", "at", "as", "it", "its",
+})
+
+# Field weights for intent matching — the authoring summary (recorded intent)
+# dominates, then title/tags, then description/slug, then the facets used.
+_MATCH_WEIGHTS = (("summary", 6), ("title", 5), ("tags", 4),
+                  ("description", 3), ("slug", 3), ("facets", 2))
+
+
+def _tokenize_request(text: str) -> list[str]:
+    """Lowercase, split on non-alphanumerics, drop short/filler words; de-duped."""
+    seen: list[str] = []
+    for tok in re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).split():
+        if len(tok) > 2 and tok not in _MATCH_STOPWORDS and tok not in seen:
+            seen.append(tok)
+    return seen
+
+
+def _match_score(terms: list[str], entry: CatalogEntry, rev: CatalogRevision) -> tuple[int, set[str]]:
+    """Weighted intent score + the set of request terms that hit any field."""
+    text = {
+        "summary": (rev.summary or "").lower(),
+        "title": (entry.title or "").lower(),
+        "tags": " ".join(entry.tags or []).lower(),
+        "description": (entry.description or "").lower(),
+        "slug": (entry.slug or "").replace("-", " ").replace("_", " ").lower(),
+        "facets": " ".join(rev.facets_used or []).lower(),
+    }
+    score = 0
+    hit: set[str] = set()
+    for term in terms:
+        for field_name, weight in _MATCH_WEIGHTS:
+            if term in text[field_name]:
+                score += weight
+                hit.add(term)
+    return score, hit
+
+
+def _match_verdict(best_confidence: float) -> str:
+    """Map the best candidate's term coverage to a reuse recommendation."""
+    if best_confidence >= 0.6:
+        return "reuse"
+    if best_confidence >= 0.3:
+        return "review"
+    return "author_new"
 
 
 # ---------------------------------------------------------------------------

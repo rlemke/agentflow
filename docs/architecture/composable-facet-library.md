@@ -34,8 +34,8 @@ which compositions recur → which primitives to harden and add.
 The osm package had ~99 workflows and many facets, but it grew *organically for humans*, so it
 **was not** a composable library. The symptoms diagnosed below were real; §9 tracks how each was
 closed. **As of this writing the primitive library is built** — every layer of the §4 taxonomy
-ships, proven on real data (items 1–5). The remaining work is composition-*time*, not primitives:
-reuse-first catalog matching and effect/cost annotations (§9 items 6–7).
+ships, proven on real data (items 1–5), and reuse-first catalog matching (item 6) is shipped. The
+only remaining work is composition-*time*, not primitives: effect/cost annotations (§9 item 7).
 
 The original symptoms (all now addressed except the two noted extract holes):
 
@@ -194,8 +194,12 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
 
 ## 8. Memory + reuse (the flywheel)
 
-- **Reuse-first.** Before authoring, match the request against the catalog by intent (the
-  authoring summary). A match → fill the typed params → run, reusing the refined spec.
+- **Reuse-first.** ✅ *shipped* (`fw_catalog_match` MCP tool → `CatalogService.match`). Before
+  authoring, match the request against the catalog **by intent** — primarily each revision's
+  recorded authoring `summary`, then title/tags/description/facets — and get a verdict: `reuse`
+  (fill `best.param_schema` and run via `fw_catalog_run`), `review` (candidates exist — inspect),
+  or `author_new` (no good match — author one, which then joins the catalog). Confidence is the
+  share of request terms a candidate covers. The workflow-level analogue of `fw_capabilities`.
 - **Parameterize for families.** One workflow should cover a request *family* (`FindBusinessMap`:
   name + type + regions → thousands of requests), not a single phrasing.
 - **Grow from solved requests.** When composition hits a missing primitive, the run preflight
@@ -318,7 +322,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    compose-a-workflow into *lookup-then-compose*: `ResolveTag` fixes the `(key, value)`, the
    capability index finds the primitives that consume it (`ExtractCategory` →
    `FilterGeoJSONByOSMType` → render), and the catalog remembers the result.
-6. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
+6. **Reuse-first catalog matching** — ✅ *shipped*. `fw_catalog_match(request)` →
+   `CatalogService.match`: intent-first matching (the authoring `summary` weighted highest) over the
+   catalog, returning a `reuse` / `review` / `author_new` verdict plus the best candidate's intent +
+   `param_schema` + confidence, so the composer fills params and runs an existing workflow instead of
+   re-authoring. The workflow-level analogue of `fw_capabilities` (§6.1).
 7. **Effect + cost annotations** — so the composer chooses efficient compositions.
 
 Each item is additive — it extends the typed/validated/distributed substrate, never relaxes it
@@ -332,6 +340,8 @@ layer; the `Clip` + full `Spatial` (9 verbs) + `Transform` + `Filter` primitives
 families (`Geocoding`, `Routing` across five swappable engines, `BuildVectorTiles`); and the
 discovery layer (the `fw_capabilities` facet index + the `osm.Vocab` tag ontology). The primitive
 library has no capability or engine gaps left; the only remaining extract holes are `routes`/`pois`.
-What remains is **composition-time**: item 6 (reuse-first catalog matching — search by intent
-before authoring) and item 7 (effect/cost annotations to guide efficient composition). Those act on
-*how the composer uses* the library, not on the library itself.
+**Item 6 (reuse-first catalog matching) is now ✅ shipped too** (`fw_catalog_match`): the
+composition loop is closed — match an NL request to an existing workflow by intent, else compose
+from the discoverable primitives, then the catalog remembers it. The only remaining roadmap item is
+**item 7 (effect/cost annotations)** — composer-efficiency hints that need net-new FFL
+effect-annotation syntax; it tunes *which* composition is chosen, not what's expressible.

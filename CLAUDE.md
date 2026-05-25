@@ -403,6 +403,8 @@ The MCP server (`python -m facetwork.mcp`) exposes FFL compiler tools, runtime m
 
 **Facet capability index** (`fw_capabilities`): the facet-level analogue of `fw_catalog_search` (which finds workflows). Searches the deployed/seeded facet library — or an FFL `source` snippet you're authoring — and returns ranked facets `{qualified_name, purpose, signature, params, returns, namespace, is_event}` so an LLM discovers composable primitives by *intent* ("what operates on a GeoJSON path?", "reverse geocode") instead of guessing names. Built from the compiled FFL (`emit_dict` / a flow's `compiled_ast`) by `facetwork/capabilities/`; pairs with a domain tag vocabulary (e.g. `osm.Vocab.ResolveTag`, NL term → `key=value`) for NL→tag, together turning compose-a-workflow into *lookup-then-compose*. See [docs/architecture/composable-facet-library.md](docs/architecture/composable-facet-library.md) §6.
 
+**Reuse-first catalog matching** (`fw_catalog_match`): the workflow-level counterpart — before authoring, match an NL `request` against the catalog **by intent** (each revision's authoring `summary`, weighted over title/tags/description/facets) and get a `reuse` / `review` / `author_new` verdict + the best candidate's `param_schema` to fill. Reuse an existing workflow (run via `fw_catalog_run`) instead of re-authoring; a miss → author one, which then joins the catalog. See `CatalogService.match`.
+
 **PostGIS query tool** (`afl_postgis_query`): runs read-only SQL against the OSM database. Write operations are blocked at two levels (SQL keyword filter + `default_transaction_read_only=on`). Schema:
 - `osm_nodes` (osm_id, region, tags JSONB, geom Point)
 - `osm_ways` (osm_id, region, tags JSONB, geom LineString)
