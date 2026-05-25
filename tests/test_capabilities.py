@@ -86,3 +86,57 @@ def test_signature_render():
     sig = wd.signature
     assert sig.startswith("event facet geo.Spatial.WithinDistance(")
     assert "=> (result: R)" in sig
+
+
+# --- effect / cost annotations (item 7) ----------------------------------------
+
+_ANNOT_SRC = """
+namespace eng {
+    /** Pure in-process transform. */
+    event facet PureOp(p: String) => (out: String) with Effect(kind = "pure") with Cost(tier = "cheap")
+
+    /** Hits an external engine. */
+    event facet ExternalOp(p: String) => (out: String) with Effect(kind = "external")
+
+    /** Big cached scan. */
+    event facet ScanOp(region: String) => (out: String) with Timeout(minutes = 120)
+
+    /** Unannotated. */
+    event facet PlainOp(p: String) => (out: String)
+}
+"""
+
+
+def _annot():
+    return index_program(emit_dict(parse(_ANNOT_SRC)))
+
+
+def test_effect_cost_parsed_from_mixins():
+    by = {c.name: c for c in _annot()}
+    assert (by["PureOp"].effect, by["PureOp"].cost) == ("pure", "cheap")
+    assert by["ExternalOp"].effect == "external" and by["ExternalOp"].cost == ""
+    assert by["PlainOp"].effect == "" and by["PlainOp"].cost == ""
+    # mixin target names are captured (regression: was read from the wrong key)
+    assert "Effect" in by["PureOp"].mixins and "Cost" in by["PureOp"].mixins
+    assert by["PureOp"].to_dict()["effect"] == "pure"
+
+
+def test_cost_inferred_from_timeout():
+    scan = next(c for c in _annot() if c.name == "ScanOp")
+    assert scan.cost == "expensive"          # 120 min -> expensive
+    assert "Timeout" in scan.mixins
+
+
+def test_search_effect_filter_excludes_unannotated():
+    caps = _annot()
+    pure = {c.name for c in search(caps, effect="pure")}
+    assert pure == {"PureOp"}                # PlainOp (unknown effect) excluded
+    assert {c.name for c in search(caps, effect="external")} == {"ExternalOp"}
+
+
+def test_search_max_cost_keeps_cheap_and_unknown_drops_expensive():
+    caps = _annot()
+    names = {c.name for c in search(caps, max_cost="cheap")}
+    assert "PureOp" in names                 # cheap <= cheap
+    assert "ScanOp" not in names             # expensive > cheap -> dropped
+    assert "PlainOp" in names                # unknown cost passes the ceiling

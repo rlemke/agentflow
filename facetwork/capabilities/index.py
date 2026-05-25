@@ -53,6 +53,11 @@ class FacetCapability:
     params: list[FacetParam] = field(default_factory=list)
     returns: list[FacetParam] = field(default_factory=list)
     mixins: list[str] = field(default_factory=list)
+    # Effect/cost annotations (from `with Effect(kind=…)` / `with Cost(tier=…)`
+    # mixins, or inferred from `with Timeout(minutes=…)`); "" when unknown. Let the
+    # composer prefer pure/cheap primitives and know which steps hit an engine.
+    effect: str = ""             # "" | "pure" | "external" | "io"
+    cost: str = ""               # "" | "free" | "cheap" | "moderate" | "expensive"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -62,6 +67,8 @@ class FacetCapability:
             "purpose": self.purpose,
             "is_event": self.is_event,
             "signature": self.signature,
+            "effect": self.effect,
+            "cost": self.cost,
             "params": [p.to_dict() for p in self.params],
             "returns": [r.to_dict() for r in self.returns],
             "mixins": self.mixins,
@@ -113,14 +120,56 @@ def _first_line(text: str) -> str:
     return ""
 
 
+# Cost tiers, cheapest → most expensive (for the max_cost ceiling filter).
+COST_ORDER = {"free": 0, "cheap": 1, "moderate": 2, "expensive": 3}
+
+
+def _mixin_arg(mixin: dict, *names: str):
+    """Value of the first matching named arg of a mixin (unwraps {value: …})."""
+    for arg in mixin.get("args") or []:
+        if arg.get("name") in names:
+            v = arg.get("value")
+            return v.get("value") if isinstance(v, dict) and "value" in v else v
+    return None
+
+
+def _annotations(mixins_raw: list | None) -> tuple[list[str], str, str]:
+    """Parse a facet's mixins into (mixin target names, effect, cost).
+
+    Recognizes the annotation mixins ``Effect(kind=…)`` and ``Cost(tier=…)``;
+    falls back to inferring cost from ``Timeout(minutes=…)`` (≥30 min →
+    ``expensive``, else ``moderate``) when no explicit ``Cost`` is given.
+    """
+    names: list[str] = []
+    effect = cost = ""
+    timeout_min: float | None = None
+    for m in mixins_raw or []:
+        if not isinstance(m, dict):
+            continue
+        target = m.get("target") or m.get("name") or ""
+        if not target:
+            continue
+        names.append(target)
+        if target == "Effect":
+            effect = str(_mixin_arg(m, "kind", "effect") or "") or effect
+        elif target == "Cost":
+            cost = str(_mixin_arg(m, "tier", "weight") or "") or cost
+        elif target == "Timeout":
+            mins = _mixin_arg(m, "minutes")
+            try:
+                timeout_min = float(mins) if mins is not None else timeout_min
+            except (TypeError, ValueError):
+                pass
+    if not cost and timeout_min is not None:
+        cost = "expensive" if timeout_min >= 30 else "moderate"
+    return names, effect, cost
+
+
 def _facet_capability(decl: dict, namespace: str) -> FacetCapability:
     name = decl.get("name", "")
     qualified = f"{namespace}.{name}" if namespace else name
     doc = (decl.get("doc") or {}).get("description", "") if isinstance(decl.get("doc"), dict) else ""
-    mixins = []
-    for m in decl.get("mixins") or []:
-        if isinstance(m, dict) and m.get("name"):
-            mixins.append(m["name"])
+    mixins, effect, cost = _annotations(decl.get("mixins"))
     return FacetCapability(
         qualified_name=qualified,
         name=name,
@@ -131,6 +180,8 @@ def _facet_capability(decl: dict, namespace: str) -> FacetCapability:
         params=_params(decl.get("params")),
         returns=_params(decl.get("returns")),
         mixins=mixins,
+        effect=effect,
+        cost=cost,
     )
 
 
@@ -198,6 +249,8 @@ def search(
     namespace: str = "",
     kind: str = "all",
     limit: int = 0,
+    effect: str = "",
+    max_cost: str = "",
 ) -> list[FacetCapability]:
     """Filter + rank capabilities.
 
@@ -206,12 +259,18 @@ def search(
     * ``namespace`` — prefix match on the facet's namespace (e.g. ``osm.Spatial``
       or just ``osm``).
     * ``kind`` — ``"facet"`` | ``"event_facet"`` | ``"all"``.
+    * ``effect`` — keep only facets with this declared effect (``pure`` / ``external``
+      / ``io``); un-annotated facets are excluded (you asked for a *known* effect).
+    * ``max_cost`` — drop facets whose *known* cost tier exceeds this ceiling
+      (``free`` < ``cheap`` < ``moderate`` < ``expensive``); un-annotated cost passes.
     * ``limit`` — cap the result count (0 = no cap).
 
     Results are ranked by relevance when ``query`` is given, else by qualified name.
     """
     terms = [t for t in query.lower().split() if t]
     ns = namespace.lower().strip()
+    eff = effect.lower().strip()
+    cost_ceiling = COST_ORDER.get(max_cost.lower().strip())
     result: list[tuple[int, FacetCapability]] = []
     for cap in caps:
         if kind == "facet" and cap.is_event:
@@ -219,6 +278,10 @@ def search(
         if kind == "event_facet" and not cap.is_event:
             continue
         if ns and not (cap.namespace.lower() == ns or cap.namespace.lower().startswith(ns + ".")):
+            continue
+        if eff and cap.effect.lower() != eff:
+            continue
+        if cost_ceiling is not None and cap.cost and COST_ORDER.get(cap.cost.lower(), 99) > cost_ceiling:
             continue
         if terms:
             score = _score(cap, terms)

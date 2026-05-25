@@ -34,8 +34,8 @@ which compositions recur → which primitives to harden and add.
 The osm package had ~99 workflows and many facets, but it grew *organically for humans*, so it
 **was not** a composable library. The symptoms diagnosed below were real; §9 tracks how each was
 closed. **As of this writing the primitive library is built** — every layer of the §4 taxonomy
-ships, proven on real data (items 1–5), and reuse-first catalog matching (item 6) is shipped. The
-only remaining work is composition-*time*, not primitives: effect/cost annotations (§9 item 7).
+ships, proven on real data, and the composition-time items (6 reuse-first matching, 7 effect/cost
+annotations) are shipped too — **all seven roadmap items are complete** (§9).
 
 The original symptoms (all now addressed except the two noted extract holes):
 
@@ -151,8 +151,9 @@ NL → facet must be *reliable*, not guesswork. Two pieces:
    library by default, or a `source` snippet you're authoring. Proven over the 813-facet osm
    library: "dissolve features by group" → `osm.Transform.Dissolve`, "reverse geocode coordinates"
    → `osm.geocode.ReverseGeocode`, "buffer service area" → `osm.Spatial.Buffer`, namespace-filtered
-   "within distance" → the `osm.Spatial` distance verbs. (Effect `@pure`/`@external` + cost
-   annotations are still future — FFL has no effect-annotation syntax yet; the index omits them.)
+   "within distance" → the `osm.Spatial` distance verbs. The index also carries **effect** (`pure` /
+   `external`) and **cost** (`free`…`expensive`) per facet (§9 item 7), so `fw_capabilities(effect=,
+   max_cost=)` can return e.g. only the pure/cheap primitives that are free to chain.
 2. **A domain vocabulary (ontology)** — ✅ *shipped* (`osm.Vocab`, backed by
    `_osm_tools/vocab.py`). A curated OSM tag ontology — `amenity` / `shop` / `highway` / `tourism` /
    `leisure` / `natural` / `landuse` values, each with synonyms — exposed as `ResolveTag(term, key?)`
@@ -327,7 +328,16 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    catalog, returning a `reuse` / `review` / `author_new` verdict plus the best candidate's intent +
    `param_schema` + confidence, so the composer fills params and runs an existing workflow instead of
    re-authoring. The workflow-level analogue of `fw_capabilities` (§6.1).
-7. **Effect + cost annotations** — so the composer chooses efficient compositions.
+7. **Effect + cost annotations** — ✅ *shipped*. Facets carry effect/cost via the existing `with`-mixin
+   syntax (no new grammar): `with Effect(kind = "pure"|"external"|"io")` and
+   `with Cost(tier = "free"|"cheap"|"moderate"|"expensive")`; cost is also **inferred** from an
+   existing `with Timeout(minutes = …)` (≥30 → expensive). The capability indexer parses these into
+   `effect`/`cost` fields and `fw_capabilities` gains `effect=` / `max_cost=` filters, so the composer
+   prefers pure/cheap primitives and sees which steps hit an engine. Proven on the osm library: the 9
+   `osm.Spatial` + 3 `osm.Transform` verbs report `pure`/`cheap`; `ExtractCategory`/`Clip`/
+   `BuildVectorTiles` report `external`/`expensive` (cost inferred from their `Timeout`); `osm.geocode`
+   reports `external`/`cheap`. (Annotation is opt-in + additive — the representative set above is
+   annotated; the rest default to unknown until tagged.)
 
 Each item is additive — it extends the typed/validated/distributed substrate, never relaxes it
 — consistent with the thesis's design position. The end state: a complex OSM NL request is
@@ -340,8 +350,10 @@ layer; the `Clip` + full `Spatial` (9 verbs) + `Transform` + `Filter` primitives
 families (`Geocoding`, `Routing` across five swappable engines, `BuildVectorTiles`); and the
 discovery layer (the `fw_capabilities` facet index + the `osm.Vocab` tag ontology). The primitive
 library has no capability or engine gaps left; the only remaining extract holes are `routes`/`pois`.
-**Item 6 (reuse-first catalog matching) is now ✅ shipped too** (`fw_catalog_match`): the
-composition loop is closed — match an NL request to an existing workflow by intent, else compose
-from the discoverable primitives, then the catalog remembers it. The only remaining roadmap item is
-**item 7 (effect/cost annotations)** — composer-efficiency hints that need net-new FFL
-effect-annotation syntax; it tunes *which* composition is chosen, not what's expressible.
+**Items 6 and 7 are now ✅ shipped too**: `fw_catalog_match` closes the composition loop (match an
+NL request to an existing workflow by intent → else compose from the discoverable primitives → the
+catalog remembers it), and effect/cost annotations (`with Effect`/`Cost` mixins, surfaced through
+`fw_capabilities`) let the composer prefer pure/cheap primitives. **All seven roadmap items are
+complete** — the orthogonal, complete, discoverable, distributed primitive library the design called
+for is realized end to end, with the only loose ends being the `routes`/`pois` extract holes and
+the (opt-in, additive) effect/cost tagging of the remaining facets.

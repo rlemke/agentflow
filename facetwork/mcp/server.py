@@ -496,6 +496,18 @@ def create_server(
                             "description": "Optional FFL source to index instead of the "
                             "deployed library (use when authoring).",
                         },
+                        "effect": {
+                            "type": "string",
+                            "enum": ["pure", "external", "io"],
+                            "description": "Keep only facets with this declared effect "
+                            "(pure = in-process compute; external = hits a network/engine).",
+                        },
+                        "max_cost": {
+                            "type": "string",
+                            "enum": ["free", "cheap", "moderate", "expensive"],
+                            "description": "Drop facets whose known cost tier exceeds this "
+                            "ceiling (prefer cheap primitives; un-annotated cost passes).",
+                        },
                         "limit": {
                             "type": "integer",
                             "description": "Max results to return (default 25; 0 = all).",
@@ -1532,6 +1544,8 @@ def _tool_capabilities(arguments: dict[str, Any], get_store: Any) -> list[TextCo
             namespace=arguments.get("namespace", ""),
             kind=arguments.get("kind", "all"),
             limit=limit,
+            effect=arguments.get("effect", ""),
+            max_cost=arguments.get("max_cost", ""),
         )
         return _catalog_text({
             "corpus": corpus,
