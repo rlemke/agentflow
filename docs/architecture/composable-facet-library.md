@@ -78,7 +78,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; by-element-type ✓; radius ✓; **contains/regex** ✗; `CompleteWays`/recurse ✗ (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Count` / `Summarize` / `Dissolve` ✗ (turf, shapely, PostGIS) |
-| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `SpatialJoin`, `Buffer`, `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
+| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✗ (Nominatim, Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓; `BuildVectorTiles` (→ MBTiles) ✗ (Mapnik, tippecanoe, OpenMapTiles) |
@@ -225,7 +225,16 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    that makes continental-scale spatial work tractable. (The live run also surfaced + fixed a latent
    bug in the previously-untested `pbf_clip` tool: `osmium extract` needs an explicit
    `--output-format pbf` because the staging filename hides the extension.)
-   Remaining in this item: the relational/areal verbs `SpatialJoin`, `Buffer`, `Intersect`/`Union`.
+   **`SpatialJoin` and `Buffer` complete the Spatial family** (also `osm.Spatial`): `SpatialJoin`
+   attaches a reference layer's properties onto each subject feature by a topological predicate
+   (`intersects`/`within`/`contains` — the point-in-polygon join, projection-invariant so it queries
+   the WGS84 STRtree directly), with `how="inner"`/`"left"`; `Buffer` expands each feature by a
+   distance into polygons (metric AEQD project → `buffer` → reproject) for service-area coverage.
+   Both proven on real California data and **cross-validated** against `BeyondDistance`: buffering the
+   142 hospitals by 10 mi and joining the 4,992 places `within` the coverage found **1,768 covered**;
+   1,768 + 3,223 (beyond) = 4,991 of 4,992 — two independent implementations agreeing to a single
+   boundary point. **Item 2's relational core is done**; only the set-ops `Intersect`/`Union` (and
+   `Centroid`/`Simplify`) remain, deferred until a target query needs them.
 3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
    `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
 4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
