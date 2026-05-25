@@ -336,8 +336,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    prefers pure/cheap primitives and sees which steps hit an engine. Proven on the osm library: the 9
    `osm.Spatial` + 3 `osm.Transform` verbs report `pure`/`cheap`; `ExtractCategory`/`Clip`/
    `BuildVectorTiles` report `external`/`expensive` (cost inferred from their `Timeout`); `osm.geocode`
-   reports `external`/`cheap`. (Annotation is opt-in + additive — the representative set above is
-   annotated; the rest default to unknown until tagged.)
+   reports `external`/`cheap`. **All 247 osm event facets are now annotated** (100% coverage),
+   classified by parameter type and namespace: PBF extractors / builds / imports / downloads →
+   `external`/`expensive`; PostGIS + routing engines → `external`/`moderate`; GeoJSON filters / stats /
+   Spatial / Transform → `pure`/`cheap`; loaders + render → `io`/`cheap`; vocab → `pure`/`free`.
+   Explicit `with Effect`/`Cost` mixins remain the override for hand-tuning.
 
 Each item is additive — it extends the typed/validated/distributed substrate, never relaxes it
 — consistent with the thesis's design position. The end state: a complex OSM NL request is
