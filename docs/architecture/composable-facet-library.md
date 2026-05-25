@@ -144,10 +144,17 @@ NL → facet must be *reliable*, not guesswork. Two pieces:
    → `osm.geocode.ReverseGeocode`, "buffer service area" → `osm.Spatial.Buffer`, namespace-filtered
    "within distance" → the `osm.Spatial` distance verbs. (Effect `@pure`/`@external` + cost
    annotations are still future — FFL has no effect-annotation syntax yet; the index omits them.)
-2. **A domain vocabulary (ontology)** — the tag values the domain understands: `amenity` values
-   (fast_food, cafe, pharmacy, bank…), `shop` values, `highway` values, etc., with synonyms. This
-   is what lets "find a pharmacy" map to `amenity=pharmacy` deterministically, and tells the
-   composer whether "business type" keys on `amenity` or `shop`.
+2. **A domain vocabulary (ontology)** — ✅ *shipped* (`osm.Vocab`, backed by
+   `_osm_tools/vocab.py`). A curated OSM tag ontology — `amenity` / `shop` / `highway` / `tourism` /
+   `leisure` / `natural` / `landuse` values, each with synonyms — exposed as `ResolveTag(term, key?)`
+   → `(osm_key, osm_value, confidence, alternatives)` and `ListTagValues(key)`. This is what lets
+   "find a pharmacy" map to `amenity=pharmacy` deterministically (confidence 1.0 on a canonical
+   value, 0.9 on a synonym), and tells the composer whether a "business type" keys on `amenity` or
+   `shop`. Proven: "gas station" → `amenity=fuel`, "grocery store" → `shop=supermarket`, "freeway"
+   → `highway=motorway`, "coffee shop" → `amenity=cafe`, "gym" → `leisure=fitness_centre`; an
+   unknown term resolves to confidence 0. The resolved `(osm_key, osm_value)` feeds straight into
+   `ExtractCategory` + `FilterGeoJSONByOSMType`, and `ResolveTag` itself is discoverable via the
+   capability index — the two halves close the loop.
 
 Together these turn "compose a workflow" from pattern-matching on memorised tags into a
 *lookup-then-compose*.
@@ -267,12 +274,14 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    `Nearest` / `MapMatch` verbs (need a running OSRM/engine) and a `Trip` facet. **`BuildVectorTiles`**
    remains a thin facet wrapper over the complete `_osm_tools/vector_tiles_build.py` (tippecanoe), to
    be added once tippecanoe is available in the target environment.
-5. **Build the discovery layer** — in progress. **The capability index is ✅ shipped**
-   (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6): NL → facet lookup over the
-   deployed library or an authored source snippet, proven over 813 osm facets. Remaining: the
-   **domain tag vocabulary** (the OSM `amenity`/`shop`/`highway` value ontology with synonyms, so
-   "find a pharmacy" maps to `amenity=pharmacy` deterministically) — an osm-side data artifact, the
-   natural complement that turns the *facet* index into a full *semantic* lookup.
+5. **Build the discovery layer** — ✅ *shipped* (both halves). **The capability index**
+   (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6.1): NL → *facet* lookup over
+   the deployed library or an authored source snippet, proven over 813 osm facets. **The domain tag
+   vocabulary** (`osm.Vocab.ResolveTag` / `ListTagValues`, see §6.2): NL → *tag* resolution
+   (`"pharmacy"` → `amenity=pharmacy`) over a curated, synonym-rich OSM ontology. Together they turn
+   compose-a-workflow into *lookup-then-compose*: `ResolveTag` fixes the `(key, value)`, the
+   capability index finds the primitives that consume it (`ExtractCategory` →
+   `FilterGeoJSONByOSMType` → render), and the catalog remembers the result.
 6. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
 7. **Effect + cost annotations** — so the composer chooses efficient compositions.
 
