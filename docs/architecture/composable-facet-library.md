@@ -29,10 +29,15 @@ turning *"map the interstate freeways in California"* into a precise spec (`high
 spec *expressible* by composition. Library and memory reinforce each other: the memory shows
 which compositions recur → which primitives to harden and add.
 
-## 2. Where we are — and the gap
+## 2. The starting point — and how the gap was closed
 
-The osm package has ~99 workflows and many facets, but it grew *organically for humans*, so
-it is **not** a composable library. Symptoms observed in practice:
+The osm package had ~99 workflows and many facets, but it grew *organically for humans*, so it
+**was not** a composable library. The symptoms diagnosed below were real; §9 tracks how each was
+closed. **As of this writing the primitive library is built** — every layer of the §4 taxonomy
+ships, proven on real data (items 1–5). The remaining work is composition-*time*, not primitives:
+reuse-first catalog matching and effect/cost annotations (§9 items 6–7).
+
+The original symptoms (all now addressed except the two noted extract holes):
 
 - **Holes** — several `extract_*` functions were declared but never written. `extract_amenities`,
   `extract_places_with_population`, `extract_parks`, and `extract_buildings` are now implemented
@@ -44,8 +49,12 @@ it is **not** a composable library. Symptoms observed in practice:
   is no queryable index of facet capabilities or the domain's tag vocabulary.
 - **Not designed for repeated composition** — a single business search filtered the full 1.2 GB
   California PBF (~54 min) because nothing was designed to be re-composed cheaply.
+  → *Closed*: `ExtractCategory` warms cheap cached category extracts (then instant), and `Clip`
+  cuts a region to a metro bbox first, so re-composition is seconds, not a full-PBF re-scan.
 
-Closing this gap is the work this document specifies.
+The first two symptoms map to §9 item 1 (extraction; only `routes`/`pois` extract holes remain),
+the third to item 5 (discovery), the fourth to items 1–2. **The gap this document specified is
+closed**; what follows is the design that was realized, with shipped-status markers in §9.
 
 ## 3. Design principles
 
@@ -317,3 +326,12 @@ Each item is additive — it extends the typed/validated/distributed substrate, 
 *looked up or composed* from an orthogonal, discoverable primitive set, **remembered** as a
 parameterized workflow, and **executed across the fleet** — and the library compounds with every
 request it learns to satisfy.
+
+**Status.** Items 1–5 are ✅ shipped and proven on real data — the orthogonal/cheap extraction
+layer; the `Clip` + full `Spatial` (9 verbs) + `Transform` + `Filter` primitives; the service
+families (`Geocoding`, `Routing` across five swappable engines, `BuildVectorTiles`); and the
+discovery layer (the `fw_capabilities` facet index + the `osm.Vocab` tag ontology). The primitive
+library has no capability or engine gaps left; the only remaining extract holes are `routes`/`pois`.
+What remains is **composition-time**: item 6 (reuse-first catalog matching — search by intent
+before authoring) and item 7 (effect/cost annotations to guide efficient composition). Those act on
+*how the composer uses* the library, not on the library itself.
