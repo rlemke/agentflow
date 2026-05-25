@@ -438,6 +438,47 @@ def create_server(
                 },
             ),
             Tool(
+                name="fw_capabilities",
+                description=(
+                    "Search the FACET capability index — the facet-level analogue of "
+                    "fw_catalog_search (which finds workflows). Returns ranked facets "
+                    "{qualified_name, purpose, signature, params, returns, namespace, "
+                    "is_event} so you can discover composable primitives by intent — "
+                    "e.g. 'what operates on a GeoJSON path?', 'what extracts amenities?', "
+                    "'reverse geocode' — instead of guessing facet names. Indexes the "
+                    "deployed/seeded library by default; pass `source` to index FFL you "
+                    "are authoring. Filter by namespace (prefix) and kind."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Free-text; matched (AND across terms) against "
+                            "facet name, purpose, doc, and param/return names + types.",
+                        },
+                        "namespace": {
+                            "type": "string",
+                            "description": "Namespace prefix filter, e.g. 'osm.Spatial' or 'osm'.",
+                        },
+                        "kind": {
+                            "type": "string",
+                            "enum": ["facet", "event_facet", "all"],
+                            "description": "Filter by facet kind (default: all).",
+                        },
+                        "source": {
+                            "type": "string",
+                            "description": "Optional FFL source to index instead of the "
+                            "deployed library (use when authoring).",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results to return (default 25; 0 = all).",
+                        },
+                    },
+                },
+            ),
+            Tool(
                 name="fw_catalog_get",
                 description=(
                     "Fetch one catalog entry + a specific (or latest) revision: "
@@ -576,6 +617,8 @@ def create_server(
             return _tool_catalog_publish(arguments, _get_store)
         elif name == "fw_catalog_run":
             return _tool_catalog_run(arguments, _get_store)
+        elif name == "fw_capabilities":
+            return _tool_capabilities(arguments, _get_store)
         else:
             return [
                 TextContent(
@@ -1431,6 +1474,46 @@ def _catalog_service(store: Any) -> Any:
 
 def _catalog_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, default=str))]
+
+
+def _tool_capabilities(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:
+    """Search the facet capability index (deployed library, or a given source)."""
+    try:
+        from facetwork.capabilities import index_program, index_programs, search
+
+        source = arguments.get("source", "")
+        if source:
+            from facetwork import emit_dict, parse
+
+            caps = index_program(emit_dict(parse(source)))
+            corpus = "source"
+        else:
+            flows = get_store().get_all_flows()
+            caps = index_programs(
+                [f.compiled_ast for f in flows if getattr(f, "compiled_ast", None)]
+            )
+            corpus = "library"
+
+        limit = arguments.get("limit", 25)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 25
+        hits = search(
+            caps,
+            query=arguments.get("query", ""),
+            namespace=arguments.get("namespace", ""),
+            kind=arguments.get("kind", "all"),
+            limit=limit,
+        )
+        return _catalog_text({
+            "corpus": corpus,
+            "indexed": len(caps),
+            "count": len(hits),
+            "capabilities": [c.to_dict() for c in hits],
+        })
+    except Exception as e:
+        return _catalog_text({"error": str(e)})
 
 
 def _tool_catalog_search(arguments: dict[str, Any], get_store: Any) -> list[TextContent]:

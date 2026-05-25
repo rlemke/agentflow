@@ -133,11 +133,17 @@ families the original taxonomy didn't enumerate: Routing, Geocoding, and Tiles.
 
 NL → facet must be *reliable*, not guesswork. Two pieces:
 
-1. **A capability index** — for every facet: a one-line purpose, its typed params + returns, its
-   layer, effects (`@pure`/`@external`), and a rough cost. Derivable from the cataloged library
-   FFL (doc comments + signatures) + effect annotations. Exposed so Claude can ask "what can
-   operate on a roads GeoJSON?" or "what extracts amenities?" — the facet-level analogue of
-   `fw_catalog_search` (which today finds *workflows*).
+1. **A capability index** — ✅ *shipped* (`facetwork/capabilities/`, MCP tool `fw_capabilities`).
+   For every facet: a one-line purpose (from its doc comment), its typed params + returns, its
+   namespace, whether it's an event facet, and a rendered signature — derived from the compiled FFL
+   (`emit_dict` / a flow's stored `compiled_ast`), so it needs no separate registry. Exposed as the
+   facet-level analogue of `fw_catalog_search`: `fw_capabilities(query, namespace, kind, source?)`
+   ranks facets by intent over free text + param/return types. It indexes the deployed/seeded
+   library by default, or a `source` snippet you're authoring. Proven over the 813-facet osm
+   library: "dissolve features by group" → `osm.Transform.Dissolve`, "reverse geocode coordinates"
+   → `osm.geocode.ReverseGeocode`, "buffer service area" → `osm.Spatial.Buffer`, namespace-filtered
+   "within distance" → the `osm.Spatial` distance verbs. (Effect `@pure`/`@external` + cost
+   annotations are still future — FFL has no effect-annotation syntax yet; the index omits them.)
 2. **A domain vocabulary (ontology)** — the tag values the domain understands: `amenity` values
    (fast_food, cafe, pharmacy, bank…), `shop` values, `highway` values, etc., with synonyms. This
    is what lets "find a pharmacy" map to `amenity=pharmacy` deterministically, and tells the
@@ -261,8 +267,12 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    `Nearest` / `MapMatch` verbs (need a running OSRM/engine) and a `Trip` facet. **`BuildVectorTiles`**
    remains a thin facet wrapper over the complete `_osm_tools/vector_tiles_build.py` (tippecanoe), to
    be added once tippecanoe is available in the target environment.
-5. **Build the discovery layer** — the capability index + the OSM tag vocabulary, exposed to the
-   composer (an MCP `fw_capabilities`-style surface).
+5. **Build the discovery layer** — in progress. **The capability index is ✅ shipped**
+   (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6): NL → facet lookup over the
+   deployed library or an authored source snippet, proven over 813 osm facets. Remaining: the
+   **domain tag vocabulary** (the OSM `amenity`/`shop`/`highway` value ontology with synonyms, so
+   "find a pharmacy" maps to `amenity=pharmacy` deterministically) — an osm-side data artifact, the
+   natural complement that turns the *facet* index into a full *semantic* lookup.
 6. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
 7. **Effect + cost annotations** — so the composer chooses efficient compositions.
 
