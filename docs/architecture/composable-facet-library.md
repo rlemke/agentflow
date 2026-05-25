@@ -205,12 +205,17 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    projection centered on the reference centroid, indexed with a shapely `STRtree` (O(log n) per
    subject feature, subject streamed). Proven by deterministic unit tests against geodesic ground
    truth (within/beyond partition the subject exactly; nearest orders by distance; unit conversion;
-   empty-reference edge), and composed end-to-end as the parameterized
-   `osm.Spatial.workflows.PlacesBeyondReach` (validates + compiles in the 86-file package).
-   Remaining in this item: **`Clip`** (`ClipByBBox`/`ClipByPolygon` — cheap sub-region queries that
-   make continental-scale spatial work tractable), and the relational/areal verbs `SpatialJoin`,
-   `Buffer`, `Intersect`/`Union`. Next verification: the full California `PlacesBeyondReach`
-   data-run (the item-1-style fleet proof).
+   empty-reference edge), then **proven end-to-end on the live fleet**: the parameterized
+   `osm.Spatial.workflows.PlacesBeyondReach` ran on California (PBF cache hit + a ~1.5-min
+   `amenities` warm pass) as `CacheRegion → ExtractCategory(amenities) →
+   FilterGeoJSONByOSMType(amenity=hospital) → ExtractCategory(population) → BeyondDistance(10 mi) →
+   RenderMap`. It filtered **142 hospitals** (from 278,795 amenity features), related **4,992
+   populated places** against them via the STRtree in ~1 s, and found **3,223 places (≈65%) beyond
+   10 mi of the nearest hospital** — the rendered map (bounds spanning the whole state) flags exactly
+   the rural places one expects (Buttonwillow, Desert Center). "Food deserts" is the same workflow
+   with `tag_key="shop", tag_value="supermarket"`. Remaining in this item: **`Clip`**
+   (`ClipByBBox`/`ClipByPolygon` — cheap sub-region queries that make continental-scale spatial work
+   tractable), and the relational/areal verbs `SpatialJoin`, `Buffer`, `Intersect`/`Union`.
 3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
    `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
 4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
