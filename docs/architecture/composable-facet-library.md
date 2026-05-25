@@ -78,16 +78,18 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; by-element-type ✓; radius ✓; **contains/regex** ✗; `CompleteWays`/recurse ✗ (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Count` / `Summarize` / `Dissolve` ✗ (turf, shapely, PostGIS) |
-| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | **all ✗** — `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer`, `Intersect`/`Union`, `Centroid`, `Simplify` (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
+| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `SpatialJoin`, `Buffer`, `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✗ (Nominatim, Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓; `BuildVectorTiles` (→ MBTiles) ✗ (Mapnik, tippecanoe, OpenMapTiles) |
 
 The biggest capability gaps, in priority order: the **Spatial** family (`WithinDistance`/`Nearest`/
 `SpatialJoin`) — the single most universal verb across the ecosystem and the unlock for "food
-deserts" or "schools without a pharmacy within 1 mile"; **`Clip`** (cheap sub-region queries);
-then the two self-contained service families that turn our extracts into answers, **Routing** and
-**Geocoding**; and **vector tiles** for scalable visualization.
+deserts" or "schools without a pharmacy within 1 mile". The distance core of this family —
+`WithinDistance`, its complement `BeyondDistance`, and `Nearest` — is now **shipped** (`osm.Spatial`,
+see §9 item 2); `SpatialJoin`/`Buffer`/`Intersect` remain. Then **`Clip`** (cheap sub-region
+queries); then the two self-contained service families that turn our extracts into answers,
+**Routing** and **Geocoding**; and **vector tiles** for scalable visualization.
 
 ### 4.1 Grounded in the OSS ecosystem
 
@@ -159,9 +161,13 @@ foreach region in [California]:
 RenderLayers(layers)
 ```
 
-It needs exactly the missing primitives: complete category extraction + a **spatial
-within/beyond-distance** transform. The interstate example we shipped
-(`Source.Cache → Extract(roads,motorway) → Filter(ref prefix "I ") → Render`) already fits the
+It needs exactly two primitives: complete category extraction (shipped, item 1) + a **spatial
+within/beyond-distance** transform. As of item 2 both exist, so the decomposition is now
+*expressible* — shipped as the parameterized `osm.Spatial.workflows.PlacesBeyondReach`
+(`Cache → ExtractCategory(amenities) → Filter(tag=value) → ExtractCategory(population) →
+BeyondDistance → RenderMap`), of which "food deserts" is the `shop=supermarket` instance and
+"healthcare deserts" the `amenity=hospital` instance. The interstate example we shipped earlier
+(`Source.Cache → Extract(roads,motorway) → Filter(ref prefix "I ") → Render`) already fit the
 model — it just exposed that `Extract(roads)` and the prefix filter had to be built first.
 
 ## 8. Memory + reuse (the flywheel)
@@ -190,9 +196,21 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    into osmium for node-only scans — benchmarking showed the node-location index wasn't the cost,
    the per-element Python callback over ~99%-untagged nodes was (264 MB region: 347s → 12s, counts
    unchanged), extrapolating California's warm from ~26 min to ~1 min. Remaining: `routes`/`pois`.
-2. **`Clip` + the `Spatial` family** — `ClipByBBox`/`ClipByPolygon` (cheap sub-region), then
-   `WithinDistance`/`Around`, `Nearest`, `SpatialJoin`, `Buffer` — the ecosystem's universal verb
-   and the unlock for complex requests ("food deserts", "schools without a pharmacy within 1mi").
+2. **`Clip` + the `Spatial` family** — the distance core is ✅ *shipped*: `osm.Spatial` now exposes
+   `WithinDistance` (keep subject features within *d* of any reference — Overpass `around` /
+   PostGIS `ST_DWithin`), `BeyondDistance` (its complement — the "food desert" primitive), and
+   `Nearest` (annotate each subject with its nearest reference distance — KNN / turf nearestPoint).
+   Contract is uniform with the Filter layer (subject GeoJSON path + reference GeoJSON path +
+   distance → GeoJSON path, tags preserved); distances are metric in a local azimuthal-equidistant
+   projection centered on the reference centroid, indexed with a shapely `STRtree` (O(log n) per
+   subject feature, subject streamed). Proven by deterministic unit tests against geodesic ground
+   truth (within/beyond partition the subject exactly; nearest orders by distance; unit conversion;
+   empty-reference edge), and composed end-to-end as the parameterized
+   `osm.Spatial.workflows.PlacesBeyondReach` (validates + compiles in the 86-file package).
+   Remaining in this item: **`Clip`** (`ClipByBBox`/`ClipByPolygon` — cheap sub-region queries that
+   make continental-scale spatial work tractable), and the relational/areal verbs `SpatialJoin`,
+   `Buffer`, `Intersect`/`Union`. Next verification: the full California `PlacesBeyondReach`
+   data-run (the item-1-style fleet proof).
 3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
    `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
 4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
