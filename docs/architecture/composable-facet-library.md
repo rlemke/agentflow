@@ -78,8 +78,8 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; **contains/regex** ✓; by-element-type ✓; radius ✓; `CompleteWays`/recurse ✗ (PBF-only — N/A at GeoJSON level) (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
-| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
-| **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch` ✓ (`osm.Routing.{OSRM,API}`, OSRM HTTP + graceful great-circle fallback); `Trip` (TSP) ✗ (OSRM, Valhalla, GraphHopper, pgRouting) |
+| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer`/`Intersect`/`Union` ✓ (`osm.Spatial`, shapely STRtree + local AEQD); `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
+| **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch`/`Trip` ✓ (`osm.Routing.{OSRM,API}`, OSRM HTTP + graceful great-circle fallback) (Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓, `BuildVectorTiles` ✓ (`osm.Tiles`, tippecanoe → MBTiles/PMTiles) (Mapnik, OpenMapTiles) |
 
@@ -246,8 +246,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    Both proven on real California data and **cross-validated** against `BeyondDistance`: buffering the
    142 hospitals by 10 mi and joining the 4,992 places `within` the coverage found **1,768 covered**;
    1,768 + 3,223 (beyond) = 4,991 of 4,992 — two independent implementations agreeing to a single
-   boundary point. **Item 2's relational core is done**; only the set-ops `Intersect`/`Union` (and
-   `Centroid`/`Simplify`) remain, deferred until a target query needs them.
+   boundary point. **Item 2's Spatial family is complete** — the set-ops `Intersect` (clip each
+   subject geometry to a mask layer, ST_Intersection) and `Union` (aggregate-merge geometries into
+   one feature, ST_Union — distinct from the per-group `Dissolve`) also shipped, proven on synthetic
+   geometry (exact areas) + a real-data union of 4,075 CA place points. Only `Centroid`/`Simplify`
+   remain, deferred until a query needs them.
 3. **The missing filters/transforms** — ✅ *shipped*. The Filter layer gains `FilterGeoJSONByTagContains`
    (substring, case-insensitive by default) and `FilterGeoJSONByTagRegex` (`re.search`) in `osm.Filters`,
    completing the exact/prefix/contains/regex match family. A new `osm.Transform` namespace adds the
@@ -260,7 +263,7 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    278,795 amenities → 448 categories in ~1 s (restaurant 21,170 + cafe 7,165); the regex filter
    `amenity ~ /^(cafe|restaurant)$/` returns exactly 28,335 = 21,170 + 7,165; `MergeLayers` of that with
    the 1,556 `name⊃"Starbucks"` matches = exactly 29,891; `Dissolve` of the 142 hospital-coverage circles
-   → one MultiPolygon. Remaining (deferred): the Spatial set-ops `Intersect`/`Union`.
+   → one MultiPolygon.
 4. **The service families** — in progress. **`Geocoding` ✅ shipped**: `osm.geocode.Geocode`
    (forward — the facet was declared but had no handler) and the new `osm.geocode.ReverseGeocode`,
    both backed by a Nominatim HTTP client (`_osm_tools/geocode.py`) with a configurable endpoint
@@ -280,8 +283,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    graph built from an `osm.Clip` Bay-Area extract (osrm-extract→partition→customize→routed):
    the 3×3 `Matrix` gave realistic drive times (SF→Oakland 20 min, SF→San Jose 60 min), `Nearest`
    snapped an SF point to "Market Street" 6 m away, and `MapMatch` snapped a 4-point trace to an
-   82-vertex road-following line (`radiuses` loosens matching for noisy traces). Only the `Trip`
-   (TSP) facet remains unbuilt; the engine-independent core + tiles + routing are all done.
+   82-vertex road-following line (`radiuses` loosens matching for noisy traces). **`Trip` (TSP) also
+   shipped** (`/trip`): proven live optimizing a 5-stop Bay-Area tour (input
+   SF→SanJose→Oakland→Fremont→Berkeley reordered to SF→SanJose→Fremont→Oakland→Berkeley, 178 km
+   roundtrip). The Routing family is complete; only Valhalla/GraphHopper query backends and
+   pgRouting remain as alternative engines.
 5. **Build the discovery layer** — ✅ *shipped* (both halves). **The capability index**
    (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6.1): NL → *facet* lookup over
    the deployed library or an authored source snippet, proven over 813 osm facets. **The domain tag
