@@ -76,8 +76,8 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Source** | region/file → queryable handle | `region → handle` | `CacheRegion` ✓; **per-category warm extracts** ✓ (`CombinedScan`/`ExtractCategory`, cached single pass); PostGIS source ◐; `Merge`/`Sort`/`ConvertFormat`/`ApplyChanges` ✗ (osmium, osmosis) |
 | **Clip** | spatial subset of a region | `handle + bbox/polygon → handle` | `ClipByBBox`/`ClipByPolygon` ✓ (`osm.Clip`, osmium-extract → clipped `OSMCache`; osmconvert `-b`, ogr2ogr, Overpass bbox) |
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
-| **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; by-element-type ✓; radius ✓; **contains/regex** ✗; `CompleteWays`/recurse ✗ (osmfilter, Overpass has-kv / recurse) |
-| **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Count` / `Summarize` / `Dissolve` ✗ (turf, shapely, PostGIS) |
+| **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; **contains/regex** ✓; by-element-type ✓; radius ✓; `CompleteWays`/recurse ✗ (PBF-only — N/A at GeoJSON level) (osmfilter, Overpass has-kv / recurse) |
+| **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
 | **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✗ (Nominatim, Photon, Pelias) |
@@ -235,8 +235,19 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    1,768 + 3,223 (beyond) = 4,991 of 4,992 — two independent implementations agreeing to a single
    boundary point. **Item 2's relational core is done**; only the set-ops `Intersect`/`Union` (and
    `Centroid`/`Simplify`) remain, deferred until a target query needs them.
-3. **The missing filters/transforms** — contains/regex tag filter, `MergeLayers`, generic
-   `Count`/`Summarize`/`Dissolve`, `CompleteWays`/recurse.
+3. **The missing filters/transforms** — ✅ *shipped*. The Filter layer gains `FilterGeoJSONByTagContains`
+   (substring, case-insensitive by default) and `FilterGeoJSONByTagRegex` (`re.search`) in `osm.Filters`,
+   completing the exact/prefix/contains/regex match family. A new `osm.Transform` namespace adds the
+   generic combine/reduce verbs: `MergeLayers` (concatenate GeoJSON layers — the foreach-fanout
+   aggregator), `Summarize` (count, optionally grouped by a tag, with count/sum/avg/min/max over a
+   measure — subsumes the listed `Count`; writes a JSON breakdown), and `Dissolve` (union each group's
+   geometries — PostGIS `ST_Union … GROUP BY` / turf dissolve). `CompleteWays`/recurse is **N/A** at the
+   GeoJSON level (features are already complete; it's a PBF-only concept, available via `FilterByOSMType`'s
+   `include_dependencies`). Proven on real California data, internally cross-consistent: `Summarize` of
+   278,795 amenities → 448 categories in ~1 s (restaurant 21,170 + cafe 7,165); the regex filter
+   `amenity ~ /^(cafe|restaurant)$/` returns exactly 28,335 = 21,170 + 7,165; `MergeLayers` of that with
+   the 1,556 `name⊃"Starbucks"` matches = exactly 29,891; `Dissolve` of the 142 hospital-coverage circles
+   → one MultiPolygon. Remaining (deferred): the Spatial set-ops `Intersect`/`Union`.
 4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
    and `Geocoding` (forward/reverse), plus `BuildVectorTiles` for scalable visualization.
 5. **Build the discovery layer** — the capability index + the OSM tag vocabulary, exposed to the
