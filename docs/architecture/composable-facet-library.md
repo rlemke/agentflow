@@ -78,7 +78,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Extract** | one category → GeoJSON | `handle + category → GeoJSON` | roads/amenities/places/parks/buildings ✓; uniform cached `ExtractCategory` ✓; routes/pois ✗ (osmium tags-filter) |
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; **contains/regex** ✓; by-element-type ✓; radius ✓; `CompleteWays`/recurse ✗ (PBF-only — N/A at GeoJSON level) (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
-| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer`/`Intersect`/`Union` ✓ (`osm.Spatial`, shapely STRtree + local AEQD); `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
+| **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer`/`Intersect`/`Union`/`Centroid`/`Simplify` ✓ — **complete** (`osm.Spatial`, shapely STRtree + local AEQD) (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch`/`Trip` ✓ (`osm.Routing.{OSRM,API}`, OSRM HTTP + graceful great-circle fallback) (Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓, `BuildVectorTiles` ✓ (`osm.Tiles`, tippecanoe → MBTiles/PMTiles) (Mapnik, OpenMapTiles) |
@@ -249,8 +249,11 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    boundary point. **Item 2's Spatial family is complete** — the set-ops `Intersect` (clip each
    subject geometry to a mask layer, ST_Intersection) and `Union` (aggregate-merge geometries into
    one feature, ST_Union — distinct from the per-group `Dissolve`) also shipped, proven on synthetic
-   geometry (exact areas) + a real-data union of 4,075 CA place points. Only `Centroid`/`Simplify`
-   remain, deferred until a query needs them.
+   geometry (exact areas) + a real-data union of 4,075 CA place points. **`Centroid`** (feature →
+   centroid Point) and **`Simplify`** (Douglas-Peucker at a metric tolerance, via AEQD) close out
+   the family — proven by chaining on real data: buffering the 142 hospitals to circles (9,230
+   vertices) then `Simplify`@1000 m cut them to 1,278 vertices (~7×) and `Centroid` reduced them to
+   142 points. **The Spatial family is complete** (9 verbs).
 3. **The missing filters/transforms** — ✅ *shipped*. The Filter layer gains `FilterGeoJSONByTagContains`
    (substring, case-insensitive by default) and `FilterGeoJSONByTagRegex` (`re.search`) in `osm.Filters`,
    completing the exact/prefix/contains/regex match family. A new `osm.Transform` namespace adds the
