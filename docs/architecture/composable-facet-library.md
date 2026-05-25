@@ -80,7 +80,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
 | **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
-| **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✗ (Nominatim, Photon, Pelias) |
+| **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓; `BuildVectorTiles` (→ MBTiles) ✗ (Mapnik, tippecanoe, OpenMapTiles) |
 
 The biggest capability gaps, in priority order: the **Spatial** family (`WithinDistance`/`Nearest`/
@@ -248,8 +248,19 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    `amenity ~ /^(cafe|restaurant)$/` returns exactly 28,335 = 21,170 + 7,165; `MergeLayers` of that with
    the 1,556 `name⊃"Starbucks"` matches = exactly 29,891; `Dissolve` of the 142 hospital-coverage circles
    → one MultiPolygon. Remaining (deferred): the Spatial set-ops `Intersect`/`Union`.
-4. **The service families** — `Routing` (Route/Matrix/Isochrone/MapMatch over the road extracts)
-   and `Geocoding` (forward/reverse), plus `BuildVectorTiles` for scalable visualization.
+4. **The service families** — in progress. **`Geocoding` ✅ shipped**: `osm.geocode.Geocode`
+   (forward — the facet was declared but had no handler) and the new `osm.geocode.ReverseGeocode`,
+   both backed by a Nominatim HTTP client (`_osm_tools/geocode.py`) with a configurable endpoint
+   (`AFL_NOMINATIM_URL` — point at a self-hosted instance for volume), a required User-Agent, and a
+   polite ~1 req/s throttle for the public instance; results are the typed `GeoCoordinate`, cached on
+   a synthetic key, and an unresolved query fails explicitly. Proven live against public Nominatim:
+   "Golden Gate Bridge" → (37.820, −122.479), Google HQ → "Google Building 41", a clean
+   forward→reverse round-trip, and reverse of Eiffel-Tower coords → "Avenue Gustave Eiffel, Paris".
+   **`Routing` core was already present** (`osm.Routing.{API,OSRM}.Route` / `MultiStopRoute` /
+   `Isochrone`, plus GraphHopper/Valhalla graph builders) — the genuine gaps are the `Matrix` /
+   `Nearest` / `MapMatch` verbs (need a running OSRM/engine) and a `Trip` facet. **`BuildVectorTiles`**
+   remains a thin facet wrapper over the complete `_osm_tools/vector_tiles_build.py` (tippecanoe), to
+   be added once tippecanoe is available in the target environment.
 5. **Build the discovery layer** — the capability index + the OSM tag vocabulary, exposed to the
    composer (an MCP `fw_capabilities`-style surface).
 6. **Reuse-first catalog matching** — search-by-intent before authoring; aggressive parameterization.
