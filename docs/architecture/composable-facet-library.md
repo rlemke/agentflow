@@ -81,7 +81,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer` ✓ (`osm.Spatial`, shapely STRtree over a local AEQD projection); `Intersect`/`Union`, `Centroid`, `Simplify` ✗ (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
 | **Routing** | answer over the road network | `points + profile → route / matrix / area` | **all ✗** — `Route`, `Matrix`, `Nearest`, `MapMatch`, `Isochrone`, `Trip` (OSRM, Valhalla, GraphHopper, pgRouting) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
-| **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓; `BuildVectorTiles` (→ MBTiles) ✗ (Mapnik, tippecanoe, OpenMapTiles) |
+| **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓, `BuildVectorTiles` ✓ (`osm.Tiles`, tippecanoe → MBTiles/PMTiles) (Mapnik, OpenMapTiles) |
 
 The biggest capability gaps, in priority order: the **Spatial** family (`WithinDistance`/`Nearest`/
 `SpatialJoin`) — the single most universal verb across the ecosystem and the unlock for "food
@@ -270,10 +270,14 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    "Golden Gate Bridge" → (37.820, −122.479), Google HQ → "Google Building 41", a clean
    forward→reverse round-trip, and reverse of Eiffel-Tower coords → "Avenue Gustave Eiffel, Paris".
    **`Routing` core was already present** (`osm.Routing.{API,OSRM}.Route` / `MultiStopRoute` /
-   `Isochrone`, plus GraphHopper/Valhalla graph builders) — the genuine gaps are the `Matrix` /
-   `Nearest` / `MapMatch` verbs (need a running OSRM/engine) and a `Trip` facet. **`BuildVectorTiles`**
-   remains a thin facet wrapper over the complete `_osm_tools/vector_tiles_build.py` (tippecanoe), to
-   be added once tippecanoe is available in the target environment.
+   `Isochrone`, plus GraphHopper/Valhalla graph builders). **`BuildVectorTiles` is now ✅ shipped**
+   (`osm.Tiles`): a path-based `build_from_geojson` over tippecanoe (→ MBTiles, → PMTiles when the
+   pmtiles CLI is present), the scalable counterpart to `RenderMap` — tile any Extract/Filter/
+   Transform output. Proven live: the 94.7 MB California amenities extract (278,795 features) → a
+   23 MB PMTiles at z0–14 in ~12 s. The remaining deferred verbs are the OSRM-backed `Matrix` /
+   `Nearest` / `MapMatch` (and a `Trip` facet) — code is straightforward (OSRM's `/table`,
+   `/nearest`, `/match` HTTP endpoints, like the existing `Route`), but a *live* proof needs a
+   running OSRM server with a built graph for the region.
 5. **Build the discovery layer** — ✅ *shipped* (both halves). **The capability index**
    (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6.1): NL → *facet* lookup over
    the deployed library or an authored source snippet, proven over 813 osm facets. **The domain tag
