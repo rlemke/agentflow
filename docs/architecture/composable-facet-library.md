@@ -79,7 +79,7 @@ geometry kernels. The status column names a representative tool establishing eac
 | **Filter** | narrow a GeoJSON by predicate | `GeoJSON + predicate → GeoJSON` | tag-exact ✓; tag-**prefix** ✓; **contains/regex** ✓; by-element-type ✓; radius ✓; `CompleteWays`/recurse ✗ (PBF-only — N/A at GeoJSON level) (osmfilter, Overpass has-kv / recurse) |
 | **Transform / Analyze** | combine, reduce | `GeoJSON(s) → GeoJSON / scalar` | per-class stats ◐; `MergeLayers` / `Summarize` (subsumes `Count`) / `Dissolve` ✓ (`osm.Transform`, shapely); generic `Count` folded into `Summarize` (turf, shapely, PostGIS) |
 | **Spatial** | relate geometries — the universal verb | `GeoJSON(s) → GeoJSON / scalar` | `WithinDistance`/`BeyondDistance`/`Nearest`/`SpatialJoin`/`Buffer`/`Intersect`/`Union`/`Centroid`/`Simplify` ✓ — **complete** (`osm.Spatial`, shapely STRtree + local AEQD) (Overpass around/area, turf, PostGIS `ST_*`, routing isochrone) |
-| **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch`/`Trip` ✓ across **four swappable engines** `osm.Routing.{OSRM,API,Valhalla,GraphHopper}` (uniform `osm.Routing.Types` schemas, HTTP + graceful great-circle fallback) (pgRouting) |
+| **Routing** | answer over the road network | `points + profile → route / matrix / area` | `Route`/`MultiStopRoute`/`Isochrone`/`Matrix`/`Nearest`/`MapMatch`/`Trip` ✓ across **five swappable engines** `osm.Routing.{OSRM,API,Valhalla,GraphHopper,PgRouting}` — **complete** (uniform `osm.Routing.Types` schemas; HTTP or SQL, all with graceful great-circle fallback) |
 | **Geocoding** | name/address ↔ coordinate | `query → coords` / `coords → address` | `ResolveRegion` ◐; `Geocode` / `ReverseGeocode` ✓ (`osm.geocode`, Nominatim HTTP — forward + reverse) (Photon, Pelias) |
 | **Render / Tiles** | produce a viewable artifact | `GeoJSON(s) → artifact` | `RenderMap` ✓, `RenderLayers` ✓, `RenderStyledMap` ✓, `BuildVectorTiles` ✓ (`osm.Tiles`, tippecanoe → MBTiles/PMTiles) (Mapnik, OpenMapTiles) |
 
@@ -295,7 +295,12 @@ model — it just exposed that `Extract(roads)` and the prefix filter had to be 
    namespace alone (the source-adapter payoff). Each degrades to the great-circle estimate when its
    server is down; mocked-HTTP tests cover request shaping + response marshalling (a live run needs a
    running Valhalla/GraphHopper server — neither is trivially provisionable here, unlike the OSRM
-   path which was proven live). Only the pgRouting engine remains unimplemented.
+   path which was proven live). **`pgRouting` also shipped** (`osm.Routing.PgRouting`) — the
+   DB-backed engine: Route/Matrix/Isochrone via `pgr_dijkstra` / `pgr_dijkstraCostMatrix` /
+   `pgr_drivingDistance` over an osm2pgrouting topology (points snapped to the nearest network
+   vertex), again reusing the shared schemas with a great-circle fallback and mocked-DB tests. The
+   Routing family now spans **five interchangeable engines** (OSRM, public API, Valhalla,
+   GraphHopper, pgRouting) — no engine gaps remain.
 5. **Build the discovery layer** — ✅ *shipped* (both halves). **The capability index**
    (`facetwork/capabilities/` + the `fw_capabilities` MCP tool, see §6.1): NL → *facet* lookup over
    the deployed library or an authored source snippet, proven over 813 osm facets. **The domain tag
