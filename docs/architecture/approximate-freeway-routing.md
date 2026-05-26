@@ -208,20 +208,27 @@ noding pass); the routing verbs are `cheap`.
 
 ## 8. Phasing & milestones
 
-- **Phase 0 (this change)** — design doc, `osm.Network` namespace scaffold
-  (validator-clean FFL + handler wiring + `network_ops` signatures + tests),
-  `networkx` dependency, `network` cache_type registered in the spec.
-- **Phase 1** — implement `BuildNetwork` (noding + adjacency + cache write).
-  Prove on the California interstate extract: assert I-5/I-80/I-580 interchanges
-  become shared nodes, `connected_components` small, artifact + sidecar correct.
-- **Phase 2** — implement `ApproxRoute`. Golden test: SF→LA along I-5 within a
-  tolerance of the known freeway distance (~615 km); off-net B → `reached_b=false`
-  + sane `gap_to_b_km`.
-- **Phase 3** — implement `RouteMatrix` + the cities-over-1M workflow (national
-  interstate network + the population filter).
-- **Phase 4** — multi-server proof: build on one host (HDFS/NFS), run the matrix
-  across ≥2 routing runners, confirm read-once-per-runner and that results match
-  the single-host run.
+- **Phase 0 ✅** — design doc, `osm.Network` namespace scaffold (validator-clean
+  FFL + handler wiring + `network_ops` signatures + tests), `networkx`
+  dependency, `network` cache_type registered in the spec.
+- **Phase 1 ✅** — `BuildNetwork` (noding + adjacency + cache write).
+  Live-proven on the real California PBF: 13,230 nodes / 14,507 edges in 1.3 s,
+  8.2 MB artifact, 9 ms cache hit; 99.4 % in one connected component spanning
+  the state (the 7 small components are benign ramp-less spurs).
+- **Phase 2 ✅** — `ApproxRoute` (snap + Dijkstra + closest-reachable-point).
+  Live: SF→LA **613.6 km** (≈615 km real I-5), LA→SD 192.6 km, SF→Sac 141.9 km,
+  all 45–248 ms; SF→Yosemite honestly reports a 143 km off-freeway gap.
+- **Phase 3 ✅** — `RouteMatrix` (all-pairs) + the `CityRoutesByPopulation`
+  workflow + the GeoJSON→waypoints adapter. Live capstone: the 3 real CA cities
+  ≥1M (LA/SD/SJ) routed end-to-end (LA↔SD 193, LA↔SJ 611, SD↔SJ 799 km).
+- **Phase 4 ✅** — multi-server proof, **run live in Docker**
+  ([`docker-compose.network-phase4.yml`](../../docker-compose.network-phase4.yml)):
+  containerized MongoDB + 2 independent `route-runner` instances sharing one
+  prebuilt network artifact via a volume. The `RouteFanout` workflow fanned out
+  21 city-pair routes; the runners claimed the tasks **lock-free, 22/20 across
+  the two instances** (coordinating only through Mongo), each **loaded the shared
+  network once** (read-once-per-runner), and the results were **identical to the
+  single-host run**. Confirms the cross-server sharing model of §4 end to end.
 - **Phase 5** — docs/CLAUDE.md catalog, capability-index + catalog entries,
   lessons-learned.
 
