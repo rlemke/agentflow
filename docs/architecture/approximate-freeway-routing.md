@@ -135,7 +135,7 @@ namespace osm.Network {
         extraction_date: String
     }
 
-    schema RouteResult {
+    schema ApproxRouteResult {
         route_path: String,             // GeoJSON LineString of the traversed segments
         distance_km: Double,
         reached_lat: Double,            // closest reachable point to B
@@ -146,7 +146,7 @@ namespace osm.Network {
         extraction_date: String
     }
 
-    schema MatrixResult {
+    schema RouteMatrixResult {
         result_path: String,            // JSON: pairs[] of {from, to, distance_km, reached_b}
         pair_count: Long,
         reachable_count: Long,
@@ -161,11 +161,11 @@ namespace osm.Network {
     /** Approximate route over a freeway network: snap A and B to the nearest
         network nodes, shortest path by segment length, and return the route plus
         the closest reachable point to B (and the residual gap when B is off-net). */
-    event facet ApproxRoute(network_path: String, from_lat: Double, from_lon: Double, to_lat: Double, to_lon: Double) => (result: RouteResult) with Effect(kind = "pure") with Cost(tier = "cheap")
+    event facet ApproxRoute(network_path: String, from_lat: Double, from_lon: Double, to_lat: Double, to_lon: Double) => (result: ApproxRouteResult) with Effect(kind = "pure") with Cost(tier = "cheap")
 
     /** All-pairs approximate routing over the small network — pure in-process,
         no engine. `points` is a JSON list of {lon, lat, name}. */
-    event facet RouteMatrix(network_path: String, points: String) => (result: MatrixResult) with Effect(kind = "pure") with Cost(tier = "cheap")
+    event facet RouteMatrix(network_path: String, points: String) => (result: RouteMatrixResult) with Effect(kind = "pure") with Cost(tier = "cheap")
 }
 ```
 
