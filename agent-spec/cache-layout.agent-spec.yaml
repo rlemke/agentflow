@@ -226,6 +226,7 @@ namespaces:
       - "graphhopper (directory artifact per region)"
       - "valhalla (directory artifact per region)"
       - "osrm (directory artifact per region)"
+      - "network (approximate-routing freeway graph: directory artifact — nodes.geojson + edges.geojson + graph.json. relative_path mirrors the source extract with a @tol<N> suffix encoding snap tolerance; see docs/architecture/approximate-freeway-routing.md)"
       - "vector_tiles (single pmtiles file per region)"
       - "html (directory artifact per map)"
     path_convention: "mirrors Geofabrik hierarchy for pbf. All derived cache_types use the same relative_path (stripping -latest.osm.pbf and adding cache-type-specific suffixes)."
