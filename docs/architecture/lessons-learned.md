@@ -293,6 +293,47 @@ A multi-day session built out roadmap items 2–7 of [`composable-facet-library.
 
 ---
 
+## Engine-free approximate routing — `osm.Network` (v0.47, 2026-05-26)
+
+The composable library had full road routing via five external engines, but that path has a hard edge for continental, multi-server runs: the graph **build** is a heavy serial step, the **build-graph → running-engine lifecycle is not wired as facets**, and replicating a multi-GB graph across hosts is real work. `osm.Network` (`BuildNetwork` / `ApproxRoute` / `RouteMatrix` + the `CityRoutesByPopulation` / `RouteFanout` workflows) trades exactness for a tiny network and routes purely in-process. Lessons:
+
+### A. When cross-server sharing is hard, shrink the shared artifact until it is trivial
+
+**Requirement**: Before building distribution machinery (engine replicas, graph servers, transfer protocols), ask whether the shared state can be made small enough that the *existing* cache + a read-once load solves it.
+
+**What happened**: Restricting the routable graph to interstate/freeway LineStrings made it ~MB (13,230 nodes for all of California), versus a full OSRM graph's tens of GB. At that size the graph is just another content-addressed `osm/network/` cache artifact: built once, written to a shared volume, and **read once per runner into an in-process `networkx` graph** (memoized by path + sidecar sha256). The whole "build-graph → running-daemon → replicate across K hosts" lifecycle — the part that didn't distribute — *disappeared*; routing became `effect=pure` and fanned out lock-free with no engine, no `AFL_*_URL`, no replica management. Proven live in Docker (2 runner containers + containerized Mongo + a shared volume distributed a 21-route fan-out 22/20, results identical to a single host).
+
+**Upfront requirement**:
+- Treat a large piece of shared mutable state as a design smell in a distributed system. A small, immutable, content-addressed artifact + pure compute is almost always easier to distribute than a stateful server you must replicate.
+- The cheapest multi-server proof reuses the runtime you have: `docker compose --scale <runner>=N` + a `foreach` fan-out, then check tasks split across `server_id`s and results match the single-host run. No bespoke test harness.
+
+### B. Result-schema names must be unique across the whole library — and only the full-library compile proves it
+
+**Requirement**: A facet's return schema is part of the global namespace the composer resolves against; a name reused in two namespaces is ambiguous at any cross-namespace reference. Single-file validation will not catch it.
+
+**What happened**: `osm.Network.RouteResult` / `MatrixResult` validated cleanly on their own, and every unit test passed — because the collision with the identically-named `osm.Routing.Types` schemas only surfaces when something references the facet's return *from another namespace*. The first such reference was the `CityRoutesByPopulation` workflow; compiling it against the **full 70-file osm FFL library** raised `Ambiguous schema reference 'MatrixResult'`. Renaming to `ApproxRouteResult` / `RouteMatrixResult` fixed it, and a regression test now compiles the workflow against the whole library and asserts it adds **zero** new validation errors.
+
+**Upfront requirement**:
+- Prefix/scope result-schema names so they are unique library-wide (`ApproxRouteResult`, not `RouteResult`), even though the namespace already disambiguates the *facet*.
+- Add a test that compiles new cross-namespace workflows against the entire FFL set, diffing error count with/without the new file — single-file `--check` is necessary but not sufficient.
+
+### C. On partial data, the honest answer is "how close did I get" — make it a first-class output
+
+**Requirement**: A primitive that operates on an incomplete model (a freeways-only graph, a region with gaps) should return its best partial result plus a quantified residual, not an error or a silent wrong answer.
+
+**What happened**: `ApproxRoute` always returns the closest reachable on-network point to B with `reached_b` + `gap_to_b_km`. SF→Yosemite reports a route to the central valley + a `143 km` gap; Fresno/Bakersfield (on SR-99, not an interstate) show 65 / 22 km access gaps in the matrix. The caller learns *exactly* how approximate the answer is. Separately, `BuildNetwork`'s sidecar carries `connected_components` / `largest_component_frac` as build-quality signals — 99.4 % in one component (the 7 tiny spurs being ramp-less segments, since `motorway_link` ramps carry no `ref`) confirmed routability *before any route ran*.
+
+**Upfront requirement**:
+- Return `(best_partial, residual, reached_flag)`, not just a value — degradation must be visible and quantified (echoes lesson B above, for graph-partition rather than engine-down).
+- Put a cheap quality metric *in the artifact* so consumers can gate on it; a connectivity fraction catches a bad extraction/noding far earlier than a wrong route does.
+
+### D. Operational footguns (this project)
+
+- **Writable output base.** Handler tests and any facet calling `get_temp_dir` / `derive_output_path` resolve `AFL_OUTPUT_BASE` (default `/Volumes/afl_data/output`). On a host without that mount they fail with `PermissionError`, which looks like a regression but is environmental — set `AFL_OUTPUT_BASE` (+ `AFL_DATA_ROOT`) to a writable dir. New pure facets should also fall back to the system temp for staging (as `BuildNetwork` does) so they are robust to a missing data mount.
+- **`foreach` element field-access form.** Inside `andThen foreach p in $.xs { … }`, the documented form accesses the loop element as `$.p` and its fields as `$.p.field` (a `Json` element's fields are permissive). The whole element can also be passed as `p.value`. Match the namespace's existing usage.
+
+---
+
 ## Future Requirements: From Distributed Systems Literature
 
 The following requirements are drawn from *Designing Data-Intensive Applications* (Kleppmann), *Release It!* (Nygard), Temporal's durable execution model, and the Recovery Oriented Computing research (Patterson et al.). These represent gaps not yet addressed in Facetwork.
