@@ -202,6 +202,97 @@ Unit tests with MemoryStore missed all three because they test components in iso
 
 ---
 
+## Building a Composable Facet Library for LLM Composition (v0.46, 2026-05-25)
+
+A multi-day session built out roadmap items 2–7 of [`composable-facet-library.md`](composable-facet-library.md) — the Clip / Spatial / Transform / Filter primitives, the Geocoding / Routing / Tiles service families, the discovery layer (`fw_capabilities` + `osm.Vocab`), reuse-first catalog matching (`fw_catalog_match`), and effect/cost annotations. The durable engineering lessons, distinct from the distributed-systems ones above:
+
+### A. Define the shared result schemas before the engine adapters
+
+**Requirement**: When several backends implement the same operation, the *result schema* is the interface; design it first, then the adapters are thin and interchangeable.
+
+**What happened**: Routing was implemented across five engines (OSRM, the public API, Valhalla, GraphHopper, pgRouting). Because they all returned the pre-existing `osm.Routing.Types` schemas (`PointToPointResult`, `MatrixResult`, `IsochroneResult`), a workflow swaps engine by changing one namespace — `osm.Routing.OSRM.Route` → `osm.Routing.Valhalla.Route` — with no other change. Each new engine was a ~200-line adapter (request shaping + response marshalling), not a new contract.
+
+**Upfront requirement**:
+- Put the result types in their own namespace/module that all backends `use`; never let an engine's native response shape leak into the facet's return.
+- A new backend implements the verbs it natively supports against those shared types; verb coverage may differ per engine (that's honest), but the schemas do not.
+
+### B. External-engine facets degrade gracefully, never hard-fail
+
+**Requirement**: A leaf facet that calls an external engine (HTTP server, DB, subprocess) must fall back to an explicit estimate when the engine is unreachable, and report which path it took.
+
+**What happened**: Every routing/geocoding facet falls back to a great-circle estimate (or empty result) when its server is down, and every result carries a `backend` field (`osrm-local` / `valhalla` / `estimate` / `none`). This kept compositions runnable and the whole library mock-testable without standing up OSRM/Valhalla/pgRouting — only OSRM was ever provisioned live; the rest were proven by mocked-HTTP tests plus the uniform-schema guarantee.
+
+**Upfront requirement**:
+- Distinguish *"the engine answered"* from *"I estimated"* in the return (a `backend` field), so downstream and operators know the provenance.
+- Never let an unreachable engine fail the step when a coarse answer is acceptable — but make the coarseness visible. (Contrast §7: a *missing input* should still fail explicitly.)
+
+### C. Reuse existing extension points before adding syntax
+
+**Requirement**: Before designing new language/grammar, check whether an existing extension point already carries the new metadata.
+
+**What happened**: Effect/cost annotations (item 7) were assumed to "need net-new FFL effect-annotation syntax." They didn't: the existing `with`-mixin grammar accepts `with Effect(kind = "pure")` / `with Cost(tier = "cheap")` and the validator does not require a mixin target to be a declared facet, so annotation mixins parse and validate with zero compiler change. Cost was further *inferred* from the `with Timeout(minutes = …)` mixins facets already carried (≥30 → expensive) — signal derived from existing annotations rather than demanded anew.
+
+**Upfront requirement**:
+- Treat “we need new syntax” as a hypothesis to falsify, not a given. A general extension point (here, mixins as metadata) often already admits the new use.
+- Prefer inferring from data already present over requiring every fact to be re-stated.
+
+### D. Parameter type is a good effect classifier — with per-namespace overrides
+
+**Requirement**: When bulk-classifying facets (e.g. effect/cost), a parameter-type heuristic scales, but the same parameter name can mean different things; budget for overrides.
+
+**What happened**: Annotating all 247 facets used the rule *`cache: OSMCache` → external/expensive (scans the PBF); `input_path: String` → pure/cheap (operates on GeoJSON)*. It mis-classified two cases: `FilterByOSMTag`/`FilterByOSMType` take an `input_path` that is a **PBF** path (the ~54-minute full-scan trap), so they are external/expensive, not pure; and the census `*Districts` facets *return* `TIGERCache`, so a substring match on the type name misrouted them. Both were caught by re-running the capability index and reviewing the distribution + spot-checks, then fixed with name-based overrides.
+
+**Upfront requirement**:
+- Param-type heuristics are the right default for a bulk pass; pair them with a verification step (re-derive the classification, eyeball the distribution and the small/odd buckets) and a small set of explicit overrides.
+- A parameter *name* (`input_path`) is not a type — the same name spanned GeoJSON (cheap) and PBF (expensive).
+
+### E. Untested code harbors latent bugs that a new consumer surfaces
+
+**Requirement**: Code with no tests should be assumed buggy until exercised; building a new caller (or a live run) is when those bugs appear — leave room for it.
+
+**What happened**: Two latent bugs surfaced only when newer work exercised older code. (1) The pre-existing `pbf_clip` tool (no tests) failed the first live Clip run: `osmium extract` could not infer the output format from the `.staging` staging filename — fixed with an explicit `--output-format pbf`. (2) The capability indexer read facet mixins from `m["name"]`, but the emitter writes the key as `m["target"]`, so `FacetCapability.mixins` had been silently empty since it shipped — surfaced only when item 7 needed to read mixin args, and it passed every prior test because none asserted on that field.
+
+**Upfront requirement**:
+- When building on untested tool code, expect to be its first real test; verify end-to-end (a live run), don't trust that "it's been there a while."
+- Verify field access against the *actual emitted shape*, not an assumed key. A field that is "always empty" passes any test that doesn't assert it is populated — add the assertion.
+
+### F. Assert against derived structure, not hardcoded counts
+
+**Requirement**: Registry/registration tests must compute their expectations from the registry, or they go stale the moment it grows.
+
+**What happened**: A routing test hardcoded `assert poller.register.call_count == 6`. Adding the OSRM Matrix/Nearest/MapMatch/Trip verbs and then four more engines pushed it to 15; the stale assertion broke (and had silently been wrong across several earlier commits because that test was never run in those batches). The fix derives the expected count by summing `len(dispatch)` over the engine dispatch tables, so it can never go stale.
+
+**Upfront requirement**:
+- Tests over a growing registry assert *structure* (e.g. "every dispatch entry is registered exactly once"), not a magic number.
+- Run the full affected test module before committing, not just the new test file — a passing new suite does not mean an old sibling still passes (see §10).
+
+### G. Re-running by a reused execution id silently no-ops (reinforces §2)
+
+**Requirement**: Re-submitting a workflow must create a fresh execution, or stale terminal steps shadow the new request.
+
+**What happened**: `scripts/run-workflow --workflow X` mints a *deterministic* execution id per workflow. The hospital-deserts run completed; resubmitting the same workflow with *food-desert* parameters returned instantly with the **stale hospital results**, because the prior execution's steps were already `Complete` under that id and nothing re-ran. The catalog `run` path avoids this (it mints a fresh execution id per run); `run-workflow` did not. Workaround: clear the prior execution's steps/tasks, or use the catalog.
+
+**Upfront requirement**:
+- This is §2 (execution isolation) seen from the *re-run* angle: a deterministic execution id is an execution-isolation bug waiting for the second run. Every submission path must mint a fresh execution id.
+- Verify a re-run *actually ran* (check a leaf step's params match what you submitted), not merely that it reported success.
+
+### H. Cross-validate a new primitive against an independent existing one
+
+**Requirement**: Validate a new analysis primitive against a *different* primitive that should agree, on real data — agreement to a boundary case is strong evidence and catches systematic errors.
+
+**What happened**: `Buffer` + `SpatialJoin(within)` and the earlier `BeyondDistance` are independent implementations of "near vs far." Buffering the 142 California hospitals by 10 mi and joining the 4,992 populated places found **1,768 within coverage**; the prior `BeyondDistance` run found **3,223 beyond**. `1,768 + 3,223 = 4,991` of 4,992 — the single discrepancy is one place near the 10-mi boundary, classified differently because one method uses point-distance in a reference-centred projection and the other point-in-buffered-circle. Two separate code paths agreeing to one boundary point is far stronger than either passing its own unit tests.
+
+**Upfront requirement**:
+- When two primitives compute complementary facts, assert the complement holds on real data; investigate (don't paper over) any gap — here it explained a real projection/discretization difference and confirmed both were correct.
+
+### I. Operational footguns worth knowing (macOS / blocking subprocesses)
+
+- **Port 5000 is taken on macOS.** `osrm-routed` crashed with `Address already in use` on `:5000` — macOS ControlCenter (AirPlay Receiver) listens there. Use a different port (`:5050`) for local engines.
+- **Blocking-subprocess facets need a heartbeat pump.** Clip (`osmium extract`) and tile-build (`tippecanoe`) run a multi-minute blocking subprocess that cannot heartbeat from inside; each wraps the call in a daemon thread that pumps the task heartbeat every 30 s, or the 5-minute lease expires mid-build (the §5 lesson, applied to subprocesses rather than scans).
+- **The dual-import trap.** A tool reachable both as `_osm_tools.geocode` (via a `sys.path` shim) and as `osm_geocoder.tools._osm_tools.geocode` is *two distinct module objects* with *two distinct exception classes*; a test that `pytest.raises(geocode.GeocodeError)` against the wrong one fails. Reference the module the handler actually imports (through the shim) in tests.
+
+---
+
 ## Future Requirements: From Distributed Systems Literature
 
 The following requirements are drawn from *Designing Data-Intensive Applications* (Kleppmann), *Release It!* (Nygard), Temporal's durable execution model, and the Recovery Oriented Computing research (Patterson et al.). These represent gaps not yet addressed in Facetwork.
