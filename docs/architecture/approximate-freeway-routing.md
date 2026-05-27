@@ -181,11 +181,23 @@ noding pass); the routing verbs are `cheap`.
 
 ## 6. Algorithm internals
 
-- **BuildNetwork**: `shapely.ops.unary_union(lines)` nodes the geometry at every
-  crossing; merge endpoints within `snap_tolerance_m` (interchange tolerance);
-  assign node ids; emit `nodes.geojson` / `edges.geojson`; build a
-  `networkx.Graph` (weight = `length_m`), serialize to `graph.json`; compute
-  connected components for the sidecar.
+- **BuildNetwork** has two connectivity modes; it auto-selects by peeking the
+  first input feature:
+  - **Node-ID topology (primary, recommended).** When the extractor preserved
+    each way's OSM node-id sequence (`properties.node_ids` — `ExtractRoads` emits
+    it), `node_id_graph()` builds the graph on **shared OSM node IDs**: two ways
+    that reference the *same* node id connect, and only then — exactly how
+    OSRM/pgRouting/Valhalla build their graphs. Degree-2 interior nodes are
+    contracted so each edge spans junction→junction. **Zero tolerance, no
+    heuristics.** Because OSM node ids are global, separate per-region PBF
+    extracts auto-stitch at shared border nodes. Cached under a `@nodeid` key.
+  - **Coordinate-snap noding (fallback, legacy).** When `node_ids` are absent,
+    `node_linestrings()` falls back to `shapely.ops.unary_union(lines)` (node at
+    crossings) + merge endpoints within `snap_tolerance_m`. This *reconstructs*
+    topology from geometry and is lossy — see §10. Cached under `@tol<N>`.
+  - Both emit the same `nodes.geojson` / `edges.geojson` / `graph.json` artifact
+    and a `networkx.Graph` (weight = `length_m`); the sidecar records the
+    `topology` (`node_id` | `coord_snap`) and `connected_components`.
 - **ApproxRoute**: snap A and B to the nearest network node (shapely
   `nearest_points` + the projected entry via `line.project`/`interpolate`);
   `networkx.dijkstra_path` by length. If B's nearest node is unreachable from
@@ -248,9 +260,20 @@ matrix).
 
 ## 10. Risks / limitations
 
-- **Noding tolerance** is the main accuracy lever — too tight fragments the
-  graph, too loose falsely joins grade-separated crossings. Mitigation:
-  `connected_components` in the sidecar + a CA golden test.
+- **Noding tolerance** *(coordinate-snap mode only)* is the main accuracy lever
+  there — too tight fragments the graph, too loose falsely joins grade-separated
+  crossings. **The node-ID topology mode removes this lever entirely** (exact
+  shared-node connectivity, no tolerance; overpasses that cross in 2-D but share
+  no node correctly stay disconnected). Prefer node-ID; the European run (§12)
+  showed coordinate-snap plateaus and bridging heuristics don't recover it.
+- **Class-downgrade / unmapped-road gaps** *(both modes)*: node-ID can't invent
+  road that isn't in the extract. Where a through-route drops from `motorway` to
+  `trunk` (e.g. the ~10 km D-100/E80 *trunk* stretch across the Turkey↔Bulgaria
+  Kapıkule border), a motorway-only network breaks there. Fix = extract `trunk`
+  too (a `motorway+trunk` network) — proven to reconnect İstanbul↔Sofia — at the
+  cost of a larger graph and "major through-road" rather than strict-freeway
+  semantics. Genuinely sea-separated nodes (UK across the Channel) are
+  unbridgeable by any topology.
 - **Directionality / dual carriageways:** interstates are often two parallel
   ways; the graph is undirected (approximate by design). Acceptable for
   corridor-level distance; documented as a limitation.
@@ -268,3 +291,33 @@ production routers do continental queries. As a standalone, it is a clean, pure,
 massively-parallel primitive that the library absorbs with just `BuildNetwork` +
 `ApproxRoute` (+ `RouteMatrix`), discoverable via `fw_capabilities`
 (`effect=pure`) like the rest of the Spatial/Transform layers.
+
+## 12. Production findings (US + Europe)
+
+- **US interstates — works cleanly.** A single connected interstate network;
+  SF→LA 613.6 km matches reality. The approach shines when the target network is
+  one well-mapped, continuously-`motorway` component.
+- **Europe exposed coordinate-snap's ceiling.** Building the 45-country map by
+  per-country `motorway` extract + **coordinate-snap** left the network in ~400
+  components: the European giant component dead-ended at Niš while Sofia sat in a
+  611-node island, so Belgrade↔Sofia was unreachable — despite the A4/E80 being
+  tagged `motorway` end to end. The break was a **26 m gap a 25 m tolerance
+  missed by one metre.** Raising tolerance plateaued (~17%→29% reachable) and
+  *neither* ref-aware nor proximity dead-end bridging recovered city reachability
+  (+0 points): you can't reliably rebuild graph topology from geometry once the
+  node IDs are gone.
+- **Node-ID topology fixed it.** Rebuilding on shared OSM node IDs (§6)
+  reconnected Belgrade↔Sofia at an accurate **382 km**, grew the giant component
+  to ~472k nodes, and stitched per-country extracts at shared border nodes for
+  free. European city-pair reachability rose 17% → **27%**, and **all of
+  Turkey's 19 cities** formed one connected cluster (vs. shattered under
+  coordinate-snap).
+- **The residual is class-downgrade, not topology.** What still caps Europe at
+  27% is genuine: Turkey's cluster reaches Europe only via the **trunk**-class
+  Kapıkule border stretch (§10), and the UK is sea-isolated. A `motorway+trunk`
+  network connects İstanbul↔Sofia (proven) and would lift reachability further,
+  at the cost of a larger, "major-road" (not strict-freeway) graph.
+- **Takeaway:** prefer the node-ID topology mode for any multi-region build;
+  treat `snap_tolerance_m` as a legacy fallback. Decide `motorway` vs
+  `motorway+trunk` by whether you want strict freeways or major-city
+  connectivity.
