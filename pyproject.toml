@@ -60,6 +60,9 @@ mcp = [
 hdfs = [
     "pyarrow>=14.0",
 ]
+s3 = [
+    "boto3>=1.28",
+]
 
 [project.scripts]
 facetwork = "facetwork.cli:main"

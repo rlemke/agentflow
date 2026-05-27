@@ -28,6 +28,18 @@ except ImportError:
     _ReqConnectionError: Any = None  # type: ignore[no-redef]
     _ReqHTTPError: Any = None  # type: ignore[no-redef]
 
+# boto3 is an optional dependency, soft-imported only when an s3:// path is used
+# (S3 / MinIO backend). The platform's only hard runtime dep stays minimal.
+try:
+    import boto3 as _boto3
+    from botocore.config import Config as _BotoConfig
+    from botocore.exceptions import ClientError as _BotoClientError
+
+    HAS_BOTO3 = True
+except ImportError:
+    HAS_BOTO3 = False
+    _BotoClientError = Exception  # type: ignore[assignment,misc]
+
 
 @runtime_checkable
 class StorageBackend(Protocol):
@@ -364,9 +376,210 @@ class _WebHDFSWriteStream:
         self.close()
 
 
+def _s3_split(path: str) -> tuple[str, str]:
+    """Split an ``s3://bucket/key/...`` URI into ``(bucket, key)``."""
+    parsed = urlparse(path)
+    return parsed.netloc, parsed.path.lstrip("/")
+
+
+class _S3WriteStream:
+    """Buffers writes and uploads via a single put_object on close (like WebHDFS).
+
+    S3 has no append/partial-object semantics, so a whole-object PUT on close is
+    the natural unit. Adequate for the cache's modest artifacts (graph.json,
+    GeoJSON layers); not for streaming a multi-GB object, which should be staged
+    locally and uploaded with the managed transfer instead.
+    """
+
+    def __init__(self, backend: S3StorageBackend, bucket: str, key: str):
+        import io
+
+        self._backend = backend
+        self._bucket = bucket
+        self._key = key
+        self._buffer = io.BytesIO()
+
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        return self._buffer.write(data)
+
+    def close(self):
+        body = self._buffer.getvalue()
+        logger.info("S3 upload: s3://%s/%s (%.1f MB)", self._bucket, self._key, len(body) / 1_048_576)
+        self._backend._client.put_object(Bucket=self._bucket, Key=self._key, Body=body)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+class S3StorageBackend:
+    """Storage backend for S3-compatible object stores (AWS S3 or a self-hosted
+    MinIO surfacing the shared cache).
+
+    Configured from the environment so MinIO "just works" locally:
+
+    - ``AFL_S3_ENDPOINT``  — endpoint URL (e.g. ``http://localhost:9000`` for
+      MinIO). Unset → real AWS S3.
+    - ``AFL_S3_REGION``    — region (default ``us-east-1``).
+    - credentials via the standard boto3 chain (``AWS_ACCESS_KEY_ID`` /
+      ``AWS_SECRET_ACCESS_KEY`` / profile / instance role), or the convenience
+      ``AFL_S3_ACCESS_KEY`` / ``AFL_S3_SECRET_KEY``.
+
+    Objects are addressed by ``s3://bucket/key`` URIs. There are no real
+    directories: ``makedirs`` is a no-op and ``isdir`` is emulated by a prefix
+    listing — adequate for the cache's stage-locally-then-finalize pattern.
+    """
+
+    def __init__(self) -> None:
+        if not HAS_BOTO3:
+            raise RuntimeError(
+                "boto3 is required for S3/MinIO support. Install it with: "
+                "pip install boto3 (or the package's 's3' extra)."
+            )
+        endpoint = os.environ.get("AFL_S3_ENDPOINT") or None
+        region = os.environ.get("AFL_S3_REGION", "us-east-1")
+        access = os.environ.get("AFL_S3_ACCESS_KEY") or os.environ.get("AWS_ACCESS_KEY_ID")
+        secret = os.environ.get("AFL_S3_SECRET_KEY") or os.environ.get("AWS_SECRET_ACCESS_KEY")
+        self._client = _boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            region_name=region,
+            aws_access_key_id=access,
+            aws_secret_access_key=secret,
+            # MinIO speaks S3v4 + path-style addressing.
+            config=_BotoConfig(signature_version="s3v4", s3={"addressing_style": "path"}),
+        )
+
+    def _split(self, path: str) -> tuple[str, str]:
+        return _s3_split(path)
+
+    def exists(self, path: str) -> bool:
+        bucket, key = self._split(path)
+        try:
+            self._client.head_object(Bucket=bucket, Key=key)
+            return True
+        except _BotoClientError:
+            return self.isdir(path)
+
+    def open(self, path: str, mode: str = "r") -> IO:
+        bucket, key = self._split(path)
+        if "w" in mode:
+            return _S3WriteStream(self, bucket, key)  # type: ignore[return-value]
+        data = self._client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        import io
+
+        return io.BytesIO(data) if "b" in mode else io.StringIO(data.decode("utf-8"))
+
+    def makedirs(self, path: str, exist_ok: bool = True) -> None:
+        return None  # object stores have no directories
+
+    def getsize(self, path: str) -> int:
+        bucket, key = self._split(path)
+        return self._client.head_object(Bucket=bucket, Key=key)["ContentLength"]
+
+    def getmtime(self, path: str) -> float:
+        bucket, key = self._split(path)
+        return self._client.head_object(Bucket=bucket, Key=key)["LastModified"].timestamp()
+
+    def isfile(self, path: str) -> bool:
+        bucket, key = self._split(path)
+        try:
+            self._client.head_object(Bucket=bucket, Key=key)
+            return True
+        except _BotoClientError:
+            return False
+
+    def isdir(self, path: str) -> bool:
+        bucket, key = self._split(path)
+        prefix = (key.rstrip("/") + "/") if key else ""
+        resp = self._client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
+        return resp.get("KeyCount", 0) > 0
+
+    def listdir(self, path: str) -> list[str]:
+        bucket, key = self._split(path)
+        prefix = (key.rstrip("/") + "/") if key else ""
+        names: set[str] = set()
+        for page in self._client.get_paginator("list_objects_v2").paginate(
+            Bucket=bucket, Prefix=prefix, Delimiter="/"
+        ):
+            for cp in page.get("CommonPrefixes", []):
+                names.add(cp["Prefix"][len(prefix):].rstrip("/"))
+            for obj in page.get("Contents", []):
+                name = obj["Key"][len(prefix):]
+                if name:
+                    names.add(name)
+        return sorted(names)
+
+    def walk(self, path: str) -> Iterator[tuple[str, list[str], list[str]]]:
+        bucket, root = self._split(path)
+        root = root.rstrip("/")
+        prefix = root + "/" if root else ""
+        from collections import defaultdict
+
+        dirs: dict[str, set[str]] = defaultdict(set)
+        files: dict[str, list[str]] = defaultdict(list)
+        for page in self._client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                rel = obj["Key"][len(prefix):]
+                parts = rel.split("/")
+                cur = root
+                for i, part in enumerate(parts):
+                    if i == len(parts) - 1:
+                        files[cur].append(part)
+                    else:
+                        dirs[cur].add(part)
+                        cur = f"{cur}/{part}" if cur else part
+
+        def _emit(d: str):
+            sub = sorted(dirs.get(d, []))
+            base = f"s3://{bucket}/{d}" if d else f"s3://{bucket}"
+            yield base, sub, files.get(d, [])
+            for s in sub:
+                yield from _emit(f"{d}/{s}" if d else s)
+
+        yield from _emit(root)
+
+    def rmtree(self, path: str) -> None:
+        bucket, key = self._split(path)
+        prefix = key.rstrip("/") + "/"
+        batch: list[dict] = []
+        for page in self._client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                batch.append({"Key": obj["Key"]})
+                if len(batch) == 1000:
+                    self._client.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+                    batch = []
+        if batch:
+            self._client.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+
+    def remove(self, path: str) -> None:
+        bucket, key = self._split(path)
+        self._client.delete_object(Bucket=bucket, Key=key)
+
+    def join(self, *parts: str) -> str:
+        if not parts:
+            return ""
+        out = [parts[0].rstrip("/")] + [p.strip("/") for p in parts[1:] if p]
+        return "/".join(p for p in out if p)
+
+    def dirname(self, path: str) -> str:
+        bucket, key = self._split(path)
+        parent = key.rsplit("/", 1)[0] if "/" in key else ""
+        return f"s3://{bucket}/{parent}" if parent else f"s3://{bucket}"
+
+    def basename(self, path: str) -> str:
+        _bucket, key = self._split(path)
+        return key.rsplit("/", 1)[-1] if "/" in key else key
+
+
 # Singleton and cache for backend instances
 _local_backend: LocalStorageBackend | None = None
 _hdfs_backends: dict[str, HDFSStorageBackend] = {}
+_s3_backend: S3StorageBackend | None = None
 
 
 def _default_local_cache() -> str:
@@ -412,6 +625,25 @@ def localize(path: str, target_dir: str | None = None) -> str:
     """
     if target_dir is None:
         target_dir = _default_local_cache()
+
+    if path.startswith("s3://"):
+        parsed = urlparse(path)
+        bucket = parsed.netloc
+        key = parsed.path.lstrip("/")
+        local_path = os.path.join(target_dir, bucket, key)
+        backend = get_storage_backend(path)
+        if os.path.isfile(local_path):
+            try:
+                if os.path.getsize(local_path) == backend.getsize(path):
+                    logger.debug("localize: s3 cache hit %s -> %s", path, local_path)
+                    return local_path
+            except Exception:
+                pass  # re-download on any error
+        logger.info("localize: downloading %s -> %s", path, local_path)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        assert isinstance(backend, S3StorageBackend)
+        backend._client.download_file(bucket, key, local_path)
+        return local_path
 
     if not path.startswith("hdfs://"):
         if not _should_localize_mount(path):
@@ -492,7 +724,7 @@ def get_storage_backend(path: str | None = None) -> StorageBackend:
     Returns:
         A StorageBackend instance.
     """
-    global _local_backend
+    global _local_backend, _s3_backend
 
     if path and path.startswith("hdfs://"):
         parsed = urlparse(path)
@@ -502,6 +734,11 @@ def get_storage_backend(path: str | None = None) -> StorageBackend:
         if cache_key not in _hdfs_backends:
             _hdfs_backends[cache_key] = HDFSStorageBackend(host=host, port=port)
         return _hdfs_backends[cache_key]
+
+    if path and path.startswith("s3://"):
+        if _s3_backend is None:
+            _s3_backend = S3StorageBackend()
+        return _s3_backend
 
     if _local_backend is None:
         _local_backend = LocalStorageBackend()
