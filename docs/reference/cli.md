@@ -181,8 +181,14 @@ scripts/easy.sh        # runs the full pipeline using .env values
 | `AFL_JENKINS` | `false` | Enable Jenkins profile |
 | `AFL_GEOFABRIK_MIRROR` | `/Volumes/afl_data/osm` | Path to local Geofabrik mirror; mounted read-only at `/data/osm-mirror` in containers |
 | **OSM data paths** | | |
-| `AFL_DATA_ROOT` | `/Volumes/afl_data` | Unified data root; OSM/handler caches live under `$AFL_DATA_ROOT/cache/<namespace>/`. Override just the cache with `AFL_CACHE_ROOT`; set `AFL_STORAGE=hdfs` for HDFS. (Replaces the retired `AFL_CACHE_DIR`.) |
-| `AFL_OSM_OUTPUT_BASE` | `/tmp` | OSM extractor output base (local path or HDFS URI) |
+| `AFL_DATA_ROOT` | `/Volumes/afl_data` | Unified data root; OSM/handler caches live under `$AFL_DATA_ROOT/cache/<namespace>/`. Override just the cache with `AFL_CACHE_ROOT`; set `AFL_STORAGE=hdfs` or `s3` for remote storage. (Replaces the retired `AFL_CACHE_DIR`.) |
+| `AFL_STORAGE` | `local` | Storage backend: `local` \| `hdfs` \| `s3`. `s3` (AWS S3 / MinIO) makes cache + outputs portable across the fleet — see [S3 / MinIO Integration](../operations/deployment.md#s3--minio-integration). |
+| `AFL_OSM_OUTPUT_BASE` | `/tmp` | OSM extractor output base (local path, `hdfs://`, or `s3://` URI) |
+| **S3 / MinIO (when `AFL_STORAGE=s3`)** | | Requires the `s3` extra (boto3). Keep `AFL_OUTPUT_BASE` local. |
+| `AFL_S3_ENDPOINT` | *(AWS S3)* | Object-store endpoint, e.g. `http://localhost:9000` for MinIO. Unset → real AWS S3. |
+| `AFL_S3_ACCESS_KEY` / `AFL_S3_SECRET_KEY` | *(AWS chain)* | Credentials (or the standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`). |
+| `AFL_S3_REGION` | `us-east-1` | S3 region. |
+| `AFL_LOCAL_SCRATCH` | *(system temp)* | Local base for staging/tmp/locks when `AFL_DATA_ROOT` is remote. |
 | `AFL_LOCAL_OUTPUT_DIR` | `/Volumes/afl_data/output` | Handler output files (reports, maps, stats, GeoJSON). Used by all examples: osm-geocoder, census-us, hiv-drug-resistance, monte-carlo-risk, maven. Falls back to `/tmp` when unset. |
 | `AFL_LOCALIZE_MOUNTS` | *(empty)* | Comma-separated path prefixes for Docker mount paths that `localize()` should copy to container-local storage before processing. Avoids VirtioFS hangs on large files. Example: `/data/osm-mirror` |
 | **Remote runner management** | | |

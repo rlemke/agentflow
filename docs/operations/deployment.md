@@ -413,6 +413,76 @@ scripts/setup --hdfs \
 
 When the variables are unset, Docker uses named volumes (the original behavior). When set to a host path (e.g., `/mnt/hdfs/datanode`), Docker creates a bind mount instead. Ensure the target directories exist and have appropriate permissions before starting the containers.
 
+## S3 / MinIO Integration
+
+Facetwork also supports any **S3-compatible object store** (AWS S3, or a self-hosted **MinIO** surfacing the cache over HTTP) as a storage backend. This is the simplest way to make handler caches and outputs **portable across a multi-server runner fleet**: a task's step payload carries `s3://…` URIs that any runner on any host can resolve, instead of host-local paths like `/Volumes/afl_data/…`. `get_storage_backend()` detects `s3://` URIs and returns an `S3StorageBackend` (backed by `boto3`); reads are localized to a per-runner cache, writes upload on close.
+
+### Requirements
+
+- **`boto3`** — install the `s3` extra: `pip install -e ".[s3]"` (boto3 is soft-imported, so it's only needed when an `s3://` path is used).
+- **A bucket** on the object store (created once, below).
+- For MinIO: the **MinIO container** (below). For AWS S3: nothing to run — just set credentials and omit `AFL_S3_ENDPOINT`.
+
+### Starting MinIO (what the container requires)
+
+MinIO is a single self-contained container. It needs a data directory, the S3 API + console ports, and root credentials:
+
+```bash
+docker run -d --name afl-minio \
+  -p 9000:9000 \                       # S3 API (the endpoint runners talk to)
+  -p 9001:9001 \                       # web console (http://localhost:9001)
+  -e MINIO_ROOT_USER=minioadmin \      # access key
+  -e MINIO_ROOT_PASSWORD=minioadmin \  # secret key (change for anything shared)
+  -v afl-minio-data:/data \            # persist objects across restarts
+  minio/minio server /data --console-address ":9001"
+```
+
+Create the bucket once (via the AWS CLI, `mc`, or boto3):
+
+```bash
+AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin \
+  aws --endpoint-url http://localhost:9000 s3 mb s3://afl-cache
+```
+
+Tear down with `docker rm -f afl-minio` (add `-v afl-minio-data` removal to discard objects).
+
+### Configuring runners to use S3 / MinIO
+
+Set these on every runner (and on submission, for parity). See the env table below for the full list:
+
+```bash
+AFL_STORAGE=s3
+AFL_DATA_ROOT=s3://afl-cache                       # durable cache root → s3://afl-cache/cache/…
+AFL_OSM_OUTPUT_BASE=s3://afl-cache/osm-output      # handler outputs (layers, networks, routes)
+AFL_S3_ENDPOINT=http://<minio-host>:9000           # OMIT for real AWS S3
+AFL_S3_ACCESS_KEY=minioadmin                        # or the standard AWS_ACCESS_KEY_ID
+AFL_S3_SECRET_KEY=minioadmin                        # or AWS_SECRET_ACCESS_KEY
+# AFL_S3_REGION=us-east-1                            # optional
+AFL_OUTPUT_BASE=/var/afl/local                      # KEEP LOCAL — see gotcha below
+```
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `AFL_STORAGE` | `s3` | Selects the backend (`local` \| `hdfs` \| `s3`). |
+| `AFL_DATA_ROOT` | `s3://afl-cache` | Durable cache root; the sidecar cache lives under `<root>/cache/<namespace>/`. |
+| `AFL_OSM_OUTPUT_BASE` | `s3://afl-cache/osm-output` | Where OSM handler outputs are written (so downstream step payloads carry `s3://`). |
+| `AFL_S3_ENDPOINT` | `http://localhost:9000` | Object-store endpoint. **Unset → real AWS S3.** |
+| `AFL_S3_ACCESS_KEY` / `AFL_S3_SECRET_KEY` | `minioadmin` | Credentials (or the standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` chain). |
+| `AFL_S3_REGION` | `us-east-1` | Region (default `us-east-1`). |
+
+> **Gotcha — keep `AFL_OUTPUT_BASE` local.** Scratch/staging/temp must live on a local filesystem (you stage locally, then finalize onto the object store). The cache's `staging`/`tmp`/`locks` roots fall back to a local base automatically when `AFL_DATA_ROOT` is remote (override with `AFL_LOCAL_SCRATCH`), but `AFL_OUTPUT_BASE` also feeds the runtime's temp dir — point it at a **local** path, not an `s3://` URI. Put the durable artifacts on S3 via `AFL_DATA_ROOT` + `AFL_OSM_OUTPUT_BASE`.
+
+### Running S3 tests
+
+```bash
+# Path-helper/dispatch tests always run; the live round-trip is gated on AFL_S3_ENDPOINT:
+AFL_S3_ENDPOINT=http://localhost:9000 \
+  AFL_S3_ACCESS_KEY=minioadmin AFL_S3_SECRET_KEY=minioadmin \
+  pytest tests/runtime/test_s3_storage.py -v
+```
+
+Without `AFL_S3_ENDPOINT`, the live round-trip is skipped automatically.
+
 ## Jenkins CI/CD
 
 Facetwork includes an optional Jenkins service for CI/CD pipelines. Jenkins runs with Docker socket access, allowing it to build and test Facetwork Docker images.
