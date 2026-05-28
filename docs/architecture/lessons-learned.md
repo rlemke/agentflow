@@ -334,6 +334,50 @@ The composable library had full road routing via five external engines, but that
 
 ---
 
+## Silent failures at the handler-registry seam (v0.47.x, 2026-05-28)
+
+Two startup gotchas burned ~50 minutes of a North-America tiled render this session. The workflow ran cleanly through `MergeLayers → BuildNetwork (1.19M nodes / 1.29M edges) → RouteLayer → BuildVectorTiles×2`, then `osm.viz.RenderTiledMap` sat at `state.EventTransmit` indefinitely while the runner idled at 0.6 % CPU. Diagnosis took longer than the actual fix. Both root causes are fundamentally **a fresh fact lives in source code but a stale fact lives in MongoDB, and the runtime trusts the stale one without comparing**.
+
+### A. The `handler_registrations` collection is a write-once snapshot, not a source-of-truth mirror
+
+**Requirement**: When the registry-mode dispatcher loads facets from MongoDB at startup, it must compare what it loaded against what the in-process example packages would have declared, and warn loudly if anything is missing. Otherwise a facet added in code but never re-seeded becomes a permanently-pending task with no claimer.
+
+**What happened**: Commit `148bdc1` added `osm.viz.RenderTiledMap` to `VISUALIZATION_FACETS` in `fwh_osm`. The pre-existing runner (started before that commit) had registered the *5* old viz facets into `handler_registrations` at its launch. No one re-ran `python -m facetwork.examples osm-geocoder` after the commit, so the registry still held 5. The runner was restarted later but with a hand-crafted command (`python -m facetwork.runtime.runner --registry`) that *reads* the registry but does not re-publish — so it loaded the same stale 5. The dashboard step page showed `active = ['RenderTiledMap']` because the workflow had emitted the task; `claim_task()` is name-filtered server-side and no runner advertised the new facet name, so the task sat `pending` with `server_id=None` while every other prerequisite step was processed by the same runner.
+
+**Upfront requirement**:
+- **Compare in-process declarations against registry-loaded set at runner startup.** A duck-typed `_FacetNameCollector` (`register_handler(name, **_)` → set add) lets each example's `register_handlers(runner)` be run as a dry pass that yields the source-of-truth facet set without touching MongoDB. Diff against `dispatcher.dispatchable_facets()` and WARN per-package on facets present in code but missing from the registry. Per-package filtering matters: an example with *zero* of its facets in the registry is one the user did not seed (presumably on purpose) and should be quiet — only flag packages that are *partially* present (some facets registered, some not = drift).
+- **The diagnostic must run on every `--registry` start, not just `scripts/start-runner --example`.** The trap is that a bare `python -m facetwork.runtime.runner --registry` (used for hand-restarts, profilers, debugging) bypasses the seed step entirely. The drift check belongs in the runner itself, after `preload(verify=True)`.
+- **The warning message must name the package, the missing facets, and the fix.** "Registry drift" alone is unactionable. The shipped form is:
+  ```
+  Registry drift: 1 facet(s) declared in installed example code but NOT in
+  handler_registrations — tasks for these will sit pending with server_id=None.
+  Re-seed with `python -m facetwork.examples <name>` (or `scripts/start-runner
+  --example <name>`). osm-geocoder: osm.viz.RenderTiledMap
+  ```
+
+**Implementation**: `facetwork/runtime/runner/__main__.py::_warn_registry_drift` (called after `RegistryDispatcher.preload(verify=True)`). Best-effort: any discovery/import error is debug-logged and swallowed so the diagnostic never blocks startup. Verified in-process against the exact gotcha — the simulation logs the WARNING naming `osm.viz.RenderTiledMap` against the `osm-geocoder` package.
+
+### B. `AFL_OUTPUT_BASE` is configurable per-shell, but the runner is silent about which value it inherited
+
+**Requirement**: The runner banner must echo the effective `AFL_OUTPUT_BASE` at startup so a silent fall-back to the `.env` default (or worse, the built-in `/Volumes/afl_data/output`) is visible *before* outputs land in the wrong place.
+
+**What happened**: For ongoing OSM work, outputs are expected under `~/osm-route-cache/output/`. The user achieved this by exporting `AFL_OUTPUT_BASE` in their interactive shell before launching the long-running runner. When I restarted the runner under `nohup` from a different subshell that hadn't re-exported it, `_env.sh` loaded the `.env` default (`/tmp/output`) and the restart proceeded with no message. The render's `RenderTiledMap` step succeeded but emitted its viewer to `/tmp/output/maps/tiled/<stem>/`, breaking the dashboard's "open in browser" link and leaving the index.html one reboot away from being wiped. The same pattern bit the original osm.Network proof — captured at the time as the §D footgun above — and is the longest-standing operational trap in the project.
+
+**Upfront requirement**:
+- **Print the effective value on the banner**, tagged with its source. The shipped form distinguishes `(env)` from `(default in .env)`:
+  ```
+  AFL_OUTPUT_BASE: /Users/ralph_lemke/osm-route-cache/output  (env)
+  AFL_OUTPUT_BASE: /tmp/output  (default in .env)
+  ```
+- **Probe writability on the spot.** `mkdir -p` + `-w` test; a non-writable target emits a STDERR warning. Catches the original osm.Network case where `/Volumes/afl_data/output` doesn't exist on the host.
+- The fix lives in `scripts/start-runner` because the env resolution lives there (the runner only sees the env it was launched with). Hand-launched runners still get the silent fall-back; the documented happy path is `scripts/start-runner --example <name>` with `AFL_OUTPUT_BASE` either in `.env` or exported before the call.
+
+### Why this section, not just code comments
+
+Both fixes are diagnostic safety nets, not behavior changes. Their existence depends on future contributors understanding *why* they fire — otherwise the first time the drift warning fires for a real seeding mistake (or the first time `(default in .env)` shows up on a server that expected something else) someone will silence it without grasping the trap it's catching. The pattern generalizes: anywhere the runtime caches a fact that the example code can change unilaterally (registrations, env-derived paths, FFL schemas), the runtime must compare and warn — silently trusting the cached copy is the failure mode.
+
+---
+
 ## Future Requirements: From Distributed Systems Literature
 
 The following requirements are drawn from *Designing Data-Intensive Applications* (Kleppmann), *Release It!* (Nygard), Temporal's durable execution model, and the Recovery Oriented Computing research (Patterson et al.). These represent gaps not yet addressed in Facetwork.
