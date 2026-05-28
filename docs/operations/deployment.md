@@ -161,6 +161,71 @@ scripts/rolling-deploy --example osm-geocoder        # zero-downtime restart
 
 Each runner independently polls the shared task queue. When a workflow creates 100 event tasks, all 12 runners (4 per machine) compete for tasks via atomic `claim_task()`. The workload distributes naturally across all available runners.
 
+### Local Scratch & Multi-Server Semantics
+
+A common question when going multi-server: *each runner has its own local `/tmp` — doesn't that break distributed execution?* No: **temp is intentionally per-runner, per-task, local-only, and never crosses hosts.** Everything that needs to be shared crosses host boundaries through MongoDB (coordination) and the durable storage backend (data).
+
+#### Three planes
+
+| Plane | Where it lives | Who shares it |
+|---|---|---|
+| **Coordination** — workflows, runners, tasks, steps | MongoDB (`AFL_MONGODB_URL`) | All runners on all hosts |
+| **Durable data** — caches (`network/`, PBFs), outputs (layers, routes, maps) | `AFL_DATA_ROOT` / `AFL_OSM_OUTPUT_BASE` (local path, `hdfs://`, `s3://`, or a shared mount) | All runners on all hosts |
+| **Local scratch** — staging, in-flight temp files, the `localize()` warm cache | Per-host: `AFL_LOCAL_SCRATCH` (or system temp), `AFL_OUTPUT_BASE/tmp`, `AFL_OUTPUT_BASE/cache/osm-local` | **Only that one host** |
+
+The pattern is **stage-locally → finalize-to-durable** (see [`finalize_output_file`](../../src/osm_geocoder/handlers/shared/_output.py) and `Storage.finalize_dir_from_local`). Object stores (S3/MinIO, WebHDFS) don't do streaming/partial writes, so handlers always write to a local temp first, then upload the complete object to the durable destination as the last step. The local temp is *workspace*, not state.
+
+#### Why this doesn't violate multi-server execution
+
+A step's payload references its inputs and outputs by **URI**, not by host-local path (`s3://afl-cache/…/merged.geojson`, not `/Users/.../merged.geojson`). Whichever runner claims the next step resolves the URI on its own filesystem via `localize()`. Worked example with two runners on two hosts:
+
+```
+Runner A (host-A)                              Runner B (host-B)
+─────────────────                              ─────────────────
+1. claim_task() -> MergeLayers
+2. localize(s3://…/inputs) into
+   host-A's /…/cache/osm-local/…
+3. write streaming output to
+   host-A's /…/output/tmp/tmpXXX.geojson
+4. finalize_output_file(tmpXXX,
+     s3://afl-cache/…/merged.geojson)
+   -> object PUT, then unlink the local temp
+5. mark step complete in Mongo;
+   result payload = s3://afl-cache/…/merged.geojson
+                                               6. claim_task() -> RouteLayer
+                                                  (could just as easily have been A)
+                                               7. localize(s3://…/merged.geojson) into
+                                                  host-B's /…/cache/osm-local/…
+                                               8. write streaming routes to
+                                                  host-B's /…/output/tmp/tmpYYY.geojson
+                                               9. finalize_output_file(tmpYYY,
+                                                    s3://afl-cache/…/routes_N.geojson)
+```
+
+`tmpXXX` on host A and `tmpYYY` on host B are on different filesystems on different hosts. They never see each other and don't need to: only what goes through the durable backend crosses the host boundary.
+
+Same principle holds within a single runner: an 8-worker runner gives each worker its own `tempfile.mkstemp(...)`, which is unique by construction, so concurrent tasks on the same host don't collide either.
+
+#### Crash and retry semantics
+
+- If a runner dies mid-task, the task lease expires; the reaper resets the task to `pending`; another runner claims it from any host and **re-runs the whole step from scratch**. The partial local temp on the dead host is harmless — it was never visible to anyone and the durable destination hasn't seen anything yet.
+- If a runner finalizes the output but crashes before marking the step complete in Mongo, the next runner that claims it re-runs and overwrites; outputs are content-addressed and writes are idempotent, so the re-run produces a bit-identical artifact at the same URI.
+
+#### Why the storage backend matters here
+
+This whole model only works if the durable references in step payloads are resolvable on *every* host. That's exactly what the storage layer provides:
+
+- `AFL_STORAGE=local` with `AFL_DATA_ROOT=/Volumes/afl_data` is single-host only (unless `/Volumes/afl_data` is the same shared mount on every host).
+- `AFL_STORAGE=hdfs` or `AFL_STORAGE=s3` (with `AFL_DATA_ROOT=hdfs://…` or `s3://…`) yields step payloads with portable URIs — see [HDFS Integration](#hdfs-integration) and [S3 / MinIO Integration](#s3--minio-integration).
+
+If you skip this — e.g. keep `AFL_OSM_OUTPUT_BASE` pointed at a *local* path while running on multiple hosts — host A writes `/var/afl/output/.../merged.geojson` on its own disk, host B can't see it, and the next step fails. The S3/MinIO/HDFS work is what turns those step references into something every runner can resolve.
+
+#### Operator notes
+
+- **Localize cache grows over time.** Each runner caches everything it has `localize()`d at `AFL_OUTPUT_BASE/cache/osm-local/…` (or the explicit `target_dir`). It's *just* a cache — safe to prune. Some replication across hosts is the trade-off for not requiring a shared mount.
+- **Stale temps from dead tasks.** A crashed task can leave `tmp*.geojson` (or similar) under `AFL_LOCAL_SCRATCH` / `AFL_OUTPUT_BASE/tmp`. Periodic cleanup is the operator's job.
+- **Workers per host.** `AFL_MAX_CONCURRENT` and `--instances` control concurrency on a host; tune for memory headroom (one routing handler can hold its loaded network in `_GRAPH_CACHE`, ~MBs to ~GBs depending on the artifact).
+
 ### Production Recommendations
 
 - **MongoDB**: Dedicated server or managed service (MongoDB Atlas) with replica sets for HA
