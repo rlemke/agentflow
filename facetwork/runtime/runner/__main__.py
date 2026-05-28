@@ -19,9 +19,126 @@ Usage:
 """
 
 import argparse
+import logging
+import os
 import signal
+from pathlib import Path
 
 from .service import RunnerConfig, RunnerService
+
+_drift_logger = logging.getLogger("facetwork.runtime.runner.drift")
+
+
+class _FacetNameCollector:
+    """Duck-typed stand-in for ``RegistryRunner`` that records facet names
+    without writing to MongoDB.
+
+    Every ``register_handlers(runner)`` in the example packages calls
+    ``runner.register_handler(facet_name=..., module_uri=..., entrypoint=...)``.
+    Running them against this collector yields the source-of-truth facet set
+    in-process — which we then diff against what's in the registry to flag
+    drift.
+    """
+
+    def __init__(self) -> None:
+        self.names: set[str] = set()
+
+    def register_handler(self, facet_name: str, **_: object) -> None:
+        self.names.add(facet_name)
+
+    def _refresh_registry(self) -> None:  # pragma: no cover — defensive stub
+        pass
+
+
+def _warn_registry_drift(loaded_facet_names: list[str]) -> None:
+    """Compare in-process declared facets against the registry-loaded set.
+
+    Logs a WARNING listing facets present in installed example code but
+    missing from ``handler_registrations`` — the silent-failure mode where
+    a new facet was added in source but no one re-seeded.
+    Best-effort: any discovery failure is debug-logged and swallowed.
+    """
+    try:
+        from facetwork.examples import discover_all_examples
+    except Exception as exc:  # pragma: no cover — defensive
+        _drift_logger.debug("Drift detection skipped (examples API unavailable): %s", exc)
+        return
+
+    try:
+        repo_root = Path(os.environ.get("REPO_ROOT") or os.getcwd())
+        packages = discover_all_examples(repo_root)
+    except Exception as exc:  # pragma: no cover — defensive
+        _drift_logger.debug("Drift detection skipped (discovery failed): %s", exc)
+        return
+
+    loaded = set(loaded_facet_names)
+    # Per-package collection: only flag drift for packages the user clearly
+    # chose to host (≥1 facet already registered). An example fully absent
+    # from the registry is one the user didn't seed — flagging it would just
+    # be noise (every installed example shows up otherwise).
+    drifted: dict[str, list[str]] = {}  # pkg.name -> sorted missing
+    fully_unseeded: list[str] = []
+    skipped: list[str] = []
+    total_expected = 0
+
+    for pkg in packages:
+        if getattr(pkg, "handlers_path", None) is None and getattr(pkg, "source", "") == "local":
+            continue
+        per_pkg = _FacetNameCollector()
+        try:
+            pkg.register_handlers(per_pkg)
+        except Exception as exc:
+            # Module not importable in THIS process — same filter that
+            # preload(verify=True) applies on the other side. Expected for
+            # examples this runner wasn't built to host.
+            skipped.append(f"{pkg.name} ({type(exc).__name__})")
+            continue
+        declared = per_pkg.names
+        total_expected += len(declared)
+        if not declared:
+            continue
+        present = declared & loaded
+        missing = sorted(declared - loaded)
+        if not missing:
+            continue
+        if not present:
+            # No facets from this example in the registry → user didn't seed
+            # it, presumably on purpose. Don't WARN, just debug.
+            fully_unseeded.append(pkg.name)
+            continue
+        drifted[pkg.name] = missing
+
+    if not drifted:
+        if total_expected:
+            _drift_logger.info(
+                "Registry drift check: OK (every facet from chosen example(s) present in registry)"
+            )
+        if fully_unseeded:
+            _drift_logger.debug(
+                "Installed example(s) with zero facets in the registry (not hosted here): %s",
+                ", ".join(fully_unseeded),
+            )
+        return
+
+    total_missing = sum(len(v) for v in drifted.values())
+    parts = []
+    for name, missing in drifted.items():
+        preview = ", ".join(missing[:6]) + (f", … (+{len(missing)-6} more)" if len(missing) > 6 else "")
+        parts.append(f"{name}: {preview}")
+    _drift_logger.warning(
+        "Registry drift: %d facet(s) declared in installed example code but NOT in "
+        "handler_registrations — tasks for these will sit pending with server_id=None. "
+        "Re-seed with `python -m facetwork.examples <name>` "
+        "(or `scripts/start-runner --example <name>`). %s",
+        total_missing,
+        "; ".join(parts),
+    )
+    if skipped:
+        _drift_logger.debug(
+            "Drift detection skipped %d non-loadable example(s) here: %s",
+            len(skipped),
+            "; ".join(skipped),
+        )
 
 
 def main() -> None:
@@ -164,6 +281,15 @@ def main() -> None:
             tool_registry.register(facet_name, _make_proxy(dispatcher, facet_name))
         if loadable:
             print(f"  Registry handlers: {loadable} loadable (cached)")
+
+        # Registry-drift detection: a facet declared in installed example code
+        # but missing from handler_registrations means tasks for that facet
+        # will sit pending with server_id=None forever (claim_task is
+        # name-filtered, no runner advertises an unregistered name).
+        # This is the silent-failure mode that bit the NA tiled render: a new
+        # facet was added in source but the registry wasn't re-seeded.
+        # Surface it at startup, before workflows hang on it.
+        _warn_registry_drift(dispatcher.dispatchable_facets())
 
     runner_config = RunnerConfig(
         server_group=args.server_group,

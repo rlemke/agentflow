@@ -135,6 +135,26 @@ fi
 if [[ -n "${AFL_STUCK_TIMEOUT_MS:-}" ]]; then
     echo "  Stuck timeout: ${AFL_STUCK_TIMEOUT_MS}ms"
 fi
+
+# Surface the effective output destination so silent fallbacks (.env's
+# /tmp/output, or built-in defaults like /Volumes/afl_data/output that
+# don't exist on this host) aren't surprises. The default was getting picked
+# up across hand-restarts when the caller's shell hadn't re-exported a
+# project-specific AFL_OUTPUT_BASE.
+_OUT_BASE="${AFL_OUTPUT_BASE:-${AFL_LOCAL_OUTPUT_DIR:-}}"
+if [[ -z "$_OUT_BASE" ]]; then
+    echo "  AFL_OUTPUT_BASE: (unset — handlers will use built-in defaults)"
+    echo "    WARNING: outputs may land at /Volumes/afl_data/output (sandbox default) and fail." >&2
+else
+    _OUT_SOURCE="env"
+    if [[ "$_OUT_BASE" == "/tmp/output" ]]; then
+        _OUT_SOURCE="default in .env"
+    fi
+    echo "  AFL_OUTPUT_BASE: $_OUT_BASE  ($_OUT_SOURCE)"
+    if ! mkdir -p "$_OUT_BASE" 2>/dev/null || [[ ! -w "$_OUT_BASE" ]]; then
+        echo "    WARNING: $_OUT_BASE is not writable in this shell; outputs will fail or fall back." >&2
+    fi
+fi
 echo ""
 
 # Register handlers via the shared discovery API.
