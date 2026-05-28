@@ -192,6 +192,36 @@ In distributed mode, steps 8-10 happen across multiple servers. Each server clai
 | `FacetAttributes` | `afl/runtime/step.py` | Parameter and return value container for steps |
 | `ExecutionResult` | `afl/runtime/evaluator.py` | Outcome of execute/resume: success, outputs, status |
 
+## Composition with External Engines (Spark, OSRM, …)
+
+Facetwork is not a replacement for heavyweight distributed engines like Spark, OSRM, Valhalla, GraphHopper, or pgRouting — it **composes** with them. The composition runs both ways.
+
+### Pattern 1 — An engine *inside* a handler
+
+A facet's handler is just a Python function (or any of the polyglot agent SDKs). It can wrap a Spark job, an OSRM/Valhalla query, a pgRouting SQL call, or anything else. Each engine is good at something different:
+
+| Engine | Sweet spot |
+|---|---|
+| **Spark** (with Sedona for geospatial) | Selects / joins / filters / aggregations over massive data spread across HDFS — anything that benefits from shuffle-based parallelism on a Hadoop cluster |
+| **OSRM / Valhalla / GraphHopper** | Pre-built routing graphs answering shortest-path / matrix / isochrone queries at high QPS |
+| **pgRouting / PostGIS** | Spatial analytical queries (within-distance, spatial joins) backed by a relational store |
+| **In-process `networkx` / `shapely`** | Tiny graph or geometry work that doesn't justify a separate engine — see `osm.Network` |
+
+Facetwork's job around any of these is the **orchestration**: lock-free task claiming, retries, lifecycle, heartbeat/timeout, dashboard visibility, content-addressed caching of the result, and uniform schemas. The heavy engine does its specific work inside one facet call; the rest of the workflow doesn't have to know which engine was used.
+
+The five-engine routing family (`osm.Routing.{OSRM,API,Valhalla,GraphHopper,PgRouting}`) is this pattern in production: each is a thin adapter facet that returns the same `osm.Routing.Types` schemas, so workflows swap engines by changing one namespace and the rest of the pipeline doesn't notice (see [composable-facet-library.md](composable-facet-library.md) and [lessons-learned.md](lessons-learned.md)). A `osm.Spark.SelectJoin`-style facet wrapping a Spark job over HDFS fits the same slot.
+
+### Pattern 2 — Facetwork *simplifies* the engine's job
+
+Going the other direction: what would otherwise be **one monolithic Spark job** with many internal stages can be decomposed into **several facets**, each doing a focused piece. The cross-step parallelism then moves *out* of Spark's DAG scheduler and *into* facetwork's lock-free task queue:
+
+- Each facet's Spark job (if it still uses Spark) becomes **smaller and simpler** — fewer stages, fewer shuffles, easier to reason about and tune.
+- **Unrelated steps run concurrently across the runner fleet** without Spark having to coordinate them — that fan-out is already what the task queue does.
+- Each step is free to use a **different tool** — one facet can be Spark, the next pyosmium, the next in-process `networkx`. The contract between them is a typed result schema and a durable artifact (file URI), not a Spark DataFrame.
+- Steps remain **independently retriable / cacheable / observable** — facetwork's standard mechanics — without the engine's session having to survive.
+
+The net effect is a deliberate division of labour: the **distributed engine** handles what it's built for (heavy in-job parallelism over big data) and **facetwork** handles what *it's* built for (coordinating many independent steps across a fleet, with shared durable artifacts via the storage backend). Neither replaces the other; together they do less work, more clearly, than either would alone.
+
 ## Configuration
 
 Facetwork is configured via `afl.config.json` or environment variables:
