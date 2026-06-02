@@ -51,6 +51,27 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && tippecanoe --version
 
+# pmtiles CLI — converts tippecanoe's .mbtiles output into the .pmtiles
+# archives the MapLibre viewers Range-fetch (osm.viz.RenderTiledMap via
+# osm.Tiles.BuildVectorTiles). Like tippecanoe it is NOT in Debian apt;
+# without it BuildVectorTiles silently falls back to .mbtiles and the
+# browser's PMTiles client cannot read the layer (routes/lines vanish).
+# Same pet-vs-cattle reason it must be in the image, not hand-installed.
+# Pinned prebuilt release from protomaps/go-pmtiles.
+ARG PMTILES_VERSION=1.30.3
+RUN ARCH="$(dpkg --print-architecture)" \
+    && case "$ARCH" in \
+         amd64) PM_ARCH=x86_64 ;; \
+         arm64) PM_ARCH=arm64 ;; \
+         *) echo "unsupported arch: $ARCH" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL -o /tmp/pmtiles.tar.gz \
+        "https://github.com/protomaps/go-pmtiles/releases/download/v${PMTILES_VERSION}/go-pmtiles_${PMTILES_VERSION}_Linux_${PM_ARCH}.tar.gz" \
+    && tar -xzf /tmp/pmtiles.tar.gz -C /usr/local/bin pmtiles \
+    && rm /tmp/pmtiles.tar.gz \
+    && chmod +x /usr/local/bin/pmtiles \
+    && pmtiles version
+
 # Install facetwork from the build context.  Optional extras commonly
 # needed across examples (folium / pyshp / osm2geojson / requests)
 # come along for free.
