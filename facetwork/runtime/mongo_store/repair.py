@@ -165,7 +165,23 @@ class RepairMixin(_MixinBase):
                 ancestors_reset,
             )
         else:
-            self._set_step_state(step, StepState.EVENT_TRANSMIT)
+            # Only true event-facet statement steps (VariableAssignment /
+            # YieldAssignment) dispatch an event via EVENT_TRANSMIT. A
+            # Workflow or Block step lands in STATEMENT_ERROR only because a
+            # descendant errored; resetting *it* to EVENT_TRANSMIT makes the
+            # runtime spawn a bogus event task named after the workflow —
+            # one no runner can service (the workflow facet has no handler)
+            # and which mis-routes via resolve_task_list on the unqualified
+            # name. Such a container step must instead re-drive its block
+            # continuation, mirroring the ancestor-walk states below
+            # (blocks -> BLOCK_EXECUTION_CONTINUE, workflow / other
+            # containers -> STATEMENT_BLOCKS_CONTINUE).
+            if step.is_statement:
+                self._set_step_state(step, StepState.EVENT_TRANSMIT)
+            elif step.is_block:
+                self._set_step_state(step, StepState.BLOCK_EXECUTION_CONTINUE)
+            else:
+                self._set_step_state(step, StepState.STATEMENT_BLOCKS_CONTINUE)
             self._walk_errored_ancestors(
                 step.block_id,
                 lambda a: a.block_id,

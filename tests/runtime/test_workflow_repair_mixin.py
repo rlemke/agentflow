@@ -130,3 +130,66 @@ class TestRepairResetMixinSubStep:
 
         reloaded = store.get_step(regular.id)
         assert reloaded.state == StepState.EVENT_TRANSMIT
+
+
+@needs_mongomock
+class TestRepairResetContainerStepNotEventTransmit:
+    """A Workflow / Block step that errored only because a descendant
+    errored must NOT be reset to EVENT_TRANSMIT.
+
+    EVENT_TRANSMIT on a container step makes the runtime spawn a bogus
+    event task named after the workflow (via ``_create_event_task``) —
+    one that no runner can service (the workflow facet has no handler)
+    and which mis-routes through ``resolve_task_list`` on the unqualified
+    name, leaving the run wedged. Container steps must instead re-drive
+    their block continuation. Regression for the repair-workflow
+    continuation mis-routing bug.
+    """
+
+    def test_workflow_step_resets_to_statement_blocks_continue(self, store):
+        from facetwork.runtime.states import StepState
+        from facetwork.runtime.step import StepDefinition
+        from facetwork.runtime.types import ObjectType
+
+        wf = StepDefinition.create(
+            workflow_id="wf-repair-container",
+            object_type=ObjectType.WORKFLOW,
+            facet_name="CitiesByZoomTiledMapFanout",
+        )
+        # The workflow step is in STATEMENT_ERROR only because a
+        # descendant (a tile build) errored; the propagated message even
+        # matches a transient pattern, so the transient-retry loop picks
+        # it up.
+        wf.mark_error(
+            RuntimeError("Block has 2 errored step(s): [Errno 2] "
+                         "No such file or directory: 'tippecanoe'")
+        )
+        store.save_step(wf)
+
+        store._reset_failed_step_and_ancestors(wf, {wf.id: wf}, [])
+
+        reloaded = store.get_step(wf.id)
+        assert reloaded.state != StepState.EVENT_TRANSMIT, (
+            "a Workflow step reset to EVENT_TRANSMIT spawns a bogus, "
+            "unclaimable event task named after the workflow"
+        )
+        assert reloaded.state == StepState.STATEMENT_BLOCKS_CONTINUE
+
+    def test_block_step_resets_to_block_execution_continue(self, store):
+        from facetwork.runtime.states import StepState
+        from facetwork.runtime.step import StepDefinition
+        from facetwork.runtime.types import ObjectType
+
+        block = StepDefinition.create(
+            workflow_id="wf-repair-container",
+            object_type=ObjectType.AND_THEN,
+            facet_name="",
+        )
+        block.mark_error(RuntimeError("Block has errored step(s)"))
+        store.save_step(block)
+
+        store._reset_failed_step_and_ancestors(block, {block.id: block}, [])
+
+        reloaded = store.get_step(block.id)
+        assert reloaded.state != StepState.EVENT_TRANSMIT
+        assert reloaded.state == StepState.BLOCK_EXECUTION_CONTINUE
