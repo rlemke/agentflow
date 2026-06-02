@@ -27,6 +27,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# tippecanoe — builds the vector tiles for osm.Tiles.BuildVectorTiles.
+# It is NOT packaged in Debian apt, so build the pinned release from
+# source, then drop the build toolchain (keeping only the runtime libs
+# tippecanoe links: libsqlite3-0, zlib1g) to keep the image slim.
+#
+# This MUST live in the image, not be hand-installed in a container:
+# the OSM runner is scaled to N replicas that race the same task list,
+# so a tippecanoe missing from any replica makes tile-build tasks
+# dead-letter when they happen to land there (pet-vs-cattle trap).
+ARG TIPPECANOE_VERSION=2.53.0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential libsqlite3-dev zlib1g-dev \
+    && git clone --depth 1 --branch "${TIPPECANOE_VERSION}" \
+        https://github.com/felt/tippecanoe.git /tmp/tippecanoe \
+    && make -C /tmp/tippecanoe -j"$(nproc)" \
+    && make -C /tmp/tippecanoe install \
+    && rm -rf /tmp/tippecanoe \
+    && apt-get purge -y build-essential libsqlite3-dev zlib1g-dev \
+    && apt-get install -y --no-install-recommends libsqlite3-0 zlib1g \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && tippecanoe --version
+
 # Install facetwork from the build context.  Optional extras commonly
 # needed across examples (folium / pyshp / osm2geojson / requests)
 # come along for free.
